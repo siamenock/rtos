@@ -1,0 +1,5 @@
+#!/bin/bash
+
+BASE="`dirname \"$0\"`"
+
+exec sudo qemu-system-x86_64 -m 256 -hda ${BASE}/../lib/root.img -M pc -smp 8 -d cpu_reset -no-reboot -no-shutdown -monitor stdio -net nic,model=rtl8139 -net tap,script=${BASE}/../lib/qemu-ifup $@

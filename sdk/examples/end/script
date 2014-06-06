@@ -1,0 +1,4 @@
+login packetngin packetngin
+create -core 4 -memory 32MB -storage 2MB -nic 00:00:00:00:00:00 1024 1024 100Mbps 100Mbps 2MB -args -ip 192.168.100.2
+send echo
+start

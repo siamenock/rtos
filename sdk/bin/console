@@ -1,0 +1,5 @@
+#!/bin/bash
+
+BASE="`dirname \"$0\"`"
+
+exec java -cp $BASE com.packetngin.Console $@
