@@ -243,9 +243,8 @@ void main(void) {
 		printf("Cleaning up memory...\n");
 		gmalloc_extend();
 		
-		printf("Initializing device drivers: ");
+		printf("Initializing device drivers...");
 		int count = device_module_init();
-		printf("%d inited\n", count);
 		
 		nics_count = device_count(DEVICE_TYPE_NIC);
 		printf("Finding NICs: %d\n", nics_count);
@@ -273,7 +272,7 @@ void main(void) {
 		
 		event_busy(idle0_event, NULL);
 		
-		dummy_init();
+		dummy_init();	// There is no meaning
 	} else {
 	// Application Process
 		mp_wakeup();

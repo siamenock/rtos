@@ -46,8 +46,8 @@ struct list_head {
 */
 
 #define printk		printf
-#define KERN_ERR	"KernErr"
-#define KERN_INFO	"KernInfo"
+#define KERN_ERR	"KernErr: "
+#define KERN_INFO	"KernInfo: "
 
 #define HZ		1000000000UL	/*cpu_frequency*/
 

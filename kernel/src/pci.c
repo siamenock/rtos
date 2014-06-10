@@ -276,8 +276,16 @@ int pci_probe(DeviceType type, PCI_ID* ids, void* driver) {
 		for(int j = 0; ids[j].vendor_id != 0 && ids[j].device_id != 0; j++) {
 			PCI_ID* id = &ids[j];
 			if(pci->vendor_id == id->vendor_id && pci->device_id == id->device_id) {
-				if(device_register(type, driver, pci, id->data))
+				if(device_register(type, driver, pci, id->data)) {
+					int len = strlen(id->name) + 1;
+					pci->name = malloc(len);
+					memcpy(pci->name, id->name, len);
+					
+					printf("\tPCI device probed: id: %d, vendor: %04x, device: %04x, name: %s\n", i, pci->vendor_id, pci->device_id, pci->name);
+					
 					count++;
+					break;
+				}
 			}
 		}
 	}

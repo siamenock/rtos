@@ -21,7 +21,7 @@ OBJS = obj/entry.o \
 
 LIBS = --start-group -ltlsf -ljsmn -lcore -llwip --end-group
 
-all: kernel.bin
+all: kernel.elf
 
 obj/%.o: src/%.asm
 	mkdir -p $(DIR)
@@ -34,13 +34,8 @@ obj/%.o: src/%.c
 	mkdir -p $(DIR)
 	gcc $(CFLAGS) -c -o $@ $<
 
-KERNEL_FILES = kernel.smap ../drivers/*.ko
-
-kernel.bin: $(OBJS) $(LIBFILES)
-	make -C ../drivers
-	ld -melf_x86_64 -T elf_x86_64.ld -nostdlib -e main -o obj/kernel.elf -L ../lib $^ $(LIBS)
-	../util/smap obj/kernel.elf kernel.smap
-	../util/pnkc obj/kernel.elf $@ $(KERNEL_FILES)
+kernel.elf: $(OBJS) $(LIBFILES)
+	ld -melf_x86_64 -T elf_x86_64.ld -nostdlib -e main -o kernel.elf -L ../lib $^ $(LIBS)
 
 clean:
 	rm -rf obj

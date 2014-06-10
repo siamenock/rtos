@@ -12,30 +12,30 @@
 
 int main(int argc, char* argv[]) {
 	if(argc < 3) {
-		printf("Usage: pnkc [kernel elf] [kernel pnkc] [[module list...]]\n");
+		printf("Usage: pnkc [kernel pnkc] [kernel elf] [[module list...]]\n");
 		return 0;
 	}
 	
-	int fd = open(argv[1], O_RDONLY);
+	int fd = open(argv[2], O_RDONLY);
 	if(fd < 0) {
-		printf("Cannot open file: %s\n", argv[1]);
+		printf("Cannot open file: %s\n", argv[2]);
 		return 1;
 	}
 	
 	struct stat state;
-	if(stat(argv[1], &state) != 0) {
-		printf("Cannot get state of file: %s\n", argv[1]);
+	if(stat(argv[2], &state) != 0) {
+		printf("Cannot get state of file: %s\n", argv[2]);
 		return 2;
 	}
 	
 	Elf64_Ehdr* ehdr = mmap(NULL, state.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
 	if(ehdr == (void*)-1) {
-		printf("Cannot open file: %s\n", argv[1]);
+		printf("Cannot open file: %s\n", argv[2]);
 		return 1;
 	}
 	
 	if(ehdr->e_ident[0] != ELFMAG0 || ehdr->e_ident[1] != ELFMAG1 || ehdr->e_ident[2] != ELFMAG2 || ehdr->e_ident[3] != ELFMAG3) {
-		printf("Illegal file format: %s\n", argv[1]);
+		printf("Illegal file format: %s\n", argv[2]);
 		return 3;
 	}
 	
@@ -64,9 +64,9 @@ int main(int argc, char* argv[]) {
 		size += hdr->sh_size;
 	
 	// Write
-	int fd2 = open(argv[2], O_RDWR | O_CREAT, 0644);
+	int fd2 = open(argv[1], O_RDWR | O_CREAT, 0644);
 	if(fd2 < 0) {
-		printf("Cannot open file: %s\n", argv[2]);
+		printf("Cannot open file: %s\n", argv[1]);
 		return 1;
 	}
 	

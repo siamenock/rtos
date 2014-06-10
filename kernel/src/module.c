@@ -11,7 +11,10 @@
 #include "symbols.h"
 #include "module.h"
 
-#define CODE_ALIGN		16
+#define MODULE_ALIGNMENT	16
+#define MAX_SECTION_COUNT	16
+#define MAX_NAME_SIZE		16
+#define ALIGN(addr, align)	(((uint64_t)(addr) + (align) - 1) & ~((align) - 1))
 
 int module_count;
 void* modules[MAX_MODULE_COUNT];
@@ -21,24 +24,21 @@ void module_init() {
 	
 	PNKC* pnkc = pnkc_find();
 	uint32_t* size = pnkc->text_offset + pnkc->text_size > pnkc->rodata_offset + pnkc->rodata_size ? &pnkc->text_size : &pnkc->rodata_size;
-	uint8_t* addr = (void*)PHYSICAL_TO_VIRTUAL(0x200000 + MAX(pnkc->text_offset + pnkc->text_size, pnkc->rodata_offset + pnkc->rodata_size));
+	void* addr = (void*)PHYSICAL_TO_VIRTUAL(0x200000 + MAX(pnkc->text_offset + pnkc->text_size, pnkc->rodata_offset + pnkc->rodata_size));
 	
-	uint8_t* org_addr = addr;
+	void* org_addr = addr;
 	uint32_t count = pnkc->file_count;
 	for(uint32_t i = 0; i < count; i++) {
 		PNKC_File file;
 		pnkc_file_get(&file, i);
 		
 		if(file.type == PNKC_TYPE_MODULE) {
-			printf("\tModule loadeding[%d]: 0x%08x(%d) ", i, (void*)file.address - (void*)pnkc, file.size);
-			addr = module_load(file.address, file.size, addr);
-			if(addr) {
-				modules[module_count++] = addr;
-				printf("Done\n");
-				
-				addr += file.size;
+			printf("\tModule loadeding[%d]...\n", i);
+			void* base = module_load(file.address, file.size, &addr);
+			if(base) {
+				modules[module_count++] = base;
 			} else {
-				printf("FAILED: %dth file, errno: 0x%x.\n", i, errno);
+				printf("\t\tFAILED: %dth file, errno: 0x%x.\n", i, errno);
 			}
 		}
 	}
@@ -86,18 +86,16 @@ static bool check_header(Elf64_Ehdr* ehdr) {
 	return true;
 }
 
-static void* init(void* file, size_t size, void* addr) {
-	addr = (void*)(((uint64_t)addr + CODE_ALIGN - 1) & ~(CODE_ALIGN - 1));	// 16 bytes align
-	bzero(addr, size);
-	memcpy(addr, file, size);
+void* module_load(void* file, size_t size, void **addr) {
+	// Check header
+	Elf64_Ehdr* ehdr = (Elf64_Ehdr*)file;
+	if(!check_header(ehdr))
+		return NULL;
 	
-	return addr;
-}
-
-static bool relocate(void* addr) {
-	Elf64_Ehdr* ehdr = (Elf64_Ehdr*)addr;
-	Elf64_Shdr* shdr = (Elf64_Shdr*)(addr + ehdr->e_shoff);
-	char* shstrtab = addr + shdr[ehdr->e_shstrndx].sh_offset;
+	// Find string table
+	Elf64_Shdr* shdr = (Elf64_Shdr*)((void*)ehdr + ehdr->e_shoff);
+	char* shstrtab = (void*)ehdr + shdr[ehdr->e_shstrndx].sh_offset;
+	Elf64_Sym* symtab = NULL;
 	char* strtab = NULL;
 	
 	char* shstr(Elf64_Word offset) {
@@ -108,55 +106,75 @@ static bool relocate(void* addr) {
 		return strtab + offset;
 	}
 	
-	Elf64_Rela* rela_text = NULL;
-	int rela_text_size = 0;
-	Elf64_Rel* rel_text = NULL;
-	int rel_text_size = 0;
-	void* text = NULL;
-	
-	Elf64_Rela* rela_data = NULL;
-	int rela_data_size = 0;
-	Elf64_Rel* rel_data = NULL;
-	int rel_data_size = 0;
-	void* data = NULL;
-	
-	Elf64_Sym* symtab = NULL;
-	
+	// Find symbolic, string table
 	for(uint16_t i = 0; i < ehdr->e_shnum; i++) {
 		char* name = shstr(shdr[i].sh_name);
-		if(strcmp(name, ".text") == 0) {
-			text = addr + shdr[i].sh_offset;
-		} else if(strcmp(name, ".data") == 0) {
-			data = addr + shdr[i].sh_offset;
-		} else if(strcmp(name, ".rela.text") == 0) {
-			rela_text = addr + shdr[i].sh_offset;
-			rela_text_size = shdr[i].sh_size / sizeof(Elf64_Rela);
-		} else if(strcmp(name, ".rel.text") == 0) {
-			rel_text = addr + shdr[i].sh_offset;
-			rel_text_size = shdr[i].sh_size / sizeof(Elf64_Rel);
-		} else if(strcmp(name, ".rela.data") == 0) {
-			rela_data = addr + shdr[i].sh_offset;
-			rela_data_size = shdr[i].sh_size / sizeof(Elf64_Rela);
-		} else if(strcmp(name, ".rel.data") == 0) {
-			rel_data = addr + shdr[i].sh_offset;
-			rel_data_size = shdr[i].sh_size / sizeof(Elf64_Rel);
-		} else if(strcmp(name, ".symtab") == 0) {
-			symtab = addr + shdr[i].sh_offset;
-		} else if(shdr[i].sh_type == SHT_STRTAB && strcmp(shstr(shdr[i].sh_name), ".strtab") == 0) {
-			strtab = addr + shdr[i].sh_offset;
+		if(shdr[i].sh_type == SHT_SYMTAB && strcmp(name, ".symtab") == 0) {
+			symtab = (void*)ehdr + shdr[i].sh_offset;
+		} else if(shdr[i].sh_type == SHT_STRTAB && strcmp(name, ".strtab") == 0) {
+			strtab = (void*)ehdr + shdr[i].sh_offset;
 		}
 	}
 	
-	if(symtab == NULL) {
-		errno = 0x33;	// .symtab section not found
-		return false;
-	} else if(strtab == NULL) {
-		errno = 0x34;	// .strtab section not found
-		return false;
+	if(!symtab || !strtab) {
+		errno = 0x42;	// There is no symbolic or string table
+		return NULL;
 	}
 	
-	// Relocate module
-	bool relocate_base(Elf64_Rela* rela, int rela_size, Elf64_Rel* rel, int rel_size, void* base) {
+	void* load() {
+		// Allocate section area
+		void* base = (void*)ALIGN(*addr, MODULE_ALIGNMENT);
+		memcpy(base, ehdr, sizeof(Elf64_Ehdr));
+		*addr = base + sizeof(Elf64_Ehdr);
+		
+		Elf64_Shdr* shdr2 = *addr;
+		memcpy(*addr, shdr, sizeof(Elf64_Shdr) * ehdr->e_shnum);
+		*addr += sizeof(Elf64_Shdr) * ehdr->e_shnum;
+		
+		for(uint16_t i = 0; i < ehdr->e_shnum; i++) {
+			char* name = shstr(shdr[i].sh_name);
+			
+			if(strstr(name, ".text") == name ||
+					strstr(name, ".data") == name ||
+					strstr(name, ".bss") == name ||
+					strstr(name, ".rodata") == name ||
+					strstr(name, ".shstrtab") == name ||
+					strstr(name, ".strtab") == name ||
+					strstr(name, ".symtab") == name) {
+				
+				Elf64_Addr sec_addr = ALIGN(*addr, shdr[i].sh_addralign);
+				Elf64_Xword sec_size = shdr[i].sh_size;
+				
+				shdr[i].sh_addr = shdr2[i].sh_addr = sec_addr;
+				*addr = (void*)sec_addr + sec_size;
+				
+				printf("\t\tLoading %s to 0x%p (%d bytes)\n", name, sec_addr, sec_size);
+				if(strstr(name, ".bss") == name) {
+					bzero((void*)sec_addr, sec_size);
+				} else {
+					memcpy((void*)sec_addr, (void*)ehdr + shdr[i].sh_offset , sec_size);
+				}
+			}
+		}
+		
+		return base;
+	}
+	
+	// Load sections
+	void* base = load();
+	if(!base)
+		return NULL;
+	
+	void* get_section(char* name) {
+		for(uint16_t i = 0; i < ehdr->e_shnum; i++) {
+			if(strcmp(shstr(shdr[i].sh_name), name) == 0)
+				return (void*)shdr[i].sh_addr;
+		}
+		
+		return NULL;
+	}
+	
+	bool relocate(Elf64_Rela* rela, int rela_size, void* target) {
 		for(int i = 0; i < rela_size; i++) {
 			Elf64_Sym* sym = &symtab[rela[i].r_info >> 32];
 			
@@ -166,14 +184,15 @@ static bool relocate(void* addr) {
 				Symbol* symbol = symbols_get(str(sym->st_name));
 				if(!symbol) {
 					printf("Cannot find symbol[%d]: %s\n", i, str(sym->st_name));
-					errno = 0x39;
+					errno = 0x31;
 					return false;
 				}
 				S = (uint64_t)symbol->address + sym->st_value;
 			} else {
-				S = (uint64_t)addr + shdr[sym->st_shndx].sh_offset + sym->st_value;
+				//S = (uint64_t)(void*)ehdr + shdr[sym->st_shndx].sh_offset + sym->st_value;
+				S = (uint64_t)shdr[sym->st_shndx].sh_addr + sym->st_value;
 			}
-			void* P = base + rela[i].r_offset;
+			void* P = target + rela[i].r_offset;
 			
 			uint32_t type = rela[i].r_info & 0xffffffff;
 			switch(type) {
@@ -190,7 +209,7 @@ static bool relocate(void* addr) {
 					// Do nothing
 					break;
 				case R_X86_64_RELATIVE:
-					*(uint64_t*)P = (uint64_t)base + A;
+					*(uint64_t*)P = (uint64_t)target + A;
 					break;
 				case R_X86_64_32:
 				case R_X86_64_32S:
@@ -218,22 +237,7 @@ static bool relocate(void* addr) {
 					*(uint64_t*)P = sym->st_size + A;
 					break;
 				default:
-					errno = 0x38;	// Not implemented relocation type
-					return false;
-			}
-		}
-		
-		for(int i = 0; i < rel_size; i++) {
-			uint32_t type = rel[i].r_info & 0xffffffff;
-			switch(type) {
-				case R_X86_64_NONE:
-					// Do nothing
-					break;
-				case R_X86_64_COPY:
-					// Do nothing
-					break;
-				default:
-					errno = 0x38;	// Not implemented relocation type
+					errno = 0x32;	// Not implemented relocation type
 					return false;
 			}
 		}
@@ -241,67 +245,49 @@ static bool relocate(void* addr) {
 		return true;
 	}
 	
-	if((rela_text || rel_text)) {
-		if(!text) {
-			errno = 0x31;	// .text section not found
-			return false;
+	// Relocate sections
+	for(uint16_t i = 0; i < ehdr->e_shnum; i++) {
+		char* name = shstr(shdr[i].sh_name);
+		if(strstr(name, ".rela.") == name) {
+			void* target = get_section(name + 5);
+			if(!target)
+				continue;
+			
+			printf("\t\tRelocating %s\n", name + 5);
+			
+			Elf64_Rela* rela = (void*)ehdr + shdr[i].sh_offset;
+			int rela_size = shdr[i].sh_size / sizeof(Elf64_Rela);
+			
+			if(!relocate(rela, rela_size, target))
+				return NULL;
 		}
-		
-		if(!relocate_base(rela_text, rela_text_size, rel_text, rel_text_size, text))
-			return false;
 	}
 	
-	if((rela_data || rel_data)) {
-		if(!data) {
-			errno = 0x32;	// .data section not found
-			return false;
-		}
-		
-		if(!relocate_base(rela_data, rela_data_size, rel_data, rel_data_size, data))
-			return false;
-	}
-	
-	return true;
+	return base;
 }
 
-void* module_load(void* file, size_t size, void *addr) {
-	Elf64_Ehdr* ehdr = (Elf64_Ehdr*)file;
-	
-	// Check header
-	if(!check_header(ehdr))
-		return NULL;
-	
-	// Initilize module area
-	addr = init(file, size, addr);
-	
-	// Relocate
-	if(!relocate(addr)) {
-		return NULL;
-	}
-	
-	return addr;
-}
-
-void* module_find(void* addr, char* name, int type) {
-	int type2;
+void* module_find(void* base, char* name, int type) {
 	switch(type) {
 		case MODULE_TYPE_NONE:
-			type2 = 0;
+			type = 0;
 			break;
 		case MODULE_TYPE_FUNC:
-			type2 = STT_FUNC;
+			type = STT_FUNC;
 			break;
 		case MODULE_TYPE_DATA:
-			type2 = STT_OBJECT;
+			type = STT_OBJECT;
 			break;
 		default:
 			return NULL;
 	}
 	
-	Elf64_Ehdr* ehdr = (Elf64_Ehdr*)addr;
-	Elf64_Shdr* shdr = (Elf64_Shdr*)(addr + ehdr->e_shoff);
-	char* shstrtab = addr + shdr[ehdr->e_shstrndx].sh_offset;
+	Elf64_Ehdr* ehdr = (Elf64_Ehdr*)base;
+	Elf64_Shdr* shdr = (Elf64_Shdr*)(base + sizeof(Elf64_Ehdr));
+	char* shstrtab = (char*)shdr[ehdr->e_shstrndx].sh_addr;
 	char* strtab = NULL;
+	
+	Elf64_Sym* symtab = NULL;
+	int symtab_size = 0;
 	
 	char* shstr(Elf64_Word offset) {
 		return shstrtab + offset;
@@ -311,26 +297,27 @@ void* module_find(void* addr, char* name, int type) {
 		return strtab + offset;
 	}
 	
-	Elf64_Sym* symtab = NULL;
-	int symtab_size = 0;
-	for(uint16_t i = 0; i < ehdr->e_shnum; i++) {
+	for(uint16_t i = ehdr->e_shnum - 1; i >= 1; i--) {
 		if(shdr[i].sh_type == SHT_SYMTAB) {
-			symtab = addr + shdr[i].sh_offset;
+			symtab = (Elf64_Sym*)shdr[i].sh_addr;
 			symtab_size = shdr[i].sh_size / sizeof(Elf64_Sym);
 		} else if(shdr[i].sh_type == SHT_STRTAB && strcmp(shstr(shdr[i].sh_name), ".strtab") == 0) {
-			strtab = addr + shdr[i].sh_offset;
+			strtab = (char*)shdr[i].sh_addr;
+		} else {
+			continue;
 		}
+		
+		if(symtab && strtab)
+			break;
 	}
-	
-	if(symtab == NULL || strtab == NULL)
-		return NULL;
 	
 	for(int i = 1; i < symtab_size; i++) {
 		int bind = ELF64_ST_BIND(symtab[i].st_info);
 		int symtype = ELF64_ST_TYPE(symtab[i].st_info);
 		
-		if((bind == STB_GLOBAL || bind == STB_WEAK) && (type2 == 0 || symtype == type2) && strcmp(name, str(symtab[i].st_name)) == 0)
-			return addr + shdr[symtab[i].st_shndx].sh_offset + symtab[i].st_value;
+		if((bind == STB_GLOBAL || bind == STB_WEAK) && (type == 0 || symtype == type) && strcmp(name, str(symtab[i].st_name)) == 0) {
+			return (void*)shdr[symtab[i].st_shndx].sh_addr + symtab[i].st_value;
+		}
 	}
 	
 	return NULL;

@@ -677,7 +677,7 @@ int vsprintf(char *str, const char *format, va_list va) {
 			*str++ = '-';
 		
 		char* str0 = str;
-		while(value != 0) {
+		do {
 			int mod = value % base;
 			if(mod >= 10)
 				*str++ = a + mod - 10;
@@ -685,7 +685,7 @@ int vsprintf(char *str, const char *format, va_list va) {
 				*str++ = '0' + mod;
 			
 			value /= base;
-		}
+		} while(value != 0);
 		
 		while(str - str0 < width) {
 			*str++ = fill;
@@ -704,7 +704,7 @@ int vsprintf(char *str, const char *format, va_list va) {
 			*str++ = '-';
 		
 		char* str0 = str;
-		while(value != 0) {
+		do {
 			int mod = value % base;
 			if(mod >= 10)
 				*str++ = a + mod - 10;
@@ -712,7 +712,7 @@ int vsprintf(char *str, const char *format, va_list va) {
 				*str++ = '0' + mod;
 			
 			value /= base;
-		}
+		} while(value != 0);
 		
 		while(str - str0 < width) {
 			*str++ = fill;
@@ -728,7 +728,7 @@ int vsprintf(char *str, const char *format, va_list va) {
 	
 	void print_unsigned_integer(unsigned int value, char a, int base) {
 		char* str0 = str;
-		while(value != 0) {
+		do {
 			int mod = value % base;
 			if(mod >= 10)
 				*str++ = a + mod - 10;
@@ -736,7 +736,7 @@ int vsprintf(char *str, const char *format, va_list va) {
 				*str++ = '0' + mod;
 			
 			value /= base;
-		}
+		} while(value != 0);
 		
 		while(str - str0 < width) {
 			*str++ = fill;
@@ -752,7 +752,7 @@ int vsprintf(char *str, const char *format, va_list va) {
 	
 	void print_unsigned_long(unsigned long value, char a, int base) {
 		char* str0 = str;
-		while(value != 0) {
+		do {
 			int mod = value % base;
 			if(mod >= 10)
 				*str++ = a + mod - 10;
@@ -760,7 +760,7 @@ int vsprintf(char *str, const char *format, va_list va) {
 				*str++ = '0' + mod;
 			
 			value /= base;
-		}
+		} while(value != 0);
 		
 		while(str - str0 < width) {
 			*str++ = fill;
@@ -929,133 +929,4 @@ int printf(const char* format, ...) {
 	va_end(va);
 	
 	return write1(buf, len);
-#if 0
-	va_list va;
-	
-	bool is_cursor_saved = false;
-	int saved_rows = 0;
-	int saved_cols = 0;
-	int size = 0;
-	va_start(va, format);
-	int i = 0;
-	while(1) {
-		switch(format[i]) {
-			case '%':
-				size += print_string2(format, i);
-				format += i + 1;
-				i = 0;
-				
-				char fill = ' ';
-				int width = 0;
-				if(*format >= '0' && *format <= '9') {
-					if(*format == '0') {
-						fill = '0';
-						format++;
-					}
-					
-					while(*format >= '0' && *format <= '9') {
-						width = width * 10 + (*format - '0');
-						format++;
-					}
-				}
-				
-				switch(format[0]) {
-					case '%':
-						i++;
-						break;
-					case 'c':
-						size += print_char(va_arg(va, int));
-						format++;
-						break;
-					case 's':
-						size += print_string(va_arg(va, char*));
-						format++;
-						break;
-					case 'd':
-					case 'i':
-						size += print_integer(va_arg(va, int), 10, 'a', width, fill);
-						format++;
-						break;
-					case 'u':
-						size += print_unsigned_integer(va_arg(va, unsigned int), 10, 'a', width, fill);
-						format++;
-						break;
-					case 'l':
-						switch(format[1]) {
-							case 'u':
-								size += print_unsigned_long(va_arg(va, unsigned long), 10, 'a', width, fill);
-								format += 2;
-								break;
-							case 'd':
-								size += print_long(va_arg(va, long), 10, 'a', width, fill);
-								format += 2;
-								break;
-							default:
-								// Unknwoen format
-								goto done;
-						}
-						break;
-					case 'p':
-						width = 16;
-						fill = '0';
-						size += print_unsigned_long(va_arg(va, long), 16, 'a', width, fill);
-						format++;
-						break;
-					case 'x':
-						size += print_unsigned_long(va_arg(va, long), 16, 'a', width, fill);
-						format++;
-						break;
-					case 'X':
-						size += print_unsigned_long(va_arg(va, long), 16, 'A', width, fill);
-						format++;
-						break;
-					case 'o':
-						size += print_unsigned_integer(va_arg(va, int), 8, 0, width, fill);
-						format++;
-						break;
-					case 'f':
-						size += print_double(va_arg(va, double));
-						format++;
-						break;
-					default:
-						// Unknown format
-						goto done;
-				}
-				break;
-			case '\033':	// ESC code
-				// Only supports ESC[n;mH or ESC[n;mf
-				format++;	// Remove ESC character
-				format++;	// Remove '[' character
-				char* end;
-				int n = strtol(format, &end, 0);
-				format = end;
-				format++;	// Remove ';' character
-				int m = strtol(format, &end, 0);
-				format = end;
-				format++;	// Remove 'H' or 'f' character
-				
-				if(!is_cursor_saved) {
-					get_cursor1(&saved_rows, &saved_cols);
-					is_cursor_saved = true;
-				}
-				
-				set_cursor1(m, n);	// Move cursor
-				break;
-			case 0:
-				write1(format, i);
-				size += i;
-				goto done;
-			default:
-				i++;
-		}
-	}
-done:
-	va_end(va);
-	
-	if(is_cursor_saved) {
-		set_cursor1(saved_rows, saved_cols);	// Restore cursor
-	}
-	
-	return size;
-#endif
 }

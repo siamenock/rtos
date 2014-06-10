@@ -24,7 +24,7 @@ extern void* modules[MAX_MODULE_COUNT];
 
 void module_init();
 
-void* module_load(void* file, size_t size, void* addr);
+void* module_load(void* file, size_t size, void** addr);
 void* module_get(int idx);
 void* module_find(void* addr, char* name, int type);
 bool module_iface_init(void* addr, void* iface, ModuleObject* objs, int size);
