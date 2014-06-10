@@ -5,28 +5,9 @@ QEMU=qemu-system-x86_64 -m 256 -hda root.img -M pc -smp 8 -d cpu_reset -no-reboo
 
 all: root.img
 
-boot/boot.bin:
-	make -C boot
-
-loader/loader.bin:
-	make -C loader
-
-kernel/kernel.elf:
-	make -C kernel
-
-util/rewrite:
-	make -C util
-
-util/pnkc:
-	make -C util
-
-util/smap:
-	make -C util
-
-LOADER_SIZE=$(shell stat -c%s loader/loader.bin)
-
-# boot/boot.bin loader/loader.bin kernel/kernel.elf drivers/*.ko util/smap util/pnkc util/rewrite
 root.img: 
+	make -C lib
+	make -C util
 	make -C boot
 	make -C loader
 	make -C kernel
@@ -35,7 +16,7 @@ root.img:
 	util/pnkc kernel.bin kernel/kernel.elf kernel.smap drivers/*.ko
 	cat boot/boot.bin loader/loader.bin kernel.bin > $@
 	util/truncate $@
-	util/rewrite $@ $(LOADER_SIZE)
+	util/rewrite $@
 
 sdk: root.img lib
 	rm -rf packetngin
@@ -81,4 +62,5 @@ cleanall: clean
 	make -C boot clean
 	make -C loader clean
 	make -C kernel clean
-	make -C lib clean
+	make -C drivers clean
+	make -C lib cleanall

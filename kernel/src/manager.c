@@ -26,10 +26,10 @@
 
 #include "manager.h"
 
-static uint32_t manager_ip	= 0xc0a8c8fe;	// 192.168.200.254
-static uint32_t manager_gw	= 0xc0a8c8c8;	// 192.168.200.200
-//static uint32_t manager_ip	= 0xc0a864fe;	// 192.168.100.254
-//static uint32_t manager_gw	= 0xc0a864c8;	// 192.168.100.200
+//static uint32_t manager_ip	= 0xc0a8c8fe;	// 192.168.200.254
+//static uint32_t manager_gw	= 0xc0a8c8c8;	// 192.168.200.200
+static uint32_t manager_ip	= 0xc0a864fe;	// 192.168.100.254
+static uint32_t manager_gw	= 0xc0a864c8;	// 192.168.100.200
 static uint32_t manager_netmask= 0xffffff00;	// 255.255.255.0
 
 static NI* manager_ni;
