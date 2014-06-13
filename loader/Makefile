@@ -14,7 +14,7 @@ obj/%.o: src/%.c
 	mkdir -p obj
 	gcc -m32 -masm=intel -ffreestanding -std=gnu99 -c -o $@ $<
 
-obj/loader.bin: obj/main.o obj/page.o obj/mode_switch.o
+obj/loader.bin: obj/main.o obj/page.o obj/mode_switch.o obj/bfs.o
 	ld -melf_i386 -T elf_i386.ld -nostdlib -e main -Ttext 0x10200 -o obj/loader.elf $^
 	objcopy -j .text -j .data -j .rodata -j .bss -S -O binary obj/loader.elf $@
 

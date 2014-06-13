@@ -43,7 +43,7 @@ libpacketngin.a: libc.a libm.a libtlsf.a libcore.a
 	cp libpacketngin.a ../sdk/lib/
 
 libz.a: 
-	cd zlib; ./configure
+	cd zlib; ./configure --static
 	make -C zlib
 	cp zlib/libz.a .
 
@@ -70,6 +70,6 @@ cleanall: clean
 	-make -C jsmn clean
 	-make -C core clean
 	-make -C newlib distclean
-	-make -C zlib clean
+	-make -C zlib distclean
 	-make -C lwip clean
 	-make -C openssl clean

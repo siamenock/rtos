@@ -4,6 +4,7 @@
 #include <util/list.h>
 #include <malloc.h>
 #include "idt.h"
+#include "rootfs.h"
 #include "pnkc.h"
 #include "mp.h"
 #include "gmalloc.h"
@@ -45,7 +46,7 @@ void gmalloc_extend() {
 	reserved[0].start = 0x100000;	// Description table
 	reserved[0].end = 0x200000;
 	
-	PNKC* pnkc = pnkc_find();
+	PNKC* pnkc = rootfs_file("kernel.bin", NULL);
 	reserved[1].start = 0x200000;	// Kernel global
 	reserved[1].end = 0x200000 + MAX(pnkc->text_offset + pnkc->text_size, pnkc->rodata_offset + pnkc->rodata_size);
 	

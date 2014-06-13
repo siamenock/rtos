@@ -2,6 +2,7 @@
 #include <tlsf.h>
 #include <malloc.h>
 #include "stdio.h"
+#include "rootfs.h"
 #include "pnkc.h"
 #include "malloc.h"
 
@@ -10,7 +11,8 @@
 void* __malloc_pool;
 
 void malloc_init() {
-	PNKC* pnkc = pnkc_find();
+	PNKC* pnkc = rootfs_file("kernel.bin", NULL);
+	
 	uint64_t addr1 = pnkc->data_offset + pnkc->data_size;
 	uint64_t addr2 = pnkc->bss_offset + pnkc->bss_size;
 	uint64_t start = PHYSICAL_TO_VIRTUAL(0x400000 + (addr1 > addr2 ? addr1 : addr2));
@@ -33,6 +35,7 @@ inline void* malloc(size_t size) {
 	if(!ptr) {
 		// TODO: print to stderr
 		printf("Not enough local memory!!!");
+		while(1) asm("hlt");
 	}
 	return ptr;
 }

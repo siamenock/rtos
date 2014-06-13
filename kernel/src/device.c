@@ -78,6 +78,9 @@ bool device_deregister(int fd) {
 				if(((CharOut*)device->driver)->destroy)
 					((CharOut*)device->driver)->destroy(device->id);
 				break;
+			case DEVICE_TYPE_FILESYSTEM:
+				// TODO: Implment it
+				break;
 		}
 	}
 	

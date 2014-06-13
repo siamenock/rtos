@@ -7,6 +7,7 @@
 #include <malloc.h>
 #include <elf.h>
 #include "../../loader/src/page.h"
+#include "rootfs.h"
 #include "pnkc.h"
 #include "symbols.h"
 #include "module.h"
@@ -22,23 +23,23 @@ void* modules[MAX_MODULE_COUNT];
 void module_init() {
 	#define MAX(a,b) ((a) > (b) ? (a) : (b))
 	
-	PNKC* pnkc = pnkc_find();
+	PNKC* pnkc = rootfs_file("kernel.bin", NULL);
 	uint32_t* size = pnkc->text_offset + pnkc->text_size > pnkc->rodata_offset + pnkc->rodata_size ? &pnkc->text_size : &pnkc->rodata_size;
 	void* addr = (void*)PHYSICAL_TO_VIRTUAL(0x200000 + MAX(pnkc->text_offset + pnkc->text_size, pnkc->rodata_offset + pnkc->rodata_size));
 	
 	void* org_addr = addr;
-	uint32_t count = pnkc->file_count;
-	for(uint32_t i = 0; i < count; i++) {
-		PNKC_File file;
-		pnkc_file_get(&file, i);
-		
-		if(file.type == PNKC_TYPE_MODULE) {
-			printf("\tModule loadeding[%d]...\n", i);
-			void* base = module_load(file.address, file.size, &addr);
+	char name[255];
+	uint32_t file_size;
+	void* mmap;
+	rootfs_rewind();
+	while((mmap = rootfs_next(name, &file_size))) {
+		if(strstr(name, ".ko") + 3 - name == strlen(name)) {
+			printf("\tModule loading: %s\n", name);
+			void* base = module_load(mmap, file_size, &addr);
 			if(base) {
 				modules[module_count++] = base;
 			} else {
-				printf("\t\tFAILED: %dth file, errno: 0x%x.\n", i, errno);
+				printf("\t\tFAILED: %s, errno: 0x%x.\n", name, errno);
 			}
 		}
 	}

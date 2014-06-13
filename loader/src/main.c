@@ -1,19 +1,7 @@
 #include "page.h"
+#include "pnkc.h"
+#include "bfs.h"
 #include "mode_switch.h"
-
-typedef struct {
-	uint8_t		header[8];
-	uint32_t	text_offset;
-	uint32_t	text_size;
-	uint32_t	rodata_offset;
-	uint32_t	rodata_size;
-	uint32_t	data_offset;
-	uint32_t	data_size;
-	uint32_t	bss_offset;
-	uint32_t	bss_size;
-	uint32_t	file_count;
-	uint8_t		body[0];
-} __attribute__((packed)) PNKC;
 
 #define NORMAL	0x07
 #define PASS	0x02
@@ -229,16 +217,50 @@ int check_x86_64_support() {
 }
 
 PNKC* find_kernel() {
-	uint8_t* addr = (uint8_t*)((uint32_t)main & ~0x1ff);
-	
-	for(int i = 0; i < 20; i++) {
-		if(addr[0] == 0x0f && addr[1] == 0x0d && addr[2] == 0x0a && addr[3] == 0x02 && addr[4] == 'P' && addr[5] == 'N' && addr[6] == 'K' && addr[7] == 'C')
-			return (PNKC*)addr;
+	void* find_root() {
+		void* addr = (void*)((uint32_t)main & ~0x1ff);
 		
-		addr += 512;
+		for(int i = 0; i < 20; i++) {
+			if(*(uint32_t*)addr == BFS_MAGIC) {
+				return addr;
+			}
+			
+			addr += 512;
+		}
+		
+		return 0;
 	}
 	
-	return 0;
+	void* mmap_kernel(void* bfs) {
+		File root, file;
+		if(bfs_opendir(bfs, "/", &root) != 0)
+			return 0;
+		
+		while(bfs_readdir(bfs, &root, &file) == 0) {
+			if(file.type == FS_TYPE_FILE && 
+					file.name[0] == 'k' &&
+					file.name[1] == 'e' &&
+					file.name[2] == 'r' &&
+					file.name[3] == 'n' &&
+					file.name[4] == 'e' &&
+					file.name[5] == 'l' &&
+					file.name[6] == '.' &&
+					file.name[7] == 'b' &&
+					file.name[8] == 'i' &&
+					file.name[9] == 'n') {
+				
+				return bfs_mmap(bfs, &file, 0);
+			}
+		}
+		
+		return 0;
+	}
+	
+	void* bfs = find_root();
+	if(!bfs)
+		return 0;
+	
+	return mmap_kernel(bfs);
 }
 
 int copy_kernel(PNKC* pnkc, int x, int y) {
@@ -271,10 +293,10 @@ int copy_kernel(PNKC* pnkc, int x, int y) {
 	clean((uint32_t*)0x200000, 0x400000);
 	
 	// Calc kernel position
-	uint8_t* body = pnkc->body + 8 * pnkc->file_count;
+	void* body = (void*)pnkc + sizeof(PNKC);
 	
 	// Copy .text
-	uint8_t* src = body;
+	void* src = body;
 	memcpy((uint32_t*)(0x200000 + pnkc->text_offset), (uint32_t*)src, pnkc->text_size);
 	src += pnkc->text_size;
 	
@@ -310,10 +332,10 @@ int copy_kernel_half(PNKC* pnkc, uint8_t core_id) {
 	clean((uint32_t*)(0x400000 + core_id * 0x200000), 0x200000);
 	
 	// Calc kernel position
-	uint8_t* body = pnkc->body + 8 * pnkc->file_count;
+	void* body = (void*)pnkc + sizeof(PNKC);
 	
 	// Copy .data
-	uint8_t* src = body + pnkc->text_size + pnkc->rodata_size;
+	void* src = body + pnkc->text_size + pnkc->rodata_size;
 	memcpy((uint32_t*)(0x400000 + core_id * 0x200000 + pnkc->data_offset), (uint32_t*)src, pnkc->data_size);
 	
 	// .bss is already inited

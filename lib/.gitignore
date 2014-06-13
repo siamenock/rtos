@@ -1,0 +1,25 @@
+# Newlib temporary files
+newlib*/Makefile
+newlib*/config.log
+newlib*/config.status
+newlib*/etc/Makefile
+newlib*/etc/config.cache
+newlib*/etc/config.log
+newlib*/etc/config.status
+newlib*/serdep.tmp
+newlib*/x86_64-pc-packetngin
+
+# OpenSSL temporary files
+openssl*/**/lib
+openssl*/**/*.s
+!openssl*/**/asm/*.s
+openssl*/**/*.bak
+openssl*/crypto/buildinf.h
+
+# zlib temporary files
+zlib*/**/*.lo
+zlib*/zconf.h
+zlib*/configure.log
+zlib*/example*
+zlib*/minigzip*
+zlib*/zlib.pc

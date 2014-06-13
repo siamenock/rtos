@@ -6,6 +6,7 @@ typedef enum {
 	DEVICE_TYPE_CHAR_IN,
 	DEVICE_TYPE_CHAR_OUT,
 	DEVICE_TYPE_NIC,
+	DEVICE_TYPE_FILESYSTEM,
 } DeviceType;
 
 DeviceType device_type;

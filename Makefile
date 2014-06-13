@@ -1,11 +1,13 @@
-.PHONY: all run deploy clean cleanall root.img
+.PHONY: all run deploy clean cleanall system.img mount umount
 
 CLENLOG=rm -f /tmp/qemu.log
-QEMU=qemu-system-x86_64 -m 256 -hda root.img -M pc -smp 8 -d cpu_reset -no-reboot -no-shutdown -monitor stdio -net nic,model=rtl8139 -net tap,script=util/qemu-ifup
+QEMU=qemu-system-x86_64 -m 256 -hda system.img -M pc -smp 8 -d cpu_reset -no-reboot -no-shutdown -monitor stdio -net nic,model=rtl8139 -net tap,script=util/qemu-ifup
 
-all: root.img
+all: system.img
 
-root.img: 
+SYSTEM_IMG_SIZE := 1023		# 512 bytes * 1023 blocks = 512KB - 512B (for boot loader)
+
+system.img: 
 	make -C lib
 	make -C util
 	make -C boot
@@ -13,31 +15,51 @@ root.img:
 	make -C kernel
 	make -C drivers
 	util/smap kernel/kernel.elf kernel.smap
-	util/pnkc kernel.bin kernel/kernel.elf kernel.smap drivers/*.ko
-	cat boot/boot.bin loader/loader.bin kernel.bin > $@
-	util/truncate $@
+	util/pnkc kernel/kernel.elf kernel.bin
+	# Make root.img
+	dd if=/dev/zero of=root.img count=$(SYSTEM_IMG_SIZE)
+	sudo losetup /dev/loop0 root.img
+	sudo util/mkfs.bfs /dev/loop0
+	mkdir mnt
+	sudo mount /dev/loop0 mnt
+	sudo cp kernel.bin kernel.smap drivers/*.ko mnt
+	sudo umount mnt
+	rmdir mnt
+	sudo losetup -d /dev/loop0
+	cat boot/boot.bin loader/loader.bin root.img > $@
+	#util/truncate $@
 	util/rewrite $@
 
-sdk: root.img lib
+mount:
+	sudo losetup /dev/loop0 root.img
+	mkdir mnt
+	sudo mount /dev/loop0 mnt
+
+umount:
+	sudo umount mnt
+	rmdir mnt
+	sudo losetup -d /dev/loop0
+
+sdk: system.img lib
 	rm -rf packetngin
 	cp -r skel packetngin
 	cp -r control/bin/* packetngin/bin/
 	cp util/qemu-ifup packetngin/lib/
-	cp root.img packetngin/lib/
+	cp system.img packetngin/lib/
 	cp lib/libpacketngin.a packetngin/lib/
 	cp -r lib/core/include packetngin
 	tar cfz packetngin_sdk.tgz packetngin
 
-run: root.img
+run: system.img
 	sudo $(QEMU) 
 
-cli: root.img
+cli: system.img
 	sudo $(QEMU) -curses
 
-vnc: root.img
+vnc: system.img
 	sudo $(QEMU) -vnc :0
 
-debug: root.img
+debug: system.img
 	sudo $(QEMU) -S -s 
 
 gdb:
@@ -52,11 +74,11 @@ dis: kernel/kernel.elf
 stop:
 	killall -9 qemu-system-x86_64
 
-deploy: root.img
-	dd if=root.img of=/dev/sdb && sync
+deploy: system.img
+	dd if=system.img of=/dev/sdb && sync
 
 clean:
-	rm -f root.img kernel.smap kernel.bin kernel.dis
+	rm -f system.img root.img kernel.smap kernel.bin kernel.dis
 
 cleanall: clean
 	make -C boot clean

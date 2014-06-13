@@ -8,10 +8,10 @@ OBJS = obj/entry.o \
 	obj/main.o obj/stdio.o obj/shell.o obj/port.o obj/asm.o obj/gdt.o obj/idt.o \
 	obj/isr.o obj/device.o obj/pci.o obj/malloc.o obj/gmalloc.o obj/task.o obj/task_asm.o \
 	obj/mp.o obj/apic.o obj/apic_asm.o obj/ioapic.o obj/rtc.o obj/cpu.o \
-	obj/loader.o obj/event.o obj/shared.o obj/pnkc.o obj/ni.o obj/manager.o obj/icc.o \
-	obj/string.o obj/httpd.o obj/module.o obj/symbols.o \
+	obj/loader.o obj/event.o obj/shared.o obj/ni.o obj/manager.o obj/icc.o \
+	obj/string.o obj/httpd.o obj/module.o obj/symbols.o obj/rootfs.o \
 	obj/driver/linux.o obj/driver/dummy.o \
-	obj/driver/vga.o obj/driver/keyboard.o obj/driver/stdin.o obj/driver/stdout.o
+	obj/driver/vga.o obj/driver/keyboard.o obj/driver/stdin.o obj/driver/stdout.o obj/driver/bfs.o
 	#obj/driver/rtl8139.o \
 	#obj/driver/r1000_n.o obj/driver/linux.o
 	#obj/ipxe/ipxe.o obj/driver/realtek.o \

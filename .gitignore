@@ -10,3 +10,7 @@
 
 # Disk images
 *.img
+
+# Temporary generated files
+kernel.dis
+kernel.smap
