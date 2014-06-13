@@ -18,27 +18,27 @@ system.img:
 	util/pnkc kernel/kernel.elf kernel.bin
 	# Make root.img
 	dd if=/dev/zero of=root.img count=$(SYSTEM_IMG_SIZE)
+	mkdir mnt
 	sudo losetup /dev/loop0 root.img
 	sudo util/mkfs.bfs /dev/loop0
-	mkdir mnt
 	sudo mount /dev/loop0 mnt
 	sudo cp kernel.bin kernel.smap drivers/*.ko mnt
 	sudo umount mnt
-	rmdir mnt
 	sudo losetup -d /dev/loop0
+	rmdir mnt
 	cat boot/boot.bin loader/loader.bin root.img > $@
 	#util/truncate $@
 	util/rewrite $@
 
 mount:
-	sudo losetup /dev/loop0 root.img
 	mkdir mnt
+	sudo losetup /dev/loop0 root.img
 	sudo mount /dev/loop0 mnt
 
 umount:
 	sudo umount mnt
-	rmdir mnt
 	sudo losetup -d /dev/loop0
+	rmdir mnt
 
 sdk: system.img lib
 	rm -rf packetngin
