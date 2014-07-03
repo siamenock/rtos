@@ -16,7 +16,6 @@
 #define ETHER_TYPE_QINQ3	0x9300
 
 #define ETHER_LEN	14
-#define ARP_LEN		28
 
 typedef struct {
 	uint64_t dmac: 48;
@@ -24,18 +23,6 @@ typedef struct {
 	uint16_t type;
 	uint8_t payload[0];
 } __attribute__ ((packed)) Ether;
-
-typedef struct {
-	uint16_t htype;
-	uint16_t ptype;
-	uint8_t hlen;
-	uint8_t plen;
-	uint16_t operation;
-	uint64_t sha: 48;
-	uint32_t spa;
-	uint64_t tha: 48;
-	uint32_t tpa;
-} __attribute__ ((packed)) ARP;
 
 #define endian8(v)	(v)
 #define endian16(v)	bswap_16((v))
@@ -48,10 +35,42 @@ uint16_t read_u16(void* buf, uint32_t* idx);
 uint32_t read_u32(void* buf, uint32_t* idx);
 uint64_t read_u48(void* buf, uint32_t* idx);
 uint64_t read_u64(void* buf, uint32_t* idx);
+char* read_string(void* buf, uint32_t* idx);	// Read C string without '\0'
 void write_u8(void* buf, uint8_t value, uint32_t* idx);
 void write_u16(void* buf, uint16_t value, uint32_t* idx);
 void write_u32(void* buf, uint32_t value, uint32_t* idx);
 void write_u48(void* buf, uint64_t value, uint32_t* idx);
 void write_u64(void* buf, uint64_t value, uint32_t* idx);
+void write_string(void* buf, const char* str, uint32_t* idx);	// Write C string without '\0'
+
+#define swap8(v1, v2) do {	\
+	uint8_t tmp = (v1);	\
+	(v1) = (v2);		\
+	(v2) = tmp;		\
+} while(0);
+
+#define swap16(v1, v2) do {	\
+	uint16_t tmp = (v1);	\
+	(v1) = (v2);		\
+	(v2) = tmp;		\
+} while(0);
+
+#define swap32(v1, v2) do {	\
+	uint32_t tmp = (v1);	\
+	(v1) = (v2);		\
+	(v2) = tmp;		\
+} while(0);
+
+#define swap48(v1, v2) do {	\
+	uint64_t tmp = (v1);	\
+	(v1) = (v2);		\
+	(v2) = tmp;		\
+} while(0);
+
+#define swap64(v1, v2) do {	\
+	uint64_t tmp = (v1);	\
+	(v1) = (v2);		\
+	(v2) = tmp;		\
+} while(0);
 
 #endif /* __NET_ETHER_H__ */

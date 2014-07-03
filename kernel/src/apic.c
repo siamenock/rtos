@@ -42,6 +42,18 @@ void apic_init() {
 	apic_write32(APIC_REG_LVT_LINT1R, APIC_TM_EDGE | APIC_PP_ACTIVEHIGH | APIC_DMODE_NMI);
 	apic_write32(APIC_REG_LVT_ER, apic_read32(APIC_REG_LVT_ER) | APIC_IM_DISABLED);
 	
+	// TODO: Remove this after Disable PIT bug fixed
+	void ignore_timer(uint64_t v, uint64_t e) {
+		/*
+		APIC_Handler handler = apic_register(0x20, NULL);
+		if(handler != ignore_timer)
+			apic_register(0x20, handler);
+		*/
+		//printf("Ignore timer\n");
+		asm("nop");
+	}
+	apic_register(0x20, ignore_timer);
+	
 	apic_eoi();
 }
 
@@ -133,31 +145,30 @@ typedef struct {
 	uint64_t	unknown;
 } __attribute__ ((packed)) Frame;
 
-static void dump_frame(Frame* frame) {
-	/*
-	printf("\n");
-	printf("AX=%016x BX=%016x CX=%016x DX=%016x\n", frame->rax, frame->rbx, frame->rcx, frame->rdx);
-	printf("SI=%016x DI=%016x BP=%016x SP=%016x\n", frame->rsi, frame->rdi, frame->rbp, frame->rsp);
-	printf("8 =%016x 9 =%016x 10=%016x 11=%016x\n", frame->r8, frame->r9, frame->r10, frame->r11);
-	printf("12=%016x 13=%016x 14=%016x 15=%016x\n", frame->r12, frame->r13, frame->r14, frame->r15);
-	printf("IP=%016x FL=%016x\n", frame->rip, frame->rflag);
+void apic_dump(uint64_t vector, uint64_t error_code) {
+	Frame* frame = (void*)(0xffffffff805b0000 - sizeof(Frame));
+	
+	printf("\n* Exception occurred: core=%d, vector=0x%x, error_code=0x%x\n", mp_core_id(), vector, error_code);
+	printf("AX=%016lx BX=%016lx CX=%016lx DX=%016lx\n", frame->rax, frame->rbx, frame->rcx, frame->rdx);
+	printf("SI=%016lx DI=%016lx BP=%016lx SP=%016lx\n", frame->rsi, frame->rdi, frame->rbp, frame->rsp);
+	printf("8 =%016lx 9 =%016lx 10=%016lx 11=%016lx\n", frame->r8, frame->r9, frame->r10, frame->r11);
+	printf("12=%016lx 13=%016lx 14=%016lx 15=%016lx\n", frame->r12, frame->r13, frame->r14, frame->r15);
+	printf("IP=%016lx FL=%016lx\n", frame->rip, frame->rflag);
 	printf("ES=%08x CS=%08x DS=%08x FS=%08x GS=%08x\n", frame->es, frame->cs, frame->ds, frame->fs, frame->gs);
 	
 	printf("\n");
 	uint64_t* p = (void*)frame->rsp;
 	for(int i = 0; i < 40; i += 4) {
-		printf("%016x %016x %016x %016x\n", p[i], p[i + 1], p[i + 2], p[i + 3]);
+		printf("%016lx %016lx %016lx %016lx\n", p[i], p[i + 1], p[i + 2], p[i + 3]);
 	}
-	*/
 }
 
 void isr_exception_handler(uint64_t vector, uint64_t error_code) {
 	if(vector < HANDLER_SIZE && handlers[vector]) {
 		(handlers[vector])(vector, error_code);
 	} else {
-		// TODO: Do something
-			
-		dump_frame((void*)(0xffffffff805b0000 - sizeof(Frame)));
+		apic_disable();
+		apic_dump(vector, error_code);
 		
 		while(1) {
 			uint8_t core_id = mp_core_id();
@@ -233,8 +244,11 @@ void isr_exception_handler(uint64_t vector, uint64_t error_code) {
 			*v++ = HEX(error_code >> 0);
 			*v++ = 0x40;
 			
+			while(1) asm("nop");
+			/*
 			for(int i = 0; i < 1000000; i++)
 				asm("nop");
+			*/
 		}
 	}
 }
@@ -243,6 +257,8 @@ void isr_interrupt_handler(uint64_t vector) {
 	if(vector < HANDLER_SIZE && handlers[vector]) {
 		(handlers[vector])(vector, 0);
 	} else {
+		apic_dump(vector, 0);
+		
 		while(1) {
 			uint8_t core_id = mp_core_id();
 			char* v = (char*)0xb8000 + core_id * 160 + 50 * 2;
@@ -284,7 +300,7 @@ void isr_interrupt_handler(uint64_t vector) {
 			*v++ = 0x40;
 			*v++ = ' ';
 			*v++ = 0x40;
-			*v++ = animation[(cpu_tsc() >> 16)% 4];
+			*v++ = animation[(cpu_tsc() >> 16) % 4];
 			*v++ = 0x40;
 			
 			for(int i = 0; i < 1000000; i++)

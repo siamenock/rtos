@@ -18,4 +18,6 @@ typedef struct _Packet {
 	uint8_t			buffer[0];
 } Packet;
 
+void packet_dump(Packet* packet);
+
 #endif /* __NET_PACKET__ */

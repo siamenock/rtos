@@ -28,8 +28,6 @@ typedef struct {
 	int		argc;
 	char**		argv;	// gmalloc
 	
-	void*		res;	// Standard I/O/E HTTP response
-	
 	uint8_t		status;
 } VM;
 

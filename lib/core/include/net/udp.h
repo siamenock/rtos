@@ -1,6 +1,8 @@
 #ifndef __NET_UDP_H__
 #define __NET_UDP_H__
 
+#include <net/packet.h>
+
 #define UDP_LEN			8
 
 typedef struct {
@@ -11,5 +13,10 @@ typedef struct {
 	
 	uint8_t		body[0];
 } __attribute__ ((packed)) UDP;
+
+void udp_pack(Packet* packet, uint16_t udp_body_len);
+
+uint16_t udp_port_alloc();
+void udp_port_free(uint16_t port);
 
 #endif /* __NET_UDP_H__ */

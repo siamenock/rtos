@@ -26,8 +26,8 @@ bool arp_process(Packet* packet) {
 	if(endian16(ether->type) != ETHER_TYPE_ARP)
 		return false;
 	
-	uint32_t ip = (uint32_t)(uint64_t)map_get(config, "ip");
-	if(!ip)
+	uint32_t addr = (uint32_t)(uint64_t)map_get(config, "ip");
+	if(!addr)
 		return false;
 	
 	Map* arp_table = map_get(config, ARP_TABLE);
@@ -65,14 +65,14 @@ bool arp_process(Packet* packet) {
 	ARP* arp = (ARP*)ether->payload;
 	switch(endian16(arp->operation)) {
 		case 1:	// Request
-			if(endian32(arp->tpa) == ip) {
+			if(endian32(arp->tpa) == addr) {
 				ether->dmac = ether->smac;
 				ether->smac = endian48(packet->ni->mac);
 				arp->operation = endian16(2);
 				arp->tha = arp->sha;
 				arp->tpa = arp->spa;
 				arp->sha = ether->smac;
-				arp->spa = endian32(ip);
+				arp->spa = endian32(addr);
 				
 				ni_output(packet->ni, packet);
 				
@@ -83,7 +83,7 @@ bool arp_process(Packet* packet) {
 			;
 			uint64_t smac = endian48(arp->sha);
 			uint32_t sip = endian32(arp->spa);
-			ARPEntity* entity = map_get(arp_table, (void*)(uint64_t)ip);
+			ARPEntity* entity = map_get(arp_table, (void*)(uint64_t)addr);
 			if(!entity) {
 				entity = arp_table->malloc(sizeof(ARPEntity));
 				entity->mac = smac;
@@ -98,19 +98,56 @@ bool arp_process(Packet* packet) {
 	return false;
 }
 
+bool arp_request(NetworkInterface* ni, uint32_t ip) {
+	Map* config = ni->config;
+	if(!config)
+		return false;
+	
+	uint32_t addr = (uint32_t)(uint64_t)map_get(config, "ip");
+	
+	Packet* packet = ni_alloc(ni, sizeof(Ether) + sizeof(ARP));
+	if(!packet)
+		return false;
+	
+	Ether* ether = (Ether*)(packet->buffer + packet->start);
+	ether->dmac = endian48(0xffffffffffff);
+	ether->smac = endian48(ni->mac);
+	ether->type = ETHER_TYPE_ARP;
+	
+	ARP* arp = (ARP*)ether->payload;
+	arp->htype = endian16(1);
+	arp->ptype = endian16(0x0800);
+	arp->hlen = endian8(6);
+	arp->plen = endian8(4);
+	arp->operation = endian8(1);
+	arp->sha = endian48(ni->mac);
+	arp->spa = endian32(addr);
+	arp->tha = endian48(0);
+	arp->tpa = endian32(ip);
+	 
+	packet->end = packet->start + sizeof(Ether) + sizeof(ARP);
+	
+	ni_output(ni, packet);
+	
+	return true;
+}
+
 uint64_t arp_get_mac(NetworkInterface* ni, uint32_t ip) {
 	Map* config = ni->config;
 	if(!config)
-		return 0;
+		return 0xffffffffffff;
 	
 	Map* arp_table = map_get(config, ARP_TABLE);
 	if(!arp_table) {
-		return 0;
+		arp_request(ni, ip);
+		return 0xffffffffffff;
 	}
 	
 	ARPEntity* entity = map_get(arp_table, (void*)(uint64_t)ip);
-	if(!entity)
-		return 0;
+	if(!entity) {
+		arp_request(ni, ip);
+		return 0xffffffffffff;
+	}
 	
 	return entity->mac;
 }

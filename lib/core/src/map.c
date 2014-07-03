@@ -127,6 +127,24 @@ succeed:
 	return true;
 }
 
+bool map_update(Map* map, void* key, void* data) {
+	size_t index = map->hash(key) % map->capacity;
+	if(!map->table[index]) {
+		return false;
+	}
+	
+	size_t size = list_size(map->table[index]);
+	for(int i = 0; i < size; i++) {
+		MapEntry* entry = list_get(map->table[index], i);
+		if(map->equals(entry->key, key)) {
+			entry->data = data;
+			return true;
+		}
+	}
+	
+	return false;
+}
+
 void* map_get(Map* map, void* key) {
 	size_t index = map->hash(key) % map->capacity;
 	if(!map->table[index]) {

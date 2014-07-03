@@ -1,8 +1,10 @@
 #include <stdio.h>
+#include <string.h>
 #include <malloc.h>
 #include <thread.h>
 #include <net/ni.h>
 #include <net/ether.h>
+#include <net/arp.h>
 #include <net/ip.h>
 #include <net/icmp.h>
 #include <net/checksum.h>
@@ -18,7 +20,6 @@ typedef struct {
 	uint16_t	length;
 } __attribute__((packed)) TCP_Pseudo;
 
-//static uint32_t address = 0xc0a8c80a;	// 192.168.200.10
 typedef struct {
 	uint64_t	mac;
 	uint32_t	ip;
@@ -57,6 +58,11 @@ static bool is_from_rip(uint32_t ip, uint16_t port) {
 }
 
 void ginit(int argc, char** argv) {
+	NetworkInterface* ni = ni_get(0);
+	printf("%x %p\n", vip.ip, vip.ip);
+	printf("%p %x %p\n", ni, ni->mac, ni->config);
+	ni->config = map_create(8, map_string_hash, map_string_equals, malloc, free);
+	map_put(ni->config, strdup("ip"), (void*)(uint64_t)vip.ip);
 }
 
 void init(int argc, char** argv) {
@@ -70,21 +76,8 @@ void process(NetworkInterface* ni) {
 	
 	Ether* ether = (Ether*)(packet->buffer + packet->start);
 	
-	if(endian16(ether->type) == ETHER_TYPE_ARP) {
-		// ARP response
-		ARP* arp = (ARP*)ether->payload;
-		if(endian16(arp->operation) == 1 && endian32(arp->tpa) == vip.ip) {
-			ether->dmac = ether->smac;
-			ether->smac = endian48(ni->mac);
-			arp->operation = endian16(2);
-			arp->tha = arp->sha;
-			arp->tpa = arp->spa;
-			arp->sha = ether->smac;
-			arp->spa = endian32(vip.ip);
-			
-			ni_output(ni, packet);
-			packet = NULL;
-		}
+	if(arp_process(packet)) {
+		packet = NULL;
 	} else if(endian16(ether->type) == ETHER_TYPE_IPv4) {
 		IP* ip = (IP*)ether->payload;
 		

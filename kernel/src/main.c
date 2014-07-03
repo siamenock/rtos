@@ -121,38 +121,50 @@ static void icc_start(ICC_Message* msg) {
 	
 	icc_send(msg2);
 	
-	APIC_Handler handler14 = apic_register(14, NULL);
+	// Set exception handlers
+	APIC_Handler old_exception_handlers[32];
 	
-	void stop14(uint64_t vector, uint64_t err) {
-		if(err == 0) {
-			apic_eoi();
-			
-			task_destroy(1);
-		} else {
-			// TODO: Dump right stack trace
-			handler14(vector, err);
-		}
-	}
-	
-	void stop49(uint64_t vector, uint64_t err) {
+	void exception_handler(uint64_t vector, uint64_t err) {
+		printf("user exception handler\n");
+		if(err != 0)
+			apic_dump(vector, err);
+		
 		apic_eoi();
 		
 		task_destroy(1);
 	}
 	
-	apic_register(14, stop14);
-	APIC_Handler handler49 = apic_register(49, stop49);
+	for(int i = 0; i < 32; i++) {
+		old_exception_handlers[i] = apic_register(i, exception_handler);
+	}
 	
+	// Set interrupt handler
+	void interrupt_handler(uint64_t vector, uint64_t err) {
+		printf("user interrupt handler\n");
+		
+		apic_eoi();
+		
+		task_destroy(1);
+	}
+	
+	APIC_Handler old_interrupt_handler = apic_register(49, interrupt_handler);
+	
+	// Context switching
 	task_switch(1);
-	printf("Execution completed\n");
 	
-	apic_enable();
+	// Restore interrupt handler
+	apic_register(49, old_interrupt_handler);
 	
-	apic_register(14, handler14);
-	apic_register(49, handler49);
+	// Restore exception handlers
+	for(int i = 0; i < 32; i++)
+		apic_register(i, old_exception_handlers[i]);
 	
+	// Send stopped ICC
 	ICC_Message* msg3 = icc_sending(ICC_TYPE_STOPPED, 0);
 	icc_send(msg3);
+	
+	printf("Execution completed\n");
+	apic_enable();
 	
 	return;
 
@@ -231,10 +243,10 @@ void main(void) {
 		printf("Initializing modules...\n");
 		module_init();
 		
-		mp_sync();
-		
 		printf("Initializing network interface...\n");
 		ni_init0();
+		
+		mp_sync();
 		
 		printf("Initializing events...\n");
 		event_init();

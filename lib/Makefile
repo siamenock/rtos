@@ -1,6 +1,6 @@
 .PHONY: all clean cleanall
 
-all: libtlsf.a libjsmn.a libcore.a libc.a libm.a libz.a libssl.a liblwip.a libpacketngin.a
+all: libtlsf.a libjsmn.a libcore.a libc.a libm.a libz.a libssl.a liblwip.a libxdr.a libpacketngin.a
 
 libtlsf.a: 
 	make -C TLSF/src
@@ -14,7 +14,7 @@ libjsmn.a: jsmn/libjsmn.a
 
 core/libcore.a:
 	make -C core
-	
+
 libcore.a: libjsmn.a libtlsf.a core/libcore.a
 	cp core/libcore.a .
 
@@ -40,6 +40,7 @@ libpacketngin.a: libc.a libm.a libtlsf.a libcore.a
 	cd obj; ar x ../libcore.a
 	cd obj; ar rcs ../$@ *.o
 	rm -r obj
+	cp -rL core/include/* ../sdk/include/
 	cp libpacketngin.a ../sdk/lib/
 
 libz.a: 
@@ -62,6 +63,12 @@ liblwip.a:
 	make -C lwip
 	cp lwip/liblwip.a .
 	
+xdr/linux/libxdr.a:
+	make -C xdr -f Makefile.unix linux/libxdr.a
+
+libxdr.a: xdr/linux/libxdr.a
+	cp xdr/linux/libxdr.a .
+
 clean: 
 	rm -f libtlsf.a libjsmn.a libcore.a libc.a libm.a libz.a libssl.a libcrypto.a liblwip.a libpacketngin.a
 
@@ -73,3 +80,4 @@ cleanall: clean
 	-make -C zlib distclean
 	-make -C lwip clean
 	-make -C openssl clean
+	-make -C xdr -f Makefile.unix realclean

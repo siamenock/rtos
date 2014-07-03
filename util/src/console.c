@@ -1,190 +1,789 @@
+#define _GNU_SOURCE
 #include <stdio.h>
-#include <malloc.h>
-#include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
-#include <errno.h>
 #include <unistd.h>
+#include <netdb.h>
+#include <time.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
+#include <signal.h>
 #include <fcntl.h>
+#include <rpc/pmap_clnt.h>
+#include <curl/curl.h>
+#include <util/map.h>
+#include "types.h"
+#include "rpc_manager.h"
+#include "rpc_callback.h"
 
-#define ADDRESS		"192.168.100.254"
-#define PORT		80
-#define BUFFER_SIZE	4086
+#define VERSION		"0.1.0"
+#define DEFAULT_HOST	"192.168.100.254"
+#define DEFAULT_PORT	111
+#define MAX_ARGC	256
 
-static int exchange_data();
-static int connect_server();
-static void set_addr();
-static int set_socket();
-static void print_word(int thread_id, int fd, char* text_data);
-static void parse_data(char* buffer);
-static char* create_message();
+static CLIENT *client;
+static CLIENT *ioclient;
+static char* client_host;
+static int client_port;
+static int* server_port;
 
-static int sock;
-static struct sockaddr_in addr;
+static bool is_continue = true;
+static Map* variables;
+static char result[4096];
 
-int main(int argc, char** argv) {
-	if(set_socket() < 0) {
-		fprintf(stderr, "socket setting error\n");
-		exit(-1);
-	}
-	set_addr();
-	
-	if(connect_server() < 0) {
-		exit(-1);
-	}
-	
-	exchange_data();
+typedef struct {
+	char*		name;
+	char*		desc;
+	char*		args;
+	int		(*exec)(int argc, char** argv);
+} Command;
 
+static int cmd_exit(int argc, char** argv) {
+	is_continue = false;
 	return 0;
 }
 
-int exchange_data() {
-	int fd_num;
-	char buffer[BUFFER_SIZE] = { 0, };
-	fd_set in_put, out_put;
-	fd_set temp_in, temp_out;
-	struct timeval nulltime;
-
-	FD_ZERO(&in_put);
-	FD_ZERO(&out_put);
-	FD_SET(sock, &in_put);
-	FD_SET(sock, &out_put);
-	FD_SET(STDIN_FILENO, &in_put);
-
-	while(1) {
-		temp_in = in_put;
-		temp_out = out_put;
-		nulltime.tv_sec = 3;
-		nulltime.tv_usec = 0;
-		fd_num = select(sock + 1, &temp_in, &temp_out, 0, &nulltime);
-
-		if(fd_num == -1) {
-			printf("selector error \n");
-			return -1;
+static int cmd_echo(int argc, char** argv) {
+	int pos = 0;
+	for(int i = 1; i < argc; i++) {
+		pos += sprintf(result + pos, "%s", argv[i]);
+		
+		if(i + 1 < argc) {
+			result[pos++] = ' ';
 		}
-		if(fd_num == 0) {
-			continue;
-		} else{
-			if(FD_ISSET(sock, &temp_in) != 0) {
-				recv(sock, buffer, BUFFER_SIZE - 1, 0);
-				parse_data(buffer);
-				memset(buffer, 0, BUFFER_SIZE);
-			} else if(FD_ISSET(STDIN_FILENO, &temp_in) != 0) {
-				char* message = create_message();
-				send(sock, message, strlen(message), 0);
-				free(message);
+	}
+	
+	return 0;
+}
+
+static int cmd_connect(int argc, char** argv) {
+	char* host = DEFAULT_HOST;
+	int port = DEFAULT_PORT;
+	
+	if(argc >= 2)
+		host = argv[1];
+	
+	if(argc >= 3 && is_uint16(argv[2]))
+		port = parse_uint16(argv[2]);
+	
+	struct hostent* hostent = gethostbyname(host);
+	if(!hostent) {
+		printf("Cannot resolve the host name: %s\n", host);
+		return 1;
+	}
+	
+	struct sockaddr_in addr;
+	memcpy(&addr.sin_addr, hostent->h_addr_list[0], hostent->h_length);
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons(port);
+	
+	struct timeval time;
+	time.tv_sec = 2;
+	time.tv_usec = 0;
+	
+	int sock = RPC_ANYSOCK;
+	client = clntudp_create(&addr, MANAGER, MANAGER_APPLE, time, &sock);
+	if(!client) {
+		printf("Cannot make a connection to the host: %s:%d\n", host, port);
+		return 2;
+	}
+	
+	void* result = manager_null_1(client);
+	if(result == NULL) {
+		printf("Cannot connect to the host: %s:%d\n", host, port);
+		client = NULL;
+		return 3;
+	}
+	
+	ioclient = clntudp_create(&addr, CALLBACK, CALLBACK_APPLE, time, &sock);
+	if(!ioclient) {
+		printf("Cannot make a connection to the host: %s:%d\n", host, port);
+		return 2;
+	}
+	
+	result = callback_null_1(ioclient);
+	if(result == NULL) {
+		printf("Cannot connect to the host: %s:%d\n", host, port);
+		client = NULL;
+		return 3;
+	}
+	
+	RPC_Address cbaddr;
+	cbaddr.ip = 0;
+	cbaddr.port = *server_port;
+	
+	bool_t* result2 = callback_add_1(cbaddr, client);
+	if(result2 == NULL || !*result2) {
+		printf("Cannot register callback service to the host: %s:%d\n", host, port);
+		return 4;
+	}
+	
+	if(client_host) {
+		free(client_host);
+	}
+	int len = strlen(host) + 1;
+	client_host = malloc(len);
+	memcpy(client_host, host, len);
+	
+	client_port = port;
+	
+	return 0;
+}
+
+static int cmd_ping(int argc, char** argv) {
+	int count = 1;
+	if(argc >= 2 && is_uint8(argv[1])) {
+		count = parse_uint8(argv[1]);
+	}
+	
+	if(!client) {
+		printf("Disconnected\n");
+		return 1;
+	}	
+	
+	clock_t total = clock();
+	for(int i = 0; i < count; i++) {
+		clock_t time = clock();
+		void* result = manager_null_1(client);
+		if(result != NULL) {
+			printf("time=%d ms\n", clock() - time);
+		} else {
+			printf("timeout\n");
+		}
+	}
+	
+	printf("total: %d ms\n", clock() - total);
+}
+
+static int cmd_vm_create(int argc, char** argv) {
+	RPC_VM vm;
+	vm.core_num = 1;
+	vm.memory_size = 0x1000000;	// 16MB
+	vm.storage_size = 0x1000000;	// 16MB
+	vm.nics.nics_len = 0;
+	RPC_NIC nics[RPC_MAX_NIC_COUNT];
+	vm.nics.nics_val = nics;
+	vm.args.args_len = 0;
+	char _args[RPC_MAX_ARGS_SIZE];
+	vm.args.args_val = _args;
+	
+	for(int i = 1; i < argc; i++) {
+		if(strcmp(argv[i], "core:") == 0) {
+			i++;
+			if(!is_uint8(argv[i])) {
+				printf("core must be uint8\n");
+				return -1;
+			}
+			
+			vm.core_num = parse_uint8(argv[i]);
+		} else if(strcmp(argv[i], "memory:") == 0) {
+			i++;
+			if(!is_uint32(argv[i])) {
+				printf("memory must be uint32\n");
+				return -1;
+			}
+			
+			vm.memory_size = parse_uint32(argv[i]);
+		} else if(strcmp(argv[i], "storage:") == 0) {
+			i++;
+			if(!is_uint32(argv[i])) {
+				printf("storage must be uint32\n");
+				return -1;
+			}
+			
+			vm.storage_size = parse_uint32(argv[i]);
+		} else if(strcmp(argv[i], "nic:") == 0) {
+			i++;
+			
+			RPC_NIC* nic = &vm.nics.nics_val[vm.nics.nics_len];
+			vm.nics.nics_len++;
+			
+			for( ; i < argc; i++) {
+				if(strcmp(argv[i], "mac:") == 0) {
+					i++;
+					if(!is_uint64(argv[i])) {
+						printf("mac must be uint64\n");
+						return -1;
+					}
+					nic->mac = parse_uint64(argv[i]);
+				} else if(strcmp(argv[i], "ibuf:") == 0) {
+					i++;
+					if(!is_uint32(argv[i])) {
+						printf("ibuf must be uint32\n");
+						return -1;
+					}
+					nic->input_buffer_size = parse_uint32(argv[i]);
+				} else if(strcmp(argv[i], "obuf:") == 0) {
+					i++;
+					if(!is_uint32(argv[i])) {
+						printf("obuf must be uint32\n");
+						return -1;
+					}
+					nic->output_buffer_size = parse_uint32(argv[i]);
+				} else if(strcmp(argv[i], "iband:") == 0) {
+					i++;
+					if(!is_uint64(argv[i])) {
+						printf("iband must be uint64\n");
+						return -1;
+					}
+					nic->input_bandwidth = parse_uint64(argv[i]);
+				} else if(strcmp(argv[i], "oband:") == 0) {
+					i++;
+					if(!is_uint64(argv[i])) {
+						printf("oband must be uint64\n");
+						return -1;
+					}
+					nic->output_bandwidth = parse_uint64(argv[i]);
+				} else if(strcmp(argv[i], "pool:") == 0) {
+					i++;
+					if(!is_uint32(argv[i])) {
+						printf("pool must be uint32\n");
+						return -1;
+					}
+					nic->pool_size = parse_uint32(argv[i]);
+				} else {
+					i--;
+					break;
+				}
+			}
+		} else if(strcmp(argv[i], "args:") == 0) {
+			i++;
+			
+			void cpy(char* str, int len, char end) {
+				memcpy(vm.args.args_val + vm.args.args_len, str, len);
+				vm.args.args_len += len + 1;
+				vm.args.args_val[vm.args.args_len - 1] = end;
+			}
+			
+			for( ; i < argc; i++) {
+				char* str = argv[i];
+				
+				if(str[0] == '"' || str[0] == '\'') {
+					char dil = str[0];
+					str++;
+					
+					do {
+						int len = strlen(str);
+						if(str[len - 1] != dil) {
+							cpy(str, len, ' ');
+						} else {
+							cpy(str, len - 1, '\0');
+							break;
+						}
+						
+						str = argv[++i];
+					} while(i < argc);
+				} else {
+					int len = strlen(str);
+					cpy(str, len, '\0');
+				}
 			}
 		}
 	}
-}
-
-int connect_server() {
-	char* header = "POST /vm/1/stdio HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n";
-	char buffer[BUFFER_SIZE] = { 0, };
-
-	if(connect(sock, (struct sockaddr*)&addr, sizeof(struct sockaddr_in)) < 0) {
-		fprintf(stderr, "connect error %d\n", errno);
-		return -1;
+	
+	if(!client) {
+		printf("Disconnected\n");
+		return 1;
 	}
-
-	send(sock, header, strlen(header), 0);
-	recv(sock, buffer, BUFFER_SIZE - 1, 0);
-	printf("%s", buffer);
-
+	
+	u_quad_t* vmid = vm_create_1(vm, client);
+	if(vmid == NULL) {
+		printf("Timeout\n");
+		return 2;
+	}
+	
+	sprintf(result, "%ld", *vmid);
+	
 	return 0;
 }
 
-void set_addr() {
-	addr.sin_family = AF_INET;
-	addr.sin_addr.s_addr = inet_addr(ADDRESS);
-	addr.sin_port = htons(PORT);
-}
-
-int set_socket() {
-	struct timeval timeout;
-	timeout.tv_sec = 5;
-	timeout.tv_usec = 0;
-
-	sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if(sock < 0) {
-		fprintf(stderr, "socket error\n");
+static int cmd_vm_delete(int argc, char** argv) {
+	if(argc < 1) {
+		return -100;
+	}
+	
+	if(!is_uint64(argv[1])) {
 		return -1;
 	}
-}
-
-char* create_message() {
-	int total_size;
-	int thread_id;
-	int text_size;
 	
-	char t_text_size[4] = { 0, };
-	char  t_thread_id[13] = { 0, };
-	char t_total_size[5] = { 0, };
-
-	char buffer[BUFFER_SIZE] = { 0, };
+	uint64_t vmid = parse_uint64(argv[1]);
 	
-	char* chunked_data;
-	
-	scanf("%d", &thread_id);
-	getc(stdin);
-	gets(buffer);
-	
-	text_size = strlen(buffer) + 2;
-	sprintf(t_text_size, "%0x", text_size);
-	sprintf(t_thread_id, "%0x", thread_id);
-	total_size = text_size + strlen(t_text_size) + 2 + 3 + strlen(t_thread_id) + 2;
-	sprintf(t_total_size, "%0x", total_size);
-
-	chunked_data = (char*)malloc(sizeof(char) * (total_size + strlen(t_total_size) + 5));
-	memset(chunked_data, 0, sizeof(char) * (total_size + strlen(t_total_size) + 5));	
-	sprintf(chunked_data, "%s\r\n%s\r\n0\r\n%s\r\n%s\r\n\r\n", t_total_size, t_thread_id, t_text_size, buffer);
-
-	return chunked_data;
-}
-
-void parse_data(char* buffer) {
-	int total_size;
-	int thread_id;
-	int fd;
-	int text_size;
-	
-	char* text_data;
-	char t_head[40] = { 0, };
-	int head_size;
-
-	while(1) {
-		sscanf(buffer, "%0x %0x %0x %0x", &total_size, &thread_id, &fd, &text_size);
-		sprintf(t_head, "%0x\r\n%0x\r\n%0x\r\n%0x\r\n", total_size, thread_id, fd, text_size);
-
-		text_data = (char*)malloc(sizeof(char) * text_size + 1);
-		memset(text_data, 0, sizeof(char) * text_size + 1);
-		head_size = strlen(t_head);
-		strncpy(text_data, buffer + head_size, text_size);
-	
-		print_word(thread_id, fd, text_data);
-		free(text_data);
-
-		strncpy(buffer, buffer + head_size + text_size + 2, strlen(buffer) - head_size - text_size);
-		if(strlen(buffer) == 0)
-			break;
-		if(strncmp(buffer, "\r\n", 2) == 0)
-			break;
+	if(!client) {
+		printf("Disconnected\n");
+		return 1;
 	}
+	
+	bool_t* ret = vm_delete_1(vmid, client);
+	if(ret == NULL) {
+		printf("Timeout\n");
+		return 2;
+	}
+	
+	sprintf(result, "%s", *ret ? "true" : "false");
+	
+	return 0;
 }
 
-void print_word(int thread_id, int fd, char* text_data) {
-	switch(fd) {
-		case 0:
-			printf("%d sin> %s", thread_id, text_data);
-			break;
-
-		case 1:
-			printf("%d err> %s", thread_id, text_data);
-			break;
-
-		case 2:
-			printf("%d out> %s", thread_id, text_data);
-			break;
+static int cmd_vm_list(int argc, char** argv) {
+	if(!client) {
+		printf("Disconnected\n");
+		return 1;
 	}
+	
+	RPC_VMList* ret = vm_list_1(client);
+	if(ret == NULL) {
+		printf("Timeout\n");
+		return 2;
+	}
+	
+	char* p = result;
+	for(int i = 0; i < ret->RPC_VMList_len; i++) {
+		p += sprintf(p, "%d", ret->RPC_VMList_val[i]);
+		if(i + 1 < ret->RPC_VMList_len) {
+			*p++ = ' ';
+		} else {
+			*p++ = '\0';
+		}
+	}
+	
+	return 0;
+}	
+
+static int cmd_send(int argc, char** argv) {
+	if(argc < 3) {
+		return -100;
+	}
+	
+	if(!is_uint64(argv[1])) {
+		return -1;
+	}
+	
+	CURL* curl = curl_easy_init();
+	if(!curl) {
+		printf("Cannot make CURL\n");
+		return 1;
+	}
+	
+	FILE* file = fopen(argv[2], "r");
+	if(file == NULL) {
+		printf("Cannot open file: %s\n", argv[2]);
+		return 1;
+	}
+	
+	struct stat stat;
+	if(fstat(fileno(file), &stat) < 0) {
+		printf("Cannot get state of file: %s\n", argv[2]);
+		return 2;
+	}
+	
+	char url[1024];
+	snprintf(url, 1024, "tftp://%s/%s\n", client_host, argv[1]);
+	
+	curl_easy_setopt(curl, CURLOPT_URL, url);
+	curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
+	curl_easy_setopt(curl, CURLOPT_READDATA, file);
+	curl_easy_setopt(curl, CURLOPT_INFILESIZE_LARGE, (curl_off_t)stat.st_size);
+	//curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+	
+	CURLcode res;
+	if((res = curl_easy_perform(curl)) == CURLE_OK) {
+		sprintf(result, "true");
+		
+		double speed, total;
+		curl_easy_getinfo(curl, CURLINFO_SPEED_UPLOAD, &speed);
+		curl_easy_getinfo(curl, CURLINFO_TOTAL_TIME, &total);
+		
+		printf("%.3f bytes/sec total %.3f seconds\n", speed, total);
+	} else {
+		printf("Send failed: %s\n", curl_easy_strerror(res));
+		sprintf(result, "false");
+	}
+	
+	curl_easy_cleanup(curl);
+	fclose(file);
+	
+	return 0;
+}
+
+static int cmd_md5(int argc, char** argv) {
+	if(argc < 3) {
+		return -100;
+	}
+	
+	if(!is_uint64(argv[1])) {
+		return -1;
+	}
+	
+	if(!is_uint64(argv[2])) {
+		return -2;
+	}
+	
+	uint64_t vmid = parse_uint64(argv[1]);
+	uint64_t size = parse_uint64(argv[2]);
+	
+	if(!client) {
+		printf("Disconnected\n");
+		return 1;
+	}
+	
+	RPC_Digest* ret = storage_digest_1(vmid, RPC_MD5, size, client);
+	if(ret == NULL) {
+		return -3;
+	}
+	
+	if(ret->RPC_Digest_len == 0) {
+		sprintf(result, "(nil)");
+	} else {
+		char* p = (char*)result;
+		for(int i = 0; i < ret->RPC_Digest_len; i++, p += 2) {
+			sprintf(p, "%02x", ((uint8_t*)ret->RPC_Digest_val)[i]);
+		}
+		*p = '\0';
+	}
+	
+	return 0;
+}
+static int cmd_status_set(int argc, char** argv) {
+	if(argc < 3) {
+		return -100;
+	}
+	
+	if(!is_uint64(argv[1])) {
+		return -1;
+	}
+	
+	uint64_t vmid = parse_uint64(argv[1]);
+	RPC_VMStatus status;
+	
+	if(strcmp(argv[2], "start") == 0) {
+		status = RPC_START;
+	} else if(strcmp(argv[2], "pause") == 0) {
+		status = RPC_PAUSE;
+	} else if(strcmp(argv[2], "stop") == 0) {
+		status = RPC_STOP;
+	} else {
+		printf("status must one of \"start\", \"pause\", or \"stop\"\n");
+		return -1;
+	}
+	
+	if(!client) {
+		printf("Disconnected\n");
+		return 1;
+	}
+	
+	bool_t* ret = status_set_1(vmid, status, client);
+	if(ret == NULL) {
+		printf("Timeout\n");
+		return 2;
+	}
+	
+	sprintf(result, "%s", *ret ? "true" : "false");
+	
+	return 0;
+}
+
+static int cmd_help(int argc, char** argv);
+
+static Command commands[] = {
+	{
+		.name = "exit",
+		.desc = "Exit the console",
+		.exec = cmd_exit
+	},
+	{
+		.name = "quit",
+		.desc = "Exit the console",
+		.exec = cmd_exit
+	},
+	{
+		.name = "help",
+		.desc = "Show this message",
+		.exec = cmd_help
+	},
+	{
+		.name = "echo",
+		.desc = "Print variable",
+		.args = "[variable: string]*",
+		.exec = cmd_echo
+	},
+	{
+		.name = "connect",
+		.desc = "Connect to the host",
+		.args = "[ (host: string) [port: uint16] ]",
+		.exec = cmd_connect
+	},
+	{
+		.name = "ping",
+		.desc = "RPC ping to host",
+		.args = "[count: uint8]",
+		.exec = cmd_ping
+	},
+	{
+		.name = "vm_create",
+		.desc = "Create VM",
+		.args = "vmid: uint64, core: (number: int) memory: (size: uint32) storage: (size: uint32) [nic: mac: (addr: uint64) ibuf: (size: uint32) obuf: (size: uint32) iband: (size: uint64) oband: (size: uint64) pool: (size: uint32)]* [args: [string]+ ]",
+		.exec = cmd_vm_create
+	},
+	{
+		.name = "vm_delete",
+		.desc = "Delete VM",
+		.args = "result: bool, vmid: uint64",
+		.exec = cmd_vm_delete
+	},
+	{
+		.name = "vm_list",
+		.desc = "List VM",
+		.args = "result: uint64[]",
+		.exec = cmd_vm_list
+	},
+	{
+		.name = "send",
+		.desc = "Send file",
+		.args = "result: bool, vmid: uint64 path: string",
+		.exec = cmd_send
+	},
+	{
+		.name = "md5",
+		.desc = "MD5 storage",
+		.args = "result: hex16 string, vmid: uint64 size: uint64",
+		.exec = cmd_md5
+	},
+	{
+		.name = "status_set",
+		.desc = "Set VM's status",
+		.args = "result: bool, vmid: uint64 status: string(\"start\", \"pause\", or \"stop\"",
+		.exec = cmd_status_set
+	},
+};
+
+static int cmd_help(int argc, char** argv) {
+	int count = sizeof(commands) / sizeof(Command);
+	
+	for(int i = 0; i < count; i++) {
+		printf("%s %s %s\n", commands[i].name, commands[i].desc, commands[i].args);
+	}
+	
+	return 0;
+}
+
+static Command* get_command(int argc, char** argv) {
+	int count = sizeof(commands) / sizeof(Command);
+	
+	for(int i = 0; i < count; i++) {
+		if(strcmp(argv[0], commands[i].name) == 0)
+			return &commands[i];
+	}
+	return NULL;
+}
+
+static void *
+_callback_null_1 (void  *argp, struct svc_req *rqstp)
+{
+	return (callback_null_1_svc(rqstp));
+}
+
+static void *
+_stdio_1 (RPC_Message  *argp, struct svc_req *rqstp)
+{
+	return (stdio_1_svc(*argp, rqstp));
+}
+
+static void
+callback_1(struct svc_req *rqstp, register SVCXPRT *transp)
+{
+	union {
+		RPC_Message stdio_1_arg;
+	} argument;
+	char *result;
+	xdrproc_t _xdr_argument, _xdr_result;
+	char *(*local)(char *, struct svc_req *);
+
+	switch (rqstp->rq_proc) {
+	case CALLBACK_NULL:
+		_xdr_argument = (xdrproc_t) xdr_void;
+		_xdr_result = (xdrproc_t) xdr_void;
+		local = (char *(*)(char *, struct svc_req *)) _callback_null_1;
+		break;
+
+	case STDIO:
+		_xdr_argument = (xdrproc_t) xdr_RPC_Message;
+		_xdr_result = (xdrproc_t) xdr_void;
+		local = (char *(*)(char *, struct svc_req *)) _stdio_1;
+		break;
+
+	default:
+		svcerr_noproc (transp);
+		return;
+	}
+	memset ((char *)&argument, 0, sizeof (argument));
+	if (!svc_getargs (transp, (xdrproc_t) _xdr_argument, (caddr_t) &argument)) {
+		svcerr_decode (transp);
+		return;
+	}
+	result = (*local)((char *)&argument, rqstp);
+	if (result != NULL && !svc_sendreply(transp, (xdrproc_t) _xdr_result, result)) {
+		svcerr_systemerr (transp);
+	}
+	if (!svc_freeargs (transp, (xdrproc_t) _xdr_argument, (caddr_t) &argument)) {
+		fprintf (stderr, "%s", "unable to free arguments");
+		exit (1);
+	}
+	return;
+}
+
+int main(int _argc, char** _argv) {
+	server_port = mmap(NULL, sizeof(*server_port), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	*server_port = 0;
+	
+	pid_t pid = fork();
+	if(pid != 0) {
+		pmap_unset(CALLBACK, CALLBACK_APPLE);
+		
+		SVCXPRT* transp = svcudp_create(RPC_ANYSOCK);
+		*server_port = transp->xp_port;
+		
+		printf("Callback service on %d\n", *server_port);
+		if(transp == NULL) {
+			fprintf (stderr, "%s", "cannot create udp service.\n");
+			exit(1);
+		}
+		
+		if(!svc_register(transp, CALLBACK, CALLBACK_APPLE, callback_1, IPPROTO_UDP)) {
+			fprintf (stderr, "%s", "unable to register (CALLBACK, CALLBACK_APPLE, udp).\n");
+			exit(1);
+		}
+		
+		svc_run();
+		
+		return 0;
+	}
+	
+	variables = map_create(16, map_string_hash, map_string_equals, malloc, free);
+	map_put(variables, strdup("$?"), strdup("(nil)"));
+	
+	char* argv[MAX_ARGC];
+	int argc;
+	
+	int parse(char* line) {
+		int count = 0;
+		int i = 0;
+		char* arg;
+		
+		char* next() {
+			while(line[i] == ' ')
+				i++;
+			
+			char* p = line + i;
+			if(*p == '\n')
+				return NULL;
+			
+			while(line[i] != ' ' && line[i] != '\n')
+				i++;
+			
+			return p;
+		}
+		
+		while((arg = next())) {
+			bool is_end = line[i] == '\n';
+			line[i] = '\0';
+			argv[count++] = strdup(arg);
+			
+			if(is_end || count >= MAX_ARGC)
+				return count;
+			
+			i++;
+		}
+	}
+	
+	void loop(FILE* file) {
+		char* line = NULL;
+		size_t size = 0;
+		printf("> ");
+		while(is_continue && getline(&line, &size, file) > 0) {
+			if(file != stdin)
+				printf("%s", line);
+			
+			if((argc = parse(line)) > 0) {
+				// Parse result variable
+				char* variable = NULL;
+				if(argv[0][0] == '#')
+					goto done;
+				
+				if(argv[0][0] == '$' && argv[1][0] == '=') {
+					variable = argv[0];
+					free(argv[1]);
+					
+					memmove(argv, argv + 2, sizeof(char*) * (argc - 2));
+					argc -= 2;
+				}
+				
+				// Parse argument variables
+				for(int i = 0; i < argc; i++) {
+					if(argv[i][0] == '$') {
+						char* old = argv[i];
+						argv[i] = strdup(map_get(variables, argv[i]));
+						free(old);
+					}
+				}
+				
+				// Execute
+				Command* cmd = get_command(argc, argv);
+				if(cmd) {
+					int exit_status = cmd->exec(argc, argv);
+					if(exit_status < 0) {
+						if(exit_status == -100)
+							printf("wrong number of arguments\n");
+						else	
+							printf("%d'st argument type wrong\n", -exit_status);
+					}
+					
+					char buf[16];
+					sprintf(buf, "%d", exit_status);
+					
+					free(map_get(variables, "$?"));
+					map_update(variables, "$?", strdup(buf));
+					
+					if(exit_status == 0) {
+						if(variable) {
+							if(map_contains(variables, variable)) {
+								free(map_get(variables, variable));
+								map_update(variables, variable, strdup(result));
+							} else {
+								map_put(variables, strdup(variable), strdup(result));
+							}
+						} else if(strlen(result) > 0) {
+							printf("%s\n", result);
+						}
+					}
+				} else {
+					printf("console: %s: command not found\n", argv[0]);
+				}
+				
+				// Free
+				if(variable) {
+					free(variable);
+				}
+				
+				for(int i = 0; i < argc; i++) {
+					free(argv[i]);
+				}
+			}
+			
+done:
+			printf("> ");
+		}
+	}
+	
+	for(int i = 1; i < _argc; i++) {
+		FILE* file = fopen(_argv[i], "r");
+		if(file)
+			loop(file);
+	}
+	
+	loop(stdin);
+	
+	kill(pid, SIGKILL);
+	
+	return 0;
 }

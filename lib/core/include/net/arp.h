@@ -24,6 +24,7 @@ extern uint32_t ARP_TIMEOUT;
 
 bool arp_process(Packet* packet);
 
+bool arp_request(NetworkInterface* ni, uint32_t ip);
 uint64_t arp_get_mac(NetworkInterface* ni, uint32_t ip);
 uint32_t arp_get_ip(NetworkInterface* ni, uint64_t mac);
 

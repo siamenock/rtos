@@ -27,6 +27,7 @@ Map* map_create(size_t initial_capacity, uint64_t(*hash)(void*), bool(*equals)(v
 void map_destroy(Map* map);
 bool map_is_empty(Map* map);
 bool map_put(Map* map, void* key, void* data);
+bool map_update(Map* map, void* key, void* data);
 void* map_get(Map* map, void* key);
 void* map_get_key(Map* map, void* key);
 bool map_contains(Map* map, void* key);

@@ -66,6 +66,7 @@ void apic_disable();
 void apic_pause();
 void apic_resume();
 APIC_Handler apic_register(uint64_t vector, APIC_Handler handler);
+void apic_dump(uint64_t vector, uint64_t error_code);
 
 uint32_t apic_read32(int reg);
 void apic_write32(int reg, uint32_t v);

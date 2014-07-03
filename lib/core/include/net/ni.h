@@ -3,7 +3,9 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <net/packet.h>
 #include <util/fifo.h>
+#include <util/map.h>
 
 #define NI_NONE			0
 #define NI_MAC			1
@@ -32,19 +34,6 @@
 #define PACKET_STATUS_L3_CHECKSUM	(1 >> 5)	// Is level 3(TCP, UDP) RX checksum OK or TX checksum already calculated
 
 typedef struct _NetworkInterface NetworkInterface;
-
-typedef struct _Packet {
-	NetworkInterface*	ni;
-	
-	uint32_t		status;
-	uint64_t		time;
-	
-	uint16_t		start;
-	uint16_t		end;
-	uint16_t		size;
-	
-	uint8_t			buffer[0];
-} Packet;
 
 typedef struct _NetworkInterface {
 	// Management
@@ -86,6 +75,9 @@ typedef struct _NetworkInterface {
 	uint64_t	output_packets;
 	uint64_t	output_drop_bytes;
 	uint64_t	output_drop_packets;
+	
+	// Configuration
+	Map*		config;
 } NetworkInterface;
 
 typedef Packet*(*NI_DPI)(Packet*);

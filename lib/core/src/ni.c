@@ -7,6 +7,7 @@ int __nis_count;
 NetworkInterface* __nis[NIS_SIZE];
 
 #define NI_POOL(ptr)	(void*)((uint64_t)(void*)(ptr) & ~(0x200000 - 1))
+#define ALIGN           16
 
 inline int ni_count() {
 	return __nis_count;
@@ -21,11 +22,12 @@ NetworkInterface* ni_get(int i) {
 
 Packet* ni_alloc(NetworkInterface* ni, uint16_t size) {
 	void* pool = NI_POOL(ni);
-	Packet* packet = malloc_ex(sizeof(Packet) + size, pool);
+	Packet* packet = malloc_ex(sizeof(Packet) + size + ALIGN - 1, pool);
 	if(packet) {
 		bzero(packet, sizeof(Packet));
 		packet->ni = ni;
-		packet->size = size;
+		packet->size = size + ALIGN - 1;
+		packet->end = packet->start = (((uint64_t)packet->buffer + ALIGN - 1) & ~(ALIGN - 1)) - (uint64_t)packet->buffer;
 	}
 	
 	return packet;
@@ -83,14 +85,24 @@ bool ni_output(NetworkInterface* ni, Packet* packet) {
 }
 
 bool ni_output_dup(NetworkInterface* ni, Packet* packet) {
-	Packet* p = ni_alloc(ni, packet->end - packet->start);
+	uint16_t len = packet->end - packet->start;
+	
+	Packet* p = ni_alloc(ni, len);
 	if(!p)
 		return false;
 	
+	// Copy packet data
+	uint16_t start = p->start;
+	uint16_t size = p->size;
+	
 	memcpy(p, packet, sizeof(Packet));
-	p->start = 0;
-	p->size = p->end = packet->end - packet->start;
-	memcpy((void*)p + sizeof(Packet), packet->buffer, p->size);
+	p->ni = ni;
+	p->start = start;
+	p->size = size;
+	p->end = p->start + len;
+	
+	// Copy packet buffer
+	memcpy(p->buffer + p->start, packet->buffer + packet->start, len);
 	
 	if(!ni_output(ni, p)) {
 		ni_free(p);

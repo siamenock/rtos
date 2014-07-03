@@ -3,10 +3,8 @@
 #include <tlsf.h>
 #include <util/list.h>
 #include <elf.h>
-#include <malloc.h>
 #include <errno.h>
 #include "task.h"
-#include "malloc.h"
 #include "mp.h"
 #include "cpu.h"
 

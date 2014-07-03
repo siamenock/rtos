@@ -3,15 +3,19 @@
 #include <stdlib.h>
 #include <malloc.h>
 #include <errno.h>
+#include <rpc/svc.h>
 #include <net/ether.h>
+#undef IP_TTL
 #include <net/ip.h>
+#include <net/arp.h>
 #include <net/icmp.h>
 #include <net/checksum.h>
 #include <net/udp.h>
+#include <net/rpc.h>
+#include <net/tftp.h>
 #include <net/md5.h>
 #include <util/map.h>
 #include <util/ring.h>
-#include <util/json.h>
 #include "ni.h"
 #include "malloc.h"
 #include "gmalloc.h"
@@ -22,20 +26,20 @@
 #include "cpu.h"
 #include "vm.h"
 #include "stdio.h"
-#include "httpd.h"
+#include "rpc/rpc_manager.h"
+#include "rpc/rpc_callback.h"
 
 #include "manager.h"
 
-//static uint32_t manager_ip	= 0xc0a8c8fe;	// 192.168.200.254
-//static uint32_t manager_gw	= 0xc0a8c8c8;	// 192.168.200.200
-static uint32_t manager_ip	= 0xc0a864fe;	// 192.168.100.254
-static uint32_t manager_gw	= 0xc0a864c8;	// 192.168.100.200
-static uint32_t manager_netmask= 0xffffff00;	// 255.255.255.0
+#define DEFAULT_MANAGER_IP	0xc0a864fe	// 192.168.100.254
+#define DEFAULT_MANAGER_GW	0xc0a864c8	// 192.168.100.200
+#define DEFAULT_MANAGER_NM	0xffffff00	// 255.255.255.0
 
-static NI* manager_ni;
-static struct netif* manager_netif;
+static uint32_t manager_ip	= DEFAULT_MANAGER_IP;
+static uint32_t manager_gw	= DEFAULT_MANAGER_GW;
+static uint32_t manager_netmask	= DEFAULT_MANAGER_NM;
 
-static uint64_t	last_pid = 1;
+static uint64_t	last_vmid = 1;
 static Map*	vms;
 
 // Core status
@@ -61,68 +65,40 @@ typedef struct {
 	size_t			stderr_size;
 } Core;
 
-static Core cores[MP_MAX_CORE_COUNT];
+typedef struct {
+	uint32_t	addr;
+	uint16_t	port;
+	CLIENT*		client;
+} Callback;
 
-static bool vm_destroy(VM* vm, int core) {
-	bool is_destroy = true;
+static Core cores[MP_MAX_CORE_COUNT];
+static List* callbacks;
+
+static Callback* callback_create(uint32_t addr, uint16_t port) {
+	Callback* cb = malloc(sizeof(Callback));
+	if(!cb)
+		return NULL;
 	
-	if(core == -1) {
-		for(uint32_t i = 0; i < vm->core_size; i++) {
-			if(vm->cores[i]) {
-				cores[vm->cores[i]].status = VM_STATUS_STOPPED;
-			}
-		}
-	} else {
-		for(uint32_t i = 0; i < vm->core_size; i++) {
-			if(vm->cores[i] == core) {
-				cores[vm->cores[i]].status = VM_STATUS_STOPPED;
-			}
-			
-			if(!cores[vm->cores[i]].status == VM_STATUS_STOPPED)
-				is_destroy = false;
-		}
+	bzero(cb, sizeof(Callback));
+	cb->addr = addr;
+	cb->port = port;
+	cb->client = rpc_client(cb->addr, cb->port, CALLBACK, CALLBACK_APPLE);
+	
+	if(!list_add(callbacks, cb)) {
+		clnt_destroy(cb->client);
+		free(cb);
+		return NULL;
 	}
 	
-	if(is_destroy) {
-		if(vm->memory.blocks) {
-			for(int i = 0; i < vm->memory.count; i++) {
-				if(vm->memory.blocks[i]) {
-					bfree(vm->memory.blocks[i]);
-				}
-			}
-			
-			gfree(vm->memory.blocks);
-		}
-		
-		if(vm->storage.blocks) {
-			for(int i = 0; i < vm->storage.count; i++) {
-				if(vm->storage.blocks[i]) {
-					bfree(vm->storage.blocks[i]);
-				}
-			}
-			
-			gfree(vm->storage.blocks);
-		}
-		
-		if(vm->nics) {
-			for(uint16_t i = 0; i < vm->nic_size; i++) {
-				if(vm->nics[i])
-					ni_destroy(vm->nics[i]);
-			}
-			
-			gfree(vm->nics);
-		}
-		
-		if(vm->argv) {
-			gfree(vm->argv);
-		}
-		
-		gfree(vm);
-	}
-	
-	return is_destroy;
+	return cb;
 }
 
+static void callback_destroy(Callback* cb) {
+	list_remove_data(callbacks, cb);
+	clnt_destroy(cb->client);
+	free(cb);
+}
+ 
 static void icc_started(ICC_Message* msg) {
 	Core* core = &cores[msg->core_id];
 	VM* vm = core->vm;
@@ -240,35 +216,26 @@ static void icc_stopped(ICC_Message* msg) {
 	printf("]\n");
 }
 
-static int itoh(char* buf, int value) {
-	#define HEX(v)	(((v) & 0x0f) > 9 ? ((v) & 0x0f) - 10 + 'a' : ((v) & 0x0f) + '0')
-	
-	if(value == 0) {
-		buf[0] = '0';
-		buf[1] = '\0';
-		return 1;
+static void manager_loop(NetworkInterface* ni) {
+	// Packet processing
+	Packet* packet = ni_input(ni);
+	if(packet) {
+		if(arp_process(packet))
+			return;
+		
+		if(icmp_process(packet))
+			return;
+		
+		if(rpc_process(packet))
+			return;
+		
+		if(tftp_process(packet))
+			return;
+		
+		ni_free(packet);
 	}
 	
-	int len = 0;
-	while(value != 0) {
-		buf[len++] = HEX(value);
-		value >>= 4;
-	}
-	buf[len] = '\0';
-	
-	int len2 = len / 2;
-	for(int i = 0; i < len2; i++) {
-		char t = buf[i];
-		buf[i] = buf[len - i - 1];
-		buf[len - i - 1] = t;
-	}
-	
-	return len;
-}
-
-static void idle_io(NetworkInterface* ni) {
-	ni_poll();
-	
+	// Standard I/O/E processing
 	int get_thread_id(VM* vm, int core) {
 		for(int i = 0; i < vm->core_size; i++) {
 			if(vm->cores[i] == core)
@@ -278,61 +245,64 @@ static void idle_io(NetworkInterface* ni) {
 		return -1;
 	}
 	
-	void output(uint64_t pid, HTTPContext* res, int thread_id, int fd, char* buffer, volatile size_t* head, volatile size_t* tail, size_t size) {
+	void output(uint64_t vmid, int thread_id, int fd, char* buffer, volatile size_t* head, volatile size_t* tail, size_t size) {
+		RPC_Message msg;
+		msg.vmid = vmid;
+		msg.coreid = thread_id;
+		msg.fd = fd;
+		
+		#define MAX_MESSAGE (1500 - 68)
+		
 		int text_len = ring_readable(*head, *tail, size);
+		if(text_len > MAX_MESSAGE)
+			text_len = MAX_MESSAGE;
 		
-		char size_buf[8];
-		int size_len = itoh(size_buf, text_len);
-		
-		char thread_buf[8];
-		int thread_len = itoh(thread_buf, thread_id);
-		
-		char fd_buf[8];
-		int fd_len = itoh(fd_buf, fd);
-		
-		int content_len = thread_len + 2 + fd_len + 2 + size_len + 2 + text_len;
-		
-		char total_buf[8];
-		int total_len = itoh(total_buf, content_len);
-		
-		int total = total_len + 2 + content_len + 2;
-		
-		int available = HTTP_BUFFER_SIZE - res->buf.index;
-		if(available < (total_len + 2 + fd_len + 2 + size_len + 2) * 2)
-			return;
-		
-		if(available < total) {
-			text_len -= total - available;
-			size_len = itoh(size_buf, text_len);
-			content_len = thread_len + 2 + fd_len + 2 + size_len + 2 + text_len;
-			total_len = itoh(total_buf, content_len);
-			total = total_len + 2 + content_len + 2;
-		}
-		
-		// TODO: Change it using sprintf
-		char* buf = (char*)res->buf.buf + res->buf.index;
-		res->buf.index += total;
-		
-		memcpy(buf, total_buf, total_len); buf += total_len;
-		memcpy(buf, "\r\n", 2); buf += 2;
-		
-		memcpy(buf, thread_buf, thread_len); buf += thread_len;
-		memcpy(buf, "\r\n", 2); buf += 2;
-		
-		memcpy(buf, fd_buf, fd_len); buf += fd_len;
-		memcpy(buf, "\r\n", 2); buf += 2;
-		
-		memcpy(buf, size_buf, size_len); buf += size_len;
-		memcpy(buf, "\r\n", 2); buf += 2;
-		
+		char* buf = malloc(text_len);
 		ring_read(buffer, head, *tail, size, buf, text_len);
-		buf += text_len;
-		memcpy(buf, "\r\n", 2); buf += 2;
 		
-		httpd_send(res);
+		msg.message.message_len = text_len;
+		msg.message.message_val = buf;
+		
+		ListIterator iter;
+		list_iterator_init(&iter, callbacks);
+		while(list_iterator_has_next(&iter)) {
+			Callback* cb = list_iterator_next(&iter);
+			
+			struct timeval tout = { 2, 0 };
+			 
+			void succeed(void* context, void* result) {
+				// Do nothing
+			}
+			
+			void failed(void* context, int stat1, int stat2) {
+				callback_destroy(context);
+			}
+			
+			void timeout(void* context) {
+				callback_destroy(context);
+			}
+			
+			if(!rpc_call(ni, cb->client, STDIO, (xdrproc_t)xdr_RPC_Message, (char*)&msg, (xdrproc_t)xdr_void, NULL, tout, succeed, failed, timeout, cb)) {
+				list_iterator_remove(&iter);
+				callback_destroy(cb);
+			}
+		}
 	}
 	
-	// Check Std I/O/E
+	{
+		static uint64_t out_tick;
+		if(out_tick < cpu_tsc()) {
+			char* buf = "Hello PacketNgin!\n";
+			size_t head = 0;
+			size_t tail = strlen(buf) + 1;
+			
+			output(0, 0, 1, buf, &head, &tail, 1024);
+			printf("Send hello\n");
+			
+			out_tick = cpu_tsc() + 5 * cpu_frequency;
+		}
+	}
+	
 	static int core_index;
 	
 	for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
@@ -343,17 +313,17 @@ static void idle_io(NetworkInterface* ni) {
 		if(core->status != VM_STATUS_STOPPED) {
 			int thread_id = -1;
 			
-			if(core->vm->res != NULL && core->stdout != NULL && *core->stdout_head != *core->stdout_tail) {
+			if(core->stdout != NULL && *core->stdout_head != *core->stdout_tail) {
 				thread_id = get_thread_id(core->vm, core_index);
 				
-				output(core->vm->id, core->vm->res, thread_id, 1, core->stdout, core->stdout_head, core->stdout_tail, core->stdout_size);
+				output(core->vm->id, thread_id, 1, core->stdout, core->stdout_head, core->stdout_tail, core->stdout_size);
 			}
 			
-			if(core->vm->res != NULL && core->stderr != NULL && *core->stderr_head != *core->stderr_tail) {
+			if(core->stderr != NULL && *core->stderr_head != *core->stderr_tail) {
 				if(thread_id == -1)
 					thread_id = get_thread_id(core->vm, core_index);
 				
-				output(core->vm->id, core->vm->res, thread_id, 2, core->stderr, core->stderr_head, core->stderr_tail, core->stderr_size);
+				output(core->vm->id, thread_id, 2, core->stderr, core->stderr_head, core->stderr_tail, core->stderr_size);
 			}
 			
 			break;
@@ -361,124 +331,101 @@ static void idle_io(NetworkInterface* ni) {
 	}
 }
 
-// Start of pseudo user space API
-#include <time.h>
-clock_t clock() {
-	return (clock_t)(cpu_tsc() / (cpu_frequency / CLOCKS_PER_SEC));
-}
-// End of pseudo user space API
-
-static NI* json_to_ni(JSONObject* obj) {
-	uint64_t parse_mac(char* str) {
-		uint64_t mac = 0;
-		for(int i = 0; i < 6; i++) {
-			char ch = str[2];
-			str[2] = '\0';
-			mac <<= 8;
-			mac = mac | strtol(str, NULL, 16);
-			str[2] = ch;
-			str += 3;
+static bool vm_destroy(VM* vm, int core) {
+	bool is_destroy = true;
+	
+	if(core == -1) {
+		for(uint32_t i = 0; i < vm->core_size; i++) {
+			if(vm->cores[i]) {
+				cores[vm->cores[i]].status = VM_STATUS_STOPPED;
+			}
+		}
+	} else {
+		for(uint32_t i = 0; i < vm->core_size; i++) {
+			if(vm->cores[i] == core) {
+				cores[vm->cores[i]].status = VM_STATUS_STOPPED;
+			}
+			
+			if(!cores[vm->cores[i]].status == VM_STATUS_STOPPED)
+				is_destroy = false;
+		}
+	}
+	
+	if(is_destroy) {
+		if(vm->memory.blocks) {
+			for(int i = 0; i < vm->memory.count; i++) {
+				if(vm->memory.blocks[i]) {
+					bfree(vm->memory.blocks[i]);
+				}
+			}
+			
+			gfree(vm->memory.blocks);
 		}
 		
-		return mac;
+		if(vm->storage.blocks) {
+			for(int i = 0; i < vm->storage.count; i++) {
+				if(vm->storage.blocks[i]) {
+					bfree(vm->storage.blocks[i]);
+				}
+			}
+			
+			gfree(vm->storage.blocks);
+		}
+		
+		if(vm->nics) {
+			for(uint16_t i = 0; i < vm->nic_size; i++) {
+				if(vm->nics[i])
+					ni_destroy(vm->nics[i]);
+			}
+			
+			gfree(vm->nics);
+		}
+		
+		if(vm->argv) {
+			gfree(vm->argv);
+		}
+		
+		gfree(vm);
 	}
 	
-	JSONAttr* attr = json_get(obj, "mac");
-	if(!attr) return NULL;
-	uint64_t mac = parse_mac(attr->data);
-	if(mac == 0) {
-		do {
-			mac = cpu_tsc() & 0x0fffffffffffL;
-			mac |= 0x02L << 40;	// Locally administrered
-		} while(ni_contains(mac));
-	} else if(ni_contains(mac)) {
-		printf("Manager: The mac address already in use: %012x.\n", mac);
-		errno = 509;
-		return NULL;
-	}
-	
-	attr = json_get(obj, "input_buffer_size");
-	if(!attr) return NULL;
-	uint32_t input_buffer_size = strtol(attr->data, NULL, 0);
-	
-	attr = json_get(obj, "output_buffer_size");
-	if(!attr) return NULL;
-	uint32_t output_buffer_size = strtol(attr->data, NULL, 0);
-	
-	attr = json_get(obj, "input_bandwidth");
-	if(!attr) return NULL;
-	uint64_t input_bandwidth = strtoll(attr->data, NULL, 0);
-	
-	attr = json_get(obj, "output_bandwidth");
-	if(!attr) return NULL;
-	uint64_t output_bandwidth = strtoll(attr->data, NULL, 0);
-	
-	attr = json_get(obj, "pool_size");
-	if(!attr) return NULL;
-	uint64_t pool_size = strtoll(attr->data, NULL, 0);
-	
-	uint64_t attrs[] = { 
-		NI_MAC, mac,
-		NI_INPUT_BUFFER_SIZE, input_buffer_size,
-		NI_OUTPUT_BUFFER_SIZE, output_buffer_size,
-		NI_INPUT_BANDWIDTH, input_bandwidth,
-		NI_OUTPUT_BANDWIDTH, output_bandwidth,
-		NI_POOL_SIZE, pool_size,
-		NI_INPUT_ACCEPT_ALL, 1,
-		NI_OUTPUT_ACCEPT_ALL, 1,
-		NI_INPUT_FUNC, 0,
-		NI_NONE
-	};
-	
-	return ni_create(attrs);
+	return is_destroy;
 }
 
-static uint64_t json_to_vm(JSONObject* obj) {
-	errno = 0;
+void * manager_null_1_svc(struct svc_req *rqstp) {
+	static void* result;
+	return (void*)&result;
+}
+
+u_quad_t * vm_create_1_svc(RPC_VM rpc_vm,  struct svc_req *rqstp) {
+	static u_quad_t result;
+	result = 0;
 	
 	VM* vm = gmalloc(sizeof(VM));
 	bzero(vm, sizeof(VM));
 	
 	// Allocate args
-	JSONAttr* attr = json_get(obj, "args");
-	if(attr) {
-		if(attr->type != JSON_ARRAY) { errno = 400; return 0; }
-		JSONArray* args = (JSONArray*)attr->data;
-		
-		int len = sizeof(char*) * args->size;
-		for(int i = 0; i < args->size; i++) {
-			if(args->array[i].type != JSON_STRING) {
-				printf("Manager: Illegal args syntax.\n");
-				errno = 400;
-				vm_destroy(vm, -1);
-				return 0;
-			}
-			
-			len += strlen(args->array[i].data) + 1;
-		}
-		
-		vm->argc = args->size;
-		vm->argv = gmalloc(len);
-		char* sbuf = (char*)vm->argv + sizeof(char*) * args->size;
-		for(int i = 0; i < args->size; i++) {
-			vm->argv[i] = sbuf;
-			char* str = args->array[i].data;
-			int slen = strlen(str) + 1;
-			memcpy(sbuf, str, slen);
-			sbuf += slen;
-		}
+	int argc = 0;
+	char* argv[1024];
+	char* args = rpc_vm.args.args_val;
+	int len = rpc_vm.args.args_len;
+	for(int i = 0; i < len; ) {
+		argv[argc++] = args + i;
+		i += strlen(args + i) +  1;
 	}
 	
+	vm->argv = gmalloc(sizeof(char*) * argc + rpc_vm.args.args_len);
+	vm->argc = argc;
+	memcpy(vm->argv, argv, sizeof(char*) * argc);
+	memcpy(vm->argv + sizeof(char*) * argc, rpc_vm.args.args_val, rpc_vm.args.args_len);
+	
 	// Allocate core
-	attr = json_get(obj, "core_num");
-	if(!attr) { errno = 400; return 0; }
-	vm->core_size = strtol(attr->data, NULL, 0);
+	vm->core_size = rpc_vm.core_num;
+	
 	int j = 0;
 	int core_count = mp_core_count();
 	for(int i = 0; i < core_count; i++) {
 		if(cores[i].status == VM_STATUS_STOPPED) {
 			vm->cores[j++] = i;
-			
 			cores[i].status = VM_STATUS_PAUSED;
 			cores[i].vm = vm;
 			
@@ -489,88 +436,95 @@ static uint64_t json_to_vm(JSONObject* obj) {
 	
 	if(j < vm->core_size) {
 		printf("Manager: Not enough core to allocate.\n");
-		errno = 507; // Not enough resource to allocate
 		vm_destroy(vm, -1);
-		return 0;
+		return &result;
 	}
 	
 	// Allocate memory
-	attr = json_get(obj, "memory_size");
-	if(!attr) { errno = 400; return 0; }
-	uint64_t memory_size = strtoll(attr->data, NULL, 0);
+	uint64_t memory_size = rpc_vm.memory_size;
 	memory_size = (memory_size + (VM_MEMORY_SIZE_ALIGN - 1)) & ~(VM_MEMORY_SIZE_ALIGN - 1);
 	vm->memory.count = memory_size / VM_MEMORY_SIZE_ALIGN;
 	vm->memory.blocks = gmalloc(vm->memory.count * sizeof(void*));
+	bzero(vm->memory.blocks, vm->memory.count * sizeof(void*));
 	for(int i = 0; i < vm->memory.count; i++) {
 		vm->memory.blocks[i] = bmalloc();
 		if(!vm->memory.blocks[i]) {
 			printf("Manager: Not enough memory to allocate.\n");
-			errno = 507;
 			vm_destroy(vm, -1);
-			return 0;
+			return &result;
 		}
 	}
 	
 	// Allocate storage
-	attr = json_get(obj, "storage_size");
-	if(!attr) { errno = 400; return 0; }
-	uint64_t storage_size = strtoll(attr->data, NULL, 0);
+	uint64_t storage_size = rpc_vm.storage_size;
 	storage_size = (storage_size + (VM_STORAGE_SIZE_ALIGN - 1)) & ~(VM_STORAGE_SIZE_ALIGN - 1);
 	vm->storage.count = storage_size / VM_STORAGE_SIZE_ALIGN;
 	vm->storage.blocks = gmalloc(vm->storage.count * sizeof(void*));
+	bzero(vm->storage.blocks, vm->storage.count * sizeof(void*));
 	for(int i = 0; i < vm->storage.count; i++) {
 		vm->storage.blocks[i] = bmalloc();
 		if(!vm->storage.blocks[i]) {
 			printf("Manager: Not enough storage to allocate.\n");
-			errno = 507;
 			vm_destroy(vm, -1);
-			return 0;
+			return &result;
 		}
 	}
 	
 	// Allocate NICs
-	attr = json_get(obj, "nics");
-	if(attr) {
-		if(attr->type != JSON_ARRAY) { errno = 400; return 0; }
-		JSONArray* nics = (JSONArray*)attr->data;
+	RPC_NIC* rpc_nic = rpc_vm.nics.nics_val;
+	vm->nic_size = rpc_vm.nics.nics_len;
+	vm->nics = gmalloc(sizeof(NI) * vm->nic_size);
+	bzero(vm->nics, sizeof(NI) * vm->nic_size);
+	
+	for(int i = 0; i < vm->nic_size; i++) {
+		uint64_t mac = rpc_nic[i].mac;
+		if(mac == 0) {
+			do {
+				mac = cpu_tsc() & 0x0fffffffffffL;
+				mac |= 0x02L << 40;	// Locally administrered
+			} while(ni_contains(mac));
+		} else if(ni_contains(mac)) {
+			printf("Manager: The mac address already in use: %012x.\n", mac);
+			vm_destroy(vm, -1);
+			return &result;
+		}
 		
-		vm->nic_size = nics->size;
-		vm->nics = gmalloc(sizeof(NI) * vm->nic_size);
+		uint64_t attrs[] = { 
+			NI_MAC, mac,
+			NI_INPUT_BUFFER_SIZE, rpc_nic[i].input_buffer_size,
+			NI_OUTPUT_BUFFER_SIZE, rpc_nic[i].output_buffer_size,
+			NI_INPUT_BANDWIDTH, rpc_nic[i].input_bandwidth,
+			NI_OUTPUT_BANDWIDTH, rpc_nic[i].output_bandwidth,
+			NI_POOL_SIZE, rpc_nic[i].pool_size,
+			NI_INPUT_ACCEPT_ALL, 1,
+			NI_OUTPUT_ACCEPT_ALL, 1,
+			NI_INPUT_FUNC, 0,
+			NI_NONE
+		};
 		
-		for(int i = 0; i < nics->size; i++) {
-			if(nics->array[i].type != JSON_OBJECT) {
-				errno = 400;
-				vm_destroy(vm, -1);
-				return -1;
-			}
-			
-			vm->nics[i] = json_to_ni(nics->array[i].data);
-			if(!vm->nics[i]) {
-				if(errno == 0) {
-					printf("Manager: Not enough NIC to allocate.\n");
-					errno = 507;
-				}
-				
-				vm_destroy(vm, -1);
-				return 0;
-			}
+		vm->nics[i] = ni_create(attrs);
+		if(!vm->nics[i]) {
+			printf("Manager: Not enough NIC to allocate: errno=%d.\n", errno);
+			vm_destroy(vm, -1);
+			return &result;
 		}
 	}
 	
-	// Allocate pid
-	uint64_t pid;
+	// Allocate vmid
+	uint64_t vmid;
 	while(true) {
-		pid = last_pid++;
+		vmid = last_vmid++;
 		
-		if(pid != 0 && !map_contains(vms, (void*)pid)) {
-			vm->id = pid;
-			map_put(vms, (void*)pid, vm);
+		if(vmid != 0 && !map_contains(vms, (void*)vmid)) {
+			vm->id = vmid;
+			map_put(vms, (void*)vmid, vm);
 			break;
 		}
 	}
+	result = vmid;
 	
 	// Dump info
-	printf("Manager: VM[%d] created(cores [", pid);
+	printf("Manager: VM[%d] created(cores [", vmid);
 	for(int i = 0; i < vm->core_size; i++) {
 		printf("%d", vm->cores[i]);
 		if(i + 1 < vm->core_size)
@@ -603,71 +557,45 @@ static uint64_t json_to_vm(JSONObject* obj) {
 	}
 	printf("\n");
 	
-	return pid;
+	return &result;
 }
 
-static bool vm_create(HTTPContext* req, HTTPContext* res) {
-	if(req->buf.total_index < req->buf.total_length)
-		return true;
-	
-	JSONType* json = json_parse((char*)req->buf.buf, req->buf.total_length);
-	if(json) {
-		uint64_t pid = json_to_vm((JSONObject*)json);
-		if(pid == 0) {
-			switch(errno) {
-				case 400:
-					httpd_status_set(res, errno, "JSON syntax error");
-					break;
-				case 507:
-					httpd_status_set(res, errno, "Not enough resource to allocate");
-					break;
-				case 509:
-					httpd_status_set(res, errno, "The resource already allocated");
-					break;
-				default:
-					httpd_status_set(res, 500, "Internal error");
-			}
-		} else {
-			res->buf.index = res->buf.total_length = sprintf((char*)res->buf.buf, "%d", pid);
-			
-			httpd_header_put(res, "Content-Type", "application/json");
-			httpd_status_set(res, 200, "OK");
-		}
-		
-		json_free(json);
-	} else {
-		res->buf.index = 0;
-		res->buf.total_length = 0;
-		
-		httpd_status_set(res, 400, "JSON syntax error");
-	}
-	
-	httpd_send(res);
-	
-	return true;
+RPC_VM* vm_get_1_svc(u_quad_t vmid,  struct svc_req *rqstp) {
+	static RPC_VM result;
+
+	/*
+	 * insert server code here
+	 */
+
+	return &result;
 }
 
-static bool vm_delete(HTTPContext* req, HTTPContext* res) {
-	if(req->buf.total_index < req->buf.total_length)
-		return true;
+bool_t* vm_set_1_svc(u_quad_t vmid, RPC_VM vm,  struct svc_req *rqstp) {
+	static bool_t result;
+	result = FALSE;
+
+	/*
+	 * insert server code here
+	 */
+
+	return &result;
+}
+
+bool_t * vm_delete_1_svc(u_quad_t vmid,  struct svc_req *rqstp) {
+	static bool_t result;
+	result = FALSE;
 	
-	uint64_t pid = strtoll(httpd_param_get(req, "pid"), NULL, 0);
-	VM* vm = map_get(vms, (void*)pid);
-	if(!vm) {
-		httpd_status_set(res, 410, "There is no such resource");
-		httpd_send(res);
-		return true;
-	}
+	VM* vm = map_get(vms, (void*)vmid);
+	if(!vm)
+		return &result;
 	
 	for(int i = 0; i < vm->core_size; i++) {
 		if(cores[vm->cores[i]].status == VM_STATUS_STARTED) {
-			httpd_status_set(res, 401, "Permission denied");
-			httpd_send(res);
-			return true;
+			return &result;
 		}
 	}
 	
-	printf("Manager: Delete vm[%d] on cores [", pid);
+	printf("Manager: Delete vm[%d] on cores [", vmid);
 	for(int i = 0; i < vm->core_size; i++) {
 		printf("%d", vm->cores[i]);
 		if(i + 1 < vm->core_size)
@@ -675,83 +603,78 @@ static bool vm_delete(HTTPContext* req, HTTPContext* res) {
 	}
 	printf("]\n");
 	
-	map_remove(vms, (void*)pid);
+	map_remove(vms, (void*)vmid);
 	vm_destroy(vm, -1);
 	
-	res->buf.index = res->buf.total_length = sprintf((char*)res->buf.buf, "true");
-	
-	httpd_header_put(res, "Content-Type", "application/json");
-	httpd_status_set(res, 200, "OK");
-	httpd_send(res);
-	
-	return true;
+	result = TRUE;
+	return &result;
 }
 
-static bool vm_power_set(HTTPContext* req, HTTPContext* res) {
-	typedef struct {
-		HTTPContext*	res;
-		bool		is_closed;
-		uint64_t	listener_id;
-	} Data;
+RPC_VMList * vm_list_1_svc(struct svc_req *rqstp) {
+	static RPC_VMList result;
+	static u_quad_t vmids[RPC_MAX_VM_COUNT];
 	
-	bool start_callback(int event_id, void* context, void* event) {
-		Data* data = context;
-		
-		if(data->is_closed) {
-			free(data);
-			return false;
-		}
-		
-		VM* vm = event;
-		HTTPContext* res = data->res;
-		
-		httpd_close_listener_remove(res, data->listener_id);
-		
-		free(data);
-		
-		if(vm->status == VM_STATUS_STARTED) {
-			res->buf.index = res->buf.total_length = sprintf((char*)res->buf.buf, "true");
-			
-			httpd_header_put(res, "Content-Type", "application/json");
-			httpd_status_set(res, 200, "OK");
-			httpd_send(res);
-			
-			return false;
-		} else {
-			int error_code = 0;
-			for(int i = 0; i < vm->core_size; i++) {
-				Core* core = &cores[vm->cores[i]];
-				if(core->status == VM_STATUS_STARTED)
-					continue;
-				
-				error_code = core->error_code;
-				break;
-			}
-			
-			res->buf.total_length = res->buf.index = sprintf((char*)res->buf.buf, "%d", error_code);
-			
-			httpd_header_put(res, "Content-Type", "application/json");
-			httpd_status_set(res, 500, "Internal error");
-			httpd_send(res);
-			
-			return false;
-		}
+	result.RPC_VMList_len = 0;
+	result.RPC_VMList_val = NULL;
+	
+	MapIterator iter;
+	map_iterator_init(&iter, vms);
+	while(map_iterator_has_next(&iter)) {
+		MapEntry* entry = map_iterator_next(&iter);
+		vmids[result.RPC_VMList_len++] = (uint64_t)entry->key;
+	}
+	result.RPC_VMList_val = vmids;
+	
+	return &result;
+}
+
+bool_t * status_set_1_svc(u_quad_t vmid, RPC_VMStatus status, struct svc_req *rqstp) {
+	static bool_t result;
+	result = FALSE;
+	
+	VM* vm = map_get(vms, (void*)vmid);
+	if(!vm) {
+		return &result;
 	}
 	
-	bool start_close_listener(HTTPContext* req, HTTPContext* res, void* context) {
-		Data* data = context;
-		data->is_closed = true;
+	bool callback(int event_type, void* context, void* event) {
+		SVCXPRT* transp = context;
+		VM* vm = event;
+		
+		bool_t result;
+		switch(event_type) {
+			case EVENT_VM_STARTED:
+				result = vm->status == VM_STATUS_STARTED ? TRUE : FALSE;
+				break;
+			case EVENT_VM_STOPPED:
+				result = vm->status == VM_STATUS_STOPPED ? TRUE : FALSE;
+				break;
+			default:
+				svcerr_systemerr(transp);
+				free(transp);
+				return false;
+		}
+		
+		if(!svc_sendreply(transp, (xdrproc_t)xdr_bool, (caddr_t)&result)) {
+			svcerr_systemerr(transp);
+		}
+		free(transp);
+		
 		return false;
 	}
 	
-	void start(uint64_t pid, VM* vm) {
-		printf("Manager: VM[%d] starts on cores [", pid);
+	void start(uint64_t vmid, VM* vm) {
+		printf("Manager: VM[%d] starts on cores [", vmid);
 		for(int i = 0; i < vm->core_size; i++) {
 			printf("%d", vm->cores[i]);
 			if(i + 1 < vm->core_size)
 				printf(", ");
 		}
 		printf("]\n");
+		
+		SVCXPRT* transp = malloc(sizeof(SVCXPRT));
+		memcpy(transp, rqstp->rq_xprt, sizeof(SVCXPRT));
+		event_event(EVENT_VM_STARTED, callback, transp);
 		
 		for(int i = 0; i < vm->core_size; i++) {
 			cores[vm->cores[i]].error_code = 0;
@@ -759,45 +682,10 @@ static bool vm_power_set(HTTPContext* req, HTTPContext* res) {
 			msg->data.start.vm = vm;
 			icc_send(msg);
 		}
-		
-		Data* data = malloc(sizeof(Data));
-		bzero(data, sizeof(Data));
-		data->res = res;
-		data->listener_id = httpd_close_listener_add(res, start_close_listener, data);
-		event_event(EVENT_VM_STARTED, start_callback, data);
 	}
 	
-	bool stop_callback(int event_id, void* context, void* event) {
-		Data* data = context;
-		
-		if(data->is_closed) {
-			free(data);
-			return false;
-		}
-		
-		HTTPContext* res = data->res;
-		
-		httpd_close_listener_remove(res, data->listener_id);
-		
-		free(data);
-		
-		res->buf.index = res->buf.total_length = sprintf((char*)res->buf.buf, "true");
-		
-		httpd_header_put(res, "Content-Type", "application/json");
-		httpd_status_set(res, 200, "OK");
-		httpd_send(res);
-		
-		return false;
-	}
-	
-	bool stop_close_listener(HTTPContext* req, HTTPContext* res, void* context) {
-		Data* data = context;
-		data->is_closed = true;
-		return false;
-	}
-	
-	void stop(uint64_t pid, VM* vm) {
-		printf("Manager: VM[%d] stops on cores [", pid);
+	void stop(uint64_t vmid, VM* vm) {
+		printf("Manager: VM[%d] stops on cores [", vmid);
 		for(int i = 0; i < vm->core_size; i++) {
 			printf("%d", vm->cores[i]);
 			if(i + 1 < vm->core_size)
@@ -805,388 +693,229 @@ static bool vm_power_set(HTTPContext* req, HTTPContext* res) {
 		}
 		printf("]\n");
 		
-		Data* data = malloc(sizeof(Data));
-		bzero(data, sizeof(Data));
-		data->res = res;
+		SVCXPRT* transp = malloc(sizeof(SVCXPRT));
+		memcpy(transp, rqstp->rq_xprt, sizeof(SVCXPRT));
+		event_event(EVENT_VM_STOPPED, callback, transp);
 		
 		for(int i = 0; i < vm->core_size; i++) {
-			if(cores[vm->cores[i]].status == VM_STATUS_STARTED) {
-				ICC_Message* msg = icc_sending(ICC_TYPE_STOP, vm->cores[i]);
-				icc_send(msg);
+			ICC_Message* msg = icc_sending(ICC_TYPE_STOP, vm->cores[i]);
+			icc_send(msg);
+		}
+	}
+	
+	switch(status) {
+		case RPC_START:
+			switch(vm->status) {
+				case VM_STATUS_STOPPED:
+					start(vmid, vm);
+					break;
+				case VM_STATUS_PAUSED:
+					start(vmid, vm);
+					break;
+				case VM_STATUS_STARTED:
+					return &result;
 			}
-		}
-		
-		data->listener_id = httpd_close_listener_add(res, stop_close_listener, data);
-		event_event(EVENT_VM_STOPPED, stop_callback, data);
-	}
-	
-	if(req->buf.total_index < req->buf.total_length)
-		return true;
-	
-	uint64_t pid = strtoll(httpd_param_get(req, "pid"), NULL, 0);
-	VM* vm = map_get(vms, (void*)pid);
-	if(!vm) {
-		httpd_status_set(res, 410, "There is no such resource");
-		httpd_send(res);
-		return true;
-	}
-	
-	bool is_changed = false;
-	
-	if(req->buf.total_length == 4 && strncmp((char*)req->buf.buf, "stop", 4) == 0) {
-		switch(vm->status) {
-			case VM_STATUS_STOPPED:
-				// Do nothing
-				break;
-			case VM_STATUS_PAUSED:
-				// TODO: Do something
-				break;
-			case VM_STATUS_STARTED:
-				stop(pid, vm);
-				return true;
-		}
-	} else if(req->buf.total_length == 5 && strncmp((char*)req->buf.buf, "pause", 5) == 0) {
-		switch(vm->status) {
-			case VM_STATUS_STOPPED:
-				// TODO: Do something
-				break;
-			case VM_STATUS_PAUSED:
-				// Do nothing
-				break;
-			case VM_STATUS_STARTED:
-				// TODO: Do something
-				break;
-		}
-	} else if(req->buf.total_length == 5 && strncmp((char*)req->buf.buf, "start", 5) == 0) {
-		switch(vm->status) {
-			case VM_STATUS_STOPPED:
-				start(pid, vm);
-				return true;
-			case VM_STATUS_PAUSED:
-				start(pid, vm);
-				return true;
-			case VM_STATUS_STARTED:
-				// Do nothing
-				break;
-		}
-	} else {
-		httpd_status_set(res, 400, "JSON syntax error");
-		httpd_send(res);
-		return true;
-	}
-	
-	if(is_changed) {
-		res->buf.index = res->buf.total_length = sprintf((char*)res->buf.buf, "true");
-		
-		httpd_header_put(res, "Content-Type", "application/json");
-		httpd_status_set(res, 200, "OK");
-		httpd_send(res);
-	} else {
-		res->buf.index = res->buf.total_length = sprintf((char*)res->buf.buf, "false");
-		
-		httpd_header_put(res, "Content-Type", "application/json");
-		httpd_status_set(res, 200, "OK");
-		httpd_send(res);
-	}
-	
-	return true;
-}
-
-static bool vm_power_get(HTTPContext* req, HTTPContext* res) {
-	if(req->buf.total_index < req->buf.total_length)
-		return true;
-	
-	uint64_t pid = strtoll(httpd_param_get(req, "pid"), NULL, 0);
-	VM* vm = map_get(vms, (void*)pid);
-	if(!vm) {
-		httpd_status_set(res, 410, "There is no such resource");
-		httpd_send(res);
-		return true;
-	}
-	
-	char* status;
-	switch(vm->status) {
-		case VM_STATUS_STOPPED:
-			status = "stopped";
 			break;
-		case VM_STATUS_PAUSED:
-			status = "paused";
+		case RPC_PAUSE:
+			switch(vm->status) {
+				case VM_STATUS_STOPPED:
+					// TODO: Do something
+					return &result;
+				case VM_STATUS_PAUSED:
+					// Do nothing
+					return &result;
+				case VM_STATUS_STARTED:
+					// TODO: Do something
+					return &result;
+			}
 			break;
-		case VM_STATUS_STARTED:
-			status = "started";
+		case RPC_STOP:
+			switch(vm->status) {
+				case VM_STATUS_STOPPED:
+					// Do nothing
+					return &result;
+				case VM_STATUS_PAUSED:
+					// TODO: Do something
+					return &result;
+				case VM_STATUS_STARTED:
+					stop(vmid, vm);
+					break;
+			}
 			break;
 		default:
-			status = "zombie";
+			return &result;
 	}
 	
-	res->buf.index = res->buf.total_length = sprintf((char*)res->buf.buf, status);
-	
-	httpd_header_put(res, "Content-Type", "application/json");
-	httpd_status_set(res, 200, "OK");
-	httpd_send(res);
-	
-	return true;
+	return NULL;	// Async call
 }
 
-static bool vm_storage_set(HTTPContext* req, HTTPContext* res) {
-	uint64_t pid = strtoll(httpd_param_get(req, "pid"), NULL, 0);
-	VM* vm = map_get(vms, (void*)pid);
+RPC_VMStatus * status_get_1_svc(u_quad_t vmid,  struct svc_req *rqstp) {
+	static RPC_VMStatus  result;
+	result = RPC_NONE;
+	
+	VM* vm = map_get(vms, (void*)vmid);
 	if(!vm) {
-		httpd_status_set(res, 410, "There is no such resource");
-		httpd_send(res);
-		return true;
+		return &result;
 	}
 	
-	if(vm->status == VM_STATUS_STARTED) {
-		httpd_status_set(res, 401, "Permission denied");
-		httpd_send(res);
-		return true;
+	switch(vm->status) {
+		case VM_STATUS_STOPPED:
+			result = RPC_STOP;
+			break;
+		case VM_STATUS_PAUSED:
+			result = RPC_PAUSE;
+			break;
+		case VM_STATUS_STARTED:
+			result = RPC_START;
+			break;
 	}
 	
-	int index0 = req->buf.total_index - req->buf.index;
-	int size = req->buf.index;
-	
-	int block = index0 / VM_STORAGE_SIZE_ALIGN;
-	int index = index0 % VM_STORAGE_SIZE_ALIGN;
-	
-	if(index + size > VM_STORAGE_SIZE_ALIGN) {
-		if(block + 1 >= vm->storage.count) {
-			httpd_status_set(res, 507, "Not enough resource to allocate");
-			httpd_send(res);
-			return true;
-		}
-		
-		int len2 = index + size - VM_STORAGE_SIZE_ALIGN;
-		int len1 = VM_STORAGE_SIZE_ALIGN - len2;
-		memcpy(vm->storage.blocks[block] + index, req->buf.buf, len1);
-		memcpy(vm->storage.blocks[block + 1], req->buf.buf + len1, len2);
-	} else {
-		if(block >= vm->storage.count) {
-			httpd_status_set(res, 507, "Not enough resource to allocate");
-			httpd_send(res);
-			return true;
-		}
-		
-		memcpy(vm->storage.blocks[block] + index, req->buf.buf, size);
-	}
-	
-	req->buf.index = 0;
-	
-	if(req->buf.total_index == 0) {
-		printf("Manager: Uploading vm[%d] storage: %ld bytes\n", pid, req->buf.total_length);
-	} else {
-		printf(".");
-	}
-	
-	if(req->buf.total_index >= req->buf.total_length) {
-		printf("\n");
-		
-		uint32_t md5sum[4];
-		md5_blocks(vm->storage.blocks, vm->storage.count, VM_STORAGE_SIZE_ALIGN, req->buf.total_length, md5sum);
-		uint8_t* p = (uint8_t*)md5sum;
-		
-		#define HEX(v)  (((v) & 0x0f) > 9 ? ((v) & 0x0f) - 10 + 'a' : ((v) & 0x0f) + '0')
-		uint8_t* c = res->buf.buf;
-		for(int i = 0; i < 16; i++) {
-			*c++ = HEX(p[i] >> 4);
-			*c++ = HEX(p[i] >> 0);
-		}
-		
-		res->buf.index = 32;
-		res->buf.total_length = 32;
-		
-		httpd_header_put(res, "Content-Type", "plain/text");
-		httpd_status_set(res, 200, "OK");
-		httpd_send(res);
-	}
-	
-	return true;
+	return &result;
 }
 
-static bool vm_storage_get(HTTPContext* req, HTTPContext* res) {
-	uint64_t pid = strtoll(httpd_param_get(req, "pid"), NULL, 0);
-	VM* vm = map_get(vms, (void*)pid);
-	if(!vm) {
-		httpd_status_set(res, 410, "There is no such resource");
-		httpd_send(res);
-		return true;
-	}
+RPC_Digest * storage_digest_1_svc(u_quad_t vmid, RPC_MessageDigestType type, u_quad_t size,  struct svc_req *rqstp) {
+	static RPC_Digest  result;
+	static uint32_t md5sum[4];
 	
-	bool send(HTTPContext* req, HTTPContext* res, void* context) {
-		VM* vm = context;
-		
-		if(res->buf.index + 4096 > HTTP_BUFFER_SIZE) {
-			httpd_send(res);
-			return true;
-		}
-		
-		uint64_t total = res->buf.total_index + res->buf.index;
-		int block = total / VM_STORAGE_SIZE_ALIGN;
-		int index = total % VM_STORAGE_SIZE_ALIGN;
-		
-		memcpy(res->buf.buf + res->buf.index, vm->storage.blocks[block] + index, 4096);
-		res->buf.index += 4096;
-		httpd_send(res);
-		
-		printf(".");
-		
-		if(res->buf.total_index >= res->buf.total_length) {
-			printf("\n");
-			return false;
-		} else {
-			return true;
-		}
-	}
+	result.RPC_Digest_len = 0;
+	result.RPC_Digest_val = NULL;
 	
-	res->buf.total_length = vm->storage.count * VM_STORAGE_SIZE_ALIGN;
-	httpd_header_put(res, "Content-Type", "application/octet-stream");
-	httpd_status_set(res, 200, "OK");
-	printf("Manager: Downloading vm[%d] storage: %ld bytes\n", pid, res->buf.total_length);
+	VM* vm = map_get(vms, (void*)vmid);
+	if(!vm)
+		return &result;
 	
-	httpd_send_listener_add(res, send, vm);
-	send(req, res, vm);
+	md5_blocks(vm->storage.blocks, vm->storage.count, VM_STORAGE_SIZE_ALIGN, size, md5sum);
 	
-	return true;
+	result.RPC_Digest_len = 16;
+	result.RPC_Digest_val = (char*)md5sum;
+	
+	return &result;
 }
 
-static bool vm_storage_delete(HTTPContext* req, HTTPContext* res) {
-	uint64_t pid = strtoll(httpd_param_get(req, "pid"), NULL, 0);
-	VM* vm = map_get(vms, (void*)pid);
-	if(!vm) {
-		httpd_status_set(res, 410, "There is no such resource");
-		httpd_send(res);
-		return true;
-	}
+static uint32_t get_remote_addr(struct svc_req* rqstp) {
+	Packet* packet = (Packet*)rqstp->rq_xprt->xp_p2;
+	Ether* ether = (Ether*)(packet->buffer + packet->start);
+	IP* ip = (IP*)ether->payload;
 	
-	printf("Manager: Deleting vm[%d] storage: %ld bytes\n", pid, vm->storage.count * VM_STORAGE_SIZE_ALIGN);
-	httpd_header_put(res, "Content-Type", "application/json");
-	httpd_status_set(res, 200, "OK");
-	
-	for(int i = 0; i < vm->storage.count; i++) {
-		bzero(vm->storage.blocks[i], VM_STORAGE_SIZE_ALIGN);
-	}
-	
-	res->buf.index = res->buf.total_length = sprintf((char*)res->buf.buf, "true");
-	
-	httpd_send(res);
-	
-	return true;
+	return endian32(ip->source);
 }
 
-static bool vm_stdio(HTTPContext* req, HTTPContext* res) {
-	bool close_listener(HTTPContext* req, HTTPContext* res, void* context) {
-		((VM*)context)->res = NULL;
-		
-		return false;
-	}
+bool_t * callback_add_1_svc(RPC_Address addr, struct svc_req *rqstp) {
+	static bool_t  result;
+	result = FALSE;
 	
-	uint8_t* find_eol(uint8_t* buf, uint8_t* end) {
-		for(; buf <= end - 2; buf++) {
-			if(buf[0] == '\r' && buf[1] == '\n')
-				return buf + 2;
-		}
-		return NULL;
-	}
+	uint32_t ip = addr.ip == 0 ? get_remote_addr(rqstp) : addr.ip;
+	printf("Add callback: %x:%d\n", ip, addr.port);
+	Callback* cb = callback_create(ip, addr.port);
+	if(!cb)
+		return &result;
 	
-	uint64_t pid = strtoll(httpd_param_get(req, "pid"), NULL, 0);
-	VM* vm = map_get(vms, (void*)pid);
-	if(!vm) {
-		httpd_status_set(res, 410, "There is no such resource");
-		httpd_send(res);
-		return true;
-	}
+	printf("Add callback true\n");
+	result = TRUE;
+	return &result;
+}
+
+bool_t * callback_remove_1_svc(RPC_Address addr,  struct svc_req *rqstp) {
+	static bool_t  result;
+	result = FALSE;
 	
-	if(vm->res != res) {
-		if(vm->res) {
-			httpd_close(vm->res);
-		}
-		
-		httpd_close_listener_add(res, close_listener, vm);
-		res->encoding = HTTP_ENCODING_CHUNKED;
-		httpd_status_set(res, 200, "OK");
-		httpd_send(res);
-		
-		vm->res = res;
-	}
+	uint32_t ip = addr.ip == 0 ? get_remote_addr(rqstp) : addr.ip;
 	
-	int len = req->buf.index - req->buf.total_index + req->buf.total_length;
-	uint8_t* buf = req->buf.buf;
-	uint8_t* last = buf;
-	uint8_t* end = buf + len;
-	
-	while(buf < end) {
-		int thread_id = strtol((const char*)buf, NULL, 16);
+	ListIterator iter;
+	list_iterator_init(&iter, callbacks);
+	while(list_iterator_has_next(&iter)) {
+		Callback* cb = list_iterator_next(&iter);
 		
-		buf = find_eol(buf, end);
-		if(!buf)
-			goto done;
-		int fd = strtol((const char*)buf, NULL, 16);
-		
-		buf = find_eol(buf, end);
-		if(!buf)
-			goto done;
-		int size = strtol((const char*)buf, NULL, 16);
-		
-		buf = find_eol(buf, end);
-		if(!buf)
-			goto done;
-		
-		if(end - buf < size)
-			goto done;
-		
-		if(fd == 0 && thread_id < vm->core_size) {
-			Core* core = &cores[vm->cores[thread_id]];
+		if(cb->addr == ip && cb->port == addr.port) {
+			list_iterator_remove(&iter);
+			free(cb);
 			
-			ssize_t len = ring_write(core->stdin, *core->stdin_head, core->stdin_tail, core->stdin_size, (char*)buf, size);
-			if(len < size) {
-				int text_len = size - len;
-				
-				char size_buf[8];
-				int size_len = itoh(size_buf, text_len);
-				
-				char thread_buf[8];
-				int thread_len = itoh(thread_buf, thread_id);
-				
-				char fd_buf[8];
-				int fd_len = itoh(fd_buf, fd);
-				
-				int content_len = fd_len + 2 + thread_len + 2 + size_len + 2 + text_len;
-				
-				char total_buf[8];
-				int total_len = itoh(total_buf, content_len);
-				
-				int total = total_len + 2 + content_len;
-				
-				buf -= total;
-				last = buf;
-				
-				memcpy(buf, total_buf, total_len); buf += total_len;
-				memcpy(buf, "\r\n", 2); buf += 2;
-				
-				memcpy(buf, thread_buf, thread_len); buf += thread_len;
-				memcpy(buf, "\r\n", 2); buf += 2;
-				
-				memcpy(buf, fd_buf, fd_len); buf += fd_len;
-				memcpy(buf, "\r\n", 2); buf += 2;
-				
-				memcpy(buf, size_buf, size_len); buf += size_len;
-				memcpy(buf, "\r\n", 2); buf += 2;
-				
-				goto done;
-			}
+			result = TRUE;
+			break;
 		}
-		
-		buf += size;
-		last = buf;
 	}
 	
-done:
-	memmove(req->buf.buf, last, end - last);
-	int total = last - req->buf.buf;
-	req->buf.index -= total;
-	
-	return true;
+	return &result;
 }
+
+RPC_Addresses * callback_list_1_svc(struct svc_req *rqstp) {
+	static RPC_Addresses result;
+	static RPC_Address addrs[RPC_MAX_CALLBACK_COUNT];
+	
+	result.RPC_Addresses_len = list_size(callbacks);
+	result.RPC_Addresses_val = addrs;
+	
+	int i = 0;
+	ListIterator iter;
+	list_iterator_init(&iter, callbacks);
+	while(list_iterator_has_next(&iter)) {
+		Callback* cb = list_iterator_next(&iter);
+		addrs[i].ip = cb->addr;
+		addrs[i].port = cb->port;
+		i++;
+	}
+	
+	return &result;
+}
+
+void * callback_null_1_svc(struct svc_req *rqsp) {
+	static void* result;
+	return (void*)&result;
+}
+
+void * stdio_1_svc(RPC_Message msg, struct svc_req *rqsp) {
+	static void* result;
+	// TODO: Implement it
+	printf("%d %d %d %s", msg.vmid, msg.coreid, msg.fd, msg.message.message_val);
+	
+	return (void*)&result;
+}
+
+static int tftp_create(char* filename, int mode) { // 1: read, 2: write
+	uint64_t vmid = (uint64_t)strtoll(filename, NULL, 0);
+	if(map_contains(vms, (void*)vmid)) {
+		printf("TFTP: %d [");
+		return (int)vmid;	// TODO: Change vmid type to int
+	} else {
+		return -1;
+	}
+}
+
+static int tftp_write(int fd, void* buf, uint32_t offset, int size) {
+	VM* vm = map_get(vms, (void*)(uint64_t)fd);
+	if(!vm)
+		return -2;
+	
+	if((uint64_t)offset + size > (uint64_t)vm->storage.count * VM_STORAGE_SIZE_ALIGN) {
+		return -1;
+	}
+	
+	// TODO: Calc block index, fragmented block
+	memcpy(vm->storage.blocks[0] + offset, buf, size);
+	if(size == 512)
+		printf(".");
+	else
+		printf("]\n");
+	
+	return size;
+}
+
+static int tftp_read(int fd, void* buf, uint32_t offset, int size) {
+	VM* vm = map_get(vms, (void*)(uint64_t)fd);
+	if(!vm)
+		return -2;
+	
+	if((uint64_t)offset + size > (uint64_t)vm->storage.count * VM_STORAGE_SIZE_ALIGN) {
+		return -1;
+	}
+	
+	// TODO: Calc block index, fragmented block
+	memcpy(buf, vm->storage.blocks[0] + offset, size);
+	
+	return size;
+}
+
+static TFTPCallback tftp_callback = { tftp_create, tftp_write, tftp_read };
 
 void manager_init() {
 	uint64_t attrs[] = { 
@@ -1201,34 +930,36 @@ void manager_init() {
 		NI_NONE
 	};
 	
-	manager_ni = ni_create(attrs);
+	NI* ni = ni_create(attrs);
+	ni->ni->config = map_create(8, map_string_hash, map_string_equals, malloc, free);
+	map_put(ni->ni->config, "ip", (void*)(uint64_t)manager_ip);
+	map_put(ni->ni->config, "gateway", (void*)(uint64_t)manager_gw);
+	map_put(ni->ni->config, "netmask", (void*)(uint64_t)manager_netmask);
+	map_put(ni->ni->config, TFTP_CALLBACK, &tftp_callback);
 	
-	extern NetworkInterface* __nis;
-	__nis = manager_ni->ni;
-	extern int __nis_count;
-	__nis_count = 1;
+	callbacks = list_create(malloc, free);
 	
-	manager_netif = ni_init(0, manager_ip, manager_netmask, manager_gw, true, NULL, NULL);
+	SVCXPRT* rpc;
+	if(!(rpc = svcudp_create(111)))
+		printf("Cannot create service\n");
 	
-	HTTPD* httpd = httpd_create(0, 80);
-	httpd_post(httpd, "/vm", vm_create);
-	httpd_delete(httpd, "/vm/:pid", vm_delete);
-	httpd_put(httpd, "/vm/:pid/power", vm_power_set);
-	httpd_get(httpd, "/vm/:pid/power", vm_power_get);
-	httpd_post(httpd, "/vm/:pid/storage", vm_storage_set);
-	httpd_get(httpd, "/vm/:pid/storage", vm_storage_get);
-	httpd_delete(httpd, "/vm/:pid/storage", vm_storage_delete);
-	httpd_post(httpd, "/vm/:pid/stdio", vm_stdio);
+	void manager_1(struct svc_req *rqstp, register SVCXPRT *transp);
+	if(!svc_register(rpc, MANAGER, MANAGER_APPLE, manager_1, IPPROTO_UDP))
+		printf("Cannot register manager service\n");
 	
-	event_idle((void*)idle_io, manager_ni->ni);
+	void callback_1(struct svc_req *rqstp, register SVCXPRT *transp);
+	if(!svc_register(rpc, CALLBACK, CALLBACK_APPLE, callback_1, IPPROTO_UDP))
+		printf("Cannot register callback service\n");
 	
-	vms = map_create(3, map_uint64_hash, map_uint64_equals, malloc, free);
+	vms = map_create(4, map_uint64_hash, map_uint64_equals, malloc, free);
 	
 	icc_register(ICC_TYPE_STARTED, icc_started);
 	icc_register(ICC_TYPE_STOPPED, icc_stopped);
 	
 	// Core 0 is occupied by manager
 	cores[0].status = VM_STATUS_STARTED;
+	
+	event_idle((void*)manager_loop, ni->ni);
 }
 
 void manager_get_ip(uint32_t* ip, uint32_t* netmask, uint32_t* gateway) {

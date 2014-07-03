@@ -26,4 +26,7 @@ typedef struct {
 	uint8_t		payload[0];
 } __attribute__ ((packed)) TCP;
 
+uint16_t tcp_port_alloc();
+void tcp_port_free(uint16_t port);
+
 #endif /* __NET_TCP_H__ */

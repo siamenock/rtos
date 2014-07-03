@@ -37,8 +37,8 @@ bool fifo_resize(FIFO* fifo, size_t size, void(*popped)(void*)) {
 void fifo_init(FIFO* fifo, void** array, size_t size) {
 	fifo->head = 0;
 	fifo->tail = 0;
-	fifo->array = array;
 	fifo->size = size;
+	fifo->array = array;
 	fifo->malloc = NULL;
 	fifo->free = NULL;
 }

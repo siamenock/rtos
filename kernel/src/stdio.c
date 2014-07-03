@@ -2,6 +2,7 @@
 #include <stddef.h>
 #include <string.h>
 #include <stdlib.h>
+#include <time.h>
 #include <util/ring.h>
 #include "device.h"
 #include "port.h"
@@ -12,6 +13,7 @@
 #include "driver/stdin.h"
 #include "driver/stdout.h"
 #include "event.h"
+#include "cpu.h"
 #include "stdio.h"
 
 #define BUFFER_SIZE	2048
@@ -673,8 +675,10 @@ int vsprintf(char *str, const char *format, va_list va) {
 	}
 	
 	void print_integer(int value, char a, int base) {
-		if(value < 0)
+		if(value < 0) {
 			*str++ = '-';
+			value = -value;
+		}
 		
 		char* str0 = str;
 		do {
@@ -700,8 +704,10 @@ int vsprintf(char *str, const char *format, va_list va) {
 	}
 	
 	void print_long(long value, char a, int base) {
-		if(value < 0)
+		if(value < 0) {
 			*str++ = '-';
+			value = -value;
+		}
 		
 		char* str0 = str;
 		do {
@@ -861,6 +867,22 @@ int vsprintf(char *str, const char *format, va_list va) {
 								print_long(va_arg(va, unsigned long), 0, 10);
 								format++;
 								break;
+							case 'x':
+								print_unsigned_long(va_arg(va, unsigned long), 'a', 16);
+								format++;
+								break;
+							case 'X':
+								print_unsigned_long(va_arg(va, unsigned long), 'A', 16);
+								format++;
+								break;
+							case 'o':
+								print_unsigned_long(va_arg(va, unsigned long), 0, 8);
+								format++;
+								break;
+							case 'O':
+								print_unsigned_long(va_arg(va, unsigned long), 0, 8);
+								format++;
+								break;
 							default:
 								*str++ = 0;
 								goto done;
@@ -873,19 +895,19 @@ int vsprintf(char *str, const char *format, va_list va) {
 						format++;
 						break;
 					case 'x':
-						print_unsigned_long(va_arg(va, unsigned long), 'a', 16);
+						print_unsigned_integer(va_arg(va, unsigned int), 'a', 16);
 						format++;
 						break;
 					case 'X':
-						print_unsigned_long(va_arg(va, unsigned long), 'A', 16);
+						print_unsigned_integer(va_arg(va, unsigned int), 'A', 16);
 						format++;
 						break;
 					case 'o':
-						print_unsigned_long(va_arg(va, unsigned long), 0, 8);
+						print_unsigned_integer(va_arg(va, unsigned int), 0, 8);
 						format++;
 						break;
 					case 'O':
-						print_unsigned_long(va_arg(va, unsigned long), 0, 8);
+						print_unsigned_integer(va_arg(va, unsigned int), 0, 8);
 						format++;
 						break;
 					case 'f':
@@ -930,3 +952,24 @@ int printf(const char* format, ...) {
 	
 	return write1(buf, len);
 }
+
+int fprintf(FILE* stream, const char* format, ...) {
+	char buf[4096];
+	
+	va_list va;
+	va_start(va, format);
+	int len = vsprintf(buf, format, va);
+	va_end(va);
+	
+	return write1(buf, len);
+}
+
+void exit(int status) {
+	printf("Exit is called: %d\n", status);
+	while(1) asm("hlt");
+}
+
+clock_t clock() {
+       return (clock_t)(cpu_tsc() / (cpu_frequency / CLOCKS_PER_SEC));
+}
+

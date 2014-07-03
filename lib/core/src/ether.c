@@ -35,6 +35,17 @@ uint64_t read_u64(void* buf, uint32_t* idx) {
 	return endian64(value);
 }
 
+char* read_string(void* buf, uint32_t* idx) {
+	char* str = buf + *idx;
+	char* p = str;
+	while(*p != '\0') {
+		*idx += 1;
+		p++;
+	}
+	
+	return str;
+}
+
 void write_u8(void* buf, uint8_t value, uint32_t* idx) {
 	*(uint8_t*)(buf + *idx) = value;
 	*idx += 1;
@@ -60,4 +71,12 @@ void write_u48(void* buf, uint64_t value, uint32_t* idx) {
 void write_u64(void* buf, uint64_t value, uint32_t* idx) {
 	*(uint64_t*)(buf + *idx) = endian64(value);
 	*idx += 8;
+}
+
+void write_string(void* buf, const char* str, uint32_t* idx) {
+	char* p = buf + *idx;
+	while(*str != '\0') {
+		*idx += 1;
+		*p++ = *str++;
+	}
 }

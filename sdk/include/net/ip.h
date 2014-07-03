@@ -1,7 +1,10 @@
 #ifndef __NET_IP_H__
 #define __NET_IP_H__
 
+#include <net/packet.h>
+
 #define IP_LEN			20
+#define IP_TTL			64
 
 #define IP_PROTOCOL_ICMP	0x01
 #define IP_PROTOCOL_UDP		0x11
@@ -24,4 +27,6 @@ typedef struct {
 	uint8_t		body[0];
 } __attribute__ ((packed)) IP;
 
+void ip_pack(Packet* packet, uint16_t ip_body_len);
+ 
 #endif /* __NET_IP_H__ */

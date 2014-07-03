@@ -1,6 +1,6 @@
 Ref: http://toast.djw.org.uk/qemu.html
 
-apt-get install bridge-utils
+apt-get install bridge-utils qemu-kvm
 
 /etc/network/interfaces
 iface br0 inet manual

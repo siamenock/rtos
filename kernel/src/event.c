@@ -1,7 +1,6 @@
 #include <malloc.h>
 #include <util/list.h>
 #include "cpu.h"
-#include "malloc.h"
 #include "event.h"
 
 typedef struct {
@@ -161,6 +160,7 @@ uint64_t event_tevent(bool(*func)(void*), void* context, uint64_t delay, uint64_
 }
 
 bool event_tevent_cancel(uint64_t id) {
+	free((void*)id);
 	return list_remove_data(tevents, (void*)id);
 }
 

@@ -16,7 +16,6 @@
 
 #include "ni.h"
 
-#define IO_BUFFER_SIZE	128
 #define ALIGN		16
 
 Map* nis;
@@ -92,6 +91,8 @@ NI* ni_create(uint64_t* attrs) {
 	 
 	// Allocate NI
 	NI* ni = gmalloc(sizeof(NI));
+	if(!ni)
+		return NULL;
 	bzero(ni, sizeof(NI));
 	
 	// Allocate initial pool
@@ -104,7 +105,7 @@ NI* ni_create(uint64_t* attrs) {
 	
 	void* pool = bmalloc();
 	if(pool == NULL) {
-		bfree(ni);
+		gfree(ni);
 		errno = 5;
 		return NULL;
 	}
@@ -122,6 +123,11 @@ NI* ni_create(uint64_t* attrs) {
 	
 	// Allocate extra pools
 	ni->pools = list_create(ni_malloc, ni_free);
+	if(!ni->pools) {
+		gfree(ni);
+		errno = 5;
+		return NULL;
+	}
 	list_add(ni->pools, pool);
 	uint32_t pool_count = pool_size / 0x200000 - 1;
  	for(uint32_t i = 0; i < pool_count; i++) {
@@ -185,9 +191,19 @@ NI* ni_create(uint64_t* attrs) {
 				break;
 			case NI_INPUT_BUFFER_SIZE:
 				ni->ni->input_buffer = fifo_create(attrs[i * 2 + 1], ni_malloc, ni_free);
+				if(!ni->ni->input_buffer) {
+					errno = 5;
+					gfree(ni);
+					return NULL;
+				}
 				break;
 			case NI_OUTPUT_BUFFER_SIZE:
 				ni->ni->output_buffer = fifo_create(attrs[i * 2 + 1], ni_malloc, ni_free);
+				if(!ni->ni->output_buffer) {
+					errno = 5;
+					gfree(ni);
+					return NULL;
+				}
 				break;
 			case NI_MIN_BUFFER_SIZE:
 				ni->ni->min_buffer_size = ni->min_buffer_size = attrs[i * 2 + 1];
@@ -196,26 +212,39 @@ NI* ni_create(uint64_t* attrs) {
 				ni->ni->max_buffer_size = ni->max_buffer_size = attrs[i * 2 + 1];
 				break;
 			case NI_INPUT_ACCEPT:
-				if(ni->input_accept)
-					list_add(ni->input_accept, (void*)attrs[i * 2 + 1]);
+				if(ni->input_accept) {
+					if(!list_add(ni->input_accept, (void*)attrs[i * 2 + 1])) {
+						errno = 5;
+						gfree(ni);
+						return NULL;
+					}
+				}
 				break;
 			case NI_OUTPUT_ACCEPT:
-				if(ni->output_accept)
-					list_add(ni->output_accept, (void*)attrs[i * 2 + 1]);
+				if(ni->output_accept) {
+					if(!list_add(ni->output_accept, (void*)attrs[i * 2 + 1])) {
+						errno = 5;
+						gfree(ni);
+						return NULL;
+					}
+				}
 				break;
 		}
 		
 		i++;
 	}
 	
+	// Register the ni
 	map_put(nis, (void*)ni->mac, ni);
 	
 	return ni;
 }
 
 void ni_destroy(NI* ni) {
+	// Unregister the ni
 	map_remove(nis, (void*)ni->mac);
 	
+	// Free pools
 	ListIterator iter;
 	list_iterator_init(&iter, ni->pools);
 	
@@ -521,13 +550,13 @@ void ni_process_input(uint8_t* buf1, uint32_t size1, uint8_t* buf2, uint32_t siz
 		uint16_t size = size1 + size2;
 		
 		if(ni->input_closed - ni->input_wait_grace > time) {
-			printf("closed dropped");
+			printf("closed dropped ");
 			goto dropped;
 		}
 		
 		uint16_t buffer_size = ni->padding_head + size + ni->padding_tail + (ALIGN - 1);
 		if(buffer_size > ni->max_buffer_size) {
-			printf("buffer dropped");
+			printf("buffer dropped ");
 			goto dropped;
 		}
 		
@@ -535,14 +564,14 @@ void ni_process_input(uint8_t* buf1, uint32_t size1, uint8_t* buf2, uint32_t siz
 			buffer_size = ni->min_buffer_size;
 		
 		if(!fifo_available(ni->ni->input_buffer)) {
-			printf("fifo dropped");
+			printf("fifo dropped ");
 			goto dropped;
 		}
 		
 		// Packet
 		Packet* packet = ni_alloc(ni->ni, buffer_size);
 		if(!packet) {
-			printf("memory dropped");
+			printf("memory dropped ");
 			goto dropped;
 		}
 		
@@ -562,7 +591,7 @@ void ni_process_input(uint8_t* buf1, uint32_t size1, uint8_t* buf2, uint32_t siz
 		// Push
 		if(!fifo_push(ni->ni->input_buffer, packet)) {
 			ni_free(packet);
-			printf("fifo dropped 2");
+			printf("fifo dropped 2 ");
 			goto dropped;
 		}
 		
@@ -610,8 +639,10 @@ Packet* ni_process_output() {
 	while(map_iterator_has_next(&iter)) {
 		MapEntry* entry = map_iterator_next(&iter);
 		NI* ni = entry->data;
-		if(ni->output_closed - ni->output_wait_grace > time)
+		if(ni->output_closed - ni->output_wait_grace > time) {
+			printf("output closed: %016lx\n", ni->mac);
 			continue;
+		}
 		
 		Packet* packet = fifo_pop(ni->ni->output_buffer);
 		if(!packet)

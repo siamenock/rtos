@@ -4,7 +4,6 @@
 #include <string.h>
 #include <strings.h>
 #include <errno.h>
-#include <malloc.h>
 #include <elf.h>
 #include "../../loader/src/page.h"
 #include "rootfs.h"
@@ -12,7 +11,8 @@
 #include "symbols.h"
 #include "module.h"
 
-#define MODULE_ALIGNMENT	16
+#define MODULE_ALIGNMENT	128
+#define SECTION_ALIGNMENT	128
 #define MAX_SECTION_COUNT	16
 #define MAX_NAME_SIZE		16
 #define ALIGN(addr, align)	(((uint64_t)(addr) + (align) - 1) & ~((align) - 1))
@@ -143,7 +143,7 @@ void* module_load(void* file, size_t size, void **addr) {
 					strstr(name, ".strtab") == name ||
 					strstr(name, ".symtab") == name) {
 				
-				Elf64_Addr sec_addr = ALIGN(*addr, shdr[i].sh_addralign);
+				Elf64_Addr sec_addr = ALIGN(*addr, shdr[i].sh_addralign > SECTION_ALIGNMENT ? shdr[i].sh_addralign : SECTION_ALIGNMENT);
 				Elf64_Xword sec_size = shdr[i].sh_size;
 				
 				shdr[i].sh_addr = shdr2[i].sh_addr = sec_addr;
