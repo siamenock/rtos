@@ -6,10 +6,10 @@
 #include <net/ether.h>
 #include <net/ip.h>
 #include <util/map.h>
+#include <util/event.h>
 #include "gmalloc.h"
 #include "mp.h"
 #include "cpu.h"
-#include "event.h"
 #include "pci.h"
 #include "device.h"
 #include "../../loader/src/page.h"	// TODO: Delete it

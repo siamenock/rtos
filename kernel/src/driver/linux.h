@@ -10,7 +10,7 @@
 #include <gmalloc.h>
 #include <byteswap.h>
 #include <limits.h>
-#include "../event.h"
+#include <util/event.h>
 #include "../pci.h"
 #include "../port.h"
 #include "../cpu.h"
@@ -183,13 +183,13 @@ void del_timer(struct timer_list *timer);
 #define del_timer_sync(timer)	del_timer(timer)
 
 struct work_struct {
-	void(*func)(struct work_struct*);
+	bool(*func)(struct work_struct*);
 };
 
 #define INIT_WORK(_work, _func)	(_work)->func = _func
 
 inline bool schedule_work(struct work_struct *work) {
-	event_once((void*)work->func, work);
+	event_busy_add((void*)work->func, work);
 	return true;
 }
 

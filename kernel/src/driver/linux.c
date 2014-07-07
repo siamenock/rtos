@@ -15,7 +15,7 @@ void add_timer(struct timer_list *timer) {
 		return true;
 	}
 	
-	timer->id = event_tevent((void*)fn, (void*)timer, timer->expires, timer->expires);
+	timer->id = event_timer_add((void*)fn, (void*)timer, timer->expires, timer->expires);
 }
 
 int mod_timer(struct timer_list *timer, unsigned long expires) {
@@ -23,7 +23,7 @@ int mod_timer(struct timer_list *timer, unsigned long expires) {
 		timer->expires = expires;
 		add_timer(timer);
 	} else if(timer->expires != expires) {
-		event_tevent_cancel(timer->id);
+		event_timer_remove(timer->id);
 		timer->expires = expires;
 		add_timer(timer);
 	}
@@ -32,7 +32,7 @@ int mod_timer(struct timer_list *timer, unsigned long expires) {
 }
 
 void del_timer(struct timer_list *timer) {
-	event_tevent_cancel(timer->id);
+	event_timer_remove(timer->id);
 }
 
 void msleep(unsigned int d) {

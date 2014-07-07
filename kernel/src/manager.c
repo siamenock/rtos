@@ -16,16 +16,17 @@
 #include <net/md5.h>
 #include <util/map.h>
 #include <util/ring.h>
+#include <util/event.h>
 #include "ni.h"
 #include "malloc.h"
 #include "gmalloc.h"
 #include "mp.h"
 #include "loader.h"
 #include "icc.h"
-#include "event.h"
 #include "cpu.h"
 #include "vm.h"
 #include "stdio.h"
+#include "events.h"
 #include "rpc/rpc_manager.h"
 #include "rpc/rpc_callback.h"
 
@@ -166,7 +167,7 @@ static void icc_started(ICC_Message* msg) {
 	
 	vm->status = error_code == 0 ? VM_STATUS_STARTED : VM_STATUS_STOPPED;
 	
-	event_trigger(EVENT_VM_STARTED, vm);
+	event_trigger_fire(EVENT_VM_STARTED, vm);
 	
 	if(error_code != 0) {
 		for(int i = 0; i < vm->core_size; i++) {
@@ -218,7 +219,7 @@ static void icc_stopped(ICC_Message* msg) {
 	
 	vm->status = VM_STATUS_STOPPED;
 	
-	event_trigger(EVENT_VM_STOPPED, vm);
+	event_trigger_fire(EVENT_VM_STOPPED, vm);
 	
 	printf("VM stopped on cores[");
 	for(int i = 0; i < vm->core_size; i++) {
@@ -230,23 +231,20 @@ static void icc_stopped(ICC_Message* msg) {
 	printf("]\n");
 }
 
-static void manager_loop(NetworkInterface* ni) {
+static bool manager_loop(NetworkInterface* ni) {
 	// Packet processing
 	Packet* packet = ni_input(ni);
 	if(packet) {
 		if(arp_process(packet))
-			return;
-		
-		if(icmp_process(packet))
-			return;
-		
-		if(rpc_process(packet))
-			return;
-		
-		if(tftp_process(packet))
-			return;
-		
-		ni_free(packet);
+			;
+		else if(icmp_process(packet))
+			;
+		else if(rpc_process(packet))
+			;
+		else if(tftp_process(packet))
+			;
+		else
+			ni_free(packet);
 	}
 	
 	// Standard I/O/E processing
@@ -350,6 +348,8 @@ static void manager_loop(NetworkInterface* ni) {
 			break;
 		}
 	}
+	
+	return true;
 }
 
 static bool vm_destroy(VM* vm, int core) {
@@ -658,7 +658,7 @@ bool_t * status_set_1_svc(u_quad_t vmid, RPC_VMStatus status, struct svc_req *rq
 		return &result;
 	}
 	
-	bool callback(int event_type, void* context, void* event) {
+	bool callback(int event_type, void* event, void* context) {
 		SVCXPRT* transp = context;
 		VM* vm = event;
 		
@@ -695,7 +695,7 @@ bool_t * status_set_1_svc(u_quad_t vmid, RPC_VMStatus status, struct svc_req *rq
 		
 		SVCXPRT* transp = malloc(sizeof(SVCXPRT));
 		memcpy(transp, rqstp->rq_xprt, sizeof(SVCXPRT));
-		event_event(EVENT_VM_STARTED, callback, transp);
+		event_trigger_add(EVENT_VM_STARTED, callback, transp);
 		
 		for(int i = 0; i < vm->core_size; i++) {
 			cores[vm->cores[i]].error_code = 0;
@@ -716,7 +716,7 @@ bool_t * status_set_1_svc(u_quad_t vmid, RPC_VMStatus status, struct svc_req *rq
 		
 		SVCXPRT* transp = malloc(sizeof(SVCXPRT));
 		memcpy(transp, rqstp->rq_xprt, sizeof(SVCXPRT));
-		event_event(EVENT_VM_STOPPED, callback, transp);
+		event_trigger_add(EVENT_VM_STOPPED, callback, transp);
 		
 		for(int i = 0; i < vm->core_size; i++) {
 			ICC_Message* msg = icc_sending(ICC_TYPE_STOP, vm->cores[i]);
@@ -978,7 +978,7 @@ void manager_init() {
 	// Core 0 is occupied by manager
 	cores[0].status = VM_STATUS_STARTED;
 	
-	event_idle((void*)manager_loop, ni->ni);
+	event_idle_add((void*)manager_loop, ni->ni);
 }
 
 void manager_get_ip(uint32_t* ip, uint32_t* netmask, uint32_t* gateway) {

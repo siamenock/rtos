@@ -1,24 +1,24 @@
 #include <string.h>
 #include <errno.h>
-#include "../event.h"
+#include <util/event.h>
 #include "../port.h"
 #include "../apic.h"
-#include "keyboard.h"
 #include "keyboard.h"
 
 static CharInCallback callback;
 
-static void event(void* data) {
+static bool event(void* data) {
 	int code = (uint64_t)data;
 	if(callback) {
 		callback((int)code);
 	}
+	return false;
 }
 
 static void keyboard_handler(uint64_t vector, uint64_t error_code) {
 	uint8_t code = port_in8(0x60);
 	
-	event_once(event, (void*)(uint64_t)code);
+	event_busy_add(event, (void*)(uint64_t)code);
 	
 	apic_eoi();
 }

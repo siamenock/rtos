@@ -12,7 +12,6 @@
 #include "driver/keyboard.h"
 #include "driver/stdin.h"
 #include "driver/stdout.h"
-#include "event.h"
 #include "cpu.h"
 #include "stdio.h"
 
@@ -144,7 +143,7 @@ static void stdio_dump_ring(char* header, char* buffer, size_t* head, size_t tai
 	*head = tail;
 }
 
-void stdio_event(void* data) {
+bool stdio_event(void* data) {
 	#define HEX(v)	(((v) & 0x0f) > 9 ? ((v) & 0x0f) - 10 + 'a' : ((v) & 0x0f) + '0')
 	
 	char header[10] = "Core 01> ";
@@ -177,6 +176,8 @@ void stdio_event(void* data) {
 			stdio_dump_ring(header, buffer, head, tail, size);
 		}
 	}
+	
+	return true;
 }
 
 // Ref: http://www.powerindex.net/U_convt/ascii/ascii.htm

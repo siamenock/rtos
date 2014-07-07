@@ -1,10 +1,10 @@
 #include <string.h>
+#include <util/event.h>
 #include "asm.h"
 #include "apic.h"
 #include "mp.h"
 #include "shared.h"
 #include "gmalloc.h"
-#include "event.h"
 #include "task.h"
 
 #include "icc.h"
@@ -18,8 +18,13 @@ static ICC_Handler icc_events[ICC_EVENTS_COUNT];
 static void icc(uint64_t vector, uint64_t err) {
 	icc_msg->status = ICC_STATUS_RECEIVED;
 	
+	bool event(void* context) {
+		icc_events[icc_msg->type](icc_msg);
+		return false;
+	}
+	
 	if(icc_events[icc_msg->type])
-		event_once((void*)icc_events[icc_msg->type], icc_msg);
+		event_busy_add(event, NULL);
 	else
 		icc_msg->status = ICC_STATUS_DONE;
 	

@@ -1,7 +1,9 @@
 #include <stdio.h>
 #include <thread.h>
 #include <net/ni.h>
+#include <net/packet.h>
 #include <net/ether.h>
+#include <net/arp.h>
 #include <net/ip.h>
 #include <net/icmp.h>
 #include <net/checksum.h>
@@ -106,7 +108,6 @@ void destroy() {
 void gdestroy() {
 }
 
-uint64_t num;
 int main(int argc, char** argv) {
 	printf("Thread %d bootting\n", thread_id());
 	if(thread_id() == 0) {

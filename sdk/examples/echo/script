@@ -1,12 +1,4 @@
 connect
 $vmid = vm_create core: 1 memory: 0x1000000 storage: 0x200000 nic: mac: 0 ibuf: 1024 obuf: 1024 iband: 1000000000 oband: 1000000000 pool: 0x400000 args: hello world
-#$result = md5 $vmid 290034
-#echo $result
-#$result = status_set $vmid start
-#echo $result
-#$list = vm_list
-#echo $list
-#status_set $vmid stop
-vm_delete $vmid
-
-quit
+send $vmid main
+status_set $vmid start

@@ -2,10 +2,11 @@
 #define __STDIO_H__
 
 #include <stddef.h>
+#include <stdbool.h>
 
 void stdio_init();
 void stdio_init2(void* buf, size_t size);
-void stdio_event(void*);
+bool stdio_event(void*);
 
 void stdio_scancode(int code);
 int stdio_getchar();

@@ -29,6 +29,7 @@ system.img:
 	cat boot/boot.bin loader/loader.bin root.img > $@
 	#util/truncate $@
 	util/rewrite $@
+	cp $@ sdk
 
 mount:
 	mkdir mnt
