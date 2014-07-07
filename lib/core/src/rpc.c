@@ -253,9 +253,10 @@ static bool_t sendreply(SVCXPRT *xprt, struct rpc_msg* msg) {
 		svcerr_systemerr(xprt);
 		return FALSE;
 	}
+	int len = UDP_LEN + xdr_getpos(&xdr);
+	xdr_destroy(&xdr);
 	
 	swap16(udp->source, udp->destination);
-	int len = UDP_LEN + xdr_getpos(&xdr);
 	udp->length = endian16(len);
 	udp->checksum = 0;
 	packet->end = ((void*)udp + len) - (void*)packet->buffer;
@@ -363,8 +364,9 @@ static bool_t getargs(SVCXPRT *xprt, xdrproc_t inproc, char *in) {
 }
 
 static bool_t freeargs(SVCXPRT *xprt, xdrproc_t inproc, char *in) {
-	// Do nothing
-	return TRUE;
+	XDR* xdr = (void*)xprt->xp_p1;
+	xdr->x_op = XDR_FREE;
+	return inproc(xdr, in);
 }
 
 // TODO: Create SVCXPRT dynamically
@@ -450,17 +452,19 @@ bool rpc_process(Packet* packet) {
 			ni_free(packet);
 			
 			return true;
-		} else {
-			if(fifo_size(history_fifo) >= 15) {
-				uint64_t xid = (uint64_t)fifo_pop(history_fifo);
-				Packet* back = map_remove(history_map, (void*)xid);
-				if(back)
-					ni_free(back);
-			}
-			
-			fifo_push(history_fifo, (void*)(uint64_t)msg.rm_xid);
-			map_put(history_map, (void*)(uint64_t)msg.rm_xid, NULL);
 		}
+		
+		// Make a room for history
+		if(fifo_size(history_fifo) >= 15) {
+			uint64_t xid = (uint64_t)fifo_pop(history_fifo);
+			Packet* back = map_remove(history_map, (void*)xid);
+			if(back)
+				ni_free(back);
+		}
+		
+		// Add history
+		fifo_push(history_fifo, (void*)(uint64_t)msg.rm_xid);
+		map_put(history_map, (void*)(uint64_t)msg.rm_xid, NULL);
 		
 		if(msg.ru.RM_cmb.cb_rpcvers != 2)
 			return false;
@@ -605,6 +609,7 @@ bool rpc_call(NetworkInterface* ni, CLIENT* client, unsigned long procnum, xdrpr
 	}
 	
 	udp_pack(packet, xdr_getpos(&xdr));
+	xdr_destroy(&xdr);
 	
 	ni_output(ni, packet);
 	
@@ -627,68 +632,3 @@ bool rpc_call(NetworkInterface* ni, CLIENT* client, unsigned long procnum, xdrpr
 	
 	return true;
 }
-
-/*
-// TODO Delete below test code
-#include "/home/semih/tmp/ocnrpc/msg.h"
-
-int *
-printmessage_1_svc(char **argp, struct svc_req *rqstp)
-{
-	static int  result = 0;
-	
-	result = strlen(*argp);
-	printf("Message from client: %s => %d\n", *argp, result);
-	
-	return &result;
-}
-
-static void
-messageprog_1(struct svc_req *rqstp, register SVCXPRT *transp)
-{
-	union {
-		char *printmessage_1_arg;
-	} argument;
-	char *result;
-	xdrproc_t _xdr_argument, _xdr_result;
-	char *(*local)(char *, struct svc_req *);
-
-	switch (rqstp->rq_proc) {
-	case NULLPROC:
-		(void) svc_sendreply (transp, (xdrproc_t) xdr_void, (char *)NULL);
-		return;
-
-	case PRINTMESSAGE:
-		_xdr_argument = (xdrproc_t) xdr_wrapstring;
-		_xdr_result = (xdrproc_t) xdr_int;
-		local = (char *(*)(char *, struct svc_req *)) printmessage_1_svc;
-		break;
-
-	default:
-		svcerr_noproc (transp);
-		return;
-	}
-	memset ((char *)&argument, 0, sizeof (argument));
-	if (!svc_getargs (transp, (xdrproc_t) _xdr_argument, (caddr_t) &argument)) {
-		svcerr_decode (transp);
-		return;
-	}
-	result = (*local)((char *)&argument, rqstp);
-	if (result != NULL && !svc_sendreply(transp, (xdrproc_t) _xdr_result, result)) {
-		svcerr_systemerr (transp);
-	}
-	if (!svc_freeargs (transp, (xdrproc_t) _xdr_argument, (caddr_t) &argument)) {
-		printf ("unable to free arguments");
-	}
-	return;
-}
-
-void rpc_init()
-{
-	SVCXPRT* transp;
-	if(!(transp = svcudp_create(RPC_ANYSOCK)))
-		printf("Cannot create service\n");
-	if(!svc_register(transp, MESSAGEPROG, PRINTMESSAGEVERS, messageprog_1, IPPROTO_UDP))
-		printf("Cannot register the service\n");
-}
-*/

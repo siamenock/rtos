@@ -160,8 +160,12 @@ uint64_t event_tevent(bool(*func)(void*), void* context, uint64_t delay, uint64_
 }
 
 bool event_tevent_cancel(uint64_t id) {
-	free((void*)id);
-	return list_remove_data(tevents, (void*)id);
+	if(list_remove_data(tevents, (void*)id)) {
+		free((void*)id);
+		return true;
+	} else {
+		return false;
+	}
 }
 
 void event_idle(void(*func)(void*), void* context) {

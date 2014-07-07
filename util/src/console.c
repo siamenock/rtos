@@ -133,8 +133,8 @@ static int cmd_connect(int argc, char** argv) {
 
 static int cmd_ping(int argc, char** argv) {
 	int count = 1;
-	if(argc >= 2 && is_uint8(argv[1])) {
-		count = parse_uint8(argv[1]);
+	if(argc >= 2 && is_uint64(argv[1])) {
+		count = parse_uint64(argv[1]);
 	}
 	
 	if(!client) {
@@ -516,7 +516,7 @@ static Command commands[] = {
 	{
 		.name = "ping",
 		.desc = "RPC ping to host",
-		.args = "[count: uint8]",
+		.args = "[count: uint64]",
 		.exec = cmd_ping
 	},
 	{

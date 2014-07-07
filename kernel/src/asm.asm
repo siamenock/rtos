@@ -10,6 +10,7 @@ global pause
 global read_cr2, write_cr2
 global read_cr3, write_cr3
 global refresh_cr3
+global read_rsp, read_rbp
 
 lgdt:
 	lgdt	[rdi]
@@ -91,4 +92,12 @@ write_cr3:
 refresh_cr3:
 	mov	rax, cr3
 	mov	cr3, rax
+	ret
+
+read_rsp:
+	mov	rax, rsp
+	ret
+
+read_rbp:
+	mov	rax, rbp
 	ret

@@ -188,11 +188,11 @@ void gmalloc_extend() {
 	list_destroy(blocks);
 }
 
-inline uint64_t gmalloc_total() {
+inline size_t gmalloc_total() {
 	return get_total_size(gmalloc_pool);
 }
 
-inline uint64_t gmalloc_used() {
+inline size_t gmalloc_used() {
 	return get_used_size(gmalloc_pool);
 }
 
@@ -266,12 +266,12 @@ void bfree(void* ptr) {
 	}
 }
 
-uint64_t bmalloc_total() {
+size_t bmalloc_total() {
 	return bmalloc_count * 0x200000;
 }
 
-uint64_t bmalloc_used() {
-	uint64_t size = 0;
+size_t bmalloc_used() {
+	size_t size = 0;
 	for(int i = 0; i < bmalloc_count; i++) {
 		if(bmalloc_pool[i] & 0x01) {
 			size += 0x200000;

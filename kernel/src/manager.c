@@ -31,8 +31,14 @@
 
 #include "manager.h"
 
+/*
 #define DEFAULT_MANAGER_IP	0xc0a864fe	// 192.168.100.254
 #define DEFAULT_MANAGER_GW	0xc0a864c8	// 192.168.100.200
+#define DEFAULT_MANAGER_NM	0xffffff00	// 255.255.255.0
+*/
+
+#define DEFAULT_MANAGER_IP	0xc0a8c8fe	// 192.168.200.254
+#define DEFAULT_MANAGER_GW	0xc0a8c8c8	// 192.168.200.200
 #define DEFAULT_MANAGER_NM	0xffffff00	// 255.255.255.0
 
 static uint32_t manager_ip	= DEFAULT_MANAGER_IP;
@@ -75,6 +81,14 @@ static Core cores[MP_MAX_CORE_COUNT];
 static List* callbacks;
 
 static Callback* callback_create(uint32_t addr, uint16_t port) {
+	ListIterator iter;
+	list_iterator_init(&iter, callbacks);
+	while(list_iterator_has_next(&iter)) {
+		Callback* c = list_iterator_next(&iter);
+		if(c->addr == addr && c->port == port)
+			return NULL;
+	}
+	
 	Callback* cb = malloc(sizeof(Callback));
 	if(!cb)
 		return NULL;
@@ -287,8 +301,10 @@ static void manager_loop(NetworkInterface* ni) {
 				callback_destroy(cb);
 			}
 		}
+		free(buf);
 	}
 	
+	// TODO: This is test purpose block. Delete it.
 	{
 		static uint64_t out_tick;
 		if(out_tick < cpu_tsc()) {
@@ -297,9 +313,14 @@ static void manager_loop(NetworkInterface* ni) {
 			size_t tail = strlen(buf) + 1;
 			
 			output(0, 0, 1, buf, &head, &tail, 1024);
-			printf("Send hello\n");
+			//printf("Send hello\n");
 			
 			out_tick = cpu_tsc() + 5 * cpu_frequency;
+			
+			printf("memory: local: %ld/%ld Ki, global: %ld/%ld Ki, block: %ld/%ld Ki\n", 
+				malloc_used() / 1024, malloc_total() / 1024,
+				gmalloc_used() / 1024, gmalloc_total() / 1024,
+				bmalloc_used() / 1024, bmalloc_total() / 1024);
 		}
 	}
 	
@@ -805,12 +826,10 @@ bool_t * callback_add_1_svc(RPC_Address addr, struct svc_req *rqstp) {
 	result = FALSE;
 	
 	uint32_t ip = addr.ip == 0 ? get_remote_addr(rqstp) : addr.ip;
-	printf("Add callback: %x:%d\n", ip, addr.port);
 	Callback* cb = callback_create(ip, addr.port);
 	if(!cb)
 		return &result;
 	
-	printf("Add callback true\n");
 	result = TRUE;
 	return &result;
 }

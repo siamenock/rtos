@@ -33,16 +33,16 @@ bool arp_process(Packet* packet) {
 	Map* arp_table = map_get(config, ARP_TABLE);
 	if(!arp_table) {
 		arp_table = map_create(32, map_uint64_hash, map_uint64_equals, config->malloc, config->free);
-		map_put(config, strdup(ARP_TABLE), arp_table);
+		map_put(config, ARP_TABLE, arp_table);
 	}
 	
 	clock_t current = clock();
 	
 	// GC
 	uint64_t gc_time = (uint64_t)map_get(config, ARP_TABLE_GC);
-	if(gc_time == 0) {
+	if(gc_time == 0 && !map_contains(config, ARP_TABLE_GC)) {
 		gc_time = current + GC_INTERVAL;
-		map_put(config, strdup(ARP_TABLE_GC), (void*)gc_time);
+		map_put(config, ARP_TABLE_GC, (void*)gc_time);
 	}
 	
 	if(gc_time < current) {
@@ -51,10 +51,8 @@ bool arp_process(Packet* packet) {
 		while(map_iterator_has_next(&iter)) {
 			MapEntry* entry = map_iterator_next(&iter);
 			if(((ARPEntity*)entry->data)->timeout < current) {
-				free(entry->key);	// strdup
-				arp_table->free(entry->data);
-				
 				map_iterator_remove(&iter);
+				arp_table->free(entry->data);
 			}
 		}
 		
@@ -83,15 +81,19 @@ bool arp_process(Packet* packet) {
 			;
 			uint64_t smac = endian48(arp->sha);
 			uint32_t sip = endian32(arp->spa);
-			ARPEntity* entity = map_get(arp_table, (void*)(uint64_t)addr);
+			ARPEntity* entity = map_get(arp_table, (void*)(uint64_t)sip);
 			if(!entity) {
 				entity = arp_table->malloc(sizeof(ARPEntity));
-				entity->mac = smac;
-				entity->timeout = current + ARP_TIMEOUT;
+				if(!entity)
+					goto done;
+				
 				map_put(arp_table, (void*)(uint64_t)sip, entity);
 			}
 			entity->mac = smac;
 			entity->timeout = current + ARP_TIMEOUT;
+			
+done:
+			ni_free(packet);
 			return true;
 	} 
 	

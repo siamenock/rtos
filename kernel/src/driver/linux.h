@@ -7,7 +7,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
-#include <malloc.h>
 #include <gmalloc.h>
 #include <byteswap.h>
 #include <limits.h>
@@ -382,18 +381,18 @@ inline void* kmalloc_node(size_t size, int flag, int node) {
 #define dma_mapping_error(dev, addr)	(false)
 
 inline void* kalloc(size_t size, int flag) {
-	return malloc(size);
+	return gmalloc(size);
 }
 
 inline void* kzalloc(size_t size, int flag) {
-	void* ptr = malloc(size);
+	void* ptr = gmalloc(size);
 	bzero(ptr, size);
 	
 	return ptr;
 }
 
 inline void kfree(void* ptr) {
-	free(ptr);
+	gfree(ptr);
 }
 
 /* MII */
@@ -517,9 +516,7 @@ inline void writel(u32 v, void* addr) {
 #define LPA_100HALF             0x0080  /* Can do 100mbps half-duplex  */
 #define LPA_100FULL             0x0100  /* Can do 100mbps full-duplex  */
 
-inline bool is_valid_ether_addr(const u8 *addr) {
-	return !(addr[0] & 0x01) && (addr[0] || addr[1] || addr[2] || addr[3] || addr[4] || addr[5]);
-}
+bool is_valid_ether_addr(const u8 *addr);
 
 /* Socket buffer */
 #define MAX_SKB_FRAGS	1
@@ -918,20 +915,20 @@ inline void unregister_netdev(struct net_device *dev) {
 }
 
 inline struct net_device* alloc_etherdev(int sizeof_priv) {
-	struct net_device* dev = malloc(sizeof(struct net_device));
+	struct net_device* dev = gmalloc(sizeof(struct net_device));
 	bzero(dev, sizeof(struct net_device));
 	memcpy(dev->name, "eth0", 5);
 	dev->mtu = 1500;
 	dev->addr_len = ETH_ALEN;
-	dev->priv = malloc(sizeof_priv);
+	dev->priv = gmalloc(sizeof_priv);
 	bzero(dev->priv, sizeof_priv);
 	
 	return dev;
 }
 
 inline void free_netdev(struct net_device *dev) {
-	free(dev->priv);
-	free(dev);
+	gfree(dev->priv);
+	gfree(dev);
 }
 
 inline netdev_features_t netdev_fix_features(struct net_device *dev, netdev_features_t features) {

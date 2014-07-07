@@ -1,4 +1,5 @@
 #include <string.h>
+#include <malloc.h>
 #include <util/list.h>
 #include "device.h"
 #include "port.h"

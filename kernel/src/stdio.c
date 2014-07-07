@@ -3,11 +3,11 @@
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
+#include <byteswap.h>
 #include <util/ring.h>
 #include "device.h"
 #include "port.h"
 #include "mp.h"
-#include "gmalloc.h"
 #include "driver/vga.h"
 #include "driver/keyboard.h"
 #include "driver/stdin.h"
@@ -971,5 +971,26 @@ void exit(int status) {
 
 clock_t clock() {
        return (clock_t)(cpu_tsc() / (cpu_frequency / CLOCKS_PER_SEC));
+}
+
+int putchar(int c) {
+	char ch = c;
+	return write1(&ch, 1);
+}
+
+uint32_t htonl(uint32_t hostlong) {
+	return bswap_32(hostlong);
+}
+
+uint16_t htons(uint16_t hostshort) {
+	return bswap_16(hostshort);
+}
+
+uint32_t ntohl(uint32_t netlong) {
+	return bswap_32(netlong);
+}
+
+uint16_t ntohs(uint16_t netshort) {
+	return bswap_16(netshort);
 }
 

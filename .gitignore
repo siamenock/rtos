@@ -14,3 +14,4 @@
 # Temporary generated files
 kernel.dis
 kernel.smap
+*.swp

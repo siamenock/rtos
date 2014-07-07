@@ -25,8 +25,8 @@ typedef struct {
 
 void gmalloc_init();
 void gmalloc_extend();
-uint64_t gmalloc_total();
-uint64_t gmalloc_used();
+size_t gmalloc_total();
+size_t gmalloc_used();
 
 void* gmalloc(size_t size);
 void gfree(void* ptr);
@@ -35,7 +35,7 @@ void* gcalloc(uint32_t nmemb, size_t size);
 
 void* bmalloc();
 void bfree(void* ptr);
-uint64_t bmalloc_total();
-uint64_t bmalloc_used();
+size_t bmalloc_total();
+size_t bmalloc_used();
 
 #endif /* __GMALLOC_H__ */

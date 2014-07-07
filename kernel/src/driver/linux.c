@@ -39,6 +39,10 @@ void msleep(unsigned int d) {
 	cpu_mwait(d);
 }
 
+bool is_valid_ether_addr(const u8 *addr) {
+	return !(addr[0] & 0x01) && (addr[0] || addr[1] || addr[2] || addr[3] || addr[4] || addr[5]);
+}
+
 int eth_validate_addr(struct net_device *dev) {
 	if (!is_valid_ether_addr(dev->dev_addr))
 		return -1;
@@ -119,7 +123,7 @@ void free_irq(unsigned int irq, void* dev) {
 
 int request_firmware(const struct firmware **fw, const char *name, PCI_Device *device) {
 	if(strcmp(name, "rtl_nic/rtl8168e-3.fw") == 0) {
-		struct firmware* f = malloc(sizeof(struct firmware));
+		struct firmware* f = gmalloc(sizeof(struct firmware));
 		f->data = rtl8168e_3;
 		f->size = sizeof(rtl8168e_3);
 		*(struct firmware**)fw = f;
@@ -132,5 +136,5 @@ int request_firmware(const struct firmware **fw, const char *name, PCI_Device *d
 }
 
 void release_firmware(const struct firmware *fw) {
-	free((struct firmware*)fw);
+	gfree((struct firmware*)fw);
 }
