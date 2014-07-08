@@ -15,25 +15,25 @@
 #include "cpu.h"
 #include "stdio.h"
 
-#define BUFFER_SIZE	2048
-
 struct _IO_FILE* stdin;
 struct _IO_FILE* stdout;
 struct _IO_FILE* stderr;
 
-char __stdin[32];
-size_t __stdin_head;
-size_t __stdin_tail;
-size_t __stdin_size = 32;
+#define BUFFER_SIZE	4096
+
+char __stdin[BUFFER_SIZE];
+volatile size_t __stdin_head;
+volatile size_t __stdin_tail;
+size_t __stdin_size = BUFFER_SIZE;
 
 char __stdout[BUFFER_SIZE];
-size_t __stdout_head;
-size_t __stdout_tail;
+volatile size_t __stdout_head;
+volatile size_t __stdout_tail;
 size_t __stdout_size = BUFFER_SIZE;
 
 char __stderr[BUFFER_SIZE];
-size_t __stderr_head;
-size_t __stderr_tail;
+volatile size_t __stderr_head;
+volatile size_t __stderr_tail;
 size_t __stderr_size = BUFFER_SIZE;
 
 Device* device_stdin;
@@ -61,7 +61,7 @@ void stdio_init2(void* buf, size_t size) {
 	((CharOut*)device_stdout->driver)->set_buffer(device_stdout->id, buf, size);
 }
 
-static void stdio_dump_ring(char* header, char* buffer, size_t* head, size_t tail, size_t size) {
+static void stdio_dump_ring(char* header, char* buffer, volatile size_t* head, volatile size_t tail, size_t size) {
 	int header_len = strlen(header);
 	int body_len = 80 - header_len;
 	
@@ -151,8 +151,8 @@ bool stdio_event(void* data) {
 	
 	for(int i = 1; i < count; i++) {
 		char* buffer = (char*)MP_CORE(__stdout, i);
-		size_t* head = (size_t*)MP_CORE(&__stdout_head, i);
-		size_t tail = *(size_t*)MP_CORE(&__stdout_tail, i);
+		volatile size_t* head = (size_t*)MP_CORE(&__stdout_head, i);
+		volatile size_t tail = *(size_t*)MP_CORE(&__stdout_tail, i);
 		size_t size = *(size_t*)MP_CORE(&__stdout_size, i);
 		
 		if(*head != tail) {

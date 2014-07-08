@@ -9,25 +9,15 @@
 #include "stdout.h"
 
 typedef struct {
-	char*		buffer;
-	size_t*		head;
-	size_t*		tail;
-	size_t		size;
+	char*			buffer;
+	volatile size_t*	head;
+	volatile size_t*	tail;
+	size_t			size;
 } Buffer;
 
 static Buffer buffers[2];
 
 static int init(void* device, void* data) {
-	extern char __stdout[];
-	extern size_t __stdout_head;
-	extern size_t __stdout_tail;
-	extern size_t __stdout_size;
-
-	extern char __stderr[];
-	extern size_t __stderr_head;
-	extern size_t __stderr_tail;
-	extern size_t __stderr_size;
-	
 	if(strcmp(data, "stdout") == 0) {
 		buffers[0].buffer = __stdout;
 		buffers[0].head = &__stdout_head;

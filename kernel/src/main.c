@@ -128,9 +128,10 @@ static void icc_start(ICC_Message* msg) {
 	APIC_Handler old_exception_handlers[32];
 	
 	void exception_handler(uint64_t vector, uint64_t err) {
-		printf("user exception handler\n");
-		if(err != 0)
+		printf("User VM exception handler\n");
+		if(err != 0) {	// Err zero means, user vm termination
 			apic_dump(vector, err);
+		}
 		
 		apic_eoi();
 		
@@ -138,12 +139,16 @@ static void icc_start(ICC_Message* msg) {
 	}
 	
 	for(int i = 0; i < 32; i++) {
-		old_exception_handlers[i] = apic_register(i, exception_handler);
+		if(i != 7) {
+			old_exception_handlers[i] = apic_register(i, exception_handler);
+		}
 	}
 	
 	// Set interrupt handler
 	void interrupt_handler(uint64_t vector, uint64_t err) {
-		printf("user interrupt handler\n");
+		printf("User VM interrupt handler\n");
+		
+		apic_dump(vector, err);
 		
 		apic_eoi();
 		
@@ -159,8 +164,11 @@ static void icc_start(ICC_Message* msg) {
 	apic_register(49, old_interrupt_handler);
 	
 	// Restore exception handlers
-	for(int i = 0; i < 32; i++)
-		apic_register(i, old_exception_handlers[i]);
+	for(int i = 0; i < 32; i++) {
+		if(i != 7) {
+			apic_register(i, old_exception_handlers[i]);
+		}
+	}
 	
 	// Send stopped ICC
 	ICC_Message* msg3 = icc_sending(ICC_TYPE_STOPPED, 0);
@@ -234,6 +242,18 @@ void main(void) {
 		ioapic_init();
 		apic_enable();
 		
+		void printdouble(double v) {
+			long l = (long)v;
+			printf("[%ld", l);
+			v -= l;
+			printf(".");
+			for(int i = 0; i < 8; i++) {
+				v *= 10;
+				printf("%ld", (long)v);
+				v -= (long)v;
+			}
+			printf("]\n");
+		}
 		printf("Initializing Multi-tasking...\n");
 		task_init();
 		
@@ -253,7 +273,6 @@ void main(void) {
 		
 		printf("Initializing events...\n");
 		event_init();
-		event_idle_add(stdio_event, NULL);
 		
 		printf("Cleaning up memory...\n");
 		gmalloc_extend();

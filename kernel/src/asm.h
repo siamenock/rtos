@@ -22,5 +22,6 @@ void write_cr3(uint64_t cr3);
 void refresh_cr3();
 void* read_rbp();
 void* read_rsp();
+void read_xmms0(void* v);
 
 #endif /* __ASM_H__ */

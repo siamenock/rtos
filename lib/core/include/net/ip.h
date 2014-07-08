@@ -7,8 +7,11 @@
 #define IP_TTL			64
 
 #define IP_PROTOCOL_ICMP	0x01
+#define IP_PROTOCOL_IP          0x04
 #define IP_PROTOCOL_UDP		0x11
 #define IP_PROTOCOL_TCP		0x06
+#define IP_PROTOCOL_ESP         0x32
+#define IP_PROTOCOL_AH          0x33
 
 typedef struct {
 	uint8_t		ihl: 4;

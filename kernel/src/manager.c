@@ -266,11 +266,18 @@ static bool manager_loop(NetworkInterface* ni) {
 		#define MAX_MESSAGE (1500 - 68)
 		
 		int text_len = ring_readable(*head, *tail, size);
-		if(text_len > MAX_MESSAGE)
+		if(text_len > MAX_MESSAGE) {
 			text_len = MAX_MESSAGE;
+		}
 		
 		char* buf = malloc(text_len);
 		ring_read(buffer, head, *tail, size, buf, text_len);
+		
+		if(vmid == 0) {
+			printf("Core %d%c ", thread_id, fd == 1 ? '>' : '!');
+			for(int i = 0; i < text_len; i++)
+				putchar(buf[i]);
+		}
 		
 		msg.message.message_len = text_len;
 		msg.message.message_val = buf;
@@ -302,29 +309,32 @@ static bool manager_loop(NetworkInterface* ni) {
 		free(buf);
 	}
 	
-	// TODO: This is test purpose block. Delete it.
 	{
 		static uint64_t out_tick;
 		if(out_tick < cpu_tsc()) {
+			/*
 			char* buf = "Hello PacketNgin!\n";
 			size_t head = 0;
 			size_t tail = strlen(buf) + 1;
 			
 			output(0, 0, 1, buf, &head, &tail, 1024);
-			//printf("Send hello\n");
+			*/
 			
-			out_tick = cpu_tsc() + 5 * cpu_frequency;
-			
+			/*
 			printf("memory: local: %ld/%ld Ki, global: %ld/%ld Ki, block: %ld/%ld Ki\n", 
 				malloc_used() / 1024, malloc_total() / 1024,
 				gmalloc_used() / 1024, gmalloc_total() / 1024,
 				bmalloc_used() / 1024, bmalloc_total() / 1024);
+			*/
+			
+			out_tick = cpu_tsc() + 10 * cpu_frequency;
 		}
 	}
 	
 	static int core_index;
 	
-	for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
+	int core_count = mp_core_count();
+	for(int i = 0; i < core_count; i++) {
 		core_index = (core_index + 1) % MP_MAX_CORE_COUNT;
 		
 		Core* core = &cores[core_index];
@@ -346,6 +356,26 @@ static bool manager_loop(NetworkInterface* ni) {
 			}
 			
 			break;
+		}
+	}
+	
+	for(int i = 1; i < core_count; i++) {
+		char* buffer = (char*)MP_CORE(__stdout, i);
+		volatile size_t* head = (size_t*)MP_CORE(&__stdout_head, i);
+		volatile size_t* tail = (size_t*)MP_CORE(&__stdout_tail, i);
+		size_t size = *(size_t*)MP_CORE(&__stdout_size, i);
+		
+		while(*head != *tail) {
+			output(0, i, 1, buffer, head, tail, size);
+		}
+		
+		buffer = (char*)MP_CORE(__stderr, i);
+		head = (size_t*)MP_CORE(&__stderr_head, i);
+		tail = (size_t*)MP_CORE(&__stderr_tail, i);
+		size = *(size_t*)MP_CORE(&__stderr_size, i);
+		
+		while(*head != *tail) {
+			output(0, i, 2, buffer, head, tail, size);
 		}
 	}
 	

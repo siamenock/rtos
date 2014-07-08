@@ -95,7 +95,6 @@ static uint32_t last_fpu_task = (uint32_t)-1;
 
 void task_init() {
 	void device_not_available_handler(uint64_t vector, uint64_t error_code) {
-		printf("Device not available handler.\n");
 		ts_clear();
 		
 		if(last_fpu_task != (uint32_t)-1) {
@@ -113,15 +112,6 @@ void task_init() {
 		last_fpu_task = current_task;
 	}
 	
-	/*
-	tasks[0].parent = (uint32_t)-1;
-	tasks[0].heap = 0x100000;	// 1MB ~ 6MB
-	tasks[0].heap_size = 0x500000;		// 5MB
-	tasks[0].stack = 0x600000;	// 6MB ~ 7MB
-	tasks[0].stack_size = 0x100000;		// 1MB
-	*/
-	
-	// TODO: Check who is using FPU while booting
 	ts_clear();
 	finit();
 	tasks[0].is_fpu_inited = true;
