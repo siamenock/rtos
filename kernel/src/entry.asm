@@ -19,8 +19,8 @@ start:
 	
 	; Stack segment descriptors
 	mov	ss, ax
-	mov	rsp, 0xffffffff805bfff8
-	mov	rbp, 0xffffffff805bfff8
+	mov	rsp, 0xffffffff805c0000
+	mov	rbp, 0xffffffff805c0000
 	
 	call	main
 	
