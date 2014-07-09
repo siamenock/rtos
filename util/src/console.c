@@ -89,8 +89,8 @@ static int cmd_connect(int argc, char** argv) {
 		return 2;
 	}
 	
-	void* result = manager_null_1(client);
-	if(result == NULL) {
+	void* ret = manager_null_1(client);
+	if(ret == NULL) {
 		printf("Cannot connect to the host: %s:%d\n", host, port);
 		client = NULL;
 		return 3;
@@ -102,8 +102,8 @@ static int cmd_connect(int argc, char** argv) {
 		return 2;
 	}
 	
-	result = callback_null_1(ioclient);
-	if(result == NULL) {
+	ret = callback_null_1(ioclient);
+	if(ret == NULL) {
 		printf("Cannot connect to the host: %s:%d\n", host, port);
 		client = NULL;
 		return 3;
@@ -113,8 +113,8 @@ static int cmd_connect(int argc, char** argv) {
 	cbaddr.ip = 0;
 	cbaddr.port = *server_port;
 	
-	bool_t* result2 = callback_add_1(cbaddr, client);
-	if(result2 == NULL || !*result2) {
+	bool_t* ret2 = callback_add_1(cbaddr, client);
+	if(ret2 == NULL || !*ret2) {
 		printf("Cannot register callback service to the host: %s:%d\n", host, port);
 		return 4;
 	}
@@ -145,8 +145,8 @@ static int cmd_ping(int argc, char** argv) {
 	clock_t total = clock();
 	for(int i = 0; i < count; i++) {
 		clock_t time = clock();
-		void* result = manager_null_1(client);
-		if(result != NULL) {
+		void* ret = manager_null_1(client);
+		if(ret != NULL) {
 			printf("time=%d ms\n", clock() - time);
 		} else {
 			printf("timeout\n");
@@ -157,6 +157,11 @@ static int cmd_ping(int argc, char** argv) {
 }
 
 static int cmd_vm_create(int argc, char** argv) {
+	if(!client) {
+		printf("Disconnected\n");
+		return 1;
+	}
+	
 	RPC_VM vm;
 	vm.core_num = 1;
 	vm.memory_size = 0x1000000;	// 16MB
@@ -280,11 +285,6 @@ static int cmd_vm_create(int argc, char** argv) {
 				}
 			}
 		}
-	}
-	
-	if(!client) {
-		printf("Disconnected\n");
-		return 1;
 	}
 	
 	u_quad_t* vmid = vm_create_1(vm, client);
@@ -694,6 +694,7 @@ int main(int _argc, char** _argv) {
 			
 			i++;
 		}
+		return count;
 	}
 	
 	void loop(FILE* file) {
@@ -752,7 +753,9 @@ int main(int _argc, char** _argv) {
 							} else {
 								map_put(variables, strdup(variable), strdup(result));
 							}
-						} else if(strlen(result) > 0) {
+						}
+						
+						if(strlen(result) > 0) {
 							printf("%s\n", result);
 						}
 					}
