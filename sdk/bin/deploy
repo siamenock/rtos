@@ -1,0 +1,3 @@
+#!/bin/bash
+
+dd if=../system.img of=/dev/sdb && sync
