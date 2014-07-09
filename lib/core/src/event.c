@@ -22,8 +22,10 @@ typedef struct {
 } TriggerNode;
 
 typedef struct {
-	int		event_id;
-	void*		event;
+	int			event_id;
+	void*			event;
+	TriggerEventFunc	last;
+	void*			context;
 } Trigger;
 
 static List* busy_events;
@@ -40,7 +42,9 @@ void event_init() {
 	idle_events = list_create(malloc, free);
 }
 
-static void fire(int event_id, void* event) {
+static bool is_trigger_stop;
+
+static void fire(int event_id, void* event, TriggerEventFunc last, void* context) {
 	List* list = map_get(trigger_events, (void*)(uint64_t)event_id);
 	if(!list)
 		return;
@@ -49,11 +53,18 @@ static void fire(int event_id, void* event) {
 	list_iterator_init(&iter, list);
 	while(list_iterator_has_next(&iter)) {
 		TriggerNode* node = list_iterator_next(&iter);
+		is_trigger_stop = false;
 		if(!node->func(event_id, event, node->context)) {
 			list_iterator_remove(&iter);
 			free(node);
 		}
+		
+		if(is_trigger_stop)
+			return;
 	}
+	
+	if(last)
+		last(event_id, event, context);
 }
 
 static bool get_first_bigger(void* time, void* node) {
@@ -104,7 +115,7 @@ int event_loop() {
 	// Trigger events
 	while(list_size(triggers) > 0) {
 		Trigger* trigger = list_remove_first(triggers);
-		fire(trigger->event_id, trigger->event);
+		fire(trigger->event_id, trigger->event, trigger->last, trigger->context);
 		free(trigger);
 		
 		count++;
@@ -228,19 +239,25 @@ bool event_trigger_remove(uint64_t id) {
 	return false;
 }
 
-void event_trigger_fire(int event_id, void* event) {
+void event_trigger_fire(int event_id, void* event, TriggerEventFunc last, void* context) {
 	Trigger* trigger = malloc(sizeof(Trigger));
 	if(!trigger) {
-		fire(event_id, event);
+		fire(event_id, event, last, context);
 		return;
 	}
 	trigger->event_id = event_id;
 	trigger->event = event;
-
+	trigger->last = last;
+	trigger->context = context;
+	
 	if(!list_add(triggers, trigger)) {
 		free(trigger);
-		fire(event_id, event);
+		fire(event_id, event, last, context);
 	}
+}
+
+void event_trigger_stop() {
+	is_trigger_stop = true;
 }
 
 uint64_t event_idle_add(EventFunc func, void* context) {

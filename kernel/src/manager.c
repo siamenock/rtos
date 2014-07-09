@@ -167,7 +167,7 @@ static void icc_started(ICC_Message* msg) {
 	
 	vm->status = error_code == 0 ? VM_STATUS_STARTED : VM_STATUS_STOPPED;
 	
-	event_trigger_fire(EVENT_VM_STARTED, vm);
+	event_trigger_fire(EVENT_VM_STARTED, vm, NULL, NULL);
 	
 	if(error_code != 0) {
 		for(int i = 0; i < vm->core_size; i++) {
@@ -219,7 +219,7 @@ static void icc_stopped(ICC_Message* msg) {
 	
 	vm->status = VM_STATUS_STOPPED;
 	
-	event_trigger_fire(EVENT_VM_STOPPED, vm);
+	event_trigger_fire(EVENT_VM_STOPPED, vm, NULL, NULL);
 	
 	printf("VM stopped on cores[");
 	for(int i = 0; i < vm->core_size; i++) {
