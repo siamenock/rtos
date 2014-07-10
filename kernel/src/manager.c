@@ -318,6 +318,7 @@ static bool manager_loop(NetworkInterface* ni) {
 				bmalloc_used() / 1024, bmalloc_total() / 1024);
 			*/
 			
+			//malloc_statistics();
 			out_tick = cpu_tsc() + 10 * cpu_frequency;
 		}
 	}

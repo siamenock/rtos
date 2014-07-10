@@ -611,7 +611,9 @@ bool rpc_call(NetworkInterface* ni, CLIENT* client, unsigned long procnum, xdrpr
 	udp_pack(packet, xdr_getpos(&xdr));
 	xdr_destroy(&xdr);
 	
-	ni_output(ni, packet);
+	if(!ni_output(ni, packet)) {
+		return false;
+	}
 	
 	Call* call = malloc(sizeof(Call));
 	bzero(call, sizeof(Call));

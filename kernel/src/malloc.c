@@ -67,7 +67,8 @@ void malloc_statistics() {
 	while(map_iterator_has_next(&iter)) {
 		MapEntry* entry = map_iterator_next(&iter);
 		Stat* s = entry->data;
-		printf("%p %16ld %16ld\n", entry->key, s->count, s->size);
+		if(s->count > 1)
+			printf("%p %16ld %16ld\n", entry->key, s->count, s->size);
 	}
 	
 	printf("usage: %ld/%ld\n", malloc_used(), malloc_total());
