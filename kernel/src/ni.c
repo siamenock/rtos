@@ -550,13 +550,13 @@ void ni_process_input(uint8_t* buf1, uint32_t size1, uint8_t* buf2, uint32_t siz
 		uint16_t size = size1 + size2;
 		
 		if(ni->input_closed - ni->input_wait_grace > time) {
-			printf("closed dropped ");
+			printf("closed dropped %016lx ", ni->mac);
 			goto dropped;
 		}
 		
 		uint16_t buffer_size = ni->padding_head + size + ni->padding_tail + (ALIGN - 1);
 		if(buffer_size > ni->max_buffer_size) {
-			printf("buffer dropped ");
+			printf("buffer dropped %016lx ", ni->mac);
 			goto dropped;
 		}
 		
@@ -564,14 +564,14 @@ void ni_process_input(uint8_t* buf1, uint32_t size1, uint8_t* buf2, uint32_t siz
 			buffer_size = ni->min_buffer_size;
 		
 		if(!fifo_available(ni->ni->input_buffer)) {
-			printf("fifo dropped ");
+			printf("fifo dropped %016lx ", ni->mac);
 			goto dropped;
 		}
 		
 		// Packet
 		Packet* packet = ni_alloc(ni->ni, buffer_size);
 		if(!packet) {
-			printf("memory dropped ");
+			printf("memory dropped %016lx ", ni->mac);
 			goto dropped;
 		}
 		
@@ -591,7 +591,7 @@ void ni_process_input(uint8_t* buf1, uint32_t size1, uint8_t* buf2, uint32_t siz
 		// Push
 		if(!fifo_push(ni->ni->input_buffer, packet)) {
 			ni_free(packet);
-			printf("fifo dropped 2 ");
+			printf("fifo dropped %016lx ", ni->mac);
 			goto dropped;
 		}
 		

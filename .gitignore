@@ -15,3 +15,9 @@
 kernel.dis
 kernel.smap
 *.swp
+
+# SDK
+sdk/bin/console
+sdk/include/*
+sdk/lib/*.a
+sdk/sysmte.img

@@ -76,7 +76,7 @@ stop:
 	killall -9 qemu-system-x86_64
 
 deploy: system.img
-	dd if=system.img of=/dev/sdb && sync
+	sudo dd if=system.img of=/dev/sdb && sync
 
 clean:
 	rm -f system.img root.img kernel.smap kernel.bin kernel.dis

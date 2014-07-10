@@ -147,13 +147,15 @@ static int cmd_ping(int argc, char** argv) {
 		clock_t time = clock();
 		void* ret = manager_null_1(client);
 		if(ret != NULL) {
-			printf("time=%d ms\n", clock() - time);
+			printf("time=%ld ms\n", clock() - time);
 		} else {
 			printf("timeout\n");
 		}
 	}
 	
-	printf("total: %d ms\n", clock() - total);
+	printf("total: %ld ms\n", clock() - total);
+	
+	return 0;
 }
 
 static int cmd_vm_create(int argc, char** argv) {
@@ -339,7 +341,7 @@ static int cmd_vm_list(int argc, char** argv) {
 	
 	char* p = result;
 	for(int i = 0; i < ret->RPC_VMList_len; i++) {
-		p += sprintf(p, "%d", ret->RPC_VMList_val[i]);
+		p += sprintf(p, "%lu", ret->RPC_VMList_val[i]);
 		if(i + 1 < ret->RPC_VMList_len) {
 			*p++ = ' ';
 		} else {

@@ -16,7 +16,7 @@ void* stdio_1_svc(RPC_Message message,  struct svc_req *rqstp) {
 	static char* result;
 	
 	char buffer[64] = { 0, };
-	int len = sprintf(buffer, "%d %d %d> ", message.vmid, message.coreid, message.fd);
+	int len = sprintf(buffer, "%lu %d %d> ", message.vmid, message.coreid, message.fd);
 	write(0, buffer, len);
 	write(0, message.message.message_val, message.message.message_len);
 	

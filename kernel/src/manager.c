@@ -32,22 +32,13 @@
 
 #include "manager.h"
 
-/*
 #define DEFAULT_MANAGER_IP	0xc0a864fe	// 192.168.100.254
 #define DEFAULT_MANAGER_GW	0xc0a864c8	// 192.168.100.200
 #define DEFAULT_MANAGER_NM	0xffffff00	// 255.255.255.0
-*/
-
-#define DEFAULT_MANAGER_IP	0xc0a8c8fe	// 192.168.200.254
-#define DEFAULT_MANAGER_GW	0xc0a8c8c8	// 192.168.200.200
-#define DEFAULT_MANAGER_NM	0xffffff00	// 255.255.255.0
-
-static uint32_t manager_ip	= DEFAULT_MANAGER_IP;
-static uint32_t manager_gw	= DEFAULT_MANAGER_GW;
-static uint32_t manager_netmask	= DEFAULT_MANAGER_NM;
 
 static uint64_t	last_vmid = 1;
 static Map*	vms;
+static NI*	ni;
 
 // Core status
 typedef struct {
@@ -979,11 +970,11 @@ void manager_init() {
 		NI_NONE
 	};
 	
-	NI* ni = ni_create(attrs);
+	ni = ni_create(attrs);
 	ni->ni->config = map_create(8, map_string_hash, map_string_equals, malloc, free);
-	map_put(ni->ni->config, "ip", (void*)(uint64_t)manager_ip);
-	map_put(ni->ni->config, "gateway", (void*)(uint64_t)manager_gw);
-	map_put(ni->ni->config, "netmask", (void*)(uint64_t)manager_netmask);
+	map_put(ni->ni->config, "ip", (void*)(uint64_t)DEFAULT_MANAGER_IP);
+	map_put(ni->ni->config, "gateway", (void*)(uint64_t)DEFAULT_MANAGER_GW);
+	map_put(ni->ni->config, "netmask", (void*)(uint64_t)DEFAULT_MANAGER_NM);
 	map_put(ni->ni->config, TFTP_CALLBACK, &tftp_callback);
 	
 	callbacks = list_create(malloc, free);
@@ -1011,10 +1002,26 @@ void manager_init() {
 	event_idle_add((void*)manager_loop, ni->ni);
 }
 
-void manager_get_ip(uint32_t* ip, uint32_t* netmask, uint32_t* gateway) {
-	// TODO: Implement it
+uint32_t manager_get_ip() {
+	return (uint32_t)(uint64_t)map_get(ni->ni->config, "ip");
 }
 
-void manager_set_ip(uint32_t ip, uint32_t netmask, uint32_t gateway) {
-	// TODO: Implement it
+void manager_set_ip(uint32_t ip) {
+	map_update(ni->ni->config, "ip", (void*)(uint64_t)ip);
+}
+
+uint32_t manager_get_gateway() {
+	return (uint32_t)(uint64_t)map_get(ni->ni->config, "gateway");
+}
+
+void manager_set_gateway(uint32_t gw) {
+	map_update(ni->ni->config, "gateway", (void*)(uint64_t)gw);
+}
+
+uint32_t manager_get_netmask() {
+	return (uint32_t)(uint64_t)map_get(ni->ni->config, "netmask");
+}
+
+void manager_set_netmask(uint32_t nm) {
+	map_update(ni->ni->config, "netmask", (void*)(uint64_t)nm);
 }

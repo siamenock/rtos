@@ -21,25 +21,29 @@ LIBFILES = ../lib/libtlsf.a ../lib/libjsmn.a ../lib/libcore.a ../lib/libxdr.a
 
 all: kernel.elf
 
+src/version.h:
+	./mkver.sh > $@
+
+$(DIR):
+	mkdir -p $@
+
 src/rpc/%.c: 
 	make -C src/rpc
 
 obj/rpc/%.o: src/rpc/%.c
-	mkdir -p $(DIR)
 	gcc -Wno-unused-variable $(CFLAGS) -c -o $@ $<
 
 obj/%.o: src/%.asm
-	mkdir -p $(DIR)
 	nasm -f elf64 -o $@ $<
 
 obj/%.o: src/%.c
-	mkdir -p $(DIR)
 	gcc $(CFLAGS) -c -o $@ $<
 
-kernel.elf: $(OBJS) $(LIBFILES)
-	ld -melf_x86_64 -T elf_x86_64.ld -nostdlib -e main -o kernel.elf -L ../lib $^ $(LIBS)
+kernel.elf: src/version.h $(DIR) $(OBJS) $(LIBFILES)
+	ld -melf_x86_64 -T elf_x86_64.ld -nostdlib -e main -o kernel.elf -L ../lib $(OBJS) $(LIBFILES) $(LIBS)
 
 clean:
 	make -C src/rpc clean
+	rm -f src/version.h
 	rm -rf obj
 	rm -f kernel.bin

@@ -2,14 +2,16 @@
 
 all: rewrite pnkc smap console
 
+CFLAGS := -Wall -Werror -std=c99
+
 rewrite: src/rewrite.c
-	gcc -std=c99 -o $@ $<
+	gcc $(CFLAGS) -o $@ $<
 
 pnkc: src/pnkc.c
-	gcc -std=c99 -o $@ $<
+	gcc $(CFLAGS) -o $@ $<
 
 smap: src/smap.c
-	gcc -std=c99 -o $@ $<
+	gcc $(CFLAGS) -o $@ $<
 
 src/rpc_manager.c: src/rpc_manager.x
 	cd src; rpcgen -N -C -h rpc_manager.x > rpc_manager.h
@@ -25,7 +27,7 @@ src/rpc_callback_clnt.c: src/rpc_callback.x
 CONSOLE_OBJS = ../lib/core/obj/map.o ../lib/core/obj/list.o
 
 console: src/rpc_manager.c src/rpc_manager_xdr.c src/rpc_callback_clnt.c src/rpc_callback_svc.c src/rpc_callback_xdr.c src/rpc_callback_server.c src/console.c src/types.c
-	gcc -std=c99 -o $@ -I ../lib/core/include -lcurl $(CONSOLE_OBJS) $^
+	gcc $(CFLAGS) -Wno-unused-variable -o $@ -I ../lib/core/include -lcurl $(CONSOLE_OBJS) $^
 	cp console ../sdk/bin/
 
 clean:

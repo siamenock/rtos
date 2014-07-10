@@ -40,6 +40,7 @@ libpacketngin.a: libc.a libm.a libtlsf.a libcore.a
 	cd obj; ar x ../libcore.a
 	cd obj; ar rcs ../$@ *.o
 	rm -r obj
+	mkdir -p ../sdk/include
 	cp -rL core/include/* ../sdk/include/
 	cp libpacketngin.a ../sdk/lib/
 

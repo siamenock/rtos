@@ -88,21 +88,23 @@ static int command_date() {
 }
 
 static int command_ip() {
-	/*
+	uint32_t old = manager_get_ip();
+	if(arg_idx == 1) {
+		printf("%d.%d.%d.%d\n", (old >> 24) & 0xff, (old >> 16) & 0xff, (old >> 8) & 0xff, (old >> 0) & 0xff);
+		return 0;
+	}
+	
 	char* str = cmd + args[1];
 	uint32_t address = (strtol(str, &str, 0) & 0xff) << 24; str++;
 	address |= (strtol(str, &str, 0) & 0xff) << 16; str++;
 	address |= (strtol(str, &str, 0) & 0xff) << 8; str++;
 	address |= strtol(str, NULL, 0) & 0xff;
 	
-	uint32_t old = manager_ip;
-	manager_ip = address;
+	manager_set_ip(address);
 	
 	printf("Manager's IP address changed from %d.%d.%d.%d to %d.%d.%d.%d\n", 
 		(old >> 24) & 0xff, (old >> 16) & 0xff, (old >> 8) & 0xff, (old >> 0) & 0xff,
 		(address >> 24) & 0xff, (address >> 16) & 0xff, (address >> 8) & 0xff, (address >> 0) & 0xff);
-	*/
-	// TODO: Use manager_set_ip
 	
 	return 0;
 }
@@ -273,11 +275,6 @@ void shell_callback(int code) {
 
 void shell_init() {
 	printf("\nPacketNgin ver %d.%d.%d\n", VERSION_MAJOR, VERSION_MINOR, VERSION_MICRO);
-	printf("Username: root\n");
-	printf("Password: ********\n\n");
-	printf("Welcome to PacketNgin\n");
-	printf("Last login: Mon May 6 17:48:59 2013 from 192.168.123.130\n");
-	
 	printf("# ");
 	
 	extern Device* device_stdin;
