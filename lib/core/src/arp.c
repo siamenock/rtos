@@ -75,8 +75,10 @@ bool arp_process(Packet* packet) {
 				ni_output(packet->ni, packet);
 				
 				return true;
+			} else {
+				ni_free(packet);
+				return true;
 			}
-			break;
 		case 2: // Reply
 			;
 			uint64_t smac = endian48(arp->sha);
@@ -114,14 +116,14 @@ bool arp_request(NetworkInterface* ni, uint32_t ip) {
 	Ether* ether = (Ether*)(packet->buffer + packet->start);
 	ether->dmac = endian48(0xffffffffffff);
 	ether->smac = endian48(ni->mac);
-	ether->type = ETHER_TYPE_ARP;
+	ether->type = endian16(ETHER_TYPE_ARP);
 	
 	ARP* arp = (ARP*)ether->payload;
 	arp->htype = endian16(1);
 	arp->ptype = endian16(0x0800);
 	arp->hlen = endian8(6);
 	arp->plen = endian8(4);
-	arp->operation = endian8(1);
+	arp->operation = endian16(1);
 	arp->sha = endian48(ni->mac);
 	arp->spa = endian32(addr);
 	arp->tha = endian48(0);
