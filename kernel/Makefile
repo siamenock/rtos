@@ -1,4 +1,4 @@
-.PHONY: all clean
+.PHONY: all clean mkver
 
 CFLAGS = -I ../lib/TLSF/src -I ../lib/core/include -O2 -Wall -Werror -m64 -ffreestanding -std=gnu99 -mcmodel=kernel
 
@@ -21,8 +21,8 @@ LIBFILES = ../lib/libtlsf.a ../lib/libjsmn.a ../lib/libcore.a ../lib/libxdr.a
 
 all: kernel.elf
 
-src/version.h:
-	./mkver.sh > $@
+mkver:
+	./mkver.sh > src/version.h
 
 $(DIR):
 	mkdir -p $@
@@ -39,7 +39,7 @@ obj/%.o: src/%.asm
 obj/%.o: src/%.c
 	gcc $(CFLAGS) -c -o $@ $<
 
-kernel.elf: src/version.h $(DIR) $(OBJS) $(LIBFILES)
+kernel.elf: mkver $(DIR) $(OBJS) $(LIBFILES)
 	ld -melf_x86_64 -T elf_x86_64.ld -nostdlib -e main -o kernel.elf -L ../lib $(OBJS) $(LIBFILES) $(LIBS)
 
 clean:
