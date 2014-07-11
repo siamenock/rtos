@@ -57,6 +57,17 @@ static int cmd_echo(int argc, char** argv) {
 	return 0;
 }
 
+static int cmd_sleep(int argc, char** argv) {
+	uint32_t time = 1;
+	if(argc >= 2 && is_uint32(argv[1])) {
+		time = parse_uint32(argv[1]);
+	}
+	
+	sleep(time);
+	
+	return 0;
+}
+
 static int cmd_connect(int argc, char** argv) {
 	char* host = DEFAULT_HOST;
 	int port = DEFAULT_PORT;
@@ -510,6 +521,12 @@ static Command commands[] = {
 		.exec = cmd_echo
 	},
 	{
+		.name = "sleep",
+		.desc = "Sleep n seconds",
+		.args = "[time: uint32]",
+		.exec = cmd_sleep
+	},
+	{
 		.name = "connect",
 		.desc = "Connect to the host",
 		.args = "[ (host: string) [port: uint16] ]",
@@ -725,7 +742,12 @@ int main(int _argc, char** _argv) {
 				for(int i = 0; i < argc; i++) {
 					if(argv[i][0] == '$') {
 						char* old = argv[i];
-						argv[i] = strdup(map_get(variables, argv[i]));
+						
+						if(!map_contains(variables, argv[i]))
+							argv[i] = strdup("(nil)");
+						else
+							argv[i] = strdup(map_get(variables, argv[i]));
+						
 						free(old);
 					}
 				}

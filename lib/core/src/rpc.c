@@ -555,8 +555,74 @@ CLIENT* rpc_client(uint32_t ip, uint16_t port, unsigned long prognum, unsigned l
 	return clnt;
 }
 
+bool rpc_call_async(NetworkInterface* ni, CLIENT* client, unsigned long procnum, xdrproc_t inproc, char* in) {
+	if(!ni_output_available(ni))
+		return false;
+	
+	ClientPrivate* priv = (void*)client + sizeof(CLIENT);
+	
+	Packet* packet = ni_alloc(ni, 1500);
+	Ether* ether = (Ether*)(packet->buffer + packet->start);
+	ether->dmac = endian48(arp_get_mac(ni, priv->ip));
+	ether->smac = endian48(ni->mac);
+	ether->type = endian16(ETHER_TYPE_IPv4);
+	
+	IP* ip = (IP*)ether->payload;
+	ip->version = endian8(4);
+	ip->ihl = endian8(IP_LEN / 4);
+	ip->dscp = 0;
+	ip->ecn = 0;
+	ip->length = 0;//endian16(packet_size - ETHER_LEN);
+	ip->id = clock() & 0xffff;
+	ip->flags_offset = endian16(0x02 << 13);
+	ip->ttl = endian8(0x40);
+	ip->protocol = endian8(IP_PROTOCOL_UDP);
+	ip->source = endian32((uint32_t)(uint64_t)map_get(ni->config, "ip"));
+	ip->destination = endian32(priv->ip);
+	ip->checksum = 0;
+	
+	UDP* udp = (UDP*)ip->body;
+	udp->source = endian16(111);
+	udp->destination = endian16(priv->port);
+	udp->checksum = 0;
+	
+	XDR xdr;
+	xdrmem_create(&xdr, (char*)udp->body, packet->buffer + packet->size - udp->body, XDR_ENCODE);
+	
+	struct rpc_msg msg;
+	msg.rm_xid = (uint32_t)clock();
+	msg.rm_direction = CALL;
+	msg.ru.RM_cmb.cb_rpcvers = 2;
+	msg.ru.RM_cmb.cb_prog = priv->prognum;
+	msg.ru.RM_cmb.cb_vers = priv->versnum;
+	msg.ru.RM_cmb.cb_proc = procnum;
+	bzero(&msg.ru.RM_cmb.cb_cred, sizeof(struct opaque_auth));
+	bzero(&msg.ru.RM_cmb.cb_verf, sizeof(struct opaque_auth));
+	
+	if(!xdr_rpc_msg(&xdr, &msg)) {
+		ni_free(packet);
+		return false;
+	}
+	
+	if(!inproc(&xdr, in)) {
+		ni_free(packet);
+		return false;
+	}
+	
+	udp_pack(packet, xdr_getpos(&xdr));
+	xdr_destroy(&xdr);
+	
+	if(!ni_output(ni, packet)) {
+		return false;
+	}
+	
+	return true;
+}
+
 bool rpc_call(NetworkInterface* ni, CLIENT* client, unsigned long procnum, xdrproc_t inproc, char* in, xdrproc_t outproc, char* out, struct timeval tout, void(*succeed)(void* context, void* result), void(*failed)(void* context, int stat1, int stat2), void(*timeout)(void* context), void* context) {
 	// TODO: timeout using event
+	if(!ni_output_available(ni))
+		return false;
 	
 	ClientPrivate* priv = (void*)client + sizeof(CLIENT);
 	

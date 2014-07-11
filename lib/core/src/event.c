@@ -212,6 +212,8 @@ uint64_t event_trigger_add(int event_id, TriggerEventFunc func, void* context) {
 			free(node);
 			return 0;
 		}
+		
+		map_put(trigger_events, (void*)(uint64_t)event_id, list);
 	}
 	
 	list_add(list, node);

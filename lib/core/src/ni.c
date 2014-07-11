@@ -62,6 +62,10 @@ inline Packet* ni_input(NetworkInterface* ni) {
 	return packet;
 }
 
+inline bool ni_output_available(NetworkInterface* ni) {
+	return fifo_available(ni->output_buffer);
+}
+
 inline bool ni_has_output(NetworkInterface* ni) {
 	return !fifo_empty(ni->output_buffer);
 }

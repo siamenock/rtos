@@ -26,7 +26,6 @@
 #include "cpu.h"
 #include "vm.h"
 #include "stdio.h"
-#include "events.h"
 #include "rpc/rpc_manager.h"
 #include "rpc/rpc_callback.h"
 
@@ -67,6 +66,7 @@ typedef struct {
 	uint32_t	addr;
 	uint16_t	port;
 	CLIENT*		client;
+	uint64_t	time;
 } Callback;
 
 static Core cores[MP_MAX_CORE_COUNT];
@@ -77,8 +77,10 @@ static Callback* callback_create(uint32_t addr, uint16_t port) {
 	list_iterator_init(&iter, callbacks);
 	while(list_iterator_has_next(&iter)) {
 		Callback* c = list_iterator_next(&iter);
-		if(c->addr == addr && c->port == port)
+		if(c->addr == addr && c->port == port) {
+			c->time = cpu_tsc();
 			return NULL;
+		}
 	}
 	
 	Callback* cb = malloc(sizeof(Callback));
@@ -89,6 +91,7 @@ static Callback* callback_create(uint32_t addr, uint16_t port) {
 	cb->addr = addr;
 	cb->port = port;
 	cb->client = rpc_client(cb->addr, cb->port, CALLBACK, CALLBACK_APPLE);
+	cb->time = cpu_tsc();
 	
 	if(!list_add(callbacks, cb)) {
 		clnt_destroy(cb->client);
@@ -99,12 +102,6 @@ static Callback* callback_create(uint32_t addr, uint16_t port) {
 	return cb;
 }
 
-static void callback_destroy(Callback* cb) {
-	list_remove_data(callbacks, cb);
-	clnt_destroy(cb->client);
-	free(cb);
-}
- 
 static void icc_started(ICC_Message* msg) {
 	Core* core = &cores[msg->core_id];
 	VM* vm = core->vm;
@@ -277,51 +274,44 @@ static bool manager_loop(NetworkInterface* ni) {
 		list_iterator_init(&iter, callbacks);
 		while(list_iterator_has_next(&iter)) {
 			Callback* cb = list_iterator_next(&iter);
-			
-			struct timeval tout = { 2, 0 };
-			 
-			void succeed(void* context, void* result) {
-				// Do nothing
-			}
-			
-			void failed(void* context, int stat1, int stat2) {
-				callback_destroy(context);
-			}
-			
-			void timeout(void* context) {
-				callback_destroy(context);
-			}
-			
-			if(!rpc_call(ni, cb->client, STDIO, (xdrproc_t)xdr_RPC_Message, (char*)&msg, (xdrproc_t)xdr_void, NULL, tout, succeed, failed, timeout, cb)) {
-				list_iterator_remove(&iter);
-				callback_destroy(cb);
-			}
+			rpc_call_async(ni, cb->client, STDIO, (xdrproc_t)xdr_RPC_Message, (char*)&msg);
 		}
 		free(buf);
 	}
 	
-	{
-		static uint64_t out_tick;
-		if(out_tick < cpu_tsc()) {
-			/*
-			char* buf = "Hello PacketNgin!\n";
-			size_t head = 0;
-			size_t tail = strlen(buf) + 1;
-			
-			output(0, 0, 1, buf, &head, &tail, 1024);
-			*/
-			
-			/*
-			printf("memory: local: %ld/%ld Ki, global: %ld/%ld Ki, block: %ld/%ld Ki\n", 
-				malloc_used() / 1024, malloc_total() / 1024,
-				gmalloc_used() / 1024, gmalloc_total() / 1024,
-				bmalloc_used() / 1024, bmalloc_total() / 1024);
-			*/
-			
-			//malloc_statistics();
-			out_tick = cpu_tsc() + 10 * cpu_frequency;
+	// GC callbacks
+	/* TODO: Activate it after interval callback_add call from console
+	static uint64_t gc_callback;
+	uint64_t time = cpu_tsc();
+	if(gc_callback < time) {
+		uint64_t timeout = time + 10 * cpu_frequency;
+		
+		ListIterator iter;
+		list_iterator_init(&iter, callbacks);
+		while(list_iterator_has_next(&iter)) {
+			Callback* cb = list_iterator_next(&iter);
+			if(cb->time < timeout) {
+				list_iterator_remove(&iter);
+				clnt_destroy(cb->client);
+				free(cb);
+			}
 		}
+		
+		gc_callback = time + 2 * cpu_frequency;
 	}
+	*/
+	
+	/*
+	static uint64_t debug_timer;
+	if(debug_timer < cpu_tsc()) {
+		printf("memory: local: %ld/%ldKiB, global: %ld/%ldKiB, block: %ld/%ldKiB\n", 
+			malloc_used() / 1024, malloc_total() / 1024,
+			gmalloc_used() / 1024, gmalloc_total() / 1024,
+			bmalloc_used() / 1024, bmalloc_total() / 1024);
+		
+		debug_timer = cpu_tsc() + 3 * cpu_frequency;
+	}
+	*/
 	
 	static int core_index;
 	

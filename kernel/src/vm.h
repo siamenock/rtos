@@ -4,6 +4,11 @@
 #include "mp.h"
 #include "ni.h"
 
+enum {
+	EVENT_VM_STARTED = 0x100000,
+	EVENT_VM_STOPPED,
+} VMEvents;
+
 #define VM_MEMORY_SIZE_ALIGN		0x200000
 #define VM_STORAGE_SIZE_ALIGN		0x200000
 

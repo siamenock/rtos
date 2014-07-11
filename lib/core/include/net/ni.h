@@ -96,6 +96,7 @@ void ni_free(Packet* packet);
 bool ni_has_input(NetworkInterface* ni);
 Packet* ni_input(NetworkInterface* ni);
 Packet* ni_tryinput(NetworkInterface* ni);
+bool ni_output_available(NetworkInterface* ni);
 bool ni_has_output(NetworkInterface* ni);
 bool ni_output(NetworkInterface* ni, Packet* packet);
 bool ni_output_dup(NetworkInterface* ni, Packet* packet);

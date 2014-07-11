@@ -145,17 +145,13 @@ static void icc_start(ICC_Message* msg) {
 	}
 	
 	// Set interrupt handler
-	void interrupt_handler(uint64_t vector, uint64_t err) {
-		printf("User VM interrupt handler\n");
-		
-		apic_dump(vector, err);
-		
+	void stop_handler(uint64_t vector, uint64_t err) {
 		apic_eoi();
 		
 		task_destroy(1);
 	}
 	
-	APIC_Handler old_interrupt_handler = apic_register(49, interrupt_handler);
+	APIC_Handler old_interrupt_handler = apic_register(49, stop_handler);
 	
 	// Context switching
 	task_switch(1);
