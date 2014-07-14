@@ -15,6 +15,7 @@ openssl*/**/*.s
 !openssl*/**/asm/*.s
 openssl*/**/*.bak
 openssl*/crypto/buildinf.h
+openssl*/Makefile.bak
 
 # zlib temporary files
 zlib*/**/*.lo

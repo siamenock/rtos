@@ -1,7 +1,7 @@
 #include <stdint.h>
 #include <stddef.h>
 
-void* memcpy(void* dest, const void* src, size_t size) {
+void* __memcpy_chk(void* dest, const void* src, size_t size, size_t bos) {
 	uint64_t* d = dest;
 	const uint64_t* s = src;
 	
@@ -16,6 +16,10 @@ void* memcpy(void* dest, const void* src, size_t size) {
 		*d2++ = *s2++;
 	
 	return dest;
+}
+
+void* memcpy(void* dest, const void* src, size_t size) {
+	return __memcpy_chk(dest, src, size, 0);
 }
 
 void* memset(void* dest, int c, size_t size) {

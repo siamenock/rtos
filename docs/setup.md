@@ -1,8 +1,15 @@
+# Ubuntu 14.04 LTS (Desktop)
+* Required Packages
+  * git
+  * nasm
+  * libcurl4-gnutls-dev
+  * qemu-kvm
+  * bridge-utils
+
+# Setup bridge
 Ref: http://toast.djw.org.uk/qemu.html
 
-apt-get install bridge-utils qemu-kvm
-
-/etc/network/interfaces
+Edit file: /etc/network/interfaces
 iface br0 inet manual
 	bridge_ports eth0
 	bridge_fd 9

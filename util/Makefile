@@ -27,7 +27,7 @@ src/rpc_callback_clnt.c: src/rpc_callback.x
 CONSOLE_OBJS = ../lib/core/obj/map.o ../lib/core/obj/list.o
 
 console: src/rpc_manager.c src/rpc_manager_xdr.c src/rpc_callback_clnt.c src/rpc_callback_svc.c src/rpc_callback_xdr.c src/rpc_callback_server.c src/console.c src/types.c
-	gcc $(CFLAGS) -Wno-unused-variable -o $@ -I ../lib/core/include -lcurl $(CONSOLE_OBJS) $^
+	gcc $(CFLAGS) -Wno-unused-variable -o $@ -I ../lib/core/include $(CONSOLE_OBJS) $^ -lcurl
 	cp console ../sdk/bin/
 
 clean:

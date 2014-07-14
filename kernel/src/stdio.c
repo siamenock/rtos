@@ -943,7 +943,29 @@ int sprintf(char *str, const char *format, ...) {
 	return len;
 }
 
+int __printf_chk (int flag, const char *format, ...) {
+	char buf[4096];
+	
+	va_list va;
+	va_start(va, format);
+	int len = vsprintf(buf, format, va);
+	va_end(va);
+	
+	return write1(buf, len);
+}
+
 int printf(const char* format, ...) {
+	char buf[4096];
+	
+	va_list va;
+	va_start(va, format);
+	int len = vsprintf(buf, format, va);
+	va_end(va);
+	
+	return write1(buf, len);
+}
+
+int __fprintf_chk(FILE* stream, int flag, const char* format, ...) {
 	char buf[4096];
 	
 	va_list va;
@@ -994,4 +1016,3 @@ uint32_t ntohl(uint32_t netlong) {
 uint16_t ntohs(uint16_t netshort) {
 	return bswap_16(netshort);
 }
-
