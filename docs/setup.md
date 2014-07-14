@@ -6,6 +6,9 @@
   * qemu-kvm
   * bridge-utils
 
+* Disable automount-open
+gsettings set org.gnome.desktop.media-handling automount-open false
+
 # Setup bridge
 Ref: http://toast.djw.org.uk/qemu.html
 
