@@ -233,6 +233,8 @@ void task_destroy(uint32_t id) {
 			PAGE_L4U[idx].exb ? '-' : 'x');
 	}
 	
+	list_destroy(tasks[id].mmap);
+	
 	// Restore resource
 	while(list_size(tasks[id].resources) > 0) {
 		Resource* resource = list_remove_first(tasks[id].resources);
@@ -260,6 +262,8 @@ void task_destroy(uint32_t id) {
 		}
 		free(resource);
 	}
+	
+	list_destroy(tasks[id].resources);
 	
 	refresh_cr3();
 	
