@@ -15,16 +15,13 @@ static ICC_Message* icc_msg;
 typedef void (*ICC_Handler)(ICC_Message*);
 static ICC_Handler icc_events[ICC_EVENTS_COUNT];
 
+static bool is_event;
+
 static void icc(uint64_t vector, uint64_t err) {
 	icc_msg->status = ICC_STATUS_RECEIVED;
 	
-	bool event(void* context) {
-		icc_events[icc_msg->type](icc_msg);
-		return false;
-	}
-	
 	if(icc_events[icc_msg->type])
-		event_busy_add(event, NULL);
+		is_event = true;
 	else
 		icc_msg->status = ICC_STATUS_DONE;
 	
@@ -40,6 +37,15 @@ static void terminate(uint64_t vector, uint64_t err) {
 }
 */
 
+static bool icc_event(void* context) {
+	if(is_event) {
+		icc_events[icc_msg->type](icc_msg);
+		is_event = false;
+	}
+	
+	return true;
+}
+
 void icc_init() {
 	if(mp_core_id() == 0) {
 		uint8_t core_count = mp_core_count();
@@ -49,6 +55,8 @@ void icc_init() {
 	}
 	
 	icc_msg = &shared->icc_messages[mp_core_id()];
+	
+	event_busy_add(icc_event, NULL);
 	
 	apic_register(48, icc);
 	//apic_register(49, terminate);

@@ -253,6 +253,9 @@ void main(void) {
 		printf("Initializing Multi-tasking...\n");
 		task_init();
 		
+		printf("Initializing events...\n");
+		event_init();
+		
 		printf("Initializing inter-core communications...\n");
 		icc_init();
 		
@@ -266,9 +269,6 @@ void main(void) {
 		ni_init0();
 		
 		mp_sync();
-		
-		printf("Initializing events...\n");
-		event_init();
 		
 		printf("Cleaning up memory...\n");
 		gmalloc_extend();
@@ -315,8 +315,8 @@ void main(void) {
 		apic_enable();
 		task_init();
 		mp_sync();
-		icc_init();
 		event_init();
+		icc_init();
 		stdio_init();
 		icc_register(ICC_TYPE_START, icc_start);
 		

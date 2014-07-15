@@ -6,7 +6,7 @@
 #include "pnkc.h"
 #include "malloc.h"
 
-#define DEBUG	0
+#define DEBUG	1
 
 #if DEBUG
 #include <util/map.h>
@@ -111,7 +111,11 @@ void freed(void* ptr) {
 		
 		Trace* trace = map_remove(tracing, ptr);
 		if(!trace) {
-			printf("ERROR: freeing never alloced pointer: %p\n", ((void**)read_rbp())[1]);
+			printf("ERROR: freeing never alloced pointer: %p from: %p\n", ptr, ((void**)read_rbp())[1]);
+			uint64_t* v = ptr;
+			for(int i = 0; i < 16; i++) {
+				printf("[%d] %p\n", i, v[i]);
+			}
 			while(1) asm("hlt");
 		}
 		
