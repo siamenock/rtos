@@ -1,7 +1,6 @@
 .PHONY: all run deploy clean cleanall system.img mount umount
 
-CLENLOG=rm -f /tmp/qemu.log
-QEMU=qemu-system-x86_64 -enable-kvm -cpu host -m 256 -hda system.img -M pc -smp 8 -d cpu_reset -no-reboot -no-shutdown -monitor stdio -net nic,model=rtl8139 -net tap,script=util/qemu-ifup
+QEMU=qemu-system-x86_64 $(shell util/qemu_params) -m 256 -hda system.img -M pc -smp 8 -d cpu_reset -no-reboot -no-shutdown -monitor stdio -net nic,model=rtl8139 -net tap,script=util/qemu-ifup
 
 all: system.img
 
