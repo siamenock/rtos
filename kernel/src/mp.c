@@ -40,10 +40,9 @@ void mp_analyze() {
 	MP_FloatingPointerStructure* find_FloatingPointerStructure() {
 		bool is_FloatingPointerStructure(uint8_t* p) {
 			if(memcmp(p, "_MP_", 4) == 0) {
-				int i;
 				uint8_t checksum = 0xff;
 				uint8_t length = *(uint8_t*)(p + 8) * 16;
-				for(i = 0; i < length; i++)
+				for(int i = 0; i < length; i++)
 					if(i != 10)
 						checksum += p[i];
 				checksum = ~checksum;
@@ -55,33 +54,30 @@ void mp_analyze() {
 			
 			return false;
 		}
-
-		uint64_t addr;
-		uint8_t* p;
 		
 		// Find extended BIOS area first
-		addr = *(uint16_t*)0x040e * 16;
-		for(p = (uint8_t*)addr; p <= (uint8_t*)(addr + 1024); p++) {
+		uint64_t addr = *(uint16_t*)0x040e * 16;
+		for(uint8_t* p = (uint8_t*)addr; p <= (uint8_t*)(addr + 1024); p++) {
 			if(is_FloatingPointerStructure(p))
 				return (MP_FloatingPointerStructure*)p;
 		}
 
 		// Find system memory area next
 		addr = *(uint16_t*)0x0413 * 1024;
-		for(p = (uint8_t*)(addr - 1024); p <= (uint8_t*)addr; p++) {
+		for(uint8_t* p = (uint8_t*)(addr - 1024); p <= (uint8_t*)addr; p++) {
 			if(is_FloatingPointerStructure(p))
 				return (MP_FloatingPointerStructure*)p;
 		}
 		
 		// Find BIOS ROM area last
-		for(p = (uint8_t*)0x0f0000; p < (uint8_t*)0x0fffff; p++) {
+		for(uint8_t* p = (uint8_t*)0x0f0000; p < (uint8_t*)0x0fffff; p++) {
 			if(is_FloatingPointerStructure(p))
 				return (MP_FloatingPointerStructure*)p;
 		}
 		
 		return NULL;
 	}
-
+	
 	void process_FloatingPointerStructure() {
 		cth = (MP_ConfigurationTableHeader*)(uint64_t)fps->physical_address_pointer;
 	}
@@ -89,7 +85,7 @@ void mp_analyze() {
 	void process_ConfigurationTableHeader() {
 		_apic_address = (uint64_t)cth->local_apic_address;
 	}
-
+	
 	void process_ProcessorEntry(MP_ProcessorEntry* entry) {
 		if(entry->cpu_flags & 0x01) {	// enabled
 			core_count++;
@@ -123,9 +119,10 @@ void mp_analyze() {
 	// Read MP information
 	fps = find_FloatingPointerStructure();
 	if(!fps) {
-		if(core_id == 0)
-			printf("\tCannot find Multi-processor information\n");
-		return;
+		if(core_id == 0) {
+			printf("\tCannot find floating pointer structure\n");
+			while(1) asm("hlt");
+		}
 	}
 	
 	process_FloatingPointerStructure();

@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stddef.h>
+#include "version.h"
 #include "mp.h"
 #include "port.h"
 #include "asm.h"
@@ -13,10 +14,38 @@ static APIC_Handler handlers[HANDLER_SIZE];
 
 void apic_activate() {
 	// Disable PIT
-	#define PIT_CONTROL     0x43
-	#define PIT_COUNTER0    0x40
+	#define PIT_FREQUENCY	1193180
 	
-	port_out8(PIT_CONTROL, 0x00 << 6 | 0x03 << 4 | 0x01 << 1 | 0x00 << 0);  // SC=Counter0, RW=0b11, Mode=1, BCD=Binary
+	#define PIT_COUNTER0	0x40
+	#define PIT_COUNTER1	0x41
+	#define PIT_COUNTER2	0x42
+	#define PIT_COMMAND	0x43
+	
+	#define PIT_CHANNEL0	0x00
+	#define PIT_CHANNEL1	0x40
+	#define PIT_CHANNEL2	0x60
+	
+	#define PIT_LATCH	0x00
+	#define PIT_LOW		0x10
+	#define PIT_HIGH	0x20
+	#define PIT_LOWHIGH	0x30
+	
+	#define PIT_MODE0	0x00
+	#define PIT_MODE1	0x02
+	#define PIT_MODE2	0x04
+	#define PIT_MODE3	0x06
+	#define PIT_MODE4	0x08
+	#define PIT_MODE5	0x0a
+	#define PIT_MODE6	0x0c
+	#define PIT_MODE7	0x0e
+	
+	#define PIT_BIN		0x00
+	#define PIT_BCD		0x01
+	
+	port_out8(PIT_COMMAND, PIT_CHANNEL0 | PIT_LOWHIGH | PIT_MODE0 | PIT_BIN);
+	uint16_t interval = 0;
+	port_out8(PIT_COUNTER0, (interval >> 0) & 0xff);
+	port_out8(PIT_COUNTER0, (interval >> 8) & 0xff);
 	
 	// Disable PIC(mask all)
 	#define PIC_MASTER_PORT2	0x21
@@ -41,18 +70,6 @@ void apic_init() {
 	apic_write32(APIC_REG_LVT_LINT0R, apic_read32(APIC_REG_LVT_LINT0R) | APIC_IM_DISABLED);
 	apic_write32(APIC_REG_LVT_LINT1R, APIC_TM_EDGE | APIC_PP_ACTIVEHIGH | APIC_DMODE_NMI);
 	apic_write32(APIC_REG_LVT_ER, apic_read32(APIC_REG_LVT_ER) | APIC_IM_DISABLED);
-	
-	// TODO: Remove this after Disable PIT bug fixed
-	void ignore_timer(uint64_t v, uint64_t e) {
-		/*
-		APIC_Handler handler = apic_register(0x20, NULL);
-		if(handler != ignore_timer)
-			apic_register(0x20, handler);
-		*/
-		//printf("Ignore timer\n");
-		asm("nop");
-	}
-	apic_register(0x20, ignore_timer);
 	
 	apic_eoi();
 }
@@ -148,7 +165,7 @@ typedef struct {
 void apic_dump(uint64_t vector, uint64_t error_code) {
 	Frame* frame = (void*)(0xffffffff805b0000 - sizeof(Frame));
 	
-	printf("\n* Exception occurred: core=%d, vector=0x%x, error_code=0x%x\n", mp_core_id(), vector, error_code);
+	printf("\n* Exception occurred: version=%d.%d.%d core=%d, vector=0x%x, error_code=0x%x\n", VERSION_MAJOR, VERSION_MINOR, VERSION_MICRO, mp_core_id(), vector, error_code);
 	printf("AX=%016lx BX=%016lx CX=%016lx DX=%016lx\n", frame->rax, frame->rbx, frame->rcx, frame->rdx);
 	printf("SI=%016lx DI=%016lx BP=%016lx SP=%016lx\n", frame->rsi, frame->rdi, frame->rbp, frame->rsp);
 	printf("8 =%016lx 9 =%016lx 10=%016lx 11=%016lx\n", frame->r8, frame->r9, frame->r10, frame->r11);

@@ -21,7 +21,7 @@ void ioapic_init() {
 			
 			ioapic_write64(IOAPIC_IDX_REDIRECTION_TABLE + entry->destination_io_apic_intin * 2, redirection);
 			redirection_map[entry->source_bus_irq] = entry->destination_io_apic_intin;
-			//printf("ISA IRQ remap: %d -> %d to %s\n", entry->destination_io_apic_intin, 32 + entry->source_bus_irq, entry->source_bus_irq == 0 ? "all" : "core 0");
+			printf("\tISA IRQ remap: %d -> %d to %s\n", entry->destination_io_apic_intin, 32 + entry->source_bus_irq, entry->source_bus_irq == 0 ? "all" : "core 0");
 		}
 		return true;
 	}

@@ -12,6 +12,7 @@
 #include "ni.h"
 #include "manager.h"
 #include "device.h"
+#include "port.h"
 #include "driver/charout.h"
 #include "driver/charin.h"
 
@@ -137,14 +138,49 @@ static int command_lsni() {
 	return 0;
 }
 
+static int command_reboot() {
+	asm volatile("cli");
+	
+	uint8_t code;
+	do {
+		code = port_in8(0x64);	// Keyboard Control
+		if(code & 0x01)
+			port_in8(0x60);	// Keyboard I/O
+	} while(code & 0x02);
+	
+	port_out8(0x64, 0xfe);	// Reset command
+	
+	while(1)
+		asm("hlt");
+	
+	return 0;
+}
+
+static int command_shutdown() {
+	/*
+	apic_enable();
+	
+	port_out32(
+   // send the shutdown command
+      outw((unsigned int) PM1a_CNT, SLP_TYPa | SLP_EN );
+         if ( PM1b_CNT != 0 )
+	       outw((unsigned int) PM1b_CNT, SLP_TYPb | SLP_EN );
+
+	          wrstr("acpi poweroff failed.\n");
+	*/
+	return 0;
+}
+
 static Command commands[] = {
 	{ "help", "Show this message.", command_help },
+	{ "version", "Print the kernel version.", command_version },
 	{ "clear", "Clear screen.", command_clear },
 	{ "echo", "Echo arguments.", command_echo },
 	{ "date", "Print current date and time.", command_date },
 	{ "ip", "Change manager's IP address. You can use decimal, hexadecimal or octal.", command_ip },
-	{ "version", "Print the kernel version.", command_version },
 	{ "lsni", "List network interfaces.", command_lsni },
+	{ "reboot", "Reboot the node..", command_reboot },
+	{ "shutdown", "Shutdown the node..", command_shutdown },
 };
 
 static int command_help() {

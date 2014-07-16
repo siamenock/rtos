@@ -1,7 +1,1 @@
-#!/bin/sh
-
-echo "Start of Network configuration for $1"
-/sbin/ifconfig $1 192.168.100.200 promisc up
-/sbin/brctl addif br0 $1
-echo "End of Network configuration for $1"
-sleep 2
+../sdk/lib/qemu-ifup

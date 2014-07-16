@@ -1,6 +1,6 @@
 .PHONY: all run deploy clean cleanall system.img mount umount
 
-QEMU=qemu-system-x86_64 $(shell util/qemu_params) -m 256 -hda system.img -M pc -smp 8 -d cpu_reset -no-reboot -no-shutdown -monitor stdio -net nic,model=rtl8139 -net tap,script=util/qemu-ifup
+QEMU=qemu-system-x86_64 $(shell util/qemu-params) -m 256 -hda system.img -M pc -smp 8 -d cpu_reset -no-shutdown -monitor stdio -net nic,model=rtl8139 -net tap,script=util/qemu-ifup
 
 all: system.img
 
@@ -22,13 +22,12 @@ system.img:
 	sudo util/mkfs.bfs /dev/loop0
 	sudo mount /dev/loop0 mnt
 	sudo cp kernel.bin kernel.smap drivers/*.ko mnt
+	sync
 	sudo umount mnt
 	sudo losetup -d /dev/loop0
 	rmdir mnt
 	cat boot/boot.bin loader/loader.bin root.img > $@
-	#util/truncate $@
 	util/rewrite $@
-	cp $@ sdk
 
 mount:
 	mkdir mnt
@@ -40,15 +39,12 @@ umount:
 	sudo losetup -d /dev/loop0
 	rmdir mnt
 
-sdk: system.img lib
-	rm -rf packetngin
-	cp -r skel packetngin
-	cp -r control/bin/* packetngin/bin/
-	cp util/qemu-ifup packetngin/lib/
-	cp system.img packetngin/lib/
-	cp lib/libpacketngin.a packetngin/lib/
-	cp -r lib/core/include packetngin
-	tar cfz packetngin_sdk.tgz packetngin
+ver:
+	@echo $(shell git tag).$(shell git rev-list HEAD --count)
+
+sdk: system.img
+	cp $^ sdk/
+	tar cfz packetngin_sdk-$(shell git tag).$(shell git rev-list HEAD --count).tgz sdk
 
 run: system.img
 	sudo $(QEMU) 
@@ -75,10 +71,11 @@ stop:
 	killall -9 qemu-system-x86_64
 
 deploy: system.img
+	util/chk-sdb
 	sudo dd if=system.img of=/dev/sdb && sync
 
 clean:
-	rm -f system.img root.img kernel.smap kernel.bin kernel.dis
+	rm -f system.img root.img kernel.smap kernel.bin kernel.dis packetngin_sdk-*.tgz
 
 cleanall: clean
 	make -C boot clean

@@ -35,6 +35,8 @@ obj/rpc/%.o: src/rpc/%.c
 
 obj/shell.o: src/version.h
 
+obj/apic.o: src/version.h
+
 obj/%.o: src/%.asm
 	nasm -f elf64 -o $@ $<
 

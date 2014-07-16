@@ -238,18 +238,6 @@ void main(void) {
 		ioapic_init();
 		apic_enable();
 		
-		void printdouble(double v) {
-			long l = (long)v;
-			printf("[%ld", l);
-			v -= l;
-			printf(".");
-			for(int i = 0; i < 8; i++) {
-				v *= 10;
-				printf("%ld", (long)v);
-				v -= (long)v;
-			}
-			printf("]\n");
-		}
 		printf("Initializing Multi-tasking...\n");
 		task_init();
 		
