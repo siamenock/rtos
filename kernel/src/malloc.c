@@ -6,7 +6,7 @@
 #include "pnkc.h"
 #include "malloc.h"
 
-#define DEBUG	1
+#define DEBUG	0
 
 #if DEBUG
 #include <util/map.h>
