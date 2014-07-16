@@ -1,6 +1,6 @@
 .PHONY: all clean mkver
 
-CFLAGS = -I ../lib/TLSF/src -I ../lib/core/include -O2 -Wall -Werror -m64 -ffreestanding -std=gnu99 -mcmodel=kernel
+CFLAGS = -I ../lib/TLSF/src -I ../lib/core/include -O0 -Wall -Werror -m64 -ffreestanding -std=gnu99 -mcmodel=kernel
 
 DIR = obj obj/driver obj/rpc
 
@@ -32,6 +32,8 @@ src/rpc/%.c:
 
 obj/rpc/%.o: src/rpc/%.c
 	gcc -Wno-unused-variable $(CFLAGS) -c -o $@ $<
+
+obj/shell.o: src/version.h
 
 obj/%.o: src/%.asm
 	nasm -f elf64 -o $@ $<

@@ -109,16 +109,8 @@ static int command_ip() {
 	return 0;
 }
 
-static int command_port() {
-	/*
-	char* str = cmd + args[1];
-	uint16_t port = strtol(str, NULL, 0);
-	
-	uint32_t old = manager_port;
-	manager_port = port;
-	
-	printf("Manager's port number changed from %d to %d\n", old, port);
-	*/
+static int command_version() {
+	printf("%d.%d.%d\n", VERSION_MAJOR, VERSION_MINOR, VERSION_MICRO);
 	
 	return 0;
 }
@@ -144,7 +136,7 @@ static Command commands[] = {
 	{ "echo", "Echo arguments.", command_echo },
 	{ "date", "Print current date and time.", command_date },
 	{ "ip", "Change manager's IP address. You can use decimal, hexadecimal or octal.", command_ip },
-	{ "port", "Change manager's port number. You can use decimal, hexadecimal or octal.", command_port },
+	{ "version", "Print the kernel version.", command_version },
 	{ "lsni", "List network interfaces.", command_lsni },
 };
 
