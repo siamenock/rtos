@@ -124,7 +124,14 @@ static int command_lsni() {
 	while(map_iterator_has_next(&iter)) {
 		NI* ni = map_iterator_next(&iter)->data;
 		
-		printf("%12x%c\n", ni->mac, ni->mac == ni_mac ? '*' : ' ');
+		printf("%02x:%02x:%02x:%02x:%02x:%02x %c\n", 
+			(ni->mac >> 40) & 0xff, 
+			(ni->mac >> 32) & 0xff, 
+			(ni->mac >> 24) & 0xff, 
+			(ni->mac >> 16) & 0xff, 
+			(ni->mac >> 8) & 0xff, 
+			(ni->mac >> 0) & 0xff, 
+			ni->mac == ni_mac ? '*' : ' ');
 	}
 	
 	return 0;
