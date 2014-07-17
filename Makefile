@@ -1,6 +1,6 @@
 .PHONY: all run deploy clean cleanall system.img mount umount
 
-QEMU=qemu-system-x86_64 $(shell util/qemu-params) -m 256 -hda system.img -M pc -smp 8 -d cpu_reset -no-shutdown -monitor stdio -net nic,model=rtl8139 -net tap,script=util/qemu-ifup
+QEMU=qemu-system-x86_64 $(shell util/qemu-params) -m 256 -hda system.img -M pc -smp 8 -d cpu_reset -net nic,model=rtl8139 -net tap,script=util/qemu-ifup
 
 all: system.img
 
@@ -47,16 +47,16 @@ sdk: system.img
 	tar cfz packetngin_sdk-$(shell git tag).$(shell git rev-list HEAD --count).tgz sdk
 
 run: system.img
-	sudo $(QEMU) 
+	sudo $(QEMU) -monitor stdio
 
 cli: system.img
 	sudo $(QEMU) -curses
 
 vnc: system.img
-	sudo $(QEMU) -vnc :0
+	sudo $(QEMU) -monitor stdio -vnc :0
 
 debug: system.img
-	sudo $(QEMU) -S -s 
+	sudo $(QEMU) -monitor stdio -S -s 
 
 gdb:
 	# target remote localhost:1234

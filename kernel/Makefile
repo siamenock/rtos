@@ -8,6 +8,7 @@ OBJS = obj/entry.o \
 	obj/main.o obj/stdio.o obj/shell.o obj/port.o obj/asm.o obj/gdt.o obj/idt.o \
 	obj/isr.o obj/device.o obj/pci.o obj/malloc.o obj/gmalloc.o obj/task.o obj/task_asm.o \
 	obj/mp.o obj/apic.o obj/apic_asm.o obj/ioapic.o obj/rtc.o obj/cpu.o \
+	obj/acpi.o \
 	obj/loader.o obj/shared.o obj/ni.o obj/icc.o \
 	obj/string.o obj/module.o obj/symbols.o obj/rootfs.o \
 	obj/driver/linux.o obj/driver/dummy.o \

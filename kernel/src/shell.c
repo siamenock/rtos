@@ -13,6 +13,7 @@
 #include "manager.h"
 #include "device.h"
 #include "port.h"
+#include "acpi.h"
 #include "driver/charout.h"
 #include "driver/charin.h"
 
@@ -40,8 +41,7 @@ static int command_clear() {
 }
 
 static int command_echo() {
-	int i;
-	for(i = 1; i < arg_idx; i++) {
+	for(int i = 1; i < arg_idx; i++) {
 		printf("%s", cmd + args[i]);
 		if(i + 1 < arg_idx)
 			printf(" ");
@@ -157,17 +157,9 @@ static int command_reboot() {
 }
 
 static int command_shutdown() {
-	/*
-	apic_enable();
+	printf("Shutting down\n");
+	acpi_shutdown();
 	
-	port_out32(
-   // send the shutdown command
-      outw((unsigned int) PM1a_CNT, SLP_TYPa | SLP_EN );
-         if ( PM1b_CNT != 0 )
-	       outw((unsigned int) PM1b_CNT, SLP_TYPb | SLP_EN );
-
-	          wrstr("acpi poweroff failed.\n");
-	*/
 	return 0;
 }
 
@@ -179,14 +171,25 @@ static Command commands[] = {
 	{ "date", "Print current date and time.", command_date },
 	{ "ip", "Change manager's IP address. You can use decimal, hexadecimal or octal.", command_ip },
 	{ "lsni", "List network interfaces.", command_lsni },
-	{ "reboot", "Reboot the node..", command_reboot },
-	{ "shutdown", "Shutdown the node..", command_shutdown },
+	{ "reboot", "Reboot the node.", command_reboot },
+	{ "shutdown", "Shutdown the node.", command_shutdown },
+	{ "halt", "Shutdown the node.", command_shutdown },
 };
 
 static int command_help() {
-	int i;
-	for(i = 0; i < sizeof(commands) / sizeof(Command); i++) {
-		printf("%s\t%s\n", commands[i].label, commands[i].description);
+	int command_len = 0;
+	for(int i = 0; i < sizeof(commands) / sizeof(Command); i++) {
+		int len = strlen(commands[i].label);
+		command_len = len > command_len ? len : command_len;
+	}
+	
+	for(int i = 0; i < sizeof(commands) / sizeof(Command); i++) {
+		printf("%s", commands[i].label);
+		int len = strlen(commands[i].label);
+		len = command_len - len + 2;
+		for(int i = 0; i < len; i++)
+			putchar(' ');
+		printf("%s\n", commands[i].description);
 	}
 	return 0;
 }
@@ -194,15 +197,14 @@ static int command_help() {
 static void exec() {
 	cmd[cmd_idx] = 0;
 	
-	int i;
-	for(i = 0; i < ARG_SIZE; i++) {
+	for(int i = 0; i < ARG_SIZE; i++) {
 		args[i] = -1;
 	}
 	
 	bool is_start = true;
 	char quotation = 0;
 	arg_idx = 0;
-	for(i = 0; i < cmd_idx; i++) {
+	for(int i = 0; i < cmd_idx; i++) {
 		if(quotation) {
 			if(cmd[i] == quotation) {
 				quotation = 0;
@@ -232,7 +234,7 @@ static void exec() {
 		}
 	}
 	
-	for(i = 0; i < sizeof(commands) / sizeof(Command); i++) {
+	for(int i = 0; i < sizeof(commands) / sizeof(Command); i++) {
 		if(strcmp(cmd, commands[i].label) == 0) {
 			/*int return_code =*/ commands[i].func();
 			return;

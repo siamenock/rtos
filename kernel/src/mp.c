@@ -40,14 +40,12 @@ void mp_analyze() {
 	MP_FloatingPointerStructure* find_FloatingPointerStructure() {
 		bool is_FloatingPointerStructure(uint8_t* p) {
 			if(memcmp(p, "_MP_", 4) == 0) {
-				uint8_t checksum = 0xff;
+				uint8_t checksum = 0;
 				uint8_t length = *(uint8_t*)(p + 8) * 16;
 				for(int i = 0; i < length; i++)
-					if(i != 10)
-						checksum += p[i];
-				checksum = ~checksum;
+					checksum += p[i];
 				
-				if(checksum == p[10]) {
+				if(checksum == 0) {
 					return true;
 				}
 			}

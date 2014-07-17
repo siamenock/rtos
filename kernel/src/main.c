@@ -10,6 +10,7 @@
 #include "stdio.h"
 #include "shell.h"
 #include "mp.h"
+#include "acpi.h"
 #include "apic.h"
 #include "ioapic.h"
 #include "task.h"
@@ -224,6 +225,9 @@ void main(void) {
 		
 		printf("Initializing PCI...\n");
 		pci_init();
+		
+		printf("Initializing ACPI...\n");
+		acpi_init();
 		
 		printf("Initializing APICs...\n");
 		apic_activate();
