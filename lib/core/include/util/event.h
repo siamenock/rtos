@@ -6,7 +6,7 @@
 #include <time.h>
 
 typedef bool(*EventFunc)(void* context);
-typedef bool(*TriggerEventFunc)(int event_id, void* event, void* context);
+typedef bool(*TriggerEventFunc)(uint64_t event_id, void* event, void* context);
 
 void event_init();
 int event_loop();
@@ -17,9 +17,9 @@ bool event_busy_remove(uint64_t id);
 uint64_t event_timer_add(EventFunc func, void* context, clock_t delay, clock_t period);
 bool event_timer_remove(uint64_t id);
 
-uint64_t event_trigger_add(int event_id, TriggerEventFunc func, void* context);
+uint64_t event_trigger_add(uint64_t event_id, TriggerEventFunc func, void* context);
 bool event_trigger_remove(uint64_t id);
-void event_trigger_fire(int event_id, void* event, TriggerEventFunc last, void* context);
+void event_trigger_fire(uint64_t event_id, void* event, TriggerEventFunc last, void* last_context);
 void event_trigger_stop();
 
 uint64_t event_idle_add(EventFunc func, void* context);

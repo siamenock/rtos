@@ -16,16 +16,16 @@ typedef struct {
 } TimerNode;
 
 typedef struct {
-	int			event_id;
+	uint64_t		event_id;
 	TriggerEventFunc	func;
 	void*			context;
 } TriggerNode;
 
 typedef struct {
-	int			event_id;
+	uint64_t		event_id;
 	void*			event;
 	TriggerEventFunc	last;
-	void*			context;
+	void*			last_context;
 } Trigger;
 
 static List* busy_events;
@@ -44,8 +44,8 @@ void event_init() {
 
 static bool is_trigger_stop;
 
-static void fire(int event_id, void* event, TriggerEventFunc last, void* context) {
-	List* list = map_get(trigger_events, (void*)(uint64_t)event_id);
+static void fire(uint64_t event_id, void* event, TriggerEventFunc last, void* last_context) {
+	List* list = map_get(trigger_events, (void*)event_id);
 	if(!list)
 		return;
 	
@@ -64,7 +64,7 @@ static void fire(int event_id, void* event, TriggerEventFunc last, void* context
 	}
 	
 	if(last)
-		last(event_id, event, context);
+		last(event_id, event, last_context);
 }
 
 static bool get_first_bigger(void* time, void* node) {
@@ -115,7 +115,7 @@ int event_loop() {
 	// Trigger events
 	while(list_size(triggers) > 0) {
 		Trigger* trigger = list_remove_first(triggers);
-		fire(trigger->event_id, trigger->event, trigger->last, trigger->context);
+		fire(trigger->event_id, trigger->event, trigger->last, trigger->last_context);
 		free(trigger);
 		
 		count++;
@@ -197,7 +197,7 @@ bool event_timer_remove(uint64_t id) {
 	}
 }
 
-uint64_t event_trigger_add(int event_id, TriggerEventFunc func, void* context) {
+uint64_t event_trigger_add(uint64_t event_id, TriggerEventFunc func, void* context) {
 	TriggerNode* node = malloc(sizeof(TriggerNode));
 	if(!node)
 		return 0;
@@ -205,7 +205,7 @@ uint64_t event_trigger_add(int event_id, TriggerEventFunc func, void* context) {
 	node->func = func;
 	node->context = context;
 	
-	List* list = map_get(trigger_events, (void*)(uint64_t)event_id);
+	List* list = map_get(trigger_events, (void*)event_id);
 	if(!list) {
 		list = list_create(malloc, free);
 		if(!list) {
@@ -213,7 +213,7 @@ uint64_t event_trigger_add(int event_id, TriggerEventFunc func, void* context) {
 			return 0;
 		}
 		
-		map_put(trigger_events, (void*)(uint64_t)event_id, list);
+		map_put(trigger_events, (void*)event_id, list);
 	}
 	
 	list_add(list, node);
@@ -241,20 +241,20 @@ bool event_trigger_remove(uint64_t id) {
 	return false;
 }
 
-void event_trigger_fire(int event_id, void* event, TriggerEventFunc last, void* context) {
+void event_trigger_fire(uint64_t event_id, void* event, TriggerEventFunc last, void* last_context) {
 	Trigger* trigger = malloc(sizeof(Trigger));
 	if(!trigger) {
-		fire(event_id, event, last, context);
+		fire(event_id, event, last, last_context);
 		return;
 	}
 	trigger->event_id = event_id;
 	trigger->event = event;
 	trigger->last = last;
-	trigger->context = context;
+	trigger->last_context = last_context;
 	
 	if(!list_add(triggers, trigger)) {
 		free(trigger);
-		fire(event_id, event, last, context);
+		fire(event_id, event, last, last_context);
 	}
 }
 

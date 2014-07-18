@@ -163,17 +163,67 @@ static int command_shutdown() {
 	return 0;
 }
 
+static int command_arping() {
+	static uint32_t address;
+	if(arg_idx < 2) {
+		return 1;
+	}
+	
+	char* str = cmd + args[1];
+	address = (strtol(str, &str, 0) & 0xff) << 24; str++;
+	address |= (strtol(str, &str, 0) & 0xff) << 16; str++;
+	address |= (strtol(str, &str, 0) & 0xff) << 8; str++;
+	address |= strtol(str, NULL, 0) & 0xff;
+	
+	int count = 1;
+	if(arg_idx >= 4) {
+		if(strcmp(cmd + args[2], "-c") == 0) {
+			count = strtol(cmd + args[3], NULL, 0);
+		}
+	}
+	
+	printf("arping to %d.%d.%d.%d -c %d\n", 
+		(address >> 24) & 0xff,
+		(address >> 16) & 0xff,
+		(address >> 8) & 0xff,
+		(address >> 0) & 0xff,
+		count);
+	// TODO: Implement it
+	/*
+	extern NI* manager_ni;
+	
+	bool arping(void* context) {
+		uint64_t count = (uint64_t)context;
+		
+		if(!arp_request(manager_ni, address)) {
+			return false;
+		}
+		
+		return --count != 0;
+	}
+	
+	if(!arp_request(manager_ni, address)) {
+		printf("Cannot send ARP packet\n");
+		return 1;
+	}
+	
+	event_arping
+	*/
+	return 0;
+}
+
 static Command commands[] = {
 	{ "help", "Show this message.", command_help },
 	{ "version", "Print the kernel version.", command_version },
 	{ "clear", "Clear screen.", command_clear },
 	{ "echo", "Echo arguments.", command_echo },
 	{ "date", "Print current date and time.", command_date },
-	{ "ip", "Change manager's IP address. You can use decimal, hexadecimal or octal.", command_ip },
+	{ "ip", "[(address)] Get or set IP address of manager.", command_ip },
 	{ "lsni", "List network interfaces.", command_lsni },
 	{ "reboot", "Reboot the node.", command_reboot },
 	{ "shutdown", "Shutdown the node.", command_shutdown },
 	{ "halt", "Shutdown the node.", command_shutdown },
+	{ "arping", "(address)] [\"-c\" (count)] ARP ping to the host.", command_arping },
 };
 
 static int command_help() {
