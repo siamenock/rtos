@@ -60,7 +60,7 @@ void idt_init() {
 	ID_INIT(id[46], (uint64_t)isr_46, 0x08, 1, 0x0e, 0, 1);
 	ID_INIT(id[47], (uint64_t)isr_47, 0x08, 1, 0x0e, 0, 1);
 	ID_INIT(id[48], (uint64_t)isr_48, 0x08, 1, 0x0e, 0, 1);
-	ID_INIT(id[49], (uint64_t)isr_49, 0x08, 1, 0x0e, 0, 1);
+	ID_INIT(id[49], (uint64_t)isr_49, 0x08, 2, 0x0e, 0, 1);	// User -> Kernel context switching
 	ID_INIT(id[50], (uint64_t)isr_50, 0x08, 1, 0x0e, 0, 1);
 	ID_INIT(id[51], (uint64_t)isr_51, 0x08, 1, 0x0e, 0, 1);
 	ID_INIT(id[52], (uint64_t)isr_52, 0x08, 1, 0x0e, 0, 1);

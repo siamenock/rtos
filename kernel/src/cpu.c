@@ -4,9 +4,9 @@
 #include "shared.h"
 #include "cpu.h"
 
-static uint64_t cpu_ms;
-static uint64_t cpu_us;
-static uint64_t cpu_ns;
+uint64_t cpu_ms;
+uint64_t cpu_us;
+uint64_t cpu_ns;
 
 uint64_t cpu_frequency;
 char cpu_brand[4 * 4 * 3 + 1];

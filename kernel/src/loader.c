@@ -206,7 +206,7 @@ static uint32_t load(VM* vm, void** malloc_pool, void** gmalloc_pool) {
 		stack_size -= 0x200000;
 	}
 	
-	task_stack(id, (idx << 21) - 8);
+	task_stack(id, idx << 21);
 	
 	// Global heap
 	count = code_blocks + (data_blocks + stack_blocks) * thread_count;

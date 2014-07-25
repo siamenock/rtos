@@ -9,7 +9,8 @@ enum RPC_VMStatus {
 	RPC_NONE = 0,
 	RPC_START = 1,
 	RPC_PAUSE = 2,
-	RPC_STOP = 3
+	RPC_RESUME = 3,
+	RPC_STOP = 4
 };
 
 enum RPC_MessageDigestType {

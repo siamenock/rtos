@@ -77,7 +77,8 @@ Signature        : 7f
 4MB ~ 6MB	: Kernel local
 	nKB	: Kernel data and bss
 	extra	: Local malloc
-	64KB	: TS
+	32KB	: User interrupt stack
+	32KB	: Kernel interrupt stack
 	64KB	: Kernel stack
 	256KB	: TLB
 

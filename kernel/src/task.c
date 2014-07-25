@@ -145,7 +145,7 @@ void task_entry(uint32_t id, uint64_t entry) {
 
 void task_stack(uint32_t id, uint64_t stack) {
 	tasks[id].cpu[CTX_RSP] = stack;
-	tasks[id].cpu[CTX_RBP] = stack;
+ 	tasks[id].cpu[CTX_RBP] = stack;
 }
 
 void task_arguments(uint32_t id, uint64_t argc, uint64_t argv) {
@@ -213,8 +213,6 @@ void task_resource(uint32_t id, uint8_t type, void* data) {
 }
 
 void task_destroy(uint32_t id) {
-	apic_pause();
-	
 	// Restore memory map
 	while(list_size(tasks[id].mmap) > 0) {
 		uint64_t vaddr = (uint64_t)list_remove_first(tasks[id].mmap);
@@ -234,6 +232,7 @@ void task_destroy(uint32_t id) {
 	}
 	
 	list_destroy(tasks[id].mmap);
+	tasks[id].mmap = NULL;
 	
 	// Restore resource
 	while(list_size(tasks[id].resources) > 0) {
@@ -264,6 +263,7 @@ void task_destroy(uint32_t id) {
 	}
 	
 	list_destroy(tasks[id].resources);
+	tasks[id].resources = NULL;
 	
 	refresh_cr3();
 	
@@ -273,11 +273,7 @@ void task_destroy(uint32_t id) {
 	if(id == current_task) {
 		current_task = (uint32_t)-1;
 		
-		apic_resume();
-		
 		task_switch(0);
-	} else {
-		apic_resume();
 	}
 }
 
@@ -285,11 +281,7 @@ uint32_t inline task_id() {
 	return current_task;
 }
 
-void _context_switch(void* prev, void* next);
-
 void task_switch(uint32_t id) {
-	apic_pause();
-	
 	if(id == (uint32_t)-1) {
 		id = 0;
 	}
@@ -303,9 +295,12 @@ void task_switch(uint32_t id) {
 		ts_set();
 	}
 	
+	void _context_switch(void* prev, void* next);
 	_context_switch(old_task == (uint32_t)-1 ? NULL : tasks[old_task].cpu, tasks[current_task].cpu);
-	
-	apic_resume();
+}
+
+bool task_is_active(uint32_t id) {
+	return tasks[id].mmap != NULL;
 }
 
 void task_dump(uint32_t id) {

@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
 #include <malloc.h>
@@ -110,18 +111,18 @@ static void icc_started(ICC_Message* msg) {
 	if(msg->result == 0) {
 		core->error_code = 0;
 		core->status = VM_STATUS_STARTED;
-		core->stdin = msg->data.execute.stdin;
-		core->stdin_head = msg->data.execute.stdin_head;
-		core->stdin_tail = msg->data.execute.stdin_tail;
-		core->stdin_size = msg->data.execute.stdin_size;
-		core->stdout = msg->data.execute.stdout;
-		core->stdout_head = msg->data.execute.stdout_head;
-		core->stdout_tail = msg->data.execute.stdout_tail;
-		core->stdout_size = msg->data.execute.stdout_size;
-		core->stderr = msg->data.execute.stderr;
-		core->stderr_head = msg->data.execute.stderr_head;
-		core->stderr_tail = msg->data.execute.stderr_tail;
-		core->stderr_size = msg->data.execute.stderr_size;
+		core->stdin = msg->data.started.stdin;
+		core->stdin_head = msg->data.started.stdin_head;
+		core->stdin_tail = msg->data.started.stdin_tail;
+		core->stdin_size = msg->data.started.stdin_size;
+		core->stdout = msg->data.started.stdout;
+		core->stdout_head = msg->data.started.stdout_head;
+		core->stdout_tail = msg->data.started.stdout_tail;
+		core->stdout_size = msg->data.started.stdout_size;
+		core->stderr = msg->data.started.stderr;
+		core->stderr_head = msg->data.started.stderr_head;
+		core->stderr_tail = msg->data.started.stderr_tail;
+		core->stderr_size = msg->data.started.stderr_size;
 		
 		core->status = VM_STATUS_STARTED;
 		
@@ -192,6 +193,62 @@ static void icc_started(ICC_Message* msg) {
 	}
 }
 
+static void icc_paused(ICC_Message* msg) {
+	VM* vm = cores[msg->core_id].vm;
+	
+	cores[msg->core_id].status = VM_STATUS_PAUSED;
+	
+	printf("Execution paused on core[%d].\n", msg->core_id);
+	
+	msg->status = ICC_STATUS_DONE;
+	
+	for(int i = 0; i < vm->core_size; i++) {
+		if(cores[vm->cores[i]].status != VM_STATUS_PAUSED)
+			return;
+	}
+	
+	vm->status = VM_STATUS_PAUSED;
+	
+	event_trigger_fire(EVENT_VM_PAUSED, vm, NULL, NULL);
+	
+	printf("VM paused on cores[");
+	for(int i = 0; i < vm->core_size; i++) {
+		printf("%d", vm->cores[i]);
+		if(i + 1 < vm->core_size) {
+			printf(", ");
+		}
+	}
+	printf("]\n");
+}
+
+static void icc_resumed(ICC_Message* msg) {
+	VM* vm = cores[msg->core_id].vm;
+	
+	cores[msg->core_id].status = VM_STATUS_STARTED;
+	
+	printf("Execution resumed on core[%d].\n", msg->core_id);
+	
+	msg->status = ICC_STATUS_DONE;
+	
+	for(int i = 0; i < vm->core_size; i++) {
+		if(cores[vm->cores[i]].status != VM_STATUS_STARTED)
+			return;
+	}
+	
+	vm->status = VM_STATUS_STARTED;
+	
+	event_trigger_fire(EVENT_VM_RESUMED, vm, NULL, NULL);
+	
+	printf("VM resumed on cores[");
+	for(int i = 0; i < vm->core_size; i++) {
+		printf("%d", vm->cores[i]);
+		if(i + 1 < vm->core_size) {
+			printf(", ");
+		}
+	}
+	printf("]\n");
+}
+
 static void icc_stopped(ICC_Message* msg) {
 	VM* vm = cores[msg->core_id].vm;
 	
@@ -252,7 +309,7 @@ static bool manager_loop(NetworkInterface* ni) {
 		msg.coreid = thread_id;
 		msg.fd = fd;
 		
-		#define MAX_MESSAGE (1500 - 68)
+		#define MAX_MESSAGE (1500 - 14 - 20 - 8 - 62)
 		
 		int text_len = ring_readable(*head, *tail, size);
 		if(text_len > MAX_MESSAGE) {
@@ -264,8 +321,7 @@ static bool manager_loop(NetworkInterface* ni) {
 		
 		if(vmid == 0) {
 			printf("Core %d%c ", thread_id, fd == 1 ? '>' : '!');
-			for(int i = 0; i < text_len; i++)
-				putchar(buf[i]);
+			write(1, buf, text_len);
 		}
 		
 		msg.message.message_len = text_len;
@@ -275,7 +331,8 @@ static bool manager_loop(NetworkInterface* ni) {
 		list_iterator_init(&iter, callbacks);
 		while(list_iterator_has_next(&iter)) {
 			Callback* cb = list_iterator_next(&iter);
-			rpc_call_async(ni, cb->client, STDIO, (xdrproc_t)xdr_RPC_Message, (char*)&msg);
+			if(!rpc_call_async(ni, cb->client, STDIO, (xdrproc_t)xdr_RPC_Message, (char*)&msg))
+				printf("Cannot send Std I/O message: %d\n", errno);
 		}
 		free(buf);
 	}
@@ -663,8 +720,7 @@ RPC_VMList * vm_list_1_svc(struct svc_req *rqstp) {
 }
 
 bool_t * status_set_1_svc(u_quad_t vmid, RPC_VMStatus status, struct svc_req *rqstp) {
-	static bool_t result;
-	result = FALSE;
+	static bool_t result = FALSE;
 	
 	VM* vm = map_get(vms, (void*)vmid);
 	if(!vm) {
@@ -678,6 +734,12 @@ bool_t * status_set_1_svc(u_quad_t vmid, RPC_VMStatus status, struct svc_req *rq
 		bool_t result;
 		switch(event_type) {
 			case EVENT_VM_STARTED:
+				result = vm->status == VM_STATUS_STARTED ? TRUE : FALSE;
+				break;
+			case EVENT_VM_PAUSED:
+				result = vm->status == VM_STATUS_PAUSED ? TRUE : FALSE;
+				break;
+			case EVENT_VM_RESUMED:
 				result = vm->status == VM_STATUS_STARTED ? TRUE : FALSE;
 				break;
 			case EVENT_VM_STOPPED:
@@ -718,6 +780,44 @@ bool_t * status_set_1_svc(u_quad_t vmid, RPC_VMStatus status, struct svc_req *rq
 		}
 	}
 	
+	void pause(uint64_t vmid, VM* vm) {
+		printf("Manager: VM[%d] pauses on cores [", vmid);
+		for(int i = 0; i < vm->core_size; i++) {
+			printf("%d", vm->cores[i]);
+			if(i + 1 < vm->core_size)
+				printf(", ");
+		}
+		printf("]\n");
+		
+		SVCXPRT* transp = malloc(sizeof(SVCXPRT));
+		memcpy(transp, rqstp->rq_xprt, sizeof(SVCXPRT));
+		event_trigger_add(EVENT_VM_PAUSED, callback, transp);
+		
+		for(int i = 0; i < vm->core_size; i++) {
+			ICC_Message* msg = icc_sending(ICC_TYPE_PAUSE, vm->cores[i]);
+			icc_send(msg);
+		}
+	}
+	
+	void resume(uint64_t vmid, VM* vm) {
+		printf("Manager: VM[%d] resume on cores [", vmid);
+		for(int i = 0; i < vm->core_size; i++) {
+			printf("%d", vm->cores[i]);
+			if(i + 1 < vm->core_size)
+				printf(", ");
+		}
+		printf("]\n");
+		
+		SVCXPRT* transp = malloc(sizeof(SVCXPRT));
+		memcpy(transp, rqstp->rq_xprt, sizeof(SVCXPRT));
+		event_trigger_add(EVENT_VM_RESUMED, callback, transp);
+		
+		for(int i = 0; i < vm->core_size; i++) {
+			ICC_Message* msg = icc_sending(ICC_TYPE_RESUME, vm->cores[i]);
+			icc_send(msg);
+		}
+	}
+	
 	void stop(uint64_t vmid, VM* vm) {
 		printf("Manager: VM[%d] stops on cores [", vmid);
 		for(int i = 0; i < vm->core_size; i++) {
@@ -737,50 +837,21 @@ bool_t * status_set_1_svc(u_quad_t vmid, RPC_VMStatus status, struct svc_req *rq
 		}
 	}
 	
-	switch(status) {
-		case RPC_START:
-			switch(vm->status) {
-				case VM_STATUS_STOPPED:
-					start(vmid, vm);
-					break;
-				case VM_STATUS_PAUSED:
-					start(vmid, vm);
-					break;
-				case VM_STATUS_STARTED:
-					return &result;
-			}
-			break;
-		case RPC_PAUSE:
-			switch(vm->status) {
-				case VM_STATUS_STOPPED:
-					// TODO: Do something
-					return &result;
-				case VM_STATUS_PAUSED:
-					// Do nothing
-					return &result;
-				case VM_STATUS_STARTED:
-					// TODO: Do something
-					return &result;
-			}
-			break;
-		case RPC_STOP:
-			switch(vm->status) {
-				case VM_STATUS_STOPPED:
-					// Do nothing
-					return &result;
-				case VM_STATUS_PAUSED:
-					// TODO: Do something
-					return &result;
-				case VM_STATUS_STARTED:
-					stop(vmid, vm);
-					break;
-			}
-			break;
-		default:
-			return &result;
+	if(status == RPC_START && vm->status == VM_STATUS_STOPPED) {
+		start(vmid, vm);
+		return NULL;
+	} else if(status == RPC_PAUSE && vm->status == VM_STATUS_STARTED) {
+		pause(vmid, vm);
+		return NULL;
+	} else if(status == RPC_RESUME && vm->status == VM_STATUS_PAUSED) {
+		resume(vmid, vm);
+		return NULL;
+	} else if(status == RPC_STOP && (vm->status == VM_STATUS_PAUSED || vm->status == VM_STATUS_STARTED)) {
+		stop(vmid, vm);
+		return NULL;
 	}
 	
-	return NULL;	// Async call
+	return &result;	// Async call
 }
 
 RPC_VMStatus * status_get_1_svc(u_quad_t vmid,  struct svc_req *rqstp) {
@@ -986,6 +1057,8 @@ void manager_init() {
 	vms = map_create(4, map_uint64_hash, map_uint64_equals, malloc, free);
 	
 	icc_register(ICC_TYPE_STARTED, icc_started);
+	icc_register(ICC_TYPE_PAUSED, icc_paused);
+	icc_register(ICC_TYPE_RESUMED, icc_resumed);
 	icc_register(ICC_TYPE_STOPPED, icc_stopped);
 	
 	// Core 0 is occupied by manager

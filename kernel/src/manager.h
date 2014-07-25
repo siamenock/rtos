@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+NI*	manager_ni;
+
 void manager_init();
 uint32_t manager_get_ip();
 void manager_set_ip(uint32_t ip);

@@ -5,6 +5,7 @@
 #include <stdlib.h>
 
 #include <util/map.h>
+#include <net/arp.h>
 
 #include "stdio.h"
 #include "version.h"
@@ -188,6 +189,10 @@ static int command_arping() {
 		(address >> 8) & 0xff,
 		(address >> 0) & 0xff,
 		count);
+	
+	if(!arp_request(manager_ni->ni, address)) {
+		printf("Cannot send ARP packet\n");
+	}
 	// TODO: Implement it
 	/*
 	extern NI* manager_ni;

@@ -1,4 +1,4 @@
-.PHONY: all clean cleanall
+.PHONY: all clean cleanall core newlib
 
 all: libtlsf.a libjsmn.a libcore.a libc.a libm.a libz.a libssl.a liblwip.a libxdr.a libpacketngin.a
 
@@ -18,8 +18,12 @@ core/libcore.a:
 libcore.a: libjsmn.a libtlsf.a core/libcore.a
 	cp core/libcore.a .
 
+core: libjsmn.a libtlsf.a
+	make -C core
+	cp core/libcore.a .
+
 newlib/Makefile: 
-	cd newlib; ./configure --target=x86_64-pc-packetngin --disable-multilib
+	cd newlib; CFLAGS=-fno-stack-protector ./configure --target=x86_64-pc-packetngin --disable-multilib
 
 PACKETNGIN_BASE = $(shell pwd)
 
@@ -31,6 +35,10 @@ libc.a: newlib/x86_64-pc-packetngin/newlib/libc.a
 
 libm.a: libc.a
 	cp newlib/x86_64-pc-packetngin/newlib/libm.a .
+
+newlib: newlib/Makefile
+	PATH=$$PATH:$(PACKETNGIN_BASE)/bin make -C newlib
+	cp newlib/x86_64-pc-packetngin/newlib/libc.a .
 
 libpacketngin.a: libc.a libm.a libtlsf.a libcore.a
 	mkdir -p obj

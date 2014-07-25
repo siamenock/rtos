@@ -159,19 +159,19 @@ typedef struct {
 	uint64_t	cs;
 	uint64_t	rflag;
 	uint64_t	rsp;
-	uint64_t	unknown;
+	uint64_t	ss;
 } __attribute__ ((packed)) Frame;
 
 void apic_dump(uint64_t vector, uint64_t error_code) {
 	Frame* frame = (void*)(0xffffffff805b0000 - sizeof(Frame));
 	
-	printf("\n* Exception occurred: version=%d.%d.%d core=%d, vector=0x%x, error_code=0x%x\n", VERSION_MAJOR, VERSION_MINOR, VERSION_MICRO, mp_core_id(), vector, error_code);
+	printf("\n* Exception: ver=%d.%d.%d core=%d, vector=0x%lx, error=0x%lx\n", VERSION_MAJOR, VERSION_MINOR, VERSION_MICRO, mp_core_id(), vector, error_code);
 	printf("AX=%016lx BX=%016lx CX=%016lx DX=%016lx\n", frame->rax, frame->rbx, frame->rcx, frame->rdx);
 	printf("SI=%016lx DI=%016lx BP=%016lx SP=%016lx\n", frame->rsi, frame->rdi, frame->rbp, frame->rsp);
 	printf("8 =%016lx 9 =%016lx 10=%016lx 11=%016lx\n", frame->r8, frame->r9, frame->r10, frame->r11);
 	printf("12=%016lx 13=%016lx 14=%016lx 15=%016lx\n", frame->r12, frame->r13, frame->r14, frame->r15);
 	printf("IP=%016lx FL=%016lx\n", frame->rip, frame->rflag);
-	printf("ES=%08x CS=%08x DS=%08x FS=%08x GS=%08x\n", frame->es, frame->cs, frame->ds, frame->fs, frame->gs);
+	printf("ES=%08x CS=%08x DS=%08x FS=%08x GS=%08x SS=%08x\n", frame->es, frame->cs, frame->ds, frame->fs, frame->gs, frame->ss);
 	
 	printf("\n");
 	uint64_t* p = (void*)frame->rsp;

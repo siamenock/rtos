@@ -8,7 +8,9 @@ typedef enum {
 	ICC_TYPE_START = 1,
 	ICC_TYPE_STARTED,
 	ICC_TYPE_PAUSE,
-	ICC_TYPE_PAUSEPED,
+	ICC_TYPE_PAUSED,
+	ICC_TYPE_RESUME,
+	ICC_TYPE_RESUMED,
 	ICC_TYPE_STOP,
 	ICC_TYPE_STOPPED,
 } ICCType;
@@ -42,9 +44,11 @@ typedef struct _ICC_Message {
 			size_t*	stderr_head;
 			size_t*	stderr_tail;
 			size_t	stderr_size;
-		} execute;
+		} started;
 	} data;
 } ICC_Message;
+
+extern ICC_Message* icc_msg;	// Core's local message
 
 void icc_init();
 ICC_Message* icc_sending(uint8_t type, uint16_t core_id);

@@ -4,6 +4,9 @@
 #include <stdint.h>
 
 extern uint64_t cpu_frequency;
+extern uint64_t cpu_ms;
+extern uint64_t cpu_us;
+extern uint64_t cpu_ns;
 extern char cpu_brand[4 * 4 * 3 + 1];
 
 void cpu_init();

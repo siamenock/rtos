@@ -457,8 +457,9 @@ static int cmd_md5(int argc, char** argv) {
 	
 	return 0;
 }
+
 static int cmd_status_set(int argc, char** argv) {
-	if(argc < 3) {
+	if(argc < 2) {
 		return -100;
 	}
 	
@@ -467,17 +468,15 @@ static int cmd_status_set(int argc, char** argv) {
 	}
 	
 	uint64_t vmid = parse_uint64(argv[1]);
-	RPC_VMStatus status;
-	
-	if(strcmp(argv[2], "start") == 0) {
+	RPC_VMStatus status = RPC_STOP;
+	if(strcmp(argv[0], "start") == 0) {
 		status = RPC_START;
-	} else if(strcmp(argv[2], "pause") == 0) {
+	} else if(strcmp(argv[0], "pause") == 0) {
 		status = RPC_PAUSE;
-	} else if(strcmp(argv[2], "stop") == 0) {
+	} else if(strcmp(argv[0], "resume") == 0) {
+		status = RPC_RESUME;
+	} else if(strcmp(argv[0], "stop") == 0) {
 		status = RPC_STOP;
-	} else {
-		printf("status must one of \"start\", \"pause\", or \"stop\"\n");
-		return -1;
 	}
 	
 	if(!client) {
@@ -492,6 +491,49 @@ static int cmd_status_set(int argc, char** argv) {
 	}
 	
 	sprintf(result, "%s", *ret ? "true" : "false");
+	
+	return 0;
+}
+
+static int cmd_status_get(int argc, char** argv) {
+	if(argc < 2) {
+		return -100;
+	}
+	
+	if(!is_uint64(argv[1])) {
+		return -1;
+	}
+	
+	uint64_t vmid = parse_uint64(argv[1]);
+	
+	if(!client) {
+		printf("Disconnected\n");
+		return 1;
+	}
+	
+	RPC_VMStatus* status = status_get_1(vmid, client);
+	if(status == NULL) {
+		printf("Timeout\n");
+		return 2;
+	}
+	
+	char* ret;
+	switch(*status) {
+		case RPC_START:
+			ret = "start";
+			break;
+		case RPC_PAUSE:
+			ret = "pause";
+			break;
+		case RPC_STOP:
+			ret = "stop";
+			break;
+		case RPC_NONE:
+		default:
+			ret = "none";
+	}
+	
+	sprintf(result, "%s", ret);
 	
 	return 0;
 }
@@ -539,19 +581,19 @@ static Command commands[] = {
 		.exec = cmd_ping
 	},
 	{
-		.name = "vm_create",
+		.name = "create",
 		.desc = "Create VM",
 		.args = "vmid: uint64, core: (number: int) memory: (size: uint32) storage: (size: uint32) [nic: mac: (addr: uint64) ibuf: (size: uint32) obuf: (size: uint32) iband: (size: uint64) oband: (size: uint64) pool: (size: uint32)]* [args: [string]+ ]",
 		.exec = cmd_vm_create
 	},
 	{
-		.name = "vm_delete",
+		.name = "delete",
 		.desc = "Delete VM",
 		.args = "result: bool, vmid: uint64",
 		.exec = cmd_vm_delete
 	},
 	{
-		.name = "vm_list",
+		.name = "list",
 		.desc = "List VM",
 		.args = "result: uint64[]",
 		.exec = cmd_vm_list
@@ -569,10 +611,34 @@ static Command commands[] = {
 		.exec = cmd_md5
 	},
 	{
-		.name = "status_set",
-		.desc = "Set VM's status",
-		.args = "result: bool, vmid: uint64 status: string(\"start\", \"pause\", or \"stop\"",
+		.name = "start",
+		.desc = "Start VM",
+		.args = "result: bool, vmid: uint64",
 		.exec = cmd_status_set
+	},
+	{
+		.name = "pause",
+		.desc = "Pause VM",
+		.args = "result: bool, vmid: uint64",
+		.exec = cmd_status_set
+	},
+	{
+		.name = "resume",
+		.desc = "Resume VM",
+		.args = "result: bool, vmid: uint64",
+		.exec = cmd_status_set
+	},
+	{
+		.name = "stop",
+		.desc = "Stop VM",
+		.args = "result: bool, vmid: uint64",
+		.exec = cmd_status_set
+	},
+	{
+		.name = "status",
+		.desc = "Get VM's status",
+		.args = "result: string(\"start\", \"pause\", or \"stop\") vmid: uint64",
+		.exec = cmd_status_get
 	},
 };
 

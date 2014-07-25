@@ -80,58 +80,16 @@ static bool idle_event(void* data) {
 	return true;
 }
 
-/*
-static void apic_terminate(uint64_t vector, uint64_t errno) {
-	apic_eoi();
-	
-	task_destroy(1);
-}
-*/
-
-static void icc_start(ICC_Message* msg) {
-	printf("Loading process... \n");
-	VM* vm = msg->data.start.vm;
-	
-	// TODO: Change blocks[0] to blocks
-	uint32_t id = loader_load(vm);
-	if(errno != 0)
-		goto failed;
-	
-	*(uint32_t*)task_addr(id, SYM_NIS_COUNT) = vm->nic_size;
-	NetworkInterface** nis = (NetworkInterface**)task_addr(id, SYM_NIS);
-	for(uint32_t i = 0; i < vm->nic_size; i++) {
-		task_resource(id, RESOURCE_NI, vm->nics[i]);
-		nis[i] = vm->nics[i]->ni;
-	}
-	
-	printf("Process executing...\n");
-	
-	ICC_Message* msg2 = icc_sending(ICC_TYPE_STARTED, msg->core_id);
-	msg->status = ICC_STATUS_DONE;
-	
-	msg2->result = 0;
-	msg2->data.execute.stdin = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)*(char**)task_addr(id, SYM_STDIN));
-	msg2->data.execute.stdin_head = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)task_addr(id, SYM_STDIN_HEAD));
-	msg2->data.execute.stdin_tail = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)task_addr(id, SYM_STDIN_TAIL));
-	msg2->data.execute.stdin_size = *(int*)task_addr(id, SYM_STDIN_SIZE);
-	msg2->data.execute.stdout = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)*(char**)task_addr(id, SYM_STDOUT));
-	msg2->data.execute.stdout_head = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)task_addr(id, SYM_STDOUT_HEAD));
-	msg2->data.execute.stdout_tail = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)task_addr(id, SYM_STDOUT_TAIL));
-	msg2->data.execute.stdout_size = *(int*)task_addr(id, SYM_STDOUT_SIZE);
-	msg2->data.execute.stderr = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)*(char**)task_addr(id, SYM_STDERR));
-	msg2->data.execute.stderr_head = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)task_addr(id, SYM_STDERR_HEAD));
-	msg2->data.execute.stderr_tail = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)task_addr(id, SYM_STDERR_TAIL));
-	msg2->data.execute.stderr_size = *(int*)task_addr(id, SYM_STDERR_SIZE);
-	
-	icc_send(msg2);
-	
+static void context_switch() {
 	// Set exception handlers
 	APIC_Handler old_exception_handlers[32];
 	
 	void exception_handler(uint64_t vector, uint64_t err) {
-		printf("User VM exception handler\n");
+		printf("* User VM exception handler");
 		if(err != 0) {	// Err zero means, user vm termination
 			apic_dump(vector, err);
+			while(1);
+			errno = err;
 		}
 		
 		apic_eoi();
@@ -145,20 +103,9 @@ static void icc_start(ICC_Message* msg) {
 		}
 	}
 	
-	// Set interrupt handler
-	void stop_handler(uint64_t vector, uint64_t err) {
-		apic_eoi();
-		
-		task_destroy(1);
-	}
-	
-	APIC_Handler old_interrupt_handler = apic_register(49, stop_handler);
-	
 	// Context switching
+	// TODO: Move exception handlers to task resources
 	task_switch(1);
-	
-	// Restore interrupt handler
-	apic_register(49, old_interrupt_handler);
 	
 	// Restore exception handlers
 	for(int i = 0; i < 32; i++) {
@@ -167,24 +114,86 @@ static void icc_start(ICC_Message* msg) {
 		}
 	}
 	
-	// Send stopped ICC
-	ICC_Message* msg3 = icc_sending(ICC_TYPE_STOPPED, 0);
+	// Send callback message
+	bool is_paused = errno == 0 && task_is_active(1);
+	if(is_paused) {
+		// ICC_TYPE_PAUSE is not a ICC message but a interrupt in fact, So forcely commit the message
+		icc_msg->status = ICC_STATUS_DONE;
+	}
+	
+	ICC_Message* msg3 = icc_sending(is_paused ? ICC_TYPE_PAUSED : ICC_TYPE_STOPPED, 0);
+	msg3->result = errno;
 	icc_send(msg3);
+	errno = 0;
 	
-	printf("Execution completed\n");
-	apic_enable();
-	
-	return;
-
-failed:
-	msg2 = icc_sending(ICC_TYPE_STARTED, msg->core_id);
-	msg->status = ICC_STATUS_DONE;
-	
-	msg2->result = errno;	// errno from loader_load
-	icc_send(msg2);
-	printf("Execution FAILED: %x\n", errno);
+	printf("VM %s...\n", is_paused ? "paused" : "stopped");
 }
 
+static void icc_start(ICC_Message* msg) {
+	printf("Loading VM... \n");
+	VM* vm = msg->data.start.vm;
+	
+	// TODO: Change blocks[0] to blocks
+	uint32_t id = loader_load(vm);
+	if(errno != 0) {
+		ICC_Message* msg2 = icc_sending(ICC_TYPE_STARTED, msg->core_id);
+		msg->status = ICC_STATUS_DONE;
+		
+		msg2->result = errno;	// errno from loader_load
+		icc_send(msg2);
+		printf("Execution FAILED: %x\n", errno);
+	}
+	
+	*(uint32_t*)task_addr(id, SYM_NIS_COUNT) = vm->nic_size;
+	NetworkInterface** nis = (NetworkInterface**)task_addr(id, SYM_NIS);
+	for(uint32_t i = 0; i < vm->nic_size; i++) {
+		task_resource(id, RESOURCE_NI, vm->nics[i]);
+		nis[i] = vm->nics[i]->ni;
+	}
+	
+	printf("Starting VM...\n");
+	ICC_Message* msg2 = icc_sending(ICC_TYPE_STARTED, msg->core_id);
+	msg->status = ICC_STATUS_DONE;
+	
+	msg2->result = 0;
+	msg2->data.started.stdin = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)*(char**)task_addr(id, SYM_STDIN));
+	msg2->data.started.stdin_head = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)task_addr(id, SYM_STDIN_HEAD));
+	msg2->data.started.stdin_tail = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)task_addr(id, SYM_STDIN_TAIL));
+	msg2->data.started.stdin_size = *(int*)task_addr(id, SYM_STDIN_SIZE);
+	msg2->data.started.stdout = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)*(char**)task_addr(id, SYM_STDOUT));
+	msg2->data.started.stdout_head = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)task_addr(id, SYM_STDOUT_HEAD));
+	msg2->data.started.stdout_tail = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)task_addr(id, SYM_STDOUT_TAIL));
+	msg2->data.started.stdout_size = *(int*)task_addr(id, SYM_STDOUT_SIZE);
+	msg2->data.started.stderr = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)*(char**)task_addr(id, SYM_STDERR));
+	msg2->data.started.stderr_head = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)task_addr(id, SYM_STDERR_HEAD));
+	msg2->data.started.stderr_tail = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)task_addr(id, SYM_STDERR_TAIL));
+	msg2->data.started.stderr_size = *(int*)task_addr(id, SYM_STDERR_SIZE);
+	
+	icc_send(msg2);
+	
+	context_switch();
+}
+
+static void icc_resume(ICC_Message* msg) {
+	printf("Resuming VM...\n");
+	ICC_Message* msg2 = icc_sending(ICC_TYPE_RESUMED, msg->core_id);
+	msg->status = ICC_STATUS_DONE;
+	icc_send(msg2);
+	
+	context_switch();
+}
+
+static void icc_pause(uint64_t vector, uint64_t error_code) {
+	apic_eoi();
+	
+	task_switch(0);
+}
+
+static void icc_stop(ICC_Message* msg) {
+	msg->status = ICC_STATUS_DONE;
+	
+	task_destroy(1);
+}
 
 void main(void) {
 	mp_init0();
@@ -311,8 +320,19 @@ void main(void) {
 		icc_init();
 		stdio_init();
 		icc_register(ICC_TYPE_START, icc_start);
+		icc_register(ICC_TYPE_RESUME, icc_resume);
+		icc_register(ICC_TYPE_STOP, icc_stop);
+		apic_register(49, icc_pause);
 		
 		event_idle_add(idle_event, NULL);
+		/*
+		bool tick(void* context) {
+			static int counter;
+			printf("[%d] Tick %d\n", mp_core_id(), counter++);
+			return true;
+		}
+		event_timer_add(tick, NULL, 10000000, 10000000);
+		*/
 	}
 	
 	mp_sync();

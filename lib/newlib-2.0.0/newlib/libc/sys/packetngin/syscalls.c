@@ -6,6 +6,8 @@
 #include <sys/time.h>
 #include <time.h>
 #include <stdio.h>
+#include <stdarg.h>
+
 #include "../../../../../TLSF/src/tlsf.h"
 #include "../../../../../core/include/util/ring.h"
 
@@ -257,7 +259,15 @@ void* calloc(size_t nmemb, size_t size) {
 }
 
 int __isoc99_sscanf(const char *str, const char *format, ...) {
-	return sscanf(str, format);
+	int ret;
+	va_list ap;
+	struct _reent *ptr = _REENT;
+	
+	va_start(ap, format);
+	ret = _vscanf_r(ptr, format, ap);
+	va_end(ap);
+	
+	return ret;
 }
 
 // GNU C ctype.h imitation
@@ -353,14 +363,61 @@ static const int32_t *const __ctype_toupper_ptable = __ctype_toupper_table + 128
 const int32_t **__ctype_toupper_loc(void) {
 	return (void *)&__ctype_toupper_ptable;
 }
+
 /*
-#define _memalign_r(r, s1, s2) memalign (s1, s2);
-#define _mallinfo_r(r) mallinfo ()
-#define _malloc_stats_r(r) malloc_stats ()
-#define _mallopt_r(i1, i2) mallopt (i1, i2)
-#define _malloc_usable_size_r(r, p) malloc_usable_size (p)
-#define _valloc_r(r, s) valloc (s)
-#define _pvalloc_r(r, s) pvalloc (s)
-#define _malloc_trim_r(r, s) malloc_trim (s)
-#define _mstats_r(r, p) mstats (p)
+#undef stdin
+#undef stdout
+#undef stderr
+struct _IO_FILE* stdin;
+struct _IO_FILE* stdout;
+struct _IO_FILE* stderr;
+
+int _IO_putc(int ch, struct _IO_FILE* fp) {
+	struct _reent *ptr = _REENT;
+	_REENT_SMALL_CHECK_INIT (ptr);
+	
+	if(fp == stdout) {
+		return putc(ch, _stdout_r (ptr));
+	}
+	
+	if(fp == stderr) {
+		return putc(ch, _stderr_r (ptr));
+	}
+	
+	return -1;
+}
 */
+
+// Ubuntu's libc compatible functions
+/*
+int __printf_chk (int flag, const char *fmt, ...) {
+	int ret;
+	va_list ap;
+	struct _reent *ptr = _REENT;
+	
+	_REENT_SMALL_CHECK_INIT (ptr);
+	va_start (ap, fmt);
+	ret = _vfprintf_r (ptr, _stdout_r (ptr), fmt, ap);
+	va_end (ap);
+	return ret;
+}
+
+int __fprintf_chk(FILE* fp, int flag, const char* fmt, ...) {
+	int ret;
+	va_list ap;
+
+	va_start (ap, fmt);
+	ret = _vfprintf_r (_REENT, fp, fmt, ap);
+	va_end (ap);
+	return ret;
+}
+
+void* __memcpy_chk(void* dest, const void* src, size_t size, size_t bos) {
+	return memcpy(dest, src, size);
+}
+*/
+
+void __stack_chk_fail() {
+	printf("Stack overflow\n");
+	while(1) asm("hlt");
+}

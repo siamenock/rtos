@@ -2,6 +2,7 @@
 #include <strings.h>
 #include <malloc.h>
 #include <time.h>
+#include <errno.h>
 #include <rpc/xdr.h>
 #include <rpc/rpc_msg.h>
 #include <rpc/svc.h>
@@ -556,8 +557,10 @@ CLIENT* rpc_client(uint32_t ip, uint16_t port, unsigned long prognum, unsigned l
 }
 
 bool rpc_call_async(NetworkInterface* ni, CLIENT* client, unsigned long procnum, xdrproc_t inproc, char* in) {
-	if(!ni_output_available(ni))
+	if(!ni_output_available(ni)) {
+		errno = 1;
 		return false;
+	}
 	
 	ClientPrivate* priv = (void*)client + sizeof(CLIENT);
 	
@@ -587,7 +590,7 @@ bool rpc_call_async(NetworkInterface* ni, CLIENT* client, unsigned long procnum,
 	udp->checksum = 0;
 	
 	XDR xdr;
-	xdrmem_create(&xdr, (char*)udp->body, packet->buffer + packet->size - udp->body, XDR_ENCODE);
+	xdrmem_create(&xdr, (char*)udp->body, packet->buffer + packet->end - udp->body, XDR_ENCODE);
 	
 	struct rpc_msg msg;
 	msg.rm_xid = (uint32_t)clock();
@@ -601,11 +604,13 @@ bool rpc_call_async(NetworkInterface* ni, CLIENT* client, unsigned long procnum,
 	
 	if(!xdr_rpc_msg(&xdr, &msg)) {
 		ni_free(packet);
+		errno = 2;
 		return false;
 	}
 	
 	if(!inproc(&xdr, in)) {
 		ni_free(packet);
+		errno = 3;
 		return false;
 	}
 	
@@ -613,6 +618,7 @@ bool rpc_call_async(NetworkInterface* ni, CLIENT* client, unsigned long procnum,
 	xdr_destroy(&xdr);
 	
 	if(!ni_output(ni, packet)) {
+		errno = 4;
 		return false;
 	}
 	

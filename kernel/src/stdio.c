@@ -1001,6 +1001,13 @@ int putchar(int c) {
 	return write1(&ch, 1);
 }
 
+ssize_t write(int fd, const void* buf, size_t count) {
+	if(fd == 1)
+		return write1(buf, count);
+	
+	return -1;
+}
+
 uint32_t htonl(uint32_t hostlong) {
 	return bswap_32(hostlong);
 }

@@ -80,10 +80,10 @@ void gdt_load() {
 
 void tss_init() {
 	TSS* tss = (TSS*)TSS_ADDR;
-	int i;
-	for(i = 0; i < MP_MAX_CORE_COUNT; i++) {
+	for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
 		TSS_INIT(tss[i]);
-		tss[i].ist[0] = PHYSICAL_TO_VIRTUAL(0x600000 - 0x50000);
+		tss[i].ist[0] = PHYSICAL_TO_VIRTUAL(0x600000 - 0x50000); // Kernel interrupt stack
+		tss[i].ist[1] = PHYSICAL_TO_VIRTUAL(0x600000 - 0x58000); // User interrupt stack
 		tss[i].io_map = 0xffff;	// Not using I/O map
 	}
 }
