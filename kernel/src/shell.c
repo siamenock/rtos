@@ -5,9 +5,13 @@
 #include <stdlib.h>
 
 #include <util/map.h>
+#include <util/event.h>
+#include <net/packet.h>
+#include <net/ether.h>
 #include <net/arp.h>
 
 #include "stdio.h"
+#include "cpu.h"
 #include "version.h"
 #include "rtc.h"
 #include "ni.h"
@@ -164,56 +168,55 @@ static int command_shutdown() {
 	return 0;
 }
 
+static uint32_t arping_addr;
+static uint32_t arping_count;
+static uint64_t arping_time;
+static uint64_t arping_event;
+
+static bool arping_timeout(void* context) {
+	if(arping_count <= 0)
+		return false;
+	
+	arping_time = cpu_tsc();
+	
+	printf("Reply timeout\n");
+	arping_count--;
+	
+	if(arping_count > 0) {
+		return true;
+	} else {
+		printf("Done\n");
+		return false;
+	}
+}
+
 static int command_arping() {
-	static uint32_t address;
 	if(arg_idx < 2) {
 		return 1;
 	}
 	
 	char* str = cmd + args[1];
-	address = (strtol(str, &str, 0) & 0xff) << 24; str++;
-	address |= (strtol(str, &str, 0) & 0xff) << 16; str++;
-	address |= (strtol(str, &str, 0) & 0xff) << 8; str++;
-	address |= strtol(str, NULL, 0) & 0xff;
+	arping_addr = (strtol(str, &str, 0) & 0xff) << 24; str++;
+	arping_addr |= (strtol(str, &str, 0) & 0xff) << 16; str++;
+	arping_addr |= (strtol(str, &str, 0) & 0xff) << 8; str++;
+	arping_addr |= strtol(str, NULL, 0) & 0xff;
 	
-	int count = 1;
+	arping_time = cpu_tsc();
+	
+	arping_count = 1;
 	if(arg_idx >= 4) {
 		if(strcmp(cmd + args[2], "-c") == 0) {
-			count = strtol(cmd + args[3], NULL, 0);
+			arping_count = strtol(cmd + args[3], NULL, 0);
 		}
 	}
 	
-	printf("arping to %d.%d.%d.%d -c %d\n", 
-		(address >> 24) & 0xff,
-		(address >> 16) & 0xff,
-		(address >> 8) & 0xff,
-		(address >> 0) & 0xff,
-		count);
-	
-	if(!arp_request(manager_ni->ni, address)) {
+	if(arp_request(manager_ni->ni, arping_addr)) {
+		arping_event = event_timer_add(arping_timeout, NULL, 1000000, 1000000);
+	} else {
+		arping_count = 0;
 		printf("Cannot send ARP packet\n");
 	}
-	// TODO: Implement it
-	/*
-	extern NI* manager_ni;
 	
-	bool arping(void* context) {
-		uint64_t count = (uint64_t)context;
-		
-		if(!arp_request(manager_ni, address)) {
-			return false;
-		}
-		
-		return --count != 0;
-	}
-	
-	if(!arp_request(manager_ni, address)) {
-		printf("Cannot send ARP packet\n");
-		return 1;
-	}
-	
-	event_arping
-	*/
 	return 0;
 }
 
@@ -371,4 +374,64 @@ void shell_init() {
 	
 	extern Device* device_stdin;
 	((CharIn*)device_stdin->driver)->set_callback(device_stdin->id, shell_callback);
+}
+
+bool shell_process(Packet* packet) {
+	if(arping_count== 0)
+		return false;
+	
+	Ether* ether = (Ether*)(packet->buffer + packet->start);
+	if(endian16(ether->type) != ETHER_TYPE_ARP)
+		return false;
+	
+	ARP* arp = (ARP*)ether->payload;
+	switch(endian16(arp->operation)) {
+		case 2: // Reply
+			;
+			uint64_t smac = endian48(arp->sha);
+			uint32_t sip = endian32(arp->spa);
+			
+			if(arping_addr == sip) {
+				uint64_t time = cpu_tsc();
+				uint32_t ms = (time - arping_time) / cpu_ms;
+				uint32_t ns = (time - arping_time) / cpu_ns - ms * 1000;
+				
+				printf("Reply from %d.%d.%d.%d [%02x:%02x:%02x:%02x:%02x:%02x] %d.%dms\n",
+					(sip >> 24) & 0xff,
+					(sip >> 16) & 0xff,
+					(sip >> 8) & 0xff,
+					(sip >> 0) & 0xff,
+					(smac >> 40) & 0xff,
+					(smac >> 32) & 0xff,
+					(smac >> 24) & 0xff,
+					(smac >> 16) & 0xff,
+					(smac >> 8) & 0xff,
+					(smac >> 0) & 0xff,
+					ms, ns);
+				
+				event_timer_remove(arping_event);
+				arping_count--;
+				
+				if(arping_count > 0) {
+					bool arping(void* context) {
+						arping_time = cpu_tsc();
+						if(arp_request(manager_ni->ni, arping_addr)) {
+							arping_event = event_timer_add(arping_timeout, NULL, 1000000, 1000000);
+						} else {
+							arping_count = 0;
+							printf("Cannot send ARP packet\n");
+						}
+						
+						return false;
+					}
+					
+					event_timer_add(arping, NULL, 1000000, 1000000);
+				} else {
+					printf("Done\n");
+				}
+			}
+			break;
+	}
+	
+	return false;
 }

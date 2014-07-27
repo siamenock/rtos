@@ -26,6 +26,7 @@
 #include "icc.h"
 #include "cpu.h"
 #include "vm.h"
+#include "shell.h"
 #include "stdio.h"
 #include "rpc/rpc_manager.h"
 #include "rpc/rpc_callback.h"
@@ -281,7 +282,9 @@ static bool manager_loop(NetworkInterface* ni) {
 	// Packet processing
 	Packet* packet = ni_input(ni);
 	if(packet) {
-		if(arp_process(packet))
+		if(shell_process(packet))
+			;
+		else if(arp_process(packet))
 			;
 		else if(icmp_process(packet))
 			;
