@@ -18,31 +18,27 @@ typedef struct {
 uint32_t ARP_TIMEOUT = 14400;	// 4 hours
 
 bool arp_process(Packet* packet) {
-	Map* config = packet->ni->config;
-	if(!config)
-		return false;
-	
 	Ether* ether = (Ether*)(packet->buffer + packet->start);
 	if(endian16(ether->type) != ETHER_TYPE_ARP)
 		return false;
 	
-	uint32_t addr = (uint32_t)(uint64_t)map_get(config, "ip");
+	uint32_t addr = (uint32_t)(uint64_t)ni_config_get(packet->ni, "ip");
 	if(!addr)
 		return false;
 	
-	Map* arp_table = map_get(config, ARP_TABLE);
+	Map* arp_table = ni_config_get(packet->ni, ARP_TABLE);
 	if(!arp_table) {
-		arp_table = map_create(32, map_uint64_hash, map_uint64_equals, config->malloc, config->free);
-		map_put(config, ARP_TABLE, arp_table);
+		arp_table = map_create(32, map_uint64_hash, map_uint64_equals, packet->ni->malloc, packet->ni->free, packet->ni->pool);
+		ni_config_put(packet->ni, ARP_TABLE, arp_table);
 	}
 	
 	clock_t current = clock();
 	
 	// GC
-	uint64_t gc_time = (uint64_t)map_get(config, ARP_TABLE_GC);
-	if(gc_time == 0 && !map_contains(config, ARP_TABLE_GC)) {
+	uint64_t gc_time = (uint64_t)ni_config_get(packet->ni, ARP_TABLE_GC);
+	if(gc_time == 0 && !ni_config_contains(packet->ni, ARP_TABLE_GC)) {
 		gc_time = current + GC_INTERVAL;
-		map_put(config, ARP_TABLE_GC, (void*)gc_time);
+		ni_config_put(packet->ni, ARP_TABLE_GC, (void*)gc_time);
 	}
 	
 	if(gc_time < current) {
@@ -52,12 +48,12 @@ bool arp_process(Packet* packet) {
 			MapEntry* entry = map_iterator_next(&iter);
 			if(((ARPEntity*)entry->data)->timeout < current) {
 				map_iterator_remove(&iter);
-				arp_table->free(entry->data);
+				arp_table->free(entry->data, arp_table->pool);
 			}
 		}
 		
 		gc_time = current + GC_INTERVAL;
-		map_update(config, ARP_TABLE_GC, (void*)gc_time);
+		ni_config_put(packet->ni, ARP_TABLE_GC, (void*)gc_time);
 	}
 	
 	ARP* arp = (ARP*)ether->payload;
@@ -85,7 +81,7 @@ bool arp_process(Packet* packet) {
 			uint32_t sip = endian32(arp->spa);
 			ARPEntity* entity = map_get(arp_table, (void*)(uint64_t)sip);
 			if(!entity) {
-				entity = arp_table->malloc(sizeof(ARPEntity));
+				entity = arp_table->malloc(sizeof(ARPEntity), arp_table->pool);
 				if(!entity)
 					goto done;
 				
@@ -103,11 +99,7 @@ done:
 }
 
 bool arp_request(NetworkInterface* ni, uint32_t ip) {
-	Map* config = ni->config;
-	if(!config)
-		return false;
-	
-	uint32_t addr = (uint32_t)(uint64_t)map_get(config, "ip");
+	uint32_t addr = (uint32_t)(uint64_t)ni_config_get(ni, "ip");
 	
 	Packet* packet = ni_alloc(ni, sizeof(Ether) + sizeof(ARP));
 	if(!packet)
@@ -137,11 +129,7 @@ bool arp_request(NetworkInterface* ni, uint32_t ip) {
 }
 
 uint64_t arp_get_mac(NetworkInterface* ni, uint32_t ip) {
-	Map* config = ni->config;
-	if(!config)
-		return 0xffffffffffff;
-	
-	Map* arp_table = map_get(config, ARP_TABLE);
+	Map* arp_table = ni_config_get(ni, ARP_TABLE);
 	if(!arp_table) {
 		arp_request(ni, ip);
 		return 0xffffffffffff;
@@ -157,11 +145,7 @@ uint64_t arp_get_mac(NetworkInterface* ni, uint32_t ip) {
 }
 
 uint32_t arp_get_ip(NetworkInterface* ni, uint64_t mac) {
-	Map* config = ni->config;
-	if(!config)
-		return 0;
-	
-	Map* arp_table = map_get(config, ARP_TABLE);
+	Map* arp_table = ni_config_get(ni, ARP_TABLE);
 	if(!arp_table) {
 		return 0;
 	}
@@ -175,4 +159,11 @@ uint32_t arp_get_ip(NetworkInterface* ni, uint64_t mac) {
 	}
 	
 	return 0;
+}
+
+void arp_pack(Packet* packet) {
+	Ether* ether = (Ether*)(packet->buffer + packet->start);
+	ARP* arp = (ARP*)ether->payload;
+	
+	packet->end = ((void*)arp + sizeof(ARP)) - (void*)packet->buffer;
 }

@@ -1037,13 +1037,12 @@ void manager_init() {
 	};
 	
 	manager_ni = ni_create(attrs);
-	manager_ni->ni->config = map_create(8, map_string_hash, map_string_equals, malloc, free);
-	map_put(manager_ni->ni->config, "ip", (void*)(uint64_t)DEFAULT_MANAGER_IP);
-	map_put(manager_ni->ni->config, "gateway", (void*)(uint64_t)DEFAULT_MANAGER_GW);
-	map_put(manager_ni->ni->config, "netmask", (void*)(uint64_t)DEFAULT_MANAGER_NM);
-	map_put(manager_ni->ni->config, TFTP_CALLBACK, &tftp_callback);
+	ni_config_put(manager_ni->ni, "ip", (void*)(uint64_t)DEFAULT_MANAGER_IP);
+	ni_config_put(manager_ni->ni, "gateway", (void*)(uint64_t)DEFAULT_MANAGER_GW);
+	ni_config_put(manager_ni->ni, "netmask", (void*)(uint64_t)DEFAULT_MANAGER_NM);
+	ni_config_put(manager_ni->ni, TFTP_CALLBACK, &tftp_callback);
 	
-	callbacks = list_create(malloc, free);
+	callbacks = list_create(malloc, free, NULL);
 	
 	SVCXPRT* rpc;
 	if(!(rpc = svcudp_create(111)))
@@ -1057,7 +1056,7 @@ void manager_init() {
 	if(!svc_register(rpc, CALLBACK, CALLBACK_APPLE, callback_1, IPPROTO_UDP))
 		printf("Cannot register callback service\n");
 	
-	vms = map_create(4, map_uint64_hash, map_uint64_equals, malloc, free);
+	vms = map_create(4, map_uint64_hash, map_uint64_equals, malloc, free, NULL);
 	
 	icc_register(ICC_TYPE_STARTED, icc_started);
 	icc_register(ICC_TYPE_PAUSED, icc_paused);
@@ -1071,25 +1070,25 @@ void manager_init() {
 }
 
 uint32_t manager_get_ip() {
-	return (uint32_t)(uint64_t)map_get(manager_ni->ni->config, "ip");
+	return (uint32_t)(uint64_t)ni_config_get(manager_ni->ni, "ip");
 }
 
 void manager_set_ip(uint32_t ip) {
-	map_update(manager_ni->ni->config, "ip", (void*)(uint64_t)ip);
+	ni_config_put(manager_ni->ni, "ip", (void*)(uint64_t)ip);
 }
 
 uint32_t manager_get_gateway() {
-	return (uint32_t)(uint64_t)map_get(manager_ni->ni->config, "gateway");
+	return (uint32_t)(uint64_t)ni_config_get(manager_ni->ni, "gateway");
 }
 
 void manager_set_gateway(uint32_t gw) {
-	map_update(manager_ni->ni->config, "gateway", (void*)(uint64_t)gw);
+	ni_config_put(manager_ni->ni, "gateway", (void*)(uint64_t)gw);
 }
 
 uint32_t manager_get_netmask() {
-	return (uint32_t)(uint64_t)map_get(manager_ni->ni->config, "netmask");
+	return (uint32_t)(uint64_t)ni_config_get(manager_ni->ni, "netmask");
 }
 
 void manager_set_netmask(uint32_t nm) {
-	map_update(manager_ni->ni->config, "netmask", (void*)(uint64_t)nm);
+	ni_config_put(manager_ni->ni, "netmask", (void*)(uint64_t)nm);
 }

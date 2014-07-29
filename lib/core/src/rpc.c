@@ -373,15 +373,15 @@ static bool_t freeargs(SVCXPRT *xprt, xdrproc_t inproc, char *in) {
 // TODO: Create SVCXPRT dynamically
 SVCXPRT *svcudp_create(int sock) {
 	if(!services) {
-		services = map_create(4, service_hash, service_equals, malloc, free);
+		services = map_create(4, service_hash, service_equals, malloc, free, NULL);
 	}
 	
 	if(!history_fifo) {
-		history_fifo = fifo_create(16, malloc, free);
+		history_fifo = fifo_create(16, malloc, free, NULL);
 	}
 	
 	if(!history_map) {
-		history_map = map_create(15, map_uint64_hash, map_uint64_equals, malloc, free);
+		history_map = map_create(15, map_uint64_hash, map_uint64_equals, malloc, free, NULL);
 	}
 	
 	ops.xp_getargs = getargs;
@@ -411,10 +411,7 @@ bool_t svc_register(SVCXPRT *xprt, unsigned long prognum, unsigned long versnum,
 }
 
 bool rpc_process(Packet* packet) {
-	if(!packet->ni->config)
-		return false;
-	
-	uint32_t addr = (uint32_t)(uint64_t)map_get(packet->ni->config, "ip");
+	uint32_t addr = (uint32_t)(uint64_t)ni_config_get(packet->ni, "ip");
 	if(!addr)
 		return false;
 	
@@ -580,7 +577,7 @@ bool rpc_call_async(NetworkInterface* ni, CLIENT* client, unsigned long procnum,
 	ip->flags_offset = endian16(0x02 << 13);
 	ip->ttl = endian8(0x40);
 	ip->protocol = endian8(IP_PROTOCOL_UDP);
-	ip->source = endian32((uint32_t)(uint64_t)map_get(ni->config, "ip"));
+	ip->source = endian32((uint32_t)(uint64_t)ni_config_get(ni, "ip"));
 	ip->destination = endian32(priv->ip);
 	ip->checksum = 0;
 	
@@ -648,7 +645,7 @@ bool rpc_call(NetworkInterface* ni, CLIENT* client, unsigned long procnum, xdrpr
 	ip->flags_offset = endian16(0x02 << 13);
 	ip->ttl = endian8(0x40);
 	ip->protocol = endian8(IP_PROTOCOL_UDP);
-	ip->source = endian32((uint32_t)(uint64_t)map_get(ni->config, "ip"));
+	ip->source = endian32((uint32_t)(uint64_t)ni_config_get(ni, "ip"));
 	ip->destination = endian32(priv->ip);
 	ip->checksum = 0;
 	
@@ -699,7 +696,7 @@ bool rpc_call(NetworkInterface* ni, CLIENT* client, unsigned long procnum, xdrpr
 	call->context = context;
 	
 	if(!calls) {
-		calls = map_create(16, map_uint64_hash, map_uint64_equals, malloc, free);
+		calls = map_create(16, map_uint64_hash, map_uint64_equals, malloc, free, NULL);
 	}
 	
 	map_put(calls, (void*)(uint64_t)call->xid, call);

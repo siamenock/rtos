@@ -133,8 +133,8 @@ uint32_t task_create() {
 	
 	tasks[id].cpu[CTX_RFLAGS] = 0x0200;	// Enable interrupt
 	
-	tasks[id].mmap = list_create((void*)malloc, (void*)free);
-	tasks[id].resources = list_create((void*)malloc, (void*)free);
+	tasks[id].mmap = list_create(malloc, free, NULL);
+	tasks[id].resources = list_create(malloc, free, NULL);
 	
 	return id;
 }

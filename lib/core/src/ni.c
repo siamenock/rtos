@@ -1,12 +1,12 @@
 #include <string.h>
 #include <lock.h>
+#include <util/map.h>
 #include <net/ni.h>
 #include <tlsf.h>
 
 int __nis_count;
 NetworkInterface* __nis[NIS_SIZE];
 
-#define NI_POOL(ptr)	(void*)((uint64_t)(void*)(ptr) & ~(0x200000 - 1))
 #define ALIGN           16
 
 inline int ni_count() {
@@ -21,8 +21,7 @@ NetworkInterface* ni_get(int i) {
 }
 
 Packet* ni_alloc(NetworkInterface* ni, uint16_t size) {
-	void* pool = NI_POOL(ni);
-	Packet* packet = malloc_ex(sizeof(Packet) + size + ALIGN - 1, pool);
+	Packet* packet = ni->malloc(sizeof(Packet) + size + ALIGN - 1, ni->pool);
 	if(packet) {
 		bzero(packet, sizeof(Packet));
 		packet->ni = ni;
@@ -35,7 +34,7 @@ Packet* ni_alloc(NetworkInterface* ni, uint16_t size) {
 }
 
 inline void ni_free(Packet* packet) {
-	free_ex(packet, NI_POOL(packet->ni));
+	packet->ni->free(packet, packet->ni->pool);
 }
 
 inline bool ni_has_input(NetworkInterface* ni) {
@@ -129,17 +128,60 @@ inline bool ni_tryoutput(NetworkInterface* ni, Packet* packet) {
 }
 
 size_t ni_pool_used(NetworkInterface* ni) {
-	void* pool = NI_POOL(ni);
-	return get_used_size(pool);
+	return get_used_size(ni->pool);
 }
 
 size_t ni_pool_free(NetworkInterface* ni) {
-	void* pool = NI_POOL(ni);
-	return get_total_size(pool) - get_used_size(pool);
+	return get_total_size(ni->pool) - get_used_size(ni->pool);
 }
 
 size_t ni_pool_total(NetworkInterface* ni) {
-	void* pool = NI_POOL(ni);
-	return get_total_size(pool);
+	return get_total_size(ni->pool);
+}
+
+#define CONFIG_INIT					\
+if(!ni->config->equals) {				\
+	ni->config->equals = map_string_equals;		\
+	ni->config->hash = map_string_hash;		\
+}
+
+void ni_config_put(NetworkInterface* ni, char* key, void* data) {
+	CONFIG_INIT;
+	
+	if(map_contains(ni->config, key)) {
+		map_update(ni->config, key, data);
+	} else {
+		int len = strlen(key) + 1;
+		char* key2 = ni->malloc(len, ni->pool);
+		memcpy(key2, key, len);
+		
+		map_put(ni->config, key2, data);
+	}
+}
+
+bool ni_config_contains(NetworkInterface* ni, char* key) {
+	CONFIG_INIT;
+	
+	return map_contains(ni->config, key);
+}
+
+void* ni_config_remove(NetworkInterface* ni, char* key) {
+	CONFIG_INIT;
+	
+	if(map_contains(ni->config, key)) {
+		char* key2 = map_get_key(ni->config, key);
+		void* data = map_remove(ni->config, key);
+		ni->free(key2, ni->pool);
+		
+		return data;
+	} else {
+		return NULL;
+	}
+}
+
+void* ni_config_get(NetworkInterface* ni, char* key) {
+	CONFIG_INIT;
+	
+	return map_get(ni->config, key);
 }
 

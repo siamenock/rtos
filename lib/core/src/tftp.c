@@ -10,6 +10,8 @@
 #include <util/map.h>
 
 typedef struct {
+	NetworkInterface*	ni;
+	
 	uint16_t	sport;
 	
 	uint32_t	daddr;
@@ -33,13 +35,13 @@ uint32_t TFTP_SESSION_TTL = (10 * 1000000);	// 10 secs
 static Map* sessions;
 
 static void delete(Session* session) {
-	udp_port_free(session->sport);
+	udp_port_free(session->ni, session->sport);
 	free(session->filename);
 	free(session->mode);
 	free(session);
 }
 
-static Session* create(IP* ip, UDP* udp, TFTPCallback* callback) {
+static Session* create(Packet* packet, IP* ip, UDP* udp, TFTPCallback* callback) {
 	uint32_t index = 0;
 	uint16_t opcode = read_u16(udp->body, &index);
 	char* filename = read_string(udp->body, &index);
@@ -49,7 +51,8 @@ static Session* create(IP* ip, UDP* udp, TFTPCallback* callback) {
 	
 	Session* session = malloc(sizeof(Session));
 	bzero(session, sizeof(Session));
-	session->sport = udp_port_alloc();
+	session->ni = packet->ni;
+	session->sport = udp_port_alloc(session->ni);
 	session->daddr = endian32(ip->source);
 	session->dport = endian16(udp->source);
 	int len = strlen(filename) + 1;
@@ -70,7 +73,7 @@ static Session* create(IP* ip, UDP* udp, TFTPCallback* callback) {
 	session->offset = 0;
 	
 	if(!sessions) {
-		sessions = map_create(4, map_uint64_hash, map_uint64_equals, malloc, free);
+		sessions = map_create(4, map_uint64_hash, map_uint64_equals, malloc, free, NULL);
 	}
 	
 	map_put(sessions, (void*)(uint64_t)session->sport, session);
@@ -123,10 +126,6 @@ static void nack(Packet* packet, uint16_t error_number, char* error_message) {
 }
 
 bool tftp_process(Packet* packet) {
-	Map* config = packet->ni->config;
-	if(!config)
-		return false;
-	
 	// GC
 	clock_t time = clock();
 	if(sessions && next_gc < time) {
@@ -144,15 +143,15 @@ bool tftp_process(Packet* packet) {
 		next_gc = time + TFTP_SESSION_GC;
 	} 
 	
-	uint32_t addr = (uint32_t)(uint64_t)map_get(config, "ip");
+	uint32_t addr = (uint32_t)(uint64_t)ni_config_get(packet->ni, "ip");
 	if(!addr)
 		return false;
 	
-	uint16_t port = (uint32_t)(uint64_t)map_get(config, TFTP_PORT);
+	uint16_t port = (uint32_t)(uint64_t)ni_config_get(packet->ni, TFTP_PORT);
 	if(!port)
 		port = 69;
 	
-	TFTPCallback* callback = map_get(config, TFTP_CALLBACK); 
+	TFTPCallback* callback = ni_config_get(packet->ni, TFTP_CALLBACK); 
 	if(!callback)
 		return false;
 	
@@ -174,7 +173,7 @@ bool tftp_process(Packet* packet) {
 		switch(opcode) {
 			case 1: // Read request (RRQ)
 			case 2: // Write request (WRQ)
-				session = create(ip, udp, callback);
+				session = create(packet, ip, udp, callback);
 				if(session) {
 					ack(packet, session);
 				} else {

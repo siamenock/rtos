@@ -2,8 +2,14 @@
 
 echo "Start of Network configuration for $1"
 /sbin/ifconfig $1 192.168.100.200 promisc up
-/sbin/brctl addif br0 $1
-route del -net 192.168.100.0 netmask 255.255.255.0 dev $1
-route add -net 192.168.100.0 netmask 255.255.255.0 dev br0
+
+# Check br0 is exists
+ISBR0=`/sbin/ifconfig | grep br0`
+if [ -n "$ISBR0" ]; then
+	/sbin/brctl addif br0 $1
+	route del -net 192.168.100.0 netmask 255.255.255.0 dev $1
+	route add -net 192.168.100.0 netmask 255.255.255.0 dev br0
+fi
+
 echo "End of Network configuration for $1"
-sleep 2
+sleep 1

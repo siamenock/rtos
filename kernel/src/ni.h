@@ -10,8 +10,10 @@
 typedef struct {
 	// Management
 	NetworkInterface*	ni;
-	void*		pool;
 	List*		pools;
+	void*(*malloc)(size_t, void*);
+	void(*free)(void*, void*);
+	void*		pool;
 	
 	// Information
 	uint64_t	mac;

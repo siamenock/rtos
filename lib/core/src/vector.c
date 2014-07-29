@@ -1,26 +1,30 @@
 #include <stddef.h>
 #include <util/vector.h>
 
-Vector* vector_create(size_t size, void*(*malloc)(size_t), void(*free)(void*)) {
-	Vector* vector = malloc(sizeof(Vector));
+Vector* vector_create(size_t size, void* malloc, void* free, void* pool) {
+	void*(*malloc2)(size_t,void*) = malloc;
+	void*(*free2)(void*,void*) = free;
+	
+	Vector* vector = malloc2(sizeof(Vector), pool);
 	if(!vector)
 		return NULL;
 	
-	void** array = malloc(size * sizeof(void*));
+	void** array = malloc2(size * sizeof(void*), pool);
 	if(!array) {
-		free(vector);
+		free2(vector, pool);
 		return NULL;
 	}
 	vector_init(vector, array, size);
 	vector->malloc = malloc;
 	vector->free = free;
+	vector->pool = pool;
 	
 	return vector;
 }
 
 void vector_destroy(Vector* vector) {
-	vector->free(vector->array);
-	vector->free(vector);
+	vector->free(vector->array, vector->pool);
+	vector->free(vector, vector->pool);
 }
 
 void vector_init(Vector* vector, void** array, size_t size) {
@@ -29,6 +33,7 @@ void vector_init(Vector* vector, void** array, size_t size) {
 	vector->array = array;
 	vector->malloc = NULL;
 	vector->free = NULL;
+	vector->pool = NULL;
 }
 
 bool vector_available(Vector* vector) {

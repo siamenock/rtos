@@ -43,8 +43,8 @@ void malloc_init() {
 	init_memory_pool((uint32_t)(end - start), __malloc_pool, 0);
 	
 	#if DEBUG
-	statistics = map_create(512, map_uint64_hash, map_uint64_equals, malloc, free);
-	tracing = map_create(8192, map_uint64_hash, map_uint64_equals, malloc, free);
+	statistics = map_create(512, map_uint64_hash, map_uint64_equals, malloc, free, NULL);
+	tracing = map_create(8192, map_uint64_hash, map_uint64_equals, malloc, free, NULL);
 	is_debug = true;
 	#endif /* DEBUG */
 }

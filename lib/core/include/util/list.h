@@ -13,13 +13,14 @@ typedef struct _ListNode {
 typedef struct _List {
 	ListNode*	head;
 	ListNode*	tail;
-	size_t	size;
+	size_t		size;
 	
-	void*(*malloc)(size_t);
-	void(*free)(void*);
+	void*(*malloc)(size_t,void*);
+	void(*free)(void*,void*);
+	void*		pool;
 } List;
 
-List* list_create(void*(*malloc)(size_t), void(*free)(void*));
+List* list_create(void* malloc, void* free, void* pool);
 void list_destroy(List* list);
 bool list_is_empty(List* list);
 bool list_add(List* list, void* data);

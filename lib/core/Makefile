@@ -7,7 +7,7 @@ OBJS = obj/ether.o obj/crc.o obj/checksum.o obj/ni.o obj/status.o obj/md5.o obj/
 	obj/asm.o obj/gmalloc.o obj/lock.o obj/shared.o obj/json.o obj/arp.o obj/icmp.o \
 	obj/packet.o obj/ip.o obj/udp.o obj/tcp.o obj/rpc.o obj/tftp.o obj/event.o
 
-CFLAGS = -I include -I ../TLSF/src -I ../jsmn -O2 -Wall -Werror -m64 -nostdlib -ffreestanding -std=gnu99 -mcmodel=kernel
+CFLAGS = -I include -I ../TLSF/src -I ../jsmn -O0 -Wall -Werror -m64 -nostdlib -ffreestanding -std=gnu99 -mcmodel=kernel
 
 all: libcore.a
 

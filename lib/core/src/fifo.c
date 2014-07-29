@@ -1,31 +1,35 @@
 #include <stddef.h>
 #include <util/fifo.h>
 
-FIFO* fifo_create(size_t size, void*(*malloc)(size_t), void(*free)(void*)) {
-	FIFO* fifo = malloc(sizeof(FIFO));
+FIFO* fifo_create(size_t size, void* malloc, void* free, void* pool) {
+	void*(*malloc2)(size_t,void*) = malloc;
+	void*(*free2)(void*,void*) = free;
+	
+	FIFO* fifo = malloc2(sizeof(FIFO), pool);
 	if(!fifo)
 		return NULL;
 	
-	void* array = malloc(size * sizeof(void*));
+	void* array = malloc2(size * sizeof(void*), pool);
 	if(!array) {
-		free(fifo);
+		free2(fifo, pool);
 		return NULL;
 	}
 	
 	fifo_init(fifo, array, size);
 	fifo->malloc = malloc;
 	fifo->free = free;
+	fifo->pool = pool;
 	
 	return fifo;
 }
 
 void fifo_destroy(FIFO* fifo) {
-	fifo->free(fifo->array);
-	fifo->free(fifo);
+	fifo->free(fifo->array, fifo->pool);
+	fifo->free(fifo, fifo->pool);
 }
 
 bool fifo_resize(FIFO* fifo, size_t size, void(*popped)(void*)) {
-	void* array = fifo->malloc(size * sizeof(void*));
+	void* array = fifo->malloc(size * sizeof(void*), fifo->pool);
 	if(!array)
 		return false;
 	
@@ -41,6 +45,7 @@ void fifo_init(FIFO* fifo, void** array, size_t size) {
 	fifo->array = array;
 	fifo->malloc = NULL;
 	fifo->free = NULL;
+	fifo->pool = NULL;
 }
 
 void fifo_reinit(FIFO* fifo, void** array, size_t size, void(*popped)(void*)) {

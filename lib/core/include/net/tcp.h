@@ -1,6 +1,8 @@
 #ifndef __NET_TCP_H__
 #define __NET_TCP_H__
 
+#include <net/ni.h>
+
 #define TCP_LEN			20
 
 typedef struct {
@@ -26,7 +28,7 @@ typedef struct {
 	uint8_t		payload[0];
 } __attribute__ ((packed)) TCP;
 
-uint16_t tcp_port_alloc();
-void tcp_port_free(uint16_t port);
+uint16_t tcp_port_alloc(NetworkInterface* ni);
+void tcp_port_free(NetworkInterface* ni, uint16_t port);
 
 #endif /* __NET_TCP_H__ */

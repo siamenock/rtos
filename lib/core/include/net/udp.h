@@ -2,6 +2,7 @@
 #define __NET_UDP_H__
 
 #include <net/packet.h>
+#include <net/ni.h>
 
 #define UDP_LEN			8
 
@@ -16,7 +17,7 @@ typedef struct {
 
 void udp_pack(Packet* packet, uint16_t udp_body_len);
 
-uint16_t udp_port_alloc();
-void udp_port_free(uint16_t port);
+uint16_t udp_port_alloc(NetworkInterface* ni);
+void udp_port_free(NetworkInterface* ni, uint16_t port);
 
 #endif /* __NET_UDP_H__ */

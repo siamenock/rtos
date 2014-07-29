@@ -38,6 +38,9 @@ typedef struct _NetworkInterface NetworkInterface;
 typedef struct _NetworkInterface {
 	// Management
 	uint64_t	pool_size;
+	void*(*malloc)(size_t,void*);
+	void(*free)(void*,void*);
+	void*		pool;
 	
 	// Information
 	uint64_t	mac;
@@ -105,5 +108,10 @@ bool ni_tryoutput(NetworkInterface* ni, Packet* packet);
 size_t ni_pool_used(NetworkInterface* ni);
 size_t ni_pool_free(NetworkInterface* ni);
 size_t ni_pool_total(NetworkInterface* ni);
+
+void ni_config_put(NetworkInterface* ni, char* key, void* data);
+bool ni_config_contains(NetworkInterface* ni, char* key);
+void* ni_config_remove(NetworkInterface* ni, char* key);
+void* ni_config_get(NetworkInterface* ni, char* key);
 
 #endif /* __NET_NETWORK_INTERFACE_H__ */
