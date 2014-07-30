@@ -38,8 +38,6 @@ typedef struct _NetworkInterface NetworkInterface;
 typedef struct _NetworkInterface {
 	// Management
 	uint64_t	pool_size;
-	void*(*malloc)(size_t,void*);
-	void(*free)(void*,void*);
 	void*		pool;
 	
 	// Information
@@ -85,10 +83,12 @@ typedef struct _NetworkInterface {
 
 typedef Packet*(*NI_DPI)(Packet*);
 
+/*
 struct netif;
 struct netif* ni_init(int idx, uint32_t ip, uint32_t netmask, uint32_t gw, bool is_default, 
 		NI_DPI preprocessor, NI_DPI postprocessor);
 bool ni_poll();
+*/
 
 int ni_count();
 NetworkInterface* ni_get(int idx);

@@ -9,12 +9,10 @@ typedef struct _FIFO {
 	size_t		tail;
 	size_t		size;
 	void**		array;
-	void*(*malloc)(size_t,void*);
-	void(*free)(void*,void*);
 	void*		pool;
 } FIFO;
 
-FIFO* fifo_create(size_t size, void* malloc, void* free, void* pool);
+FIFO* fifo_create(size_t size, void* pool);
 void fifo_destroy(FIFO* fifo);
 bool fifo_resize(FIFO* fifo, size_t size, void(*popped)(void*));
 void fifo_init(FIFO* fifo, void** array, size_t size);

@@ -373,15 +373,15 @@ static bool_t freeargs(SVCXPRT *xprt, xdrproc_t inproc, char *in) {
 // TODO: Create SVCXPRT dynamically
 SVCXPRT *svcudp_create(int sock) {
 	if(!services) {
-		services = map_create(4, service_hash, service_equals, malloc, free, NULL);
+		services = map_create(4, service_hash, service_equals, NULL);
 	}
 	
 	if(!history_fifo) {
-		history_fifo = fifo_create(16, malloc, free, NULL);
+		history_fifo = fifo_create(16, NULL);
 	}
 	
 	if(!history_map) {
-		history_map = map_create(15, map_uint64_hash, map_uint64_equals, malloc, free, NULL);
+		history_map = map_create(15, map_uint64_hash, map_uint64_equals, NULL);
 	}
 	
 	ops.xp_getargs = getargs;
@@ -696,7 +696,7 @@ bool rpc_call(NetworkInterface* ni, CLIENT* client, unsigned long procnum, xdrpr
 	call->context = context;
 	
 	if(!calls) {
-		calls = map_create(16, map_uint64_hash, map_uint64_equals, malloc, free, NULL);
+		calls = map_create(16, map_uint64_hash, map_uint64_equals, NULL);
 	}
 	
 	map_put(calls, (void*)(uint64_t)call->xid, call);

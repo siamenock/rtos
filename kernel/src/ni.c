@@ -32,7 +32,7 @@ static void polled(Device* device, void* buf, size_t size, void* data) {
 */
 
 void ni_init0() {
-	nis = map_create(4, map_uint64_hash, map_uint64_equals, malloc, free, NULL);
+	nis = map_create(4, map_uint64_hash, map_uint64_equals, NULL);
 }
 
 /**
@@ -111,12 +111,10 @@ NI* ni_create(uint64_t* attrs) {
 	}
 	
 	init_memory_pool(0x200000, pool, 1);
-	ni->malloc = malloc_ex;
-	ni->free = free_ex;
 	ni->pool = pool;
 	
 	// Allocate extra pools
-	ni->pools = list_create(ni->malloc, ni->free, ni->pool);
+	ni->pools = list_create(ni->pool);
 	if(!ni->pools) {
 		gfree(ni);
 		errno = 5;
@@ -143,7 +141,7 @@ NI* ni_create(uint64_t* attrs) {
 	}
 	
 	// Allocate NetworkInterface
-	ni->ni = ni->malloc(sizeof(NetworkInterface), ni->pool);
+	ni->ni = malloc_ex(sizeof(NetworkInterface), ni->pool);
 	bzero(ni->ni, sizeof(NetworkInterface));
 	
 	// Default attributes
@@ -152,9 +150,9 @@ NI* ni_create(uint64_t* attrs) {
 	ni->min_buffer_size = 128;
 	ni->max_buffer_size = 2048;
 	if(!has_key(NI_INPUT_ACCEPT_ALL))
-		ni->input_accept = list_create(ni->malloc, ni->free, ni->pool);
+		ni->input_accept = list_create(ni->pool);
 	if(!has_key(NI_OUTPUT_ACCEPT_ALL))
-		ni->output_accept = list_create(ni->malloc, ni->free, ni->pool);
+		ni->output_accept = list_create(ni->pool);
 	
 	ni->input_closed = ni->output_closed = cpu_tsc();
 	
@@ -184,7 +182,7 @@ NI* ni_create(uint64_t* attrs) {
 				ni->ni->padding_tail = ni->padding_tail = attrs[i * 2 + 1];
 				break;
 			case NI_INPUT_BUFFER_SIZE:
-				ni->ni->input_buffer = fifo_create(attrs[i * 2 + 1], ni->malloc, ni->free, ni->pool);
+				ni->ni->input_buffer = fifo_create(attrs[i * 2 + 1], ni->pool);
 				if(!ni->ni->input_buffer) {
 					errno = 5;
 					gfree(ni);
@@ -192,7 +190,7 @@ NI* ni_create(uint64_t* attrs) {
 				}
 				break;
 			case NI_OUTPUT_BUFFER_SIZE:
-				ni->ni->output_buffer = fifo_create(attrs[i * 2 + 1], ni->malloc, ni->free, ni->pool);
+				ni->ni->output_buffer = fifo_create(attrs[i * 2 + 1], ni->pool);
 				if(!ni->ni->output_buffer) {
 					errno = 5;
 					gfree(ni);
@@ -227,12 +225,10 @@ NI* ni_create(uint64_t* attrs) {
 		
 		i++;
 	}
-	ni->ni->malloc = ni->malloc;
-	ni->ni->free = ni->free;
 	ni->ni->pool = ni->pool;
 	
 	// Config
-	ni->ni->config = map_create(8, NULL, NULL, ni->malloc, ni->free, ni->pool);
+	ni->ni->config = map_create(8, NULL, NULL, ni->pool);
 	
 	// Register the ni
 	map_put(nis, (void*)ni->mac, ni);
@@ -295,7 +291,7 @@ uint32_t ni_update(NI* ni, uint64_t* attrs, uint32_t size) {
 					goto failed;
 				}
 				
-				pools = list_create(ni->malloc, ni->free, ni->pool);
+				pools = list_create(ni->pool);
 				if(!pools) {
 					result = 5;
 					goto failed;
@@ -321,7 +317,7 @@ uint32_t ni_update(NI* ni, uint64_t* attrs, uint32_t size) {
 				break;
 			case NI_INPUT_BUFFER_SIZE:
 				input_buffer_size = attrs[i * 2 + 1];
-				input_buffer = ni->malloc(sizeof(void*) * input_buffer_size, ni->pool);
+				input_buffer = malloc_ex(sizeof(void*) * input_buffer_size, ni->pool);
 				if(!input_buffer) {
 					result = 5;
 					goto failed;
@@ -329,7 +325,7 @@ uint32_t ni_update(NI* ni, uint64_t* attrs, uint32_t size) {
 				break;
 			case NI_OUTPUT_BUFFER_SIZE:
 				output_buffer_size = attrs[i * 2 + 1];
-				output_buffer = ni->malloc(sizeof(void*) * output_buffer_size, ni->pool);
+				output_buffer = malloc_ex(sizeof(void*) * output_buffer_size, ni->pool);
 				if(!output_buffer) {
 					result = 5;
 					goto failed;
@@ -341,7 +337,7 @@ uint32_t ni_update(NI* ni, uint64_t* attrs, uint32_t size) {
 				break;
 			case NI_INPUT_ACCEPT:
 				if(!input_accept) {
-					input_accept = list_create(ni->malloc, ni->free, ni->pool);
+					input_accept = list_create(ni->pool);
 					if(!input_accept) {
 						result = 5;
 						goto failed;
@@ -355,7 +351,7 @@ uint32_t ni_update(NI* ni, uint64_t* attrs, uint32_t size) {
 				break;
 			case NI_OUTPUT_ACCEPT:
 				if(!output_accept) {
-					output_accept = list_create(ni->malloc, ni->free, ni->pool);
+					output_accept = list_create(ni->pool);
 					if(!output_accept) {
 						result = 5;
 						goto failed;
@@ -421,13 +417,12 @@ succeed:
 			ni->ni->input_drop_bytes += packet->end - packet->start;
 			ni->ni->input_drop_packets++;
 			
-			ni->free(packet->buffer, ni->pool);
-			ni->free(packet, ni->pool);
+			ni_free(packet);
 		}
 		
 		void* array = ni->ni->input_buffer->array;
 		fifo_reinit(ni->ni->input_buffer, input_buffer, input_buffer_size, input_popped);
-		ni->free(array, ni->pool);
+		free_ex(array, ni->pool);
 	}
 	
 	// NI_OUTPUT_BUFFER_SIZE
@@ -438,13 +433,13 @@ succeed:
 			ni->ni->output_drop_bytes += packet->end - packet->start;
 			ni->ni->output_drop_packets++;
 			
-			ni->free(packet->buffer, ni->pool);
-			ni->free(packet, ni->pool);
+			free_ex(packet->buffer, ni->pool);
+			free_ex(packet, ni->pool);
 		}
 		
 		void* array = ni->ni->output_buffer->array;
 		fifo_reinit(ni->ni->output_buffer, output_buffer, output_buffer_size, output_popped);
-		ni->free(array, ni->pool);
+		free_ex(array, ni->pool);
 	}
 	
 	// NI_INPUT_ACCEPT

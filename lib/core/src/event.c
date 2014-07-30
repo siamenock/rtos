@@ -35,11 +35,11 @@ static List* triggers;
 static List* idle_events;
 
 void event_init() {
-	busy_events = list_create(malloc, free, NULL);
-	timer_events = list_create(malloc, free, NULL);
-	trigger_events = map_create(8, map_uint64_hash, map_uint64_equals, malloc, free, NULL);
-	triggers = list_create(malloc, free, NULL);
-	idle_events = list_create(malloc, free, NULL);
+	busy_events = list_create(NULL);
+	timer_events = list_create(NULL);
+	trigger_events = map_create(8, map_uint64_hash, map_uint64_equals, NULL);
+	triggers = list_create(NULL);
+	idle_events = list_create(NULL);
 }
 
 static bool is_trigger_stop;
@@ -207,7 +207,7 @@ uint64_t event_trigger_add(uint64_t event_id, TriggerEventFunc func, void* conte
 	
 	List* list = map_get(trigger_events, (void*)event_id);
 	if(!list) {
-		list = list_create(malloc, free, NULL);
+		list = list_create(NULL);
 		if(!list) {
 			free(node);
 			return 0;

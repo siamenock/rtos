@@ -1042,7 +1042,7 @@ void manager_init() {
 	ni_config_put(manager_ni->ni, "netmask", (void*)(uint64_t)DEFAULT_MANAGER_NM);
 	ni_config_put(manager_ni->ni, TFTP_CALLBACK, &tftp_callback);
 	
-	callbacks = list_create(malloc, free, NULL);
+	callbacks = list_create(NULL);
 	
 	SVCXPRT* rpc;
 	if(!(rpc = svcudp_create(111)))
@@ -1056,7 +1056,7 @@ void manager_init() {
 	if(!svc_register(rpc, CALLBACK, CALLBACK_APPLE, callback_1, IPPROTO_UDP))
 		printf("Cannot register callback service\n");
 	
-	vms = map_create(4, map_uint64_hash, map_uint64_equals, malloc, free, NULL);
+	vms = map_create(4, map_uint64_hash, map_uint64_equals, NULL);
 	
 	icc_register(ICC_TYPE_STARTED, icc_started);
 	icc_register(ICC_TYPE_PAUSED, icc_paused);

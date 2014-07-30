@@ -1,6 +1,7 @@
 #include <time.h>
 #include <string.h>
 #include <malloc.h>
+#include <tlsf.h>
 #include <net/ether.h>
 #include <net/arp.h>
 #include <util/map.h>
@@ -28,7 +29,7 @@ bool arp_process(Packet* packet) {
 	
 	Map* arp_table = ni_config_get(packet->ni, ARP_TABLE);
 	if(!arp_table) {
-		arp_table = map_create(32, map_uint64_hash, map_uint64_equals, packet->ni->malloc, packet->ni->free, packet->ni->pool);
+		arp_table = map_create(32, map_uint64_hash, map_uint64_equals, packet->ni->pool);
 		ni_config_put(packet->ni, ARP_TABLE, arp_table);
 	}
 	
@@ -48,7 +49,7 @@ bool arp_process(Packet* packet) {
 			MapEntry* entry = map_iterator_next(&iter);
 			if(((ARPEntity*)entry->data)->timeout < current) {
 				map_iterator_remove(&iter);
-				arp_table->free(entry->data, arp_table->pool);
+				free_ex(entry->data, packet->ni->pool);
 			}
 		}
 		
@@ -81,7 +82,7 @@ bool arp_process(Packet* packet) {
 			uint32_t sip = endian32(arp->spa);
 			ARPEntity* entity = map_get(arp_table, (void*)(uint64_t)sip);
 			if(!entity) {
-				entity = arp_table->malloc(sizeof(ARPEntity), arp_table->pool);
+				entity = malloc_ex(sizeof(ARPEntity), packet->ni->pool);
 				if(!entity)
 					goto done;
 				

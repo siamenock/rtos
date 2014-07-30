@@ -21,7 +21,7 @@ NetworkInterface* ni_get(int i) {
 }
 
 Packet* ni_alloc(NetworkInterface* ni, uint16_t size) {
-	Packet* packet = ni->malloc(sizeof(Packet) + size + ALIGN - 1, ni->pool);
+	Packet* packet = malloc_ex(sizeof(Packet) + size + ALIGN - 1, ni->pool);
 	if(packet) {
 		bzero(packet, sizeof(Packet));
 		packet->ni = ni;
@@ -34,7 +34,7 @@ Packet* ni_alloc(NetworkInterface* ni, uint16_t size) {
 }
 
 inline void ni_free(Packet* packet) {
-	packet->ni->free(packet, packet->ni->pool);
+	free_ex(packet, packet->ni->pool);
 }
 
 inline bool ni_has_input(NetworkInterface* ni) {
@@ -152,7 +152,7 @@ void ni_config_put(NetworkInterface* ni, char* key, void* data) {
 		map_update(ni->config, key, data);
 	} else {
 		int len = strlen(key) + 1;
-		char* key2 = ni->malloc(len, ni->pool);
+		char* key2 = malloc_ex(len, ni->pool);
 		memcpy(key2, key, len);
 		
 		map_put(ni->config, key2, data);
@@ -171,7 +171,7 @@ void* ni_config_remove(NetworkInterface* ni, char* key) {
 	if(map_contains(ni->config, key)) {
 		char* key2 = map_get_key(ni->config, key);
 		void* data = map_remove(ni->config, key);
-		ni->free(key2, ni->pool);
+		free_ex(key2, ni->pool);
 		
 		return data;
 	} else {

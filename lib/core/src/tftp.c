@@ -73,7 +73,7 @@ static Session* create(Packet* packet, IP* ip, UDP* udp, TFTPCallback* callback)
 	session->offset = 0;
 	
 	if(!sessions) {
-		sessions = map_create(4, map_uint64_hash, map_uint64_equals, malloc, free, NULL);
+		sessions = map_create(4, map_uint64_hash, map_uint64_equals, NULL);
 	}
 	
 	map_put(sessions, (void*)(uint64_t)session->sport, session);

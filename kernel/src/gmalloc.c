@@ -9,10 +9,10 @@
 #include "mp.h"
 #include "gmalloc.h"
 
-static void* gmalloc_pool;
+void* gmalloc_pool;
 
-static uint32_t bmalloc_count;
-static uint64_t* bmalloc_pool;
+uint32_t bmalloc_count;
+uint64_t* bmalloc_pool;
 
 static uint32_t smap_count;
 static SMAP* smap;
@@ -54,7 +54,7 @@ void gmalloc_extend() {
 	reserved[2].end = 0x400000 + 0x200000 * mp_core_count();
 	
 	// Get free blocks
-	List* blocks = list_create(malloc, free, NULL);
+	List* blocks = list_create(NULL);
 	
 	uint64_t total_size = 0;
 	
@@ -128,7 +128,7 @@ void gmalloc_extend() {
 	}
 	
 	// Allocate 2MB blocks
-	List* blocks_2mb = list_create(malloc, free, NULL);
+	List* blocks_2mb = list_create(NULL);
 	
 	for(int i = 0; i < list_size(blocks); i++) {
 		Block* b = list_get(blocks, i);

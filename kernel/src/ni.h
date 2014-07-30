@@ -11,8 +11,6 @@ typedef struct {
 	// Management
 	NetworkInterface*	ni;
 	List*		pools;
-	void*(*malloc)(size_t, void*);
-	void(*free)(void*, void*);
 	void*		pool;
 	
 	// Information

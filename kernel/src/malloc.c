@@ -29,7 +29,7 @@ int debug_malloc_count;
 int debug_free_count;
 #endif /* DEBUG */
 
-static void* __malloc_pool;
+void* __malloc_pool;
 
 void malloc_init() {
 	PNKC* pnkc = rootfs_file("kernel.bin", NULL);

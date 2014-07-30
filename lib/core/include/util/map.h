@@ -13,18 +13,15 @@ typedef struct _Map {
 	List**		table;
 	size_t		threshold;
 	size_t		capacity;
-	
 	size_t		size;
-	
-	void*(*malloc)(size_t,void*);
-	void(*free)(void*,void*);
-	void*		pool;
 	
 	uint64_t(*hash)(void*);
 	bool(*equals)(void*,void*);
+	
+	void*		pool;
 } Map;
 
-Map* map_create(size_t initial_capacity, uint64_t(*hash)(void*), bool(*equals)(void*,void*), void* malloc, void* free, void* pool);
+Map* map_create(size_t initial_capacity, uint64_t(*hash)(void*), bool(*equals)(void*,void*), void* pool);
 void map_destroy(Map* map);
 bool map_is_empty(Map* map);
 bool map_put(Map* map, void* key, void* data);

@@ -8,13 +8,10 @@ typedef struct _Vector {
 	size_t		index;
 	size_t		size;
 	void**		array;
-	
-	void*(*malloc)(size_t,void*);
-	void(*free)(void*,void*);
 	void*		pool;
 } Vector;
 
-Vector* vector_create(size_t size, void* malloc, void* free, void* pool);
+Vector* vector_create(size_t size, void* pool);
 void vector_destroy(Vector* vector);
 void vector_init(Vector* vector, void** array, size_t size);
 bool vector_available(Vector* vector);

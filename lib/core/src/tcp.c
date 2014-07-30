@@ -9,7 +9,7 @@
 uint16_t tcp_port_alloc(NetworkInterface* ni) {
 	Map* ports = ni_config_get(ni, TCP_PORTS);
 	if(!ports) {
-		ports = map_create(64, map_uint64_hash, map_uint64_equals, ni->malloc, ni->free, ni->pool);
+		ports = map_create(64, map_uint64_hash, map_uint64_equals, ni->pool);
 		ni_config_put(ni, TCP_PORTS, ports);
 	}
 	

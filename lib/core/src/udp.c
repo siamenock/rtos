@@ -22,7 +22,7 @@ void udp_pack(Packet* packet, uint16_t udp_body_len) {
 uint16_t udp_port_alloc(NetworkInterface* ni) {
 	Map* ports = ni_config_get(ni, UDP_PORTS);
 	if(!ports) {
-		ports = map_create(64, map_uint64_hash, map_uint64_equals, ni->malloc, ni->free, ni->pool);
+		ports = map_create(64, map_uint64_hash, map_uint64_equals, ni->pool);
 		ni_config_put(ni, UDP_PORTS, ports);
 	}
 	
