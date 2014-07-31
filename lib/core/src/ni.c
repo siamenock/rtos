@@ -140,7 +140,7 @@ size_t ni_pool_total(NetworkInterface* ni) {
 }
 
 #define CONFIG_INIT					\
-if(!ni->config->equals) {				\
+if(ni->config->equals != map_string_equals) {		\
 	ni->config->equals = map_string_equals;		\
 	ni->config->hash = map_string_hash;		\
 }

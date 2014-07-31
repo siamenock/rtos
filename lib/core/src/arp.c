@@ -129,6 +129,37 @@ bool arp_request(NetworkInterface* ni, uint32_t ip) {
 	return true;
 }
 
+bool arp_announce(NetworkInterface* ni, uint32_t ip) {
+	if(ip == 0)
+		ip = (uint32_t)(uint64_t)ni_config_get(ni, "ip");
+	
+	Packet* packet = ni_alloc(ni, sizeof(Ether) + sizeof(ARP));
+	if(!packet)
+		return false;
+	
+	Ether* ether = (Ether*)(packet->buffer + packet->start);
+	ether->dmac = endian48(0xffffffffffff);
+	ether->smac = endian48(ni->mac);
+	ether->type = endian16(ETHER_TYPE_ARP);
+	
+	ARP* arp = (ARP*)ether->payload;
+	arp->htype = endian16(1);
+	arp->ptype = endian16(0x0800);
+	arp->hlen = endian8(6);
+	arp->plen = endian8(4);
+	arp->operation = endian16(2);
+	arp->sha = endian48(ni->mac);
+	arp->spa = endian32(ip);
+	arp->tha = endian48(0);
+	arp->tpa = endian32(ip);
+	 
+	packet->end = packet->start + sizeof(Ether) + sizeof(ARP);
+	
+	ni_output(ni, packet);
+	
+	return true;
+}
+
 uint64_t arp_get_mac(NetworkInterface* ni, uint32_t ip) {
 	Map* arp_table = ni_config_get(ni, ARP_TABLE);
 	if(!arp_table) {

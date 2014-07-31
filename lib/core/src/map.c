@@ -11,6 +11,12 @@ Map* map_create(size_t initial_capacity, uint64_t(*hash)(void*), bool(*equals)(v
 	if(pool == NULL)
 		pool = __malloc_pool;
 	
+	if(!equals)
+		equals = map_uint64_equals;
+	
+	if(!hash)
+		hash = map_uint64_hash;
+	
 	size_t capacity = 1;
 	while(capacity < initial_capacity)
 		capacity <<= 1;

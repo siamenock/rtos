@@ -11,222 +11,262 @@
 #include <net/udp.h>
 #include <net/tcp.h>
 #include <util/list.h>
+#include <util/map.h>
+#include <util/event.h>
 
 typedef struct {
-	uint32_t	source;
-	uint32_t	destination;
-	uint8_t		padding;
-	uint8_t		protocol;
-	uint16_t	length;
-} __attribute__((packed)) TCP_Pseudo;
-
-typedef struct {
-	uint64_t	mac;
-	uint32_t	ip;
+	uint32_t	addr;
 	uint16_t	port;
-} Address;
+} Endpoint;
 
 typedef struct {
-	Address		s;
+	Endpoint	source;
 	uint16_t	port;
-	Address		d;
+	Endpoint	destination;
+	uint64_t	fin;
 } Session;
 
-static Address vip = { 0, 0xc0a8c80a, 80 };	// 192.168.200.10:80
-static Address rips[] = { 
-	{ 0x94de806314a9, 0xc0a8c8c8, 8080 }, 	// 192.168.200.200:8080
-	{ 0x94de806314a9, 0xc0a8c8c8, 8081 }, 	// 192.168.200.200:8081
-	{ 0x94de806314a9, 0xc0a8c8c8, 8082 }, 	// 192.168.200.200:8082
-	{ 0x94de806314a9, 0xc0a8c8c8, 8083 }, 	// 192.168.200.200:8083
-	{ 0x94de806314a9, 0xc0a8c8c8, 8084 }, 	// 192.168.200.200:8084
-};
+static Map* sessions;
+static Map* ports;
 
-static int rips_size = 5;
-
-static int robin = 0;
-static uint16_t next_port = 49152;
-
-static List* sessions;
-
-static bool is_from_rip(uint32_t ip, uint16_t port) {
-	for(int i = 0; i < rips_size; i++) {
-		if(rips[i].ip == ip && rips[i].port == port) {
-			return true;
-		}
-	}
-	return false;
+static void rip_add(uint32_t addr, uint16_t port) {
+	Endpoint* endpoint = malloc(sizeof(Endpoint));
+	endpoint->addr = addr;
+	endpoint->port = port;
+	
+	NetworkInterface* ni_intra = ni_get(1);
+	List* rips = ni_config_get(ni_intra, "pn.lb.rips");
+	list_add(rips, endpoint);
 }
 
-void ginit(int argc, char** argv) {
-	NetworkInterface* ni = ni_get(0);
-	printf("%x %p\n", vip.ip, vip.ip);
-	printf("%p %x %p\n", ni, ni->mac, ni->config);
-	ni->config = map_create(8, map_string_hash, map_string_equals, malloc, free);
-	map_put(ni->config, strdup("ip"), (void*)(uint64_t)vip.ip);
+static Endpoint* rip_alloc(NetworkInterface* ni) {
+	static int robin;
+	
+	List* rips = ni_config_get(ni, "pn.lb.rips");
+	int idx = (robin++) % list_size(rips);
+	
+	return list_get(rips, idx);
+}
+
+int ginit(int argc, char** argv) {
+	uint32_t count = ni_count();
+	if(count != 2)
+		return 1;
+	
+	NetworkInterface* ni_inter = ni_get(0);
+	ni_config_put(ni_inter, "ip", (void*)(uint64_t)0xc0a8640a);	// 192.168.100.10
+	ni_config_put(ni_inter, "pn.lb.port", (void*)(uint64_t)80);
+	arp_announce(ni_inter, 0);
+	
+	NetworkInterface* ni_intra = ni_get(1);
+	ni_config_put(ni_intra, "ip", (void*)(uint64_t)0xc0a86414);	// 192.168.100.200
+	arp_announce(ni_intra, 0);
+	
+	List* rips = list_create(NULL);
+	ni_config_put(ni_intra, "pn.lb.rips", rips);
+	
+	rip_add(0xc0a864c8, 8080);	//192.168.100.200
+	rip_add(0xc0a864c8, 8081);
+	rip_add(0xc0a864c8, 8082);
+	rip_add(0xc0a864c8, 8083);
+	rip_add(0xc0a864c8, 8084);
+	
+	sessions = map_create(4096, NULL, NULL, NULL);
+	ports = map_create(4096, NULL, NULL, NULL);
+	
+	return 0;
 }
 
 void init(int argc, char** argv) {
-	sessions = list_create(malloc, free);
+	sessions = map_create(4096, NULL, NULL, NULL);
 }
 
-void process(NetworkInterface* ni) {
+static NetworkInterface* ni_inter;
+static NetworkInterface* ni_intra;
+ 
+static Session* session_alloc(uint32_t saddr, uint16_t sport) {
+	uint64_t key = (uint64_t)saddr << 32 | (uint64_t)sport;
+	
+	Session* session = malloc(sizeof(Session));
+	session->source.addr = saddr;
+	session->source.port = sport;
+	session->port = tcp_port_alloc(ni_intra);
+	Endpoint* rip = rip_alloc(ni_intra);
+	session->destination.addr = rip->addr;
+	session->destination.port = rip->port;
+	session->fin = 0;
+	
+	map_put(sessions, (void*)key, session);
+	map_put(ports, (void*)(uint64_t)session->port, session);
+	
+	printf("Alloc session %x:%d -> %d -> %x:%d\n", saddr, sport, session->port, rip->addr, rip->port);
+	
+	return session;
+}
+
+static void session_free(Session* session) {
+	printf("Session freeing: %d.%d.%d.%d:%d %d %d.%d.%d.%d:%d\n", 
+		(session->source.addr) >> 24 & 0xff,
+		(session->source.addr) >> 16 & 0xff,
+		(session->source.addr) >> 8 & 0xff,
+		(session->source.addr) >> 0 & 0xff,
+		session->source.port,
+		session->port,
+		(session->destination.addr) >> 24 & 0xff,
+		(session->destination.addr) >> 16 & 0xff,
+		(session->destination.addr) >> 8 & 0xff,
+		(session->destination.addr) >> 0 & 0xff,
+		session->destination.port);
+	
+	uint64_t key = (uint64_t)session->source.addr << 32 | (uint64_t)session->source.port;
+	map_remove(sessions, (void*)key);
+	map_remove(ports, (void*)(uint64_t)session->port);
+	tcp_port_free(ni_intra, session->port);
+	free(session);
+}
+
+void process_inter() {
+	NetworkInterface* ni = ni_inter;
+	
 	Packet* packet = ni_input(ni);
 	if(!packet)
 		return;
 	
-	Ether* ether = (Ether*)(packet->buffer + packet->start);
+	if(arp_process(packet))
+		return;
 	
-	if(arp_process(packet)) {
-		packet = NULL;
-	} else if(endian16(ether->type) == ETHER_TYPE_IPv4) {
+	if(icmp_process(packet))
+		return;
+	
+	uint32_t addr = (uint32_t)(uint64_t)ni_config_get(ni, "ip");
+	uint16_t port = (uint16_t)(uint64_t)ni_config_get(ni, "pn.lb.port");
+	
+	Ether* ether = (Ether*)(packet->buffer + packet->start);
+	if(endian16(ether->type) == ETHER_TYPE_IPv4) {
 		IP* ip = (IP*)ether->payload;
 		
-		if(ip->protocol == IP_PROTOCOL_ICMP && endian32(ip->destination) == vip.ip) {
-			// Echo reply
-			ICMP* icmp = (ICMP*)ip->body;
-			
-			icmp->type = 0;
-			icmp->checksum = 0;
-			icmp->checksum = endian16(checksum(icmp, packet->end - packet->start - ETHER_LEN - IP_LEN));
-			
-			ip->destination = ip->source;
-			ip->source = endian32(vip.ip);
-			ip->ttl = endian8(64);
-			ip->checksum = 0;
-			ip->checksum = endian16(checksum(ip, ip->ihl * 4));
-			
-			ether->dmac = ether->smac;
-			ether->smac = endian48(ni->mac);
-			
-			ni_output(ni, packet);
-			packet = NULL;
-		} else if(ip->protocol == IP_PROTOCOL_TCP) {
+		if(ip->protocol == IP_PROTOCOL_TCP) {
 			TCP* tcp = (TCP*)ip->body;
 			
-			uint32_t sip = endian32(ip->source);
-			uint16_t sport = endian16(tcp->source);
-			
-			if(endian32(ip->destination) == vip.ip) {
-				if(endian16(tcp->destination) == vip.port) {
-					Session* session = NULL;
-					ListIterator iter;
-					list_iterator_init(&iter, sessions);
-					while(list_iterator_has_next(&iter)) {
-						Session* s = list_iterator_next(&iter);
-						if(s->s.ip == sip && s->s.port == sport) {
-							session = s;
-							break;
-						}
-					}
-					
-					if(!session) {
-						session = malloc(sizeof(Session));
-						session->s.mac = endian48(ether->smac);
-						session->s.ip = sip;
-						session->s.port = sport;
-						session->port = next_port;
-						session->d.mac = rips[robin].mac;
-						session->d.ip = rips[robin].ip;
-						session->d.port = rips[robin].port;
-						
-						list_add(sessions, session);
-						
-						printf("Create session %x:%d -> %d -> %x:%d\n", sip, sport, session->port, rips[robin].ip, rips[robin].port);
-						next_port++;
-						if(next_port < 49152)
-							next_port += 49152;
-						
-						robin = (robin + 1) % rips_size;
-					}
-					
-					tcp->source = endian16(session->port);
-					ip->source = endian32(vip.ip);
-					ether->smac = endian48(ni->mac);
-					
-					tcp->destination = endian16(session->d.port);
-					ip->destination = endian32(session->d.ip);
-					ether->dmac = endian48(session->d.mac);
-					
-					TCP_Pseudo pseudo;
-					pseudo.source = ip->source;
-					pseudo.destination = ip->destination;
-					pseudo.padding = 0;
-					pseudo.protocol = ip->protocol;
-					pseudo.length = endian16(endian16(ip->length) - ip->ihl * 4);
-					
-					tcp->checksum = 0;
-					uint32_t sum = (uint16_t)~checksum(&pseudo, sizeof(pseudo)) + (uint16_t)~checksum(tcp, endian16(ip->length) - ip->ihl * 4);
-					while(sum >> 16)
-						sum = (sum & 0xffff) + (sum >> 16);
-					
-					tcp->checksum = endian16(~sum);
-					
-					ip->checksum = 0;
-					ip->checksum = endian16(checksum(ip, ip->ihl * 4));
-					
-					ni_output(ni, packet);
-					
-					packet = NULL;
-				} else {
-					if(!is_from_rip(sip, sport)) {
-						ni_free(packet);
-						return;
-					}
-					
-					uint16_t dport = endian16(tcp->destination);
-					
-					Session* session = NULL;
-					ListIterator iter;
-					list_iterator_init(&iter, sessions);
-					while(list_iterator_has_next(&iter)) {
-						Session* s = list_iterator_next(&iter);
-						
-						if(s->port == dport) {
-							session = s;
-							
-							if(tcp->fin) {
-								// TODO: Destroy session after 300 seconds
-							}
-							
-							break;
-						}
-					}
-					
-					if(!session) {
-						printf("Cannot find session from %x:%d to %x:%d\n", sip, sport, endian32(ip->destination), dport);
-						ni_free(packet);
-						return;
-					}
-					
-					tcp->source = endian16(vip.port);
-					ip->source = endian32(vip.ip);
-					ether->smac = endian48(ni->mac);
-					
-					tcp->destination = endian16(session->s.port);
-					ip->destination = endian32(session->s.ip);
-					ether->dmac = endian48(session->s.mac);
-					
-					TCP_Pseudo pseudo;
-					pseudo.source = ip->source;
-					pseudo.destination = ip->destination;
-					pseudo.padding = 0;
-					pseudo.protocol = ip->protocol;
-					pseudo.length = endian16(endian16(ip->length) - ip->ihl * 4);
-					
-					tcp->checksum = 0;
-					uint32_t sum = (uint16_t)~checksum(&pseudo, sizeof(pseudo)) + (uint16_t)~checksum(tcp, endian16(ip->length) - ip->ihl * 4);
-					while(sum >> 16)
-						sum = (sum & 0xffff) + (sum >> 16);
-					
-					tcp->checksum = endian16(~sum);
-					
-					ip->checksum = 0;
-					ip->checksum = endian16(checksum(ip, ip->ihl * 4));
-					
-					ni_output(ni, packet);
-					
-					packet = NULL;
+			if(endian32(ip->destination) == addr && endian16(tcp->destination) == port) {
+				uint32_t saddr = endian32(ip->source);
+				uint16_t sport = endian16(tcp->source);
+				//uint32_t raddr = (uint32_t)(uint64_t)ni_config_get(ni_intra, "ip");
+				uint64_t key = (uint64_t)saddr << 32 | (uint64_t)sport;
+				
+				Session* session = map_get(sessions, (void*)key);
+				if(!session) {
+					session = session_alloc(saddr, sport);
 				}
+				
+				/*
+				ip->source = endian32(raddr);
+				tcp->source = endian16(session->port);
+				*/
+				ip->destination = endian32(session->destination.addr);
+				tcp->destination = endian16(session->destination.port);
+				ether->smac = endian48(ni_intra->mac);
+				ether->dmac = endian48(arp_get_mac(ni_intra, session->destination.addr));
+				tcp_pack(packet, endian16(ip->length) - ip->ihl * 4 - TCP_LEN);
+				
+				printf("Incoming: %lx %lx %d.%d.%d.%d:%d %d %d.%d.%d.%d:%d\n", 
+					endian48(ether->dmac), 
+					endian48(ether->smac),
+					(endian32(ip->source)) >> 24 & 0xff,
+					(endian32(ip->source)) >> 16 & 0xff,
+					(endian32(ip->source)) >> 8 & 0xff,
+					(endian32(ip->source)) >> 0 & 0xff,
+					endian16(tcp->source),
+					session->port,
+					(endian32(ip->destination)) >> 24 & 0xff,
+					(endian32(ip->destination)) >> 16 & 0xff,
+					(endian32(ip->destination)) >> 8 & 0xff,
+					(endian32(ip->destination)) >> 0 & 0xff,
+					endian16(tcp->destination));
+				
+				if(session->fin && tcp->ack) {
+					printf("Ack fin\n");
+					event_timer_remove(session->fin);
+					session_free(session);
+				}
+				
+				ni_output(ni_intra, packet);
+				
+				packet = NULL;
+			}
+		}
+	}
+	
+	if(packet)
+		ni_free(packet);
+}
+
+void process_intra() {
+	NetworkInterface* ni = ni_intra;
+	
+	Packet* packet = ni_input(ni);
+	if(!packet)
+		return;
+	
+	if(arp_process(packet))
+		return;
+	
+	if(icmp_process(packet))
+		return;
+	
+	Ether* ether = (Ether*)(packet->buffer + packet->start);
+	
+	if(endian16(ether->type) == ETHER_TYPE_IPv4) {
+		IP* ip = (IP*)ether->payload;
+		
+		if(ip->protocol == IP_PROTOCOL_TCP) {
+			TCP* tcp = (TCP*)ip->body;
+			
+			Session* session = map_get(ports, (void*)(uint64_t)endian16(tcp->destination));
+			if(session) {
+				uint32_t addr = (uint32_t)(uint64_t)ni_config_get(ni_inter, "ip");
+				uint16_t port = (uint16_t)(uint64_t)ni_config_get(ni_inter, "pn.lb.port");
+				
+				tcp->source = endian16(port);
+				ip->source = endian32(addr);
+				tcp->destination = endian16(session->source.port);
+				ip->destination = endian32(session->source.addr);
+				ether->smac = endian48(ni_inter->mac);
+				ether->dmac = endian48(arp_get_mac(ni_inter, endian32(ip->destination)));
+				tcp_pack(packet, endian16(ip->length) - ip->ihl * 4 - TCP_LEN);
+				
+				printf("Outgoing: %lx %lx %d.%d.%d.%d:%d %d %d.%d.%d.%d:%d\n", 
+					endian48(ether->dmac), 
+					endian48(ether->smac),
+					(endian32(ip->source)) >> 24 & 0xff,
+					(endian32(ip->source)) >> 16 & 0xff,
+					(endian32(ip->source)) >> 8 & 0xff,
+					(endian32(ip->source)) >> 0 & 0xff,
+					endian16(tcp->source),
+					session->port,
+					(endian32(ip->destination)) >> 24 & 0xff,
+					(endian32(ip->destination)) >> 16 & 0xff,
+					(endian32(ip->destination)) >> 8 & 0xff,
+					(endian32(ip->destination)) >> 0 & 0xff,
+					endian16(tcp->destination));
+				
+				if(tcp->fin) {
+					bool gc(void* context) {
+						Session* session = context;
+						
+						printf("Timeout fin\n");
+						session_free(session);
+						
+						return false;
+					}
+					
+					printf("Fin timer\n");
+					session->fin = event_timer_add(gc, session, 3000, 3000);
+				}
+				
+				ni_output(ni_inter, packet);
+				
+				packet = NULL;
 			}
 		}
 	}
@@ -244,7 +284,9 @@ void gdestroy() {
 int main(int argc, char** argv) {
 	printf("Thread %d bootting\n", thread_id());
 	if(thread_id() == 0) {
-		ginit(argc, argv);
+		int err = ginit(argc, argv);
+		if(err != 0)
+			return err;
 	}
 	
 	thread_barrior();
@@ -253,17 +295,20 @@ int main(int argc, char** argv) {
 	
 	thread_barrior();
 	
-	uint32_t i = 0;
+	ni_inter = ni_get(0);
+	ni_intra = ni_get(1);
+	event_init();
+	
 	while(1) {
-		uint32_t count = ni_count();
-		if(count > 0) {
-			i = (i + 1) % count;
-			
-			NetworkInterface* ni = ni_get(i);
-			if(ni_has_input(ni)) {
-				process(ni);
-			}
+		if(ni_has_input(ni_inter)) {
+			process_inter();
 		}
+		
+		if(ni_has_input(ni_intra)) {
+			process_intra();
+		}
+		
+		event_loop();
 	}
 	
 	thread_barrior();

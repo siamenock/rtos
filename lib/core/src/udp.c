@@ -5,6 +5,7 @@
 #include <util/map.h>
 
 #define UDP_PORTS	".pn.udp.ports"
+#define UDP_NEXT_PORT	".pn.udp.next_port"
 
 void udp_pack(Packet* packet, uint16_t udp_body_len) {
 	Ether* ether = (Ether*)(packet->buffer + packet->start);
@@ -26,12 +27,17 @@ uint16_t udp_port_alloc(NetworkInterface* ni) {
 		ni_config_put(ni, UDP_PORTS, ports);
 	}
 	
-	uint16_t port = (uint16_t)clock();
-	while(port < 49152 || map_contains(ports, (void*)(uint64_t)port)) {
-		port = (uint16_t)clock();
-	}
+	uint16_t port = (uint16_t)(uint64_t)ni_config_get(ni, UDP_NEXT_PORT);
+	if(port < 49152)
+		port = 49152;
+	
+	while(map_contains(ports, (void*)(uint64_t)port)) {
+		if(++port < 49152)
+			port = 49152;
+	}	
 	
 	map_put(ports, (void*)(uint64_t)port, (void*)(uint64_t)port);
+	ni_config_put(ni, UDP_NEXT_PORT, (void*)(uint64_t)(port + 1));
 	
 	return port;
 }
