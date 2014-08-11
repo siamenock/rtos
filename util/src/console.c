@@ -12,7 +12,7 @@
 #include <fcntl.h>
 #include <rpc/pmap_clnt.h>
 #include <curl/curl.h>
-#include <util/map.h>
+#include "map.h"
 #include "types.h"
 #include "rpc_manager.h"
 #include "rpc_callback.h"
@@ -744,7 +744,7 @@ int main(int _argc, char** _argv) {
 		return 0;
 	}
 	
-	variables = map_create(16, map_string_hash, map_string_equals, malloc, free);
+	variables = map_create(16, map_string_hash, map_string_equals);
 	map_put(variables, strdup("$?"), strdup("(nil)"));
 	
 	char* argv[MAX_ARGC];
