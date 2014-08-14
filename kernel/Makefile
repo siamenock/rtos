@@ -14,7 +14,7 @@ OBJS = obj/entry.o \
 	obj/driver/linux.o obj/driver/dummy.o \
 	obj/driver/vga.o obj/driver/keyboard.o obj/driver/stdin.o obj/driver/stdout.o obj/driver/bfs.o \
 	obj/rpc/rpc_manager.o obj/rpc/rpc_manager_xdr.o obj/rpc/rpc_callback.o obj/rpc/rpc_callback_xdr.o \
-	obj/manager.o
+	obj/vm.o obj/manager.o
 
 LIBS = --start-group -ltlsf -ljsmn -lcore --end-group -lxdr
 

@@ -66,7 +66,11 @@ int init_page_tables(uint8_t core_id) {
 		l4k[i].us = 0;
 		l4k[i].rw = 1;
 		l4k[i].ps = 1;
+		l4k[i].exb = 1;
 	}
+	
+	// Kernel global area(code, rodata, modules, gmalloc)
+	l4k[1].exb = 0;
 	
 	// Kernel local area(malloc, TLB, TS, data, bss, stack)
 	l4k[2 + core_id] = l4k[2];

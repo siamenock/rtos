@@ -19,6 +19,7 @@
 #include "malloc.h"
 #include "gmalloc.h"
 #include "ni.h"
+#include "vm.h"
 #include "manager.h"
 #include "icc.h"
 #include "loader.h"
@@ -295,7 +296,10 @@ void main(void) {
 				ni_mac = status.mac;
 		}
 		
-		printf("Initializing manager...\n");
+		printf("Initializing VM manager...\n");
+		vm_init();
+		
+		printf("Initializing RPC manager...\n");
 		manager_init();
 		
 		printf("Initializing shell...\n");

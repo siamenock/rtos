@@ -2,6 +2,7 @@
 #define __MANAGER_H__
 
 #include <stdint.h>
+#include "ni.h"
 
 NI*	manager_ni;
 

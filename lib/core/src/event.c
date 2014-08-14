@@ -47,7 +47,7 @@ static bool is_trigger_stop;
 static void fire(uint64_t event_id, void* event, TriggerEventFunc last, void* last_context) {
 	List* list = map_get(trigger_events, (void*)event_id);
 	if(!list)
-		return;
+		goto done;
 	
 	ListIterator iter;
 	list_iterator_init(&iter, list);
@@ -63,6 +63,7 @@ static void fire(uint64_t event_id, void* event, TriggerEventFunc last, void* la
 			return;
 	}
 	
+done:
 	if(last)
 		last(event_id, event, last_context);
 }

@@ -220,6 +220,22 @@ static int command_arping() {
 	return 0;
 }
 
+static int command_create() {
+	if(arg_idx < 2) {
+		return 1;
+	}
+	
+	return 0;
+}
+
+static int command_start() {
+	if(arg_idx < 2) {
+		return 1;
+	}
+	
+	return 0;
+}
+
 static Command commands[] = {
 	{ "help", "Show this message.", command_help },
 	{ "version", "Print the kernel version.", command_version },
@@ -231,7 +247,9 @@ static Command commands[] = {
 	{ "reboot", "Reboot the node.", command_reboot },
 	{ "shutdown", "Shutdown the node.", command_shutdown },
 	{ "halt", "Shutdown the node.", command_shutdown },
-	{ "arping", "(address)] [\"-c\" (count)] ARP ping to the host.", command_arping },
+	{ "arping", "(address) [\"-c\" (count)] ARP ping to the host.", command_arping },
+	{ "create", "Create VM", command_create },
+	{ "start", "Start VM", command_start },
 };
 
 static int command_help() {

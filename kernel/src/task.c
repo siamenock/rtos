@@ -187,11 +187,14 @@ void task_resource(uint32_t id, uint8_t type, void* data) {
 	resource->data = data;
 	list_add(tasks[id].resources, resource);
 	
-	ListIterator iter;
-	
 	switch(type) {
 		case RESOURCE_NI:
-			list_iterator_init(&iter, ((NI*)data)->pools);
+			;
+			bool is_first = true;
+			NI* ni = (NI*)data;
+			
+			ListIterator iter;
+			list_iterator_init(&iter, ni->pools);
 			while(list_iterator_has_next(&iter)) {
 				uint64_t vaddr = (uint64_t)list_iterator_next(&iter);
 				
@@ -201,11 +204,29 @@ void task_resource(uint32_t id, uint8_t type, void* data) {
 				PAGE_L4U[idx].rw = 1;
 				PAGE_L4U[idx].exb = 1;
 				
-				printf("Task: virtual memory map: %dMB -> %dMB %c%c%c %s\n", idx * 2, PAGE_L4U[idx].base * 2, 
-					PAGE_L4U[idx].us ? 'r' : '-', 
-					PAGE_L4U[idx].rw ? 'w' : '-', 
-					PAGE_L4U[idx].exb ? '-' : 'x',
-					"NIC");
+				if(is_first) {
+					printf("Task: virtual memory map : %dMB -> %dMB %c%c%c %s[%02x:%02x:%02x:%02x:%02x:%02x]\n", 
+						idx * 2, PAGE_L4U[idx].base * 2, 
+						PAGE_L4U[idx].us ? 'r' : '-', 
+						PAGE_L4U[idx].rw ? 'w' : '-', 
+						PAGE_L4U[idx].exb ? '-' : 'x',
+						"NIC",
+						(ni->mac >> 40) & 0xff,
+						(ni->mac >> 32) & 0xff,
+						(ni->mac >> 24) & 0xff,
+						(ni->mac >> 16) & 0xff,
+						(ni->mac >> 8) & 0xff,
+						(ni->mac >> 0) & 0xff);
+					
+					is_first = false;
+				} else {
+					printf("Task: virtual memory map : %dMB -> %dMB %c%c%c %s\n", 
+						idx * 2, PAGE_L4U[idx].base * 2, 
+						PAGE_L4U[idx].us ? 'r' : '-', 
+						PAGE_L4U[idx].rw ? 'w' : '-', 
+						PAGE_L4U[idx].exb ? '-' : 'x',
+						"NIC");
+				}
 			}
 			task_refresh_mmap();
 			break;
@@ -223,7 +244,7 @@ void task_destroy(uint32_t id) {
 		PAGE_L4U[idx].base = idx;
 		PAGE_L4U[idx].us = 0;
 		PAGE_L4U[idx].rw = 1;
-		PAGE_L4U[idx].exb = 0;
+		PAGE_L4U[idx].exb = 1;
 		
 		printf("Task: virtual memory map: %dMB -> %dMB %c%c%c\n", idx * 2, PAGE_L4U[idx].base * 2, 
 			PAGE_L4U[idx].us ? 'r' : '-', 
