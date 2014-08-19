@@ -1,4 +1,3 @@
-#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
@@ -21,12 +20,13 @@
 #define DEFAULT_HOST	"192.168.100.254"
 #define DEFAULT_PORT	111
 #define MAX_ARGC	256
+#define MAX_LINE_SIZE 2048
 
 static CLIENT *client;
 static CLIENT *ioclient;
 static char* client_host;
 static int client_port;
-static int* server_port;
+static int server_port;
 
 static bool is_continue = true;
 static Map* variables;
@@ -122,7 +122,7 @@ static int cmd_connect(int argc, char** argv) {
 	
 	RPC_Address cbaddr;
 	cbaddr.ip = 0;
-	cbaddr.port = *server_port;
+	cbaddr.port = server_port;
 	
 	bool_t* ret2 = callback_add_1(cbaddr, client);
 	if(ret2 == NULL || !*ret2) {
@@ -718,31 +718,24 @@ callback_1(struct svc_req *rqstp, register SVCXPRT *transp)
 }
 
 int main(int _argc, char** _argv) {
-	server_port = mmap(NULL, sizeof(*server_port), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	*server_port = 0;
+	server_port = 0;
 	
-	pid_t pid = fork();
-	if(pid != 0) {
-		pmap_unset(CALLBACK, CALLBACK_APPLE);
+	pmap_unset(CALLBACK, CALLBACK_APPLE);
 		
-		SVCXPRT* transp = svcudp_create(RPC_ANYSOCK);
-		*server_port = transp->xp_port;
+	SVCXPRT* transp = svcudp_create(RPC_ANYSOCK);
+	server_port = transp->xp_port;
 		
-		printf("Callback service on %d\n", *server_port);
-		if(transp == NULL) {
-			fprintf (stderr, "%s", "cannot create udp service.\n");
-			exit(1);
-		}
-		
-		if(!svc_register(transp, CALLBACK, CALLBACK_APPLE, callback_1, IPPROTO_UDP)) {
-			fprintf (stderr, "%s", "unable to register (CALLBACK, CALLBACK_APPLE, udp).\n");
-			exit(1);
-		}
-		
-		svc_run();
-		
-		return 0;
+	printf("Callback service on %d\n", server_port);
+	if(transp == NULL) {
+		fprintf (stderr, "%s", "cannot create udp service.\n");
+		exit(1);
 	}
+		
+	if(!svc_register(transp, CALLBACK, CALLBACK_APPLE, callback_1, IPPROTO_UDP)) {
+		fprintf (stderr, "%s", "unable to register (CALLBACK, CALLBACK_APPLE, udp).\n");
+		exit(1);
+	}
+		
 	
 	variables = map_create(16, map_string_hash, map_string_equals);
 	map_put(variables, strdup("$?"), strdup("(nil)"));
@@ -782,101 +775,182 @@ int main(int _argc, char** _argv) {
 		return count;
 	}
 	
-	void loop(FILE* file) {
-		char* line = NULL;
-		size_t size = 0;
+	void execute_cmd(char* line, bool is_dump) {
 		printf("> ");
-		while(is_continue && getline(&line, &size, file) > 0) {
-			if(file != stdin)
-				printf("%s", line);
+		
+		//if is_dump == true then file cmd
+		//   is_dump == false then stdin cmd
+		if(is_dump == true)
+			printf("%s", line);
 			
-			if((argc = parse(line)) > 0) {
-				// Parse result variable
-				char* variable = NULL;
-				if(argv[0][0] == '#')
-					goto done;
+		if((argc = parse(line)) > 0) {
+			// Parse result variable
+			char* variable = NULL;
+			if(argv[0][0] == '#')
+				goto done;
 				
-				if(argv[0][0] == '$' && argv[1][0] == '=') {
-					variable = argv[0];
-					free(argv[1]);
+			if(argv[0][0] == '$' && argv[1][0] == '=') {
+				variable = argv[0];
+				free(argv[1]);
+				
+				memmove(argv, argv + 2, sizeof(char*) * (argc - 2));
+				argc -= 2;
+			}
+				
+			// Parse argument variables
+			for(int i = 0; i < argc; i++) {
+				if(argv[i][0] == '$') {
+					char* old = argv[i];
 					
-					memmove(argv, argv + 2, sizeof(char*) * (argc - 2));
-					argc -= 2;
-				}
-				
-				// Parse argument variables
-				for(int i = 0; i < argc; i++) {
-					if(argv[i][0] == '$') {
-						char* old = argv[i];
+					if(!map_contains(variables, argv[i]))
+						argv[i] = strdup("(nil)");
+					else
+						argv[i] = strdup(map_get(variables, argv[i]));
 						
-						if(!map_contains(variables, argv[i]))
-							argv[i] = strdup("(nil)");
-						else
-							argv[i] = strdup(map_get(variables, argv[i]));
-						
-						free(old);
-					}
-				}
-				
-				// Execute
-				Command* cmd = get_command(argc, argv);
-				if(cmd) {
-					int exit_status = cmd->exec(argc, argv);
-					if(exit_status < 0) {
-						if(exit_status == -100)
-							printf("wrong number of arguments\n");
-						else	
-							printf("%d'st argument type wrong\n", -exit_status);
-					}
-					
-					char buf[16];
-					sprintf(buf, "%d", exit_status);
-					
-					free(map_get(variables, "$?"));
-					map_update(variables, "$?", strdup(buf));
-					
-					if(exit_status == 0) {
-						if(variable) {
-							if(map_contains(variables, variable)) {
-								free(map_get(variables, variable));
-								map_update(variables, variable, strdup(result));
-							} else {
-								map_put(variables, strdup(variable), strdup(result));
-							}
-						}
-						
-						if(strlen(result) > 0) {
-							printf("%s\n", result);
-						}
-					}
-				} else {
-					printf("console: %s: command not found\n", argv[0]);
-				}
-				
-				// Free
-				if(variable) {
-					free(variable);
-				}
-				
-				for(int i = 0; i < argc; i++) {
-					free(argv[i]);
+					free(old);
 				}
 			}
-			
-done:
-			printf("> ");
+				
+			// Execute
+			Command* cmd = get_command(argc, argv);
+			if(cmd) {
+				int exit_status = cmd->exec(argc, argv);
+				if(exit_status < 0) {
+					if(exit_status == -100)
+						printf("wrong number of arguments\n");
+					else	
+						printf("%d'st argument type wrong\n", -exit_status);
+				}
+					
+				char buf[16];
+				sprintf(buf, "%d", exit_status);
+				
+				free(map_get(variables, "$?"));
+				map_update(variables, "$?", strdup(buf));
+					
+				if(exit_status == 0) {
+					if(variable) {
+						if(map_contains(variables, variable)) {
+							free(map_get(variables, variable));
+							map_update(variables, variable, strdup(result));
+						} else {
+							map_put(variables, strdup(variable), strdup(result));
+						}
+					}
+						
+					if(strlen(result) > 0) {
+						printf("%s\n", result);
+					}
+				}
+			} else {
+				printf("console: %s: command not found\n", argv[0]);
+			}
+				
+				// Free
+			if(variable) {
+				free(variable);
+			}
+				
+			for(int i = 0; i < argc; i++) {
+				free(argv[i]);
+			}
 		}
+			
+		done:
+		printf("> ");
 	}
+	
+	List* fd_list = list_create();
 	
 	for(int i = 1; i < _argc; i++) {
-		FILE* file = fopen(_argv[i], "r");
-		if(file)
-			loop(file);
+		int fd = open(_argv[i], O_RDONLY);
+		if(fd != -1) {
+			list_add(fd_list, (void*)(int64_t)fd);
+		}
 	}
-	
-	loop(stdin);
-	
-	kill(pid, SIGKILL);
-	
+	list_add(fd_list, STDIN_FILENO); //fd of stdin
+
+	void get_cmd_line(int fd) {
+		static char line[MAX_LINE_SIZE] = {0, };
+		int seek = 0;
+		static int eod = 0; //end of data
+		char* search_point;
+
+		while(1) {
+			if((eod += read(fd, &line[eod], MAX_LINE_SIZE - eod - 1)) != 0) {
+				seek = 0;
+				while(1) {
+					if((search_point = strchr(&line[seek], '\n')) != NULL) { //find
+						execute_cmd(&line[seek], fd != STDIN_FILENO);
+						seek = search_point - line + 1;
+						continue;
+					} else if(seek == 0){ //not found '\n' and seek == 0
+						line[eod + 1] = '\n'; //set line
+						execute_cmd(&line[seek], fd != STDIN_FILENO);
+						line[MAX_LINE_SIZE - 1] = '\0';
+						seek = 0;
+						eod = 0; 
+						if(fd == STDIN_FILENO) {
+							return;
+						} else
+							break;
+					} else { //not found '\n' and seek != 0
+						memmove(line, line + seek, eod - seek);
+						eod = eod - seek;
+						if(fd == STDIN_FILENO) {
+							return;
+						} else
+							break;
+					}
+				}
+			} else { //not have read data == EOF
+				if(eod != 0) {//has last line
+					line[eod + 1] = '\n';
+					execute_cmd(&line[0], fd != STDIN_FILENO);
+					line[MAX_LINE_SIZE - 1] = '\0';
+				}
+				seek = 0;
+				eod = 0;
+				return;
+			}		
+		}
+	}
+
+	int retval;
+	fd_set in_put;
+	fd_set temp_in;
+
+	int svc_sock = transp->xp_sock;
+	int fd = (int)(int64_t)list_remove_first(fd_list);
+	FD_ZERO(&in_put);
+	FD_SET(svc_sock, &in_put);
+	FD_SET(fd, &in_put);
+
+	while(is_continue) {
+		temp_in = in_put;
+
+		retval = select(fd > svc_sock ? (fd + 1) : (svc_sock + 1), &temp_in, 0, 0, NULL);
+
+		if(retval == -1) {
+			printf("selector error \n");
+			return -1;
+		} else if(retval == 0) {
+			//select time over
+			continue;
+		} else {
+			if(FD_ISSET(svc_sock, &temp_in) != 0) {
+				svc_getreqset(&temp_in);
+			}
+			if(FD_ISSET(fd, &temp_in) != 0) {	
+				get_cmd_line(fd);
+				if(fd != STDIN_FILENO) { //Not stdin fd
+					FD_CLR(fd, &in_put);
+					close(fd);
+					fd = (int)(int64_t)list_remove_first(fd_list);
+					FD_SET(fd, &in_put);
+				}
+			}
+		}
+	}
 	return 0;
 }

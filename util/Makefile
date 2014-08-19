@@ -2,7 +2,7 @@
 
 all: rewrite pnkc smap console
 
-CFLAGS := -Wall -Werror -std=c99
+CFLAGS := -Wall -Werror -std=gnu99
 
 rewrite: src/rewrite.c
 	gcc $(CFLAGS) -o $@ $<
