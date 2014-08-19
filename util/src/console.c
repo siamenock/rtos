@@ -776,8 +776,6 @@ int main(int _argc, char** _argv) {
 	}
 	
 	void execute_cmd(char* line, bool is_dump) {
-		printf("> ");
-		
 		//if is_dump == true then file cmd
 		//   is_dump == false then stdin cmd
 		if(is_dump == true)
@@ -927,6 +925,8 @@ int main(int _argc, char** _argv) {
 	FD_SET(svc_sock, &in_put);
 	FD_SET(fd, &in_put);
 
+	printf("> ");
+	fflush(stdout);
 	while(is_continue) {
 		temp_in = in_put;
 
