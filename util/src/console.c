@@ -858,6 +858,7 @@ int main(int _argc, char** _argv) {
 			
 		done:
 		printf("> ");
+		fflush(stdout);
 	}
 	
 	List* fd_list = list_create();
@@ -879,15 +880,15 @@ int main(int _argc, char** _argv) {
 		while(1) {
 			if((eod += read(fd, &line[eod], MAX_LINE_SIZE - eod - 1)) != 0) {
 				seek = 0;
+				line[eod] = '\0';
 				while(1) {
-					if((search_point = strchr(&line[seek], '\n')) != NULL) { //find
+					if((search_point = strchr(&line[seek], '\n')) != NULL) { //find	
 						execute_cmd(&line[seek], fd != STDIN_FILENO);
 						seek = search_point - line + 1;
 						continue;
 					} else if(seek == 0){ //not found '\n' and seek == 0
-						line[eod + 1] = '\n'; //set line
+						line[eod] = '\n'; //set line
 						execute_cmd(&line[seek], fd != STDIN_FILENO);
-						line[MAX_LINE_SIZE - 1] = '\0';
 						seek = 0;
 						eod = 0; 
 						if(fd == STDIN_FILENO) {
@@ -896,6 +897,7 @@ int main(int _argc, char** _argv) {
 							break;
 					} else { //not found '\n' and seek != 0
 						memmove(line, line + seek, eod - seek);
+
 						eod = eod - seek;
 						if(fd == STDIN_FILENO) {
 							return;
@@ -905,9 +907,8 @@ int main(int _argc, char** _argv) {
 				}
 			} else { //not have read data == EOF
 				if(eod != 0) {//has last line
-					line[eod + 1] = '\n';
+					line[eod] = '\n';
 					execute_cmd(&line[0], fd != STDIN_FILENO);
-					line[MAX_LINE_SIZE - 1] = '\0';
 				}
 				seek = 0;
 				eod = 0;
