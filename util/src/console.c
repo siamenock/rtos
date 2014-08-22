@@ -730,13 +730,13 @@ int main(int _argc, char** _argv) {
 		fprintf (stderr, "%s", "cannot create udp service.\n");
 		exit(1);
 	}
-		
-	if(!svc_register(transp, CALLBACK, CALLBACK_APPLE, callback_1, IPPROTO_UDP)) {
-		fprintf (stderr, "%s", "unable to register (CALLBACK, CALLBACK_APPLE, udp).\n");
-		exit(1);
-	}
-		
 	
+	FILE* temp = stderr;
+	stderr = fopen("/dev/null","w"); //not print stderr message
+	svc_register(transp, CALLBACK, CALLBACK_APPLE, callback_1, IPPROTO_UDP);
+	fclose(stderr);
+	stderr = temp;
+
 	variables = map_create(16, map_string_hash, map_string_equals);
 	map_put(variables, strdup("$?"), strdup("(nil)"));
 	
