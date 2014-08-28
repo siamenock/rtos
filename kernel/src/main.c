@@ -197,12 +197,12 @@ static void icc_stop(ICC_Message* msg) {
 }
 
 void main(void) {
-	mp_init0();
 	cpu_init();
+	mp_init0();
 	
-	// Bootstrap process
 	uint8_t core_id = mp_core_id();
 	if(core_id == 0) {
+		// Bootstrap processor
 		stdio_init();
 		
 		printf("Initializing shared area...\n");
@@ -309,7 +309,7 @@ void main(void) {
 		
 		dummy_init();	// There is no meaning
 	} else {
-	// Application Process
+		// Application Processor
 		mp_wakeup();
 		malloc_init();
 		mp_analyze();

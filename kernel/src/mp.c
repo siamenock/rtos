@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <lock.h>
-#include "port.h"
 #include "asm.h"
 #include "apic.h"
 #include "cpu.h"
@@ -9,15 +8,19 @@
 #include "mp.h"
 
 // Ref: http://www.cs.cmu.edu/~410/doc/intel-mp.pdf
-// Ref: http://download.intel.com/design/archives/processors/pro/docs/24201606.pdf
+// Ref: http://www.intel.com/design/pentium/datashts/24201606.pdf
 // Ref: http://www.intel.com/content/dam/doc/specification-update/64-architecture-x2apic-specification.pdf
+// Ref: http://www.bioscentral.com/misc/cmosmap.htm
+// Ref: http://www.singlix.com/trdos/UNIX_V1/xv6/lapic.c
+
+bool mp_apics[MP_MAX_CORE_COUNT];
 
 static MP_FloatingPointerStructure* fps;
 static MP_ConfigurationTableHeader* cth;
 
 static uint8_t core_id = 0xff;
-static bool is_ht = false;
 static uint8_t core_count = 0;
+static uint8_t thread_count = 1;
 static uint8_t last_apic_id = 0;
 static uint8_t bus_isa_id = (uint8_t)-1;
 static uint8_t bus_pci_id = (uint8_t)-1;
@@ -25,15 +28,27 @@ static uint8_t bus_pci_id = (uint8_t)-1;
 extern uint64_t _ioapic_address;
 extern uint64_t _apic_address;
 
+static void cpuid(uint32_t* a, uint32_t* b, uint32_t* c, uint32_t* d) {
+	asm volatile("cpuid"
+		: "=a"(*a), "=b"(*b), "=c"(*c), "=d"(*d)
+		: "a"(*a), "b"(*b), "c"(*c), "d"(*d));
+}
+
 void mp_init0() {
+	// Get CPU ID
 	uint32_t a, b, c, d;
-	asm("cpuid"
-		: "=a"(a), "=b"(b), "=c"(c), "=d"(d)
-		: "a"(1));
-	
+	a = 0x01;
+	cpuid(&a, &b, &c, &d);
 	core_id = (b >> 24) & 0xff;
 	
-	is_ht = !!(d & (1 << 28));
+	// Get thread count (Intel CPU)
+	// TODO: AMD CPU
+	if(strstr(cpu_brand, "Intel") != NULL) {
+		a = 0x0b;
+		c = 0;
+		cpuid(&a, &b, &c, &d);
+		thread_count = b & 0xffff;
+	}
 }
 
 void mp_analyze() {
@@ -86,8 +101,12 @@ void mp_analyze() {
 	
 	void process_ProcessorEntry(MP_ProcessorEntry* entry) {
 		if(entry->cpu_flags & 0x01) {	// enabled
-			core_count++;
+			core_count += thread_count;
 			last_apic_id = entry->local_apic_id;
+			
+			for(int i = 0; i < thread_count; i++) {
+				mp_apics[entry->local_apic_id + i] = true;
+			}
 		}
 	}
 	
@@ -157,22 +176,12 @@ void mp_analyze() {
 		}
 	}
 	
-	uint8_t threads_per_core = last_apic_id / (core_count - 1);
-	uint8_t thread_count = threads_per_core * core_count;
-	
 	if(core_id == 0) {
 		printf("\tIO APIC Address: %x\n", _ioapic_address);
 		printf("\tLocal APIC Address: %x\n", _apic_address);
-		printf("\tPhysical core count: %d\n", core_count);
-		printf("\tHyper threading supported: %s\n", is_ht ? "yes" : "no");
-		if(is_ht) {
-			printf("\tThreads per core: %d\n", threads_per_core);
-			printf("\tTotal thread count: %d\n", thread_count);
-		}
+		printf("\tCore count: %d\n", core_count);
+		printf("\tThread count: %d\n", thread_count);
 	}
-	
-	if(is_ht)
-		core_count = thread_count;
 }
 
 void mp_init() {
@@ -183,11 +192,10 @@ void mp_init() {
 				APIC_DM_PHYSICAL | 
 				APIC_DMODE_INIT);
 	
-	
-	cpu_uwait(10);
+	cpu_uwait(200);
 	
 	if(apic_read32(APIC_REG_ICR) & APIC_DS_PENDING) {
-		printf("\tCannot send core init IPI.\n");
+		printf("\tCannot send core init IPI(1/2).\n");
 		return;
 	}
 	
@@ -197,46 +205,29 @@ void mp_init() {
 				APIC_DM_PHYSICAL | 
 				APIC_DMODE_INIT);
 	
-	cpu_nwait(100);
+	cpu_uwait(100);
 	
 	if(apic_read32(APIC_REG_ICR) & APIC_DS_PENDING) {
-		printf("\tCannot send core init IPI.\n");
+		printf("\tCannot send core init IPI(2/2).\n");
 		return;
 	}
 	
-	printf("\tSend core startup IPI to APs...\n");
-	/*
-	for(int i = 0; i < 2; i++) {
-		apic_write64(APIC_REG_ICR, APIC_DSH_OTHERS | 
-					APIC_TM_EDGE | 
-					APIC_LV_DEASSERT | 
-					//APIC_LV_ASSERT | 
-					APIC_DM_PHYSICAL | 
-					APIC_DMODE_STARTUP |
-					0x10);	// Startup address: 0x10 = 0x10000 / 4KB
-		
-		cpu_nwait(200);
-		
-		if(apic_read32(APIC_REG_ICR) & APIC_DS_PENDING) {
-			printf("\tCannot send core startup IPI(%d/2).\n", i);
-			return;
-		}
-	}
-	*/
-	
+	printf("\tSend core startup IPI to APs: ");
 	mp_wait_init();
-	printf("\tBooting APs: ");
-	for(int j = 1; j < core_count; j++) {
+	
+	for(int j = 1; j < MP_MAX_CORE_COUNT; j++) {
+		if(!mp_apics[j])
+			continue;
+		
 		for(int i = 0; i < 2; i++) {
-			apic_write64(APIC_REG_ICR, ((uint64_t)j << 56) |
-						APIC_DSH_NONE | 
+			apic_write64(APIC_REG_ICR, ((uint64_t)j << 56) /*APIC_DSH_OTHERS*/ |
 						APIC_TM_EDGE | 
-						APIC_LV_DEASSERT | 
+						APIC_LV_ASSERT | 
 						APIC_DM_PHYSICAL | 
 						APIC_DMODE_STARTUP |
 						0x10);	// Startup address: 0x10 = 0x10000 / 4KB
 			
-			cpu_nwait(200);
+			cpu_uwait(200);
 			
 			if(apic_read32(APIC_REG_ICR) & APIC_DS_PENDING) {
 				printf("\tCannot send core startup IPI(%d/2).\n", i);
@@ -244,8 +235,12 @@ void mp_init() {
 			}
 		}
 		
-		mp_wait(j);
-		printf("\%d ", j);
+		if(mp_wait(j, 3000000)) {
+			printf("%d ", j);
+		} else {
+			printf("%d!(The core is not working) ", j);
+			mp_apics[j] = false;
+		}
 	}
 	printf("Done\n");
 }
@@ -254,11 +249,21 @@ void mp_wait_init() {
 	shared->mp_wait_map = 0;
 }
 
-void mp_wait(uint8_t core_id) {
+bool mp_wait(uint8_t core_id, uint32_t us) {
+	uint64_t time = cpu_tsc();
+	time += cpu_us * us;
+	
 	uint32_t map = 1 << core_id;
 	
-	while((shared->mp_wait_map & map) == 0)
-		asm volatile("nop");
+	while(cpu_tsc() < time) {
+		if(shared->mp_wait_map & map) {
+			return true;
+		}
+		
+		asm("nop");
+	}
+	
+	return false;
 }
 
 void mp_wakeup() {
@@ -271,8 +276,10 @@ void mp_sync() {
 	uint32_t map = 1 << core_id;
 	
 	uint32_t full = 0;
-	for(int i = 0; i < core_count; i++)
-		full |= 1 << i;
+	for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
+		if(mp_apics[i])
+			full |= 1 << i;
+	}
 	
 	lock_lock(&shared->mp_sync_lock);
 	if(shared->mp_sync_map == full) {	// The first one

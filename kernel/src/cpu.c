@@ -96,7 +96,7 @@ void cpu_init() {
 	
 	cpu_ms = cpu_frequency / 1000;
 	cpu_us = cpu_ms / 1000;
-	cpu_ns = cpu_ms / 1000;
+	cpu_ns = cpu_us / 1000;
 }
 
 void cpu_info() {

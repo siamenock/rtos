@@ -103,11 +103,13 @@ typedef struct {
 	uint32_t	predefined_range_list;
 } __attribute__((packed)) MP_CompatabilityBusAddressSpaceModifierEntry;
 
+extern bool mp_apics[];
+
 void mp_init0();
 void mp_analyze();
 void mp_init();
 void mp_wait_init();
-void mp_wait(uint8_t core_id);
+bool mp_wait(uint8_t core_id, uint32_t us);
 void mp_wakeup();
 void mp_sync();
 uint8_t mp_core_count();

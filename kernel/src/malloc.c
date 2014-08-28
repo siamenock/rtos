@@ -43,8 +43,8 @@ void malloc_init() {
 	init_memory_pool((uint32_t)(end - start), __malloc_pool, 0);
 	
 	#if DEBUG
-	statistics = map_create(512, map_uint64_hash, map_uint64_equals, malloc, free, NULL);
-	tracing = map_create(8192, map_uint64_hash, map_uint64_equals, malloc, free, NULL);
+	statistics = map_create(512, map_uint64_hash, map_uint64_equals, NULL);
+	tracing = map_create(8192, map_uint64_hash, map_uint64_equals, NULL);
 	is_debug = true;
 	#endif /* DEBUG */
 }
@@ -67,7 +67,7 @@ void malloc_statistics() {
 	while(map_iterator_has_next(&iter)) {
 		MapEntry* entry = map_iterator_next(&iter);
 		Stat* s = entry->data;
-		if(s->count > 1)
+		if(s->count >= 2 || s->size > 2048)
 			printf("%p %16ld %16ld\n", entry->key, s->count, s->size);
 	}
 	
@@ -148,7 +148,8 @@ inline void* malloc(size_t size) {
 	
 	if(!ptr) {
 		// TODO: print to stderr
-		printf("Not enough local memory!!!\n");
+		printf("Not enough local memory for!!!\n");
+		printf("Requested size: %ld from %p\n", ((void**)read_rbp())[1], size);
 		
 		#if DEBUG
 		malloc_statistics();
