@@ -20,7 +20,7 @@ typedef struct _Map {
 
 } Map;
 
-Map* map_create(size_t initial_capacity, uint64_t(*hash)(void*), bool(*equals)(void*,void*));
+Map* map_create(size_t initial_capacity, uint64_t(*hash)(void*), bool(*equals)(void*,void*), void* pool);
 void map_destroy(Map* map);
 bool map_is_empty(Map* map);
 bool map_put(Map* map, void* key, void* data);
