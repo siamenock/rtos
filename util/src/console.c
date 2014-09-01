@@ -11,15 +11,15 @@
 #include <fcntl.h>
 #include <rpc/pmap_clnt.h>
 #include <curl/curl.h>
-#include "map.h"
+#include "list.h"
 #include "types.h"
 #include "rpc_manager.h"
 #include "rpc_callback.h"
+#include "cmd.h"
 
 #define VERSION		"0.1.0"
 #define DEFAULT_HOST	"192.168.100.254"
 #define DEFAULT_PORT	111
-#define MAX_ARGC	256
 #define MAX_LINE_SIZE 2048
 
 static CLIENT *client;
@@ -29,17 +29,9 @@ static int client_port;
 static int server_port;
 
 static bool is_continue = true;
-static Map* variables;
-static char result[4096];
-
-typedef struct {
-	char*		name;
-	char*		desc;
-	char*		args;
-	int		(*exec)(int argc, char** argv);
-} Command;
 
 static int cmd_exit(int argc, char** argv) {
+	cmd_result[0] = '\0';
 	is_continue = false;
 	return 0;
 }
@@ -47,13 +39,13 @@ static int cmd_exit(int argc, char** argv) {
 static int cmd_echo(int argc, char** argv) {
 	int pos = 0;
 	for(int i = 1; i < argc; i++) {
-		pos += sprintf(result + pos, "%s", argv[i]);
-		
+		pos += sprintf(cmd_result + pos, "%s", argv[i]);
+
 		if(i + 1 < argc) {
-			result[pos++] = ' ';
+			cmd_result[pos++] = ' ';
 		}
 	}
-	
+
 	return 0;
 }
 
@@ -64,7 +56,7 @@ static int cmd_sleep(int argc, char** argv) {
 	}
 	
 	sleep(time);
-	
+        cmd_result[0] = '\0';
 	return 0;
 }
 
@@ -138,7 +130,8 @@ static int cmd_connect(int argc, char** argv) {
 	memcpy(client_host, host, len);
 	
 	client_port = port;
-	
+
+        cmd_result[0] = '\0';
 	return 0;
 }
 
@@ -306,7 +299,7 @@ static int cmd_vm_create(int argc, char** argv) {
 		return 2;
 	}
 	
-	sprintf(result, "%ld", *vmid);
+	sprintf(cmd_result, "%ld", *vmid);
 	
 	return 0;
 }
@@ -333,7 +326,7 @@ static int cmd_vm_delete(int argc, char** argv) {
 		return 2;
 	}
 	
-	sprintf(result, "%s", *ret ? "true" : "false");
+	sprintf(cmd_result, "%s", *ret ? "true" : "false");
 	
 	return 0;
 }
@@ -350,7 +343,7 @@ static int cmd_vm_list(int argc, char** argv) {
 		return 2;
 	}
 	
-	char* p = result;
+	char* p = cmd_result;
 	for(int i = 0; i < ret->RPC_VMList_len; i++) {
 		p += sprintf(p, "%lu", ret->RPC_VMList_val[i]);
 		if(i + 1 < ret->RPC_VMList_len) {
@@ -401,7 +394,7 @@ static int cmd_send(int argc, char** argv) {
 	
 	CURLcode res;
 	if((res = curl_easy_perform(curl)) == CURLE_OK) {
-		sprintf(result, "true");
+		sprintf(cmd_result, "true");
 		
 		double speed, total;
 		curl_easy_getinfo(curl, CURLINFO_SPEED_UPLOAD, &speed);
@@ -410,7 +403,7 @@ static int cmd_send(int argc, char** argv) {
 		printf("%.3f bytes/sec total %.3f seconds\n", speed, total);
 	} else {
 		printf("Send failed: %s\n", curl_easy_strerror(res));
-		sprintf(result, "false");
+		sprintf(cmd_result, "false");
 	}
 	
 	curl_easy_cleanup(curl);
@@ -446,9 +439,9 @@ static int cmd_md5(int argc, char** argv) {
 	}
 	
 	if(ret->RPC_Digest_len == 0) {
-		sprintf(result, "(nil)");
+		sprintf(cmd_result, "(nil)");
 	} else {
-		char* p = (char*)result;
+		char* p = (char*)cmd_result;
 		for(int i = 0; i < ret->RPC_Digest_len; i++, p += 2) {
 			sprintf(p, "%02x", ((uint8_t*)ret->RPC_Digest_val)[i]);
 		}
@@ -490,7 +483,7 @@ static int cmd_status_set(int argc, char** argv) {
 		return 2;
 	}
 	
-	sprintf(result, "%s", *ret ? "true" : "false");
+	sprintf(cmd_result, "%s", *ret ? "true" : "false");
 	
 	return 0;
 }
@@ -533,134 +526,120 @@ static int cmd_status_get(int argc, char** argv) {
 			ret = "none";
 	}
 	
-	sprintf(result, "%s", ret);
+	sprintf(cmd_result, "%s", ret);
 	
 	return 0;
 }
 
-static int cmd_help(int argc, char** argv);
-
-static Command commands[] = {
+Command commands[] = {
 	{
 		.name = "exit",
 		.desc = "Exit the console",
-		.exec = cmd_exit
+		.func = cmd_exit
 	},
 	{
 		.name = "quit",
 		.desc = "Exit the console",
-		.exec = cmd_exit
+		.func = cmd_exit
 	},
 	{
 		.name = "help",
 		.desc = "Show this message",
-		.exec = cmd_help
+		.func = cmd_help
 	},
 	{
 		.name = "echo",
 		.desc = "Print variable",
 		.args = "[variable: string]*",
-		.exec = cmd_echo
+		.func = cmd_echo
 	},
 	{
 		.name = "sleep",
 		.desc = "Sleep n seconds",
 		.args = "[time: uint32]",
-		.exec = cmd_sleep
+		.func = cmd_sleep
 	},
 	{
 		.name = "connect",
 		.desc = "Connect to the host",
 		.args = "[ (host: string) [port: uint16] ]",
-		.exec = cmd_connect
+		.func = cmd_connect
 	},
 	{
 		.name = "ping",
 		.desc = "RPC ping to host",
 		.args = "[count: uint64]",
-		.exec = cmd_ping
+		.func = cmd_ping
 	},
 	{
 		.name = "create",
 		.desc = "Create VM",
 		.args = "vmid: uint64, core: (number: int) memory: (size: uint32) storage: (size: uint32) [nic: mac: (addr: uint64) ibuf: (size: uint32) obuf: (size: uint32) iband: (size: uint64) oband: (size: uint64) pool: (size: uint32)]* [args: [string]+ ]",
-		.exec = cmd_vm_create
+		.func = cmd_vm_create
 	},
 	{
 		.name = "delete",
 		.desc = "Delete VM",
 		.args = "result: bool, vmid: uint64",
-		.exec = cmd_vm_delete
+		.func = cmd_vm_delete
 	},
 	{
 		.name = "list",
 		.desc = "List VM",
 		.args = "result: uint64[]",
-		.exec = cmd_vm_list
+		.func = cmd_vm_list
 	},
 	{
 		.name = "send",
 		.desc = "Send file",
 		.args = "result: bool, vmid: uint64 path: string",
-		.exec = cmd_send
+		.func = cmd_send
 	},
 	{
 		.name = "md5",
 		.desc = "MD5 storage",
 		.args = "result: hex16 string, vmid: uint64 size: uint64",
-		.exec = cmd_md5
+		.func = cmd_md5
 	},
 	{
 		.name = "start",
 		.desc = "Start VM",
 		.args = "result: bool, vmid: uint64",
-		.exec = cmd_status_set
+		.func = cmd_status_set
 	},
 	{
 		.name = "pause",
 		.desc = "Pause VM",
 		.args = "result: bool, vmid: uint64",
-		.exec = cmd_status_set
+		.func = cmd_status_set
 	},
 	{
 		.name = "resume",
 		.desc = "Resume VM",
 		.args = "result: bool, vmid: uint64",
-		.exec = cmd_status_set
+		.func = cmd_status_set
 	},
 	{
 		.name = "stop",
 		.desc = "Stop VM",
 		.args = "result: bool, vmid: uint64",
-		.exec = cmd_status_set
+		.func = cmd_status_set
 	},
 	{
 		.name = "status",
 		.desc = "Get VM's status",
 		.args = "result: string(\"start\", \"pause\", or \"stop\") vmid: uint64",
-		.exec = cmd_status_get
+		.func = cmd_status_get
+	},
+	{
+		.name = NULL,
+		.desc = NULL,
+		.args = NULL,
+		.func = NULL
 	},
 };
 
-static int cmd_help(int argc, char** argv) {
-	int count = sizeof(commands) / sizeof(Command);
-	
-	for(int i = 0; i < count; i++) {
-		printf("%s %s %s\n", commands[i].name, commands[i].desc, commands[i].args);
-	}
-	
-	return 0;
-}
-
-static Command* get_command(int argc, char** argv) {
-	int count = sizeof(commands) / sizeof(Command);
-	
-	for(int i = 0; i < count; i++) {
-		if(strcmp(argv[0], commands[i].name) == 0)
-			return &commands[i];
-	}
-	return NULL;
-}
+size_t cmd_count = sizeof(commands) / sizeof(Command);
 
 static void *
 _callback_null_1 (void  *argp, struct svc_req *rqstp)
@@ -730,131 +709,29 @@ int main(int _argc, char** _argv) {
 		fprintf (stderr, "%s", "cannot create udp service.\n");
 		exit(1);
 	}
-	
+
 	FILE* temp = stderr;
 	stderr = fopen("/dev/null","w"); //not print stderr message
 	svc_register(transp, CALLBACK, CALLBACK_APPLE, callback_1, IPPROTO_UDP);
 	fclose(stderr);
 	stderr = temp;
 
-	variables = map_create(16, map_string_hash, map_string_equals);
-	map_put(variables, strdup("$?"), strdup("(nil)"));
-	
-	char* argv[MAX_ARGC];
-	int argc;
-	
-	int parse(char* line) {
-		int count = 0;
-		int i = 0;
-		char* arg;
-		
-		char* next() {
-			while(line[i] == ' ')
-				i++;
-			
-			char* p = line + i;
-			if(*p == '\n')
-				return NULL;
-			
-			while(line[i] != ' ' && line[i] != '\n')
-				i++;
-			
-			return p;
-		}
-		
-		while((arg = next())) {
-			bool is_end = line[i] == '\n';
-			line[i] = '\0';
-			argv[count++] = strdup(arg);
-			
-			if(is_end || count >= MAX_ARGC)
-				return count;
-			
-			i++;
-		}
-		return count;
-	}
-	
+	cmd_init();
+
 	void execute_cmd(char* line, bool is_dump) {
 		//if is_dump == true then file cmd
 		//   is_dump == false then stdin cmd
 		if(is_dump == true)
-			printf("%s", line);
-			
-		if((argc = parse(line)) > 0) {
-			// Parse result variable
-			char* variable = NULL;
-			if(argv[0][0] == '#')
-				goto done;
-				
-			if(argv[0][0] == '$' && argv[1][0] == '=') {
-				variable = argv[0];
-				free(argv[1]);
-				
-				memmove(argv, argv + 2, sizeof(char*) * (argc - 2));
-				argc -= 2;
-			}
-				
-			// Parse argument variables
-			for(int i = 0; i < argc; i++) {
-				if(argv[i][0] == '$') {
-					char* old = argv[i];
-					
-					if(!map_contains(variables, argv[i]))
-						argv[i] = strdup("(nil)");
-					else
-						argv[i] = strdup(map_get(variables, argv[i]));
-						
-					free(old);
-				}
-			}
-				
-			// Execute
-			Command* cmd = get_command(argc, argv);
-			if(cmd) {
-				int exit_status = cmd->exec(argc, argv);
-				if(exit_status < 0) {
-					if(exit_status == -100)
-						printf("wrong number of arguments\n");
-					else	
-						printf("%d'st argument type wrong\n", -exit_status);
-				}
-					
-				char buf[16];
-				sprintf(buf, "%d", exit_status);
-				
-				free(map_get(variables, "$?"));
-				map_update(variables, "$?", strdup(buf));
-					
-				if(exit_status == 0) {
-					if(variable) {
-						if(map_contains(variables, variable)) {
-							free(map_get(variables, variable));
-							map_update(variables, variable, strdup(result));
-						} else {
-							map_put(variables, strdup(variable), strdup(result));
-						}
-					}
-						
-					if(strlen(result) > 0) {
-						printf("%s\n", result);
-					}
-				}
-			} else {
-				printf("console: %s: command not found\n", argv[0]);
-			}
-				
-				// Free
-			if(variable) {
-				free(variable);
-			}
-				
-			for(int i = 0; i < argc; i++) {
-				free(argv[i]);
-			}
+			printf("%s\n", line);
+		
+		int exit_status = cmd_exec(line);
+		if(exit_status < 0) {
+			if(exit_status == -100)
+				printf("wrong number of arguments\n");
+			else
+				printf("%d'std argument type wrong\n", -exit_status);
 		}
 			
-		done:
 		printf("> ");
 		fflush(stdout);
 	}
@@ -881,11 +758,12 @@ int main(int _argc, char** _argv) {
 				line[eod] = '\0';
 				while(1) {
 					if((search_point = strchr(&line[seek], '\n')) != NULL) { //find	
+						*search_point = '\0';
 						execute_cmd(&line[seek], fd != STDIN_FILENO);
 						seek = search_point - line + 1;
 						continue;
 					} else if(seek == 0){ //not found '\n' and seek == 0
-						line[eod] = '\n'; //set line
+						line[eod] = '\0'; //set line
 						execute_cmd(&line[seek], fd != STDIN_FILENO);
 						seek = 0;
 						eod = 0; 
@@ -905,7 +783,7 @@ int main(int _argc, char** _argv) {
 				}
 			} else { //not have read data == EOF
 				if(eod != 0) {//has last line
-					line[eod] = '\n';
+					line[eod] = '\0';
 					execute_cmd(&line[0], fd != STDIN_FILENO);
 				}
 				seek = 0;

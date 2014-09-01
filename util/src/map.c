@@ -7,7 +7,7 @@
 
 #define THRESHOLD(cap)	(((cap) >> 2) + ((cap) >> 4))	// 75%
 
-Map* map_create(size_t initial_capacity, uint64_t(*hash)(void*), bool(*equals)(void*, void*)) {
+Map* map_create(size_t initial_capacity, uint64_t(*hash)(void*), bool(*equals)(void*, void*), void* pool) {
 	
 	if(!equals)
 		equals = map_uint64_equals;

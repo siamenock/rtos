@@ -24,7 +24,7 @@ src/rpc_callback_clnt.c: src/rpc_callback.x
 	cd src; rpcgen -N -C -m rpc_callback.x > rpc_callback_svc.c
 	cd src; rpcgen -N -C -c rpc_callback.x > rpc_callback_xdr.c
 
-console: src/rpc_manager.c src/rpc_manager_xdr.c src/rpc_callback_clnt.c src/rpc_callback_svc.c src/rpc_callback_xdr.c src/rpc_callback_server.c src/console.c src/types.c src/map.c src/list.c
+console: src/rpc_manager.c src/rpc_manager_xdr.c src/rpc_callback_clnt.c src/rpc_callback_svc.c src/rpc_callback_xdr.c src/rpc_callback_server.c src/console.c src/types.c src/map.c src/list.c src/cmd.c
 	gcc $(CFLAGS) -Wno-unused-variable -o $@ $^ -lcurl
 	cp console ../sdk/bin/
 
