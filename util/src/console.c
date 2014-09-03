@@ -11,11 +11,11 @@
 #include <fcntl.h>
 #include <rpc/pmap_clnt.h>
 #include <curl/curl.h>
-#include "list.h"
+#include <util/list.h>
+#include <util/cmd.h>
 #include "types.h"
 #include "rpc_manager.h"
 #include "rpc_callback.h"
-#include "cmd.h"
 
 #define VERSION		"0.1.0"
 #define DEFAULT_HOST	"192.168.100.254"
@@ -38,6 +38,7 @@ static int cmd_exit(int argc, char** argv) {
 
 static int cmd_echo(int argc, char** argv) {
 	int pos = 0;
+	cmd_result[0] = '\0';
 	for(int i = 1; i < argc; i++) {
 		pos += sprintf(cmd_result + pos, "%s", argv[i]);
 
@@ -158,7 +159,8 @@ static int cmd_ping(int argc, char** argv) {
 	}
 	
 	printf("total: %ld ms\n", clock() - total);
-	
+
+	cmd_result[0] = '\0';
 	return 0;
 }
 
@@ -344,6 +346,7 @@ static int cmd_vm_list(int argc, char** argv) {
 	}
 	
 	char* p = cmd_result;
+	cmd_result[0] = '\0';
 	for(int i = 0; i < ret->RPC_VMList_len; i++) {
 		p += sprintf(p, "%lu", ret->RPC_VMList_val[i]);
 		if(i + 1 < ret->RPC_VMList_len) {
@@ -736,7 +739,7 @@ int main(int _argc, char** _argv) {
 		fflush(stdout);
 	}
 	
-	List* fd_list = list_create();
+	List* fd_list = list_create(NULL);
 	
 	for(int i = 1; i < _argc; i++) {
 		int fd = open(_argv[i], O_RDONLY);

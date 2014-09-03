@@ -17,10 +17,12 @@ core/libcore.a:
 
 libcore.a: libjsmn.a libtlsf.a core/libcore.a
 	cp core/libcore.a .
+	cp core/libcore_linux.a .
 
 core: libjsmn.a libtlsf.a
 	make -C core
 	cp core/libcore.a .
+	cp core/libcore_linux.a .
 
 newlib/Makefile: 
 	cd newlib; CFLAGS=-fno-stack-protector ./configure --target=x86_64-pc-packetngin --disable-multilib
@@ -79,7 +81,7 @@ libxdr.a: xdr/linux/libxdr.a
 	cp xdr/linux/libxdr.a .
 
 clean: 
-	rm -f libtlsf.a libjsmn.a libcore.a libc.a libm.a libz.a libssl.a libcrypto.a liblwip.a libpacketngin.a
+	rm -f libtlsf.a libjsmn.a libcore.a libcore_linux.a libc.a libm.a libz.a libssl.a libcrypto.a liblwip.a libpacketngin.a
 
 cleanall: clean
 	-make -C TLSF/src clean

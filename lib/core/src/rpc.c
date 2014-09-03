@@ -277,6 +277,7 @@ static bool_t sendreply(SVCXPRT *xprt, struct rpc_msg* msg) {
 	return TRUE;
 }
 
+#ifndef LINUX
 bool_t svc_sendreply(SVCXPRT *xprt, xdrproc_t outproc, char *out) {
 	struct rpc_msg msg;
 	msg.rm_direction = REPLY;
@@ -288,6 +289,7 @@ bool_t svc_sendreply(SVCXPRT *xprt, xdrproc_t outproc, char *out) {
 	
 	return sendreply(xprt, &msg);
 }
+#endif
 
 void svcerr_noproc(SVCXPRT *xprt) {
 	struct rpc_msg msg;
@@ -329,6 +331,7 @@ typedef struct {
 	unsigned long protocol;
 } Service;
 
+#ifndef LINUX
 static uint64_t service_hash(void* key) {
 	Service* service = key;
 	return service->prognum + service->versnum;
@@ -341,6 +344,7 @@ static bool service_equals(void* key1, void* key2) {
 	return service1->prognum == service2->prognum &&
 		service1->versnum == service2->versnum;
 }
+#endif
 
 bool_t pmap_unset(unsigned long prognum, unsigned long versnum) {
 	if(!services)
@@ -359,6 +363,7 @@ bool_t pmap_unset(unsigned long prognum, unsigned long versnum) {
 	return FALSE;
 }
 
+#ifndef LINUX
 static bool_t getargs(SVCXPRT *xprt, xdrproc_t inproc, char *in) {
 	XDR* xdr = (void*)xprt->xp_p1;
 	return inproc(xdr, in);
@@ -369,7 +374,6 @@ static bool_t freeargs(SVCXPRT *xprt, xdrproc_t inproc, char *in) {
 	xdr->x_op = XDR_FREE;
 	return inproc(xdr, in);
 }
-
 // TODO: Create SVCXPRT dynamically
 SVCXPRT *svcudp_create(int sock) {
 	if(!services) {
@@ -409,6 +413,7 @@ bool_t svc_register(SVCXPRT *xprt, unsigned long prognum, unsigned long versnum,
 	
 	return TRUE;
 }
+#endif
 
 bool rpc_process(Packet* packet) {
 	uint32_t addr = (uint32_t)(uint64_t)ni_config_get(packet->ni, "ip");
@@ -553,6 +558,7 @@ CLIENT* rpc_client(uint32_t ip, uint16_t port, unsigned long prognum, unsigned l
 	return clnt;
 }
 
+#ifndef LINUX
 bool rpc_call_async(NetworkInterface* ni, CLIENT* client, unsigned long procnum, xdrproc_t inproc, char* in) {
 	if(!ni_output_available(ni)) {
 		errno = 1;
@@ -621,6 +627,7 @@ bool rpc_call_async(NetworkInterface* ni, CLIENT* client, unsigned long procnum,
 	
 	return true;
 }
+#endif
 
 bool rpc_call(NetworkInterface* ni, CLIENT* client, unsigned long procnum, xdrproc_t inproc, char* in, xdrproc_t outproc, char* out, struct timeval tout, void(*succeed)(void* context, void* result), void(*failed)(void* context, int stat1, int stat2), void(*timeout)(void* context), void* context) {
 	// TODO: timeout using event
