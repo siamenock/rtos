@@ -21,7 +21,7 @@ system.img:
 	sudo losetup /dev/loop0 root.img
 	sudo util/mkfs.bfs /dev/loop0
 	sudo mount /dev/loop0 mnt
-	sudo cp kernel.bin kernel.smap drivers/*.ko mnt
+	sudo cp kernel.bin kernel.smap drivers/*.ko firmware/* mnt
 	sync
 	sudo umount mnt
 	sudo losetup -d /dev/loop0

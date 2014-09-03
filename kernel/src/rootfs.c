@@ -1,5 +1,6 @@
 #include <stddef.h>
 #include <string.h>
+#include "gmalloc.h"
 #include "driver/bfs.h"
 #include "rootfs.h"
 
@@ -26,6 +27,21 @@ static bool rootfs_bfs() {
 	}
 	
 	return true;
+}
+
+void* rootfs_addr() {
+	if(!rootfs_bfs())
+		return NULL;
+	
+	return bfs;
+}
+
+uint32_t rootfs_size() {
+	if(!rootfs_bfs())
+		return 0;
+	
+	BFS_SuperBlock* super = bfs;
+	return super->end + 1;
 }
 
 void* rootfs_file(const char* name, uint32_t* size) {

@@ -5,12 +5,12 @@
 #include "rootfs.h"
 #include "pnkc.h"
 #include "malloc.h"
+#include "asm.h"
 
 #define DEBUG	0
 
 #if DEBUG
 #include <util/map.h>
-#include "asm.h"
 
 typedef struct {
 	uint64_t	count;
@@ -148,8 +148,8 @@ inline void* malloc(size_t size) {
 	
 	if(!ptr) {
 		// TODO: print to stderr
-		printf("Not enough local memory for!!!\n");
-		printf("Requested size: %ld from %p\n", ((void**)read_rbp())[1], size);
+		printf("Not enough local memory!!!\n");
+		printf("Requested size: %ld from %p\n", size, ((void**)read_rbp())[1]);
 		
 		#if DEBUG
 		malloc_statistics();

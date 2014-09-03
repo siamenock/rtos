@@ -296,27 +296,31 @@ static bool vm_loop(void* context) {
 		
 		Core* core = &cores[core_index];
 		
-		if(core->status != VM_STATUS_STOP) {
-			int thread_id = -1;
+		if(core->status != VM_STATUS_PAUSE && core->status != VM_STATUS_START)
+			continue;
+		
+		int thread_id = -1;
+		
+		if(core->stdout != NULL && *core->stdout_head != *core->stdout_tail) {
+			thread_id = get_thread_id(core->vm, core_index);
 			
-			if(core->stdout != NULL && *core->stdout_head != *core->stdout_tail) {
-				thread_id = get_thread_id(core->vm, core_index);
-				
-				stdio_callback(core->vm->id, thread_id, 1, core->stdout, core->stdout_head, core->stdout_tail, core->stdout_size);
-			}
-			
-			if(core->stderr != NULL && *core->stderr_head != *core->stderr_tail) {
-				if(thread_id == -1)
-					thread_id = get_thread_id(core->vm, core_index);
-				
-				stdio_callback(core->vm->id, thread_id, 2, core->stderr, core->stderr_head, core->stderr_tail, core->stderr_size);
-			}
-			
-			break;
+			stdio_callback(core->vm->id, thread_id, 1, core->stdout, core->stdout_head, core->stdout_tail, core->stdout_size);
 		}
+		
+		if(core->stderr != NULL && *core->stderr_head != *core->stderr_tail) {
+			if(thread_id == -1)
+				thread_id = get_thread_id(core->vm, core_index);
+			
+			stdio_callback(core->vm->id, thread_id, 2, core->stderr, core->stderr_head, core->stderr_tail, core->stderr_size);
+		}
+		
+		break;
 	}
 	
 	for(int i = 1; i < core_count; i++) {
+		if(cores[i].status == VM_STATUS_INVALID)
+			continue;
+		
 		char* buffer = (char*)MP_CORE(__stdout, i);
 		volatile size_t* head = (size_t*)MP_CORE(&__stdout_head, i);
 		volatile size_t* tail = (size_t*)MP_CORE(&__stdout_tail, i);
@@ -352,7 +356,7 @@ void vm_init() {
 	
 	for(int i = 1; i < MP_MAX_CORE_COUNT; i++) {
 		if(!mp_apics[i])
-			cores[i].status = VM_STATUS_START;	// Disable the core
+			cores[i].status = VM_STATUS_INVALID;	// Disable the core
 	}
 	
 	event_idle_add(vm_loop, NULL);

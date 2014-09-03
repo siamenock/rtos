@@ -16,6 +16,7 @@
 #define VM_STATUS_PAUSE		1
 #define VM_STATUS_START		2
 #define VM_STATUS_RESUME	3
+#define VM_STATUS_INVALID	-1
 
 typedef struct {
 	uint32_t	count;

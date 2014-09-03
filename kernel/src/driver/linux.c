@@ -1,5 +1,6 @@
 #include "linux.h"
 #include "../apic.h"
+#include "../rootfs.h"
 
 uint64_t jiffies = 0;
 
@@ -119,16 +120,16 @@ void free_irq(unsigned int irq, void* dev) {
 	//apic_register(irq, NULL);
 }
 
-#include "firmware.h"
-
 int request_firmware(const struct firmware **fw, const char *name, PCI_Device *device) {
-	if(strcmp(name, "rtl_nic/rtl8168e-3.fw") == 0) {
+	uint32_t size;
+	void* mmap = rootfs_file(name, &size);
+	if(mmap) {
 		struct firmware* f = gmalloc(sizeof(struct firmware));
-		f->data = rtl8168e_3;
-		f->size = sizeof(rtl8168e_3);
+		f->data = mmap;
+		f->size = size;
 		*(struct firmware**)fw = f;
 	} else {
-		printf("Unknown firmware: %s\n", name);
+		printf("Unknown firmware: '%s'\n", name);
 		return -1;
 	}
 	

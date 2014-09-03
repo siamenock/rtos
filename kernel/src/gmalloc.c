@@ -42,7 +42,7 @@ void gmalloc_extend() {
 	} Block;
 	
 	// Make reserved blocks
-	Block reserved[3];
+	Block reserved[4];
 	reserved[0].start = 0x100000;	// Description table
 	reserved[0].end = 0x200000;
 	
@@ -52,6 +52,9 @@ void gmalloc_extend() {
 	
 	reserved[2].start = 0x400000;	// Kernel local
 	reserved[2].end = 0x400000 + 0x200000 * mp_core_count();
+	
+	reserved[3].start = (uint64_t)rootfs_addr();	// RootFS
+	reserved[3].end = reserved[3].start + rootfs_size();
 	
 	// Get free blocks
 	List* blocks = list_create(NULL);
@@ -104,7 +107,7 @@ void gmalloc_extend() {
 	for(int i = 0; i < list_size(blocks); i++) {
 		Block* b = list_get(blocks, i);
 		
-		for(int j = 0; j < 3; j++) {
+		for(int j = 0; j < 4; j++) {
 			Block* r = &reserved[j];
 			if(r->start >= b->end || r->end <= b->start) {
 				continue;
