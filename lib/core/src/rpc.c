@@ -1,3 +1,4 @@
+#ifndef LINUX
 #include <string.h>
 #include <strings.h>
 #include <malloc.h>
@@ -369,7 +370,6 @@ static bool_t freeargs(SVCXPRT *xprt, xdrproc_t inproc, char *in) {
 	xdr->x_op = XDR_FREE;
 	return inproc(xdr, in);
 }
-
 // TODO: Create SVCXPRT dynamically
 SVCXPRT *svcudp_create(int sock) {
 	if(!services) {
@@ -703,3 +703,4 @@ bool rpc_call(NetworkInterface* ni, CLIENT* client, unsigned long procnum, xdrpr
 	
 	return true;
 }
+#endif

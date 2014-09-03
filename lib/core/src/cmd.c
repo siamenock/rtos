@@ -2,9 +2,8 @@
 #include <stdbool.h>
 #include <string.h>
 #include <malloc.h>
-
-#include "cmd.h"
-#include "map.h"
+#include <util/cmd.h>
+#include <util/map.h>
 
 static Map* variables = NULL;
 char cmd_result[CMD_RESULT_SIZE];
@@ -33,7 +32,6 @@ int cmd_help(int argc, char** argv) {
 		else
 			printf("%s\n", commands[i].desc);
         }
-	cmd_result[0] = '\0';
 
         return 0;
 }
@@ -109,6 +107,9 @@ static void cmd_parse_arg(int argc, char** argv) {
 }
 
 static Command* cmd_get(int argc, char** argv) {
+	if(argc == 0)
+		return NULL;
+
         for(int i = 0; commands[i].name != NULL; i++) {
                 if(strcmp(argv[0], commands[i].name) == 0) {
                         return &commands[i];
@@ -134,17 +135,13 @@ static void cmd_update_var(int exit_status, char* variable) {
 				if(strlen(cmd_result) > 0)
 					map_update(variables, variable, strdup(cmd_result));
 				else
-					map_update(variables, variable, strdup("(nil)"));
-			
+					map_update(variables, variable, strdup("(nil)"));		
 			} else {
 				if(strlen(cmd_result) > 0)
 					map_put(variables, strdup(variable), strdup(cmd_result));
 				else
 					map_put(variables, strdup(variable), strdup("(nil)"));
 			}
-		}
-		if(strlen(cmd_result) > 0) {
-			printf("%s\n", cmd_result);
 		}
 	}
 }
@@ -154,18 +151,23 @@ int cmd_exec(char* line) {
 	char* argv[CMD_MAX_ARGC];
 	
 	argc = cmd_parse_line(line, argv);
-	if(argv[0][0] == '#')
+	if(argc == 0 || argv[0][0] == '#')
 		return 0;
 
 	char* variable = cmd_parse_var(&argc, argv);
 	cmd_parse_arg(argc, argv);
 	Command* cmd = cmd_get(argc, argv);
 	int exit_status = 0;
-	if(cmd != NULL) {
+	if(cmd) {
+		cmd_result[0] = '\0';
 		exit_status = cmd->func(argc, argv);
 		cmd_update_var(exit_status, variable);
+		if(strlen(cmd_result) > 0) {
+                        printf("%s\n", cmd_result);
+		}
 	}
-	free(variable);
+	if(variable)
+		free(variable);
 
 	return exit_status;
 }
