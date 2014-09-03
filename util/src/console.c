@@ -31,14 +31,14 @@ static int server_port;
 static bool is_continue = true;
 
 static int cmd_exit(int argc, char** argv) {
-	cmd_result[0] = '\0';
 	is_continue = false;
+
 	return 0;
 }
 
 static int cmd_echo(int argc, char** argv) {
 	int pos = 0;
-	cmd_result[0] = '\0';
+
 	for(int i = 1; i < argc; i++) {
 		pos += sprintf(cmd_result + pos, "%s", argv[i]);
 
@@ -55,9 +55,8 @@ static int cmd_sleep(int argc, char** argv) {
 	if(argc >= 2 && is_uint32(argv[1])) {
 		time = parse_uint32(argv[1]);
 	}
-	
 	sleep(time);
-        cmd_result[0] = '\0';
+
 	return 0;
 }
 
@@ -132,7 +131,6 @@ static int cmd_connect(int argc, char** argv) {
 	
 	client_port = port;
 
-        cmd_result[0] = '\0';
 	return 0;
 }
 
@@ -160,7 +158,6 @@ static int cmd_ping(int argc, char** argv) {
 	
 	printf("total: %ld ms\n", clock() - total);
 
-	cmd_result[0] = '\0';
 	return 0;
 }
 
@@ -346,7 +343,6 @@ static int cmd_vm_list(int argc, char** argv) {
 	}
 	
 	char* p = cmd_result;
-	cmd_result[0] = '\0';
 	for(int i = 0; i < ret->RPC_VMList_len; i++) {
 		p += sprintf(p, "%lu", ret->RPC_VMList_val[i]);
 		if(i + 1 < ret->RPC_VMList_len) {

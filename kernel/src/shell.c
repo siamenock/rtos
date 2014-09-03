@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include <util/cmd.h>
 #include <util/map.h>
 #include <util/event.h>
 #include <net/packet.h>
@@ -24,35 +25,23 @@
 
 #include "shell.h"
 
-#define CMD_SIZE	512
-#define ARG_SIZE	64
+#define CMD_SIZE 	512
 
-static char cmd[CMD_SIZE];
-static int args[ARG_SIZE];
-static int arg_idx;
-static int cmd_idx;
-
-typedef struct {
-	char* label;
-	char* description;
-	int (*func)();
-} Command;
-
-static int command_help();
-
-static int command_clear() {
+static int cmd_clear() {
 	printf("\f");
+
 	return 0;
 }
 
-static int command_echo() {
-	for(int i = 1; i < arg_idx; i++) {
-		printf("%s", cmd + args[i]);
-		if(i + 1 < arg_idx)
-			printf(" ");
+static int cmd_echo(int argc, char** argv) {
+	int pos = 0;
+	for(int i = 1; i < argc; i++) {
+		pos += sprintf(cmd_result + pos, "%s", argv[i]) - 1;
+		if(i + 1 < argc) {
+			cmd_result[pos++] = ' ';
+		}
 	}
-	printf("\n");
-	
+
 	return 0;
 }
 
@@ -83,7 +72,7 @@ static char* weeks[] = {
 	"Sat",
 };
 
-static int command_date() {
+static int cmd_date(int argc, char** argv) {
 	uint32_t date = rtc_date();
 	uint32_t time = rtc_time();
 	
@@ -93,14 +82,14 @@ static int command_date() {
 	return 0;
 }
 
-static int command_ip() {
+static int cmd_ip(int argc, char** argv) {
 	uint32_t old = manager_get_ip();
-	if(arg_idx == 1) {
+	if(argc == 1) {
 		printf("%d.%d.%d.%d\n", (old >> 24) & 0xff, (old >> 16) & 0xff, (old >> 8) & 0xff, (old >> 0) & 0xff);
 		return 0;
 	}
 	
-	char* str = cmd + args[1];
+	char* str = argv[1];
 	uint32_t address = (strtol(str, &str, 0) & 0xff) << 24; str++;
 	address |= (strtol(str, &str, 0) & 0xff) << 16; str++;
 	address |= (strtol(str, &str, 0) & 0xff) << 8; str++;
@@ -115,13 +104,13 @@ static int command_ip() {
 	return 0;
 }
 
-static int command_version() {
+static int cmd_version(int argc, char** argv) {
 	printf("%d.%d.%d\n", VERSION_MAJOR, VERSION_MINOR, VERSION_MICRO);
 	
 	return 0;
 }
 
-static int command_lsni() {
+static int cmd_lsni() {
 	extern Map* nis;
 	extern uint64_t ni_mac;
 	
@@ -143,7 +132,7 @@ static int command_lsni() {
 	return 0;
 }
 
-static int command_reboot() {
+static int cmd_reboot() {
 	asm volatile("cli");
 	
 	uint8_t code;
@@ -161,7 +150,7 @@ static int command_reboot() {
 	return 0;
 }
 
-static int command_shutdown() {
+static int cmd_shutdown() {
 	printf("Shutting down\n");
 	acpi_shutdown();
 	
@@ -190,12 +179,12 @@ static bool arping_timeout(void* context) {
 	}
 }
 
-static int command_arping() {
-	if(arg_idx < 2) {
+static int cmd_arping(int argc, char** argv) {
+	if(argc < 2) {
 		return 1;
 	}
 	
-	char* str = cmd + args[1];
+	char* str = argv[1];
 	arping_addr = (strtol(str, &str, 0) & 0xff) << 24; str++;
 	arping_addr |= (strtol(str, &str, 0) & 0xff) << 16; str++;
 	arping_addr |= (strtol(str, &str, 0) & 0xff) << 8; str++;
@@ -204,9 +193,9 @@ static int command_arping() {
 	arping_time = cpu_tsc();
 	
 	arping_count = 1;
-	if(arg_idx >= 4) {
-		if(strcmp(cmd + args[2], "-c") == 0) {
-			arping_count = strtol(cmd + args[3], NULL, 0);
+	if(argc >= 4) {
+		if(strcmp(argv[2], "-c") == 0) {
+			arping_count = strtol(argv[3], NULL, 0);
 		}
 	}
 	
@@ -216,114 +205,101 @@ static int command_arping() {
 		arping_count = 0;
 		printf("Cannot send ARP packet\n");
 	}
-	
+
 	return 0;
 }
 
-static int command_create() {
-	if(arg_idx < 2) {
+static int cmd_create(int argc, char** argv) {
+	if(argc < 2) {
 		return 1;
 	}
-	
+
 	return 0;
 }
 
-static int command_start() {
-	if(arg_idx < 2) {
+static int cmd_start(int argc, char** argv) {
+	if(argc < 2) {
 		return 1;
 	}
-	
+
 	return 0;
 }
 
-static Command commands[] = {
-	{ "help", "Show this message.", command_help },
-	{ "version", "Print the kernel version.", command_version },
-	{ "clear", "Clear screen.", command_clear },
-	{ "echo", "Echo arguments.", command_echo },
-	{ "date", "Print current date and time.", command_date },
-	{ "ip", "[(address)] Get or set IP address of manager.", command_ip },
-	{ "lsni", "List network interfaces.", command_lsni },
-	{ "reboot", "Reboot the node.", command_reboot },
-	{ "shutdown", "Shutdown the node.", command_shutdown },
-	{ "halt", "Shutdown the node.", command_shutdown },
-	{ "arping", "(address) [\"-c\" (count)] ARP ping to the host.", command_arping },
-	{ "create", "Create VM", command_create },
-	{ "start", "Start VM", command_start },
+Command commands[] = {
+	{
+		.name = "help",
+		.desc = "Show this message.", 
+		.func = cmd_help 
+	},
+	{ 
+		.name = "version", 
+		.desc = "Print the kernel version.", 
+		.func = cmd_version 
+	},
+	{ 
+		.name = "clear", 
+		.desc = "Clear screen.", 
+		.func = cmd_clear 
+	},
+	{ 
+		.name = "echo", 
+		.desc = "Echo arguments.", 
+		.func = cmd_echo 
+	},
+	{ 
+		.name = "date", 
+		.desc = "Print current date and time.", 
+		.func = cmd_date 
+	},
+	{ 
+		.name = "ip", 
+		.desc = "[(address)] Get or set IP address of manager.", 
+		.func = cmd_ip 
+	},
+	{ 
+		.name = "lsni", 
+		.desc = "List network interfaces.", 
+		.func = cmd_lsni 
+	},
+	{ 
+		.name = "reboot", 
+		.desc = "Reboot the node.", 
+		.func = cmd_reboot 
+	},
+	{ 
+		.name = "shutdown", 
+		.desc = "Shutdown the node.", 
+		.func = cmd_shutdown 
+	},
+	{ 
+		.name = "halt", 
+		.desc = "Shutdown the node.", 
+		.func = cmd_shutdown 
+	},
+	{ 
+		.name = "arping", 
+		.desc = "(address) [\"-c\" (count)] ARP ping to the host.", 
+		.func = cmd_arping 
+	},
+	{ 
+		.name = "create", 
+		.desc = "Create VM", 
+		.func = cmd_create 
+	},
+	{ 
+		.name = "start", 
+		.desc = "Start VM", 
+		.func = cmd_start 
+	},
+	{
+		.name = NULL
+	},
 };
 
-static int command_help() {
-	int command_len = 0;
-	for(int i = 0; i < sizeof(commands) / sizeof(Command); i++) {
-		int len = strlen(commands[i].label);
-		command_len = len > command_len ? len : command_len;
-	}
-	
-	for(int i = 0; i < sizeof(commands) / sizeof(Command); i++) {
-		printf("%s", commands[i].label);
-		int len = strlen(commands[i].label);
-		len = command_len - len + 2;
-		for(int i = 0; i < len; i++)
-			putchar(' ');
-		printf("%s\n", commands[i].description);
-	}
-	return 0;
-}
-
-static void exec() {
-	cmd[cmd_idx] = 0;
-	
-	for(int i = 0; i < ARG_SIZE; i++) {
-		args[i] = -1;
-	}
-	
-	bool is_start = true;
-	char quotation = 0;
-	arg_idx = 0;
-	for(int i = 0; i < cmd_idx; i++) {
-		if(quotation) {
-			if(cmd[i] == quotation) {
-				quotation = 0;
-				cmd[i] = 0;
-				cmd[i + 1] = 0;
-				i++;
-				is_start = true;
-			}
-		} else {
-			switch(cmd[i]) {
-				case '"': case '\'':
-					quotation = cmd[i];
-					cmd[i] = 0;
-					i++;
-					args[arg_idx++] = i;
-					break;
-				case ' ':
-					cmd[i] = 0;
-					is_start = true;
-					break;
-				default:
-					if(is_start) {
-						args[arg_idx++] = i;
-						is_start = false;
-					}
-			}
-		}
-	}
-	
-	for(int i = 0; i < sizeof(commands) / sizeof(Command); i++) {
-		if(strcmp(cmd, commands[i].label) == 0) {
-			/*int return_code =*/ commands[i].func();
-			return;
-		}
-	}
-	
-	if(arg_idx > 0)
-		printf("shell: %s: command not found\n", cmd);
-	
-	return;
-}
 
 void shell_callback(int code) {
+	static char cmd[CMD_SIZE];
+	static int cmd_idx = 0;
 	extern Device* device_stdout;
 	stdio_scancode(code);
 	
@@ -331,10 +307,11 @@ void shell_callback(int code) {
 	while(ch >= 0) {
 		switch(ch) {
 			case '\n':
+				cmd[cmd_idx] = '\0';
 				putchar(ch);
-				exec();
-				cmd_idx = 0;
+				cmd_exec(cmd);
 				printf("# ");
+				cmd_idx = 0;
 				break;
 			case '\f':
 				putchar(ch);
@@ -392,6 +369,7 @@ void shell_init() {
 	
 	extern Device* device_stdin;
 	((CharIn*)device_stdin->driver)->set_callback(device_stdin->id, shell_callback);
+	cmd_init();
 }
 
 bool shell_process(Packet* packet) {
