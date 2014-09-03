@@ -32,7 +32,6 @@ int cmd_help(int argc, char** argv) {
 		else
 			printf("%s\n", commands[i].desc);
         }
-	cmd_result[0] = '\0';
 
         return 0;
 }
@@ -144,9 +143,6 @@ static void cmd_update_var(int exit_status, char* variable) {
 					map_put(variables, strdup(variable), strdup("(nil)"));
 			}
 		}
-		if(strlen(cmd_result) > 0) {
-			printf("%s\n", cmd_result);
-		}
 	}
 }
 
@@ -163,8 +159,12 @@ int cmd_exec(char* line) {
 	Command* cmd = cmd_get(argc, argv);
 	int exit_status = 0;
 	if(cmd) {
+		cmd_result[0] = '\0';
 		exit_status = cmd->func(argc, argv);
 		cmd_update_var(exit_status, variable);
+		if(strlen(cmd_result) > 0) {
+                        printf("%s\n", cmd_result);
+		}
 	}
 	if(variable)
 		free(variable);

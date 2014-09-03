@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stddef.h>
+#include <malloc.h>
 
 void* __memcpy_chk(void* dest, const void* src, size_t size, size_t bos) {
 	uint64_t* d = dest;
@@ -341,4 +342,12 @@ int atoi(const char *nptr) {
 
 long atol(const char *nptr) {
 	return (long)strtol(nptr, NULL, 10);
+}
+
+char* strdup(char* source) {
+	int str_len =  strlen(source) + 1;
+	char* dest = malloc(str_len);
+	memcpy(dest, source, str_len);
+	
+	return dest;
 }
