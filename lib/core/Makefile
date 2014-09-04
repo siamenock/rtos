@@ -1,15 +1,24 @@
 .PHONY: all kernel clean
 
-DIR = obj obj/ds
+DIR = obj obj/ds obj_linux obj_linux/ds
 
-OBJS = obj/ether.o obj/crc.o obj/checksum.o obj/ni.o obj/status.o obj/md5.o obj/md5_asm.o \
-	obj/fifo.o obj/vector.o obj/list.o obj/map.o obj/ring.o obj/errno.o obj/thread.o \
-	obj/asm.o obj/gmalloc.o obj/lock.o obj/shared.o obj/json.o obj/arp.o obj/icmp.o \
-	obj/packet.o obj/ip.o obj/udp.o obj/tcp.o obj/rpc.o obj/tftp.o obj/event.o
+OBJ_DIR = obj/
+
+LINUX_DIR = obj_linux/
+
+OBJS = ether.o crc.o checksum.o ni.o status.o  md5.o md5_asm.o \
+	fifo.o vector.o list.o map.o ring.o errno.o thread.o \
+	asm.o gmalloc.o lock.o shared.o json.o arp.o icmp.o \
+	packet.o ip.o udp.o tcp.o rpc.o tftp.o event.o cmd.o \
+	malloc_linux.o
 
 CFLAGS = -I include -I ../TLSF/src -I ../jsmn -O0 -Wall -Werror -m64 -nostdlib -ffreestanding -std=gnu99 -mcmodel=kernel
 
-all: libcore.a
+all: packetngin linux
+
+packetngin: libcore.a
+
+linux: libcore_linux.a
 
 obj/%.o: src/%.c
 	mkdir -p $(DIR)
@@ -23,9 +32,26 @@ obj/%.o: src/%.asm
 	mkdir -p $(DIR)
 	nasm -f elf64 -o $@ $<
 
-libcore.a: $(OBJS)
+libcore.a: $(addprefix $(OBJ_DIR), $(OBJS))
+	ar rcs $@ $^
+
+obj_linux/%.o: src/%.c
+	mkdir -p $(DIR)
+	gcc $(CFLAGS) -DLINUX -c -o $@ $<
+
+obj_linux/%.o: src/%.s
+	mkdir -p $(DIR)
+	gcc $(CFLAGS) -DLINUX -c -o $@ $<
+
+obj_linux/%.o: src/%.asm
+	mkdir -p $(DIR)
+	nasm -f elf64 -o $@ $<
+
+libcore_linux.a: $(addprefix $(LINUX_DIR), $(OBJS))
 	ar rcs $@ $^
 
 clean: 
 	rm -rf obj
 	rm -f libcore.a
+	rm -rf obj_linux
+	rm -f libcore_linux.a
