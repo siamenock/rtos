@@ -1,6 +1,6 @@
 .PHONY: all clean cleanall core newlib
 
-all: libtlsf.a libjsmn.a libcore.a libc.a libm.a libz.a libssl.a liblwip.a libxdr.a libpacketngin.a
+all: libtlsf.a libjsmn.a libcore.a libcore_linux.a libc.a libm.a libz.a libssl.a liblwip.a libxdr.a libpacketngin.a
 
 libtlsf.a: 
 	make -C TLSF/src
@@ -15,8 +15,13 @@ libjsmn.a: jsmn/libjsmn.a
 core/libcore.a:
 	make -C core
 
+core/libcore_linux.a:
+	make -C core
+
 libcore.a: libjsmn.a libtlsf.a core/libcore.a
 	cp core/libcore.a .
+
+libcore_linux.a: core/libcore_linux.a
 	cp core/libcore_linux.a .
 
 core: libjsmn.a libtlsf.a
