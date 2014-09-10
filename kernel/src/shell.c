@@ -3,7 +3,9 @@
 #include <stdbool.h>
 #include <string.h>
 #include <stdlib.h>
+#include <limits.h>
 
+#include <util/types.h>
 #include <util/cmd.h>
 #include <util/map.h>
 #include <util/event.h>
@@ -22,10 +24,12 @@
 #include "acpi.h"
 #include "driver/charout.h"
 #include "driver/charin.h"
+#include "vm.h"
 
 #include "shell.h"
 
 #define CMD_SIZE 	512
+#define MAX_NIC_COUNT	32
 
 static int cmd_clear() {
 	printf("\f");
@@ -213,15 +217,166 @@ static int cmd_create(int argc, char** argv) {
 	if(argc < 2) {
 		return 1;
 	}
-
+	VMSpec* vm = malloc(sizeof(VMSpec));
+	vm->core_size = 1;
+	vm->memory_size = 0x1000000;	// 16MB
+	vm->storage_size = 0x1000000;	// 16MB
+	vm->nic_size = 0;
+	vm->nics = malloc(sizeof(NICSpec) * MAX_NIC_COUNT);
+	vm->argc = 0;
+	vm->argv = malloc(sizeof(char*) * CMD_MAX_ARGC);
+	
+	for(int i = 1; i < argc; i++) {
+		if(strcmp(argv[i], "core:") == 0) {
+			i++;
+			if(!is_uint8(argv[i])) {
+				printf("core must be uint8\n");
+				return -1;
+			}
+			
+			vm->core_size = parse_uint8(argv[i]);
+		} else if(strcmp(argv[i], "memory:") == 0) {
+			i++;
+			if(!is_uint32(argv[i])) {
+				printf("memory must be uint32\n");
+				return -1;
+			}
+			
+			vm->memory_size = parse_uint32(argv[i]);
+		} else if(strcmp(argv[i], "storage:") == 0) {
+			i++;
+			if(!is_uint32(argv[i])) {
+				printf("storage must be uint32\n");
+				return -1;
+			}
+			
+			vm->storage_size = parse_uint32(argv[i]);
+		} else if(strcmp(argv[i], "nic:") == 0) {
+			i++;
+			
+			NICSpec* nic = &(vm->nics[vm->nic_size++]);
+			for( ; i < argc; i++) {
+				if(strcmp(argv[i], "mac:") == 0) {
+					i++;
+					if(!is_uint64(argv[i])) {
+						printf("mac must be uint64\n");
+						return -1;
+					}
+					nic->mac = parse_uint64(argv[i]);
+				} else if(strcmp(argv[i], "ibuf:") == 0) {
+					i++;
+					if(!is_uint32(argv[i])) {
+						printf("ibuf must be uint32\n");
+						return -1;
+					}
+					nic->input_buffer_size = parse_uint32(argv[i]);
+				} else if(strcmp(argv[i], "obuf:") == 0) {
+					i++;
+					if(!is_uint32(argv[i])) {
+						printf("obuf must be uint32\n");
+						return -1;
+					}
+					nic->output_buffer_size = parse_uint32(argv[i]);
+				} else if(strcmp(argv[i], "iband:") == 0) {
+					i++;
+					if(!is_uint64(argv[i])) {
+						printf("iband must be uint64\n");
+						return -1;
+					}
+					nic->input_bandwidth = parse_uint64(argv[i]);
+				} else if(strcmp(argv[i], "oband:") == 0) {
+					i++;
+					if(!is_uint64(argv[i])) {
+						printf("oband must be uint64\n");
+						return -1;
+					}
+					nic->output_bandwidth = parse_uint64(argv[i]);
+				} else if(strcmp(argv[i], "pool:") == 0) {
+					i++;
+					if(!is_uint32(argv[i])) {
+						printf("pool must be uint32\n");
+						return -1;
+					}
+					nic->pool_size = parse_uint32(argv[i]);
+				} else {
+					i--;
+					break;
+				}
+			}
+		} else if(strcmp(argv[i], "args:") == 0) {
+			i++;
+			for( ; i < argc; i++) {
+				vm->argv[vm->argc++] = argv[i];
+			}
+		}
+	}
+	
+	uint64_t vmid = vm_create(vm);
+	if(vmid == 0) {
+		return 2;
+	}
+	
+	sprintf(cmd_result, "%ld", vmid);
+	
 	return 0;
 }
 
-static int cmd_start(int argc, char** argv) {
+static int cmd_status_set(int argc, char** argv) {
+	void status_setted(bool result, void* context) {
+		cmd_async_result(result ? "true" : "false", 0);
+	}
+
 	if(argc < 2) {
 		return 1;
 	}
+	if(!is_uint64(argv[1])) {
+		return -1;
+	}
+	
+	uint64_t vmid = parse_uint64(argv[1]);
+	int status = 0;
+	if(strcmp(argv[0], "start") == 0) {
+		status = VM_STATUS_START;
+	} else if(strcmp(argv[0], "pause") == 0) {
+		status = VM_STATUS_PAUSE;
+	} else if(strcmp(argv[0], "resume") == 0) {
+		status = VM_STATUS_RESUME;
+	} else if(strcmp(argv[0], "stop") == 0) {
+		status = VM_STATUS_STOP;
+	}
+	
+	vm_status_set(vmid, status, status_setted, NULL);
+	
+	return CMD_ASYNC_FUNC;
+}
 
+static int cmd_status_get(int argc, char** argv) {
+	if(argc < 2) {
+		return -100;
+	}
+	
+	if(!is_uint64(argv[1])) {
+		return -1;
+	}
+
+	uint64_t vmid = parse_uint64(argv[1]);
+	char* ret;
+	switch(vm_status_get(vmid)) {
+		case VM_STATUS_START:
+			ret = "start";
+			break;
+		case VM_STATUS_PAUSE:
+			ret = "pause";
+			break;
+		case VM_STATUS_STOP:
+			ret = "stop";
+			break;
+		default:
+			ret = "none";
+			break;
+	}
+
+	sprintf(cmd_result, "%s", ret);
 	return 0;
 }
 
@@ -243,7 +398,8 @@ Command commands[] = {
 	},
 	{ 
 		.name = "echo", 
-		.desc = "Echo arguments.", 
+		.desc = "Echo arguments.",
+		.args = "[variable: string]*",
 		.func = cmd_echo 
 	},
 	{ 
@@ -253,7 +409,8 @@ Command commands[] = {
 	},
 	{ 
 		.name = "ip", 
-		.desc = "[(address)] Get or set IP address of manager.", 
+		.desc = "Get or set IP address of manager.",
+		.args = "[(address)]",
 		.func = cmd_ip 
 	},
 	{ 
@@ -278,18 +435,45 @@ Command commands[] = {
 	},
 	{ 
 		.name = "arping", 
-		.desc = "(address) [\"-c\" (count)] ARP ping to the host.", 
+		.desc = "ARP ping to the host.",
+		.args = "(address) [\"-c\" (count)]",
 		.func = cmd_arping 
 	},
 	{ 
 		.name = "create", 
-		.desc = "Create VM", 
+		.desc = "Create VM",
+		.args = "vmid: uint64, core: (number: int) memory: (size: uint32) storage: (size: uint32) [nic: mac: (addr: uint64) ibuf: (size: uint32) obuf: (size: uint32) iband: (size: uint64) oband: (size: uint64) pool: (size: uint32)]* [args: [string]+ ]",
 		.func = cmd_create 
 	},
 	{ 
 		.name = "start", 
-		.desc = "Start VM", 
-		.func = cmd_start 
+		.desc = "Start VM",
+		.args = "result: bool, vmid: uint64",
+		.func = cmd_status_set 
+	},
+	{
+		.name = "pause",
+		.desc = "Pause VM",
+		.args = "result: bool, vmid: uint64",
+		.func = cmd_status_set
+	},
+	{
+		.name = "resume",
+		.desc = "Resume VM",
+		.args = "result: bool, vmid: uint64",
+		.func = cmd_status_set
+	},
+	{
+		.name = "stop",
+		.desc = "Stop VM",
+		.args = "result: bool, vmid: uint64",
+		.func = cmd_status_set
+	},
+	{
+		.name = "status",
+		.desc = "Get VM's status",
+		.args = "result: string(\"start\", \"pause\", or \"stop\") vmid: uint64",
+		.func = cmd_status_get
 	},
 	{
 		.name = NULL
@@ -356,7 +540,6 @@ void shell_callback(int code) {
 					cmd[cmd_idx++] = ch;
 					putchar(ch);
 				}
-				
 		}
 		
 		ch = stdio_getchar();

@@ -13,7 +13,7 @@
 #include <curl/curl.h>
 #include <util/list.h>
 #include <util/cmd.h>
-#include "types.h"
+#include <util/types.h>
 #include "rpc_manager.h"
 #include "rpc_callback.h"
 
@@ -267,27 +267,7 @@ static int cmd_vm_create(int argc, char** argv) {
 			}
 			
 			for( ; i < argc; i++) {
-				char* str = argv[i];
-				
-				if(str[0] == '"' || str[0] == '\'') {
-					char dil = str[0];
-					str++;
-					
-					do {
-						int len = strlen(str);
-						if(str[len - 1] != dil) {
-							cpy(str, len, ' ');
-						} else {
-							cpy(str, len - 1, '\0');
-							break;
-						}
-						
-						str = argv[++i];
-					} while(i < argc);
-				} else {
-					int len = strlen(str);
-					cpy(str, len, '\0');
-				}
+				cpy(argv[i], strlen(argv[i]), '\0');
 			}
 		}
 	}
@@ -631,10 +611,7 @@ Command commands[] = {
 		.func = cmd_status_get
 	},
 	{
-		.name = NULL,
-		.desc = NULL,
-		.args = NULL,
-		.func = NULL
+		.name = NULL
 	},
 };
 
