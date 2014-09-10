@@ -2,17 +2,13 @@
 #include <stdbool.h>
 #include <string.h>
 #include <malloc.h>
+#include <limits.h>
 #include <util/cmd.h>
 #include <util/map.h>
 
 static Map* variables = NULL;
+static char* variable = NULL;
 char cmd_result[CMD_RESULT_SIZE];
-
-void cmd_init(void) {
-	variables = map_create(16, map_string_hash, map_string_equals, NULL);
-	map_put(variables, strdup("$?"), strdup("(nil)"));
-	map_put(variables, strdup("$nil"), strdup("(nil)"));
-}
 
 int cmd_help(int argc, char** argv) {
         int command_len = 0;
@@ -47,8 +43,7 @@ static int cmd_parse_line(char* line, char** argv) {
 			if(line[i] == quotation) {
 				quotation = 0;
 				line[i] = '\0';
-				line[i + 1] = '\0';
-				i++;
+				argv[argc++] = start;
 				is_start = true;
 			}
 		} else {
@@ -57,8 +52,7 @@ static int cmd_parse_line(char* line, char** argv) {
 				case '"':
 					quotation = line[i];
 					line[i] = '\0';
-					i++;
-					argv[argc++] = start;
+					start = &line[i + 1];
 					break;
 				case ' ':
 				case '\0':
@@ -81,8 +75,7 @@ static int cmd_parse_line(char* line, char** argv) {
 	return argc;
 }
 
-static char* cmd_parse_var(int* argc, char** argv) {
-	char* variable = NULL;
+static void cmd_parse_var(int* argc, char** argv) {
 	if(*argc >= 2) {
 		if((argv[0][0] == '$') && (argv[1][0] == '=')) {
 			variable = strdup(argv[0]);
@@ -90,8 +83,6 @@ static char* cmd_parse_var(int* argc, char** argv) {
 			*argc -= 2;
 		}
 	}
-
-	return variable;	
 }
 
 static void cmd_parse_arg(int argc, char** argv) {
@@ -121,7 +112,7 @@ static Command* cmd_get(int argc, char** argv) {
         return NULL;
 }
 
-static void cmd_update_var(int exit_status, char* variable) {
+static void cmd_update_var(int exit_status) {
 	char buf[16];
 	sprintf(buf, "%d", exit_status);
 	
@@ -146,6 +137,26 @@ static void cmd_update_var(int exit_status, char* variable) {
 	}
 }
 
+void cmd_async_result(char* result, int exit_status) {
+	if(result)
+		sprintf(cmd_result, "%s", result);
+	cmd_update_var(exit_status);
+
+	if(strlen(cmd_result) > 0) {
+		printf("%s\n", cmd_result);
+	}
+	if(variable) {
+		free(variable);
+		variable = NULL;
+	}
+}
+
+void cmd_init(void) {
+	variables = map_create(16, map_string_hash, map_string_equals, NULL);
+	map_put(variables, strdup("$?"), strdup("(nil)"));
+	map_put(variables, strdup("$nil"), strdup("(nil)"));
+}
+
 int cmd_exec(char* line) {
 	int argc;
 	char* argv[CMD_MAX_ARGC];
@@ -154,20 +165,25 @@ int cmd_exec(char* line) {
 	if(argc == 0 || argv[0][0] == '#')
 		return 0;
 
-	char* variable = cmd_parse_var(&argc, argv);
+	cmd_parse_var(&argc, argv);
 	cmd_parse_arg(argc, argv);
 	Command* cmd = cmd_get(argc, argv);
 	int exit_status = 0;
 	if(cmd) {
 		cmd_result[0] = '\0';
 		exit_status = cmd->func(argc, argv);
-		cmd_update_var(exit_status, variable);
+		if(exit_status == CMD_ASYNC_FUNC) {
+			return exit_status;
+		}
+		cmd_update_var(exit_status);
 		if(strlen(cmd_result) > 0) {
                         printf("%s\n", cmd_result);
 		}
 	}
-	if(variable)
+	if(variable) {
 		free(variable);
+		variable = NULL;
+	}
 
 	return exit_status;
 }

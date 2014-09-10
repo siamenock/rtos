@@ -1,5 +1,5 @@
 #include <stdlib.h>
-#include "types.h"
+#include "util/types.h"
 
 bool is_uint8(const char* val) {
 	char* end = NULL;
