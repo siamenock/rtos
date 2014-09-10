@@ -16,7 +16,9 @@
 
 #include "ni.h"
 
-#define ALIGN		16
+#define DEBUG	1
+
+#define ALIGN	16
 
 Map* nis;
 
@@ -528,6 +530,14 @@ void ni_process_input(uint8_t* buf1, uint32_t size1, uint8_t* buf2, uint32_t siz
 	
 	uint64_t time = cpu_tsc();
 	
+	#if DEBUG
+	printf("Input:  %02x:%02x:%02x:%02x:%02x:%02x %02x:%02x:%02x:%02x:%02x:%02x\n", 
+		(dmac >> 40) & 0xff, (dmac >> 32) & 0xff, (dmac >> 24) & 0xff,
+		(dmac >> 16) & 0xff, (dmac >> 8) & 0xff, (dmac >> 0) & 0xff,
+		(smac >> 40) & 0xff, (smac >> 32) & 0xff, (smac >> 24) & 0xff,
+		(smac >> 16) & 0xff, (smac >> 8) & 0xff, (smac >> 0) & 0xff);
+	#endif /* DEBUG */
+	
 	bool input(NI* ni) {
 		if(ni->input_accept && list_index_of(ni->input_accept, (void*)smac, NULL) < 0)
 			return false;
@@ -652,6 +662,15 @@ Packet* ni_process_output() {
 		}
 		
 		ether->smac = endian48(ni->mac);	// Fix mac address
+		
+		#if DEBUG
+		uint64_t smac = ni->mac;
+		printf("Output: %02x:%02x:%02x:%02x:%02x:%02x %02x:%02x:%02x:%02x:%02x:%02x\n", 
+			(dmac >> 40) & 0xff, (dmac >> 32) & 0xff, (dmac >> 24) & 0xff,
+			(dmac >> 16) & 0xff, (dmac >> 8) & 0xff, (dmac >> 0) & 0xff,
+			(smac >> 40) & 0xff, (smac >> 32) & 0xff, (smac >> 24) & 0xff,
+			(smac >> 16) & 0xff, (smac >> 8) & 0xff, (smac >> 0) & 0xff);
+		#endif /* DEBUG */
 		
 		return packet;
 	}
