@@ -29,7 +29,6 @@
 
 #include "shell.h"
 
-#define CMD_SIZE 	512
 #define MAX_VM_COUNT	128
 #define MAX_NIC_COUNT	32
 
@@ -197,7 +196,7 @@ static bool arping_timeout(void* context) {
 
 static int cmd_arping(int argc, char** argv) {
 	if(argc < 2) {
-		return 1;
+		return CMD_STATUS_WRONG_NUMBER;
 	}
 	
 	char* str = argv[1];
@@ -227,7 +226,7 @@ static int cmd_arping(int argc, char** argv) {
 
 static int cmd_md5(int argc, char** argv) {
 	if(argc < 3) {
-		return -100;
+		return CMD_STATUS_WRONG_NUMBER;
 	}
 
 	if(!is_uint64(argv[1])) {
@@ -258,7 +257,7 @@ static int cmd_md5(int argc, char** argv) {
 
 static int cmd_create(int argc, char** argv) {
 	if(argc < 2) {
-		return 1;
+		return CMD_STATUS_WRONG_NUMBER;
 	}
 	VMSpec* vm = malloc(sizeof(VMSpec));
 	vm->core_size = 1;
@@ -366,7 +365,7 @@ static int cmd_create(int argc, char** argv) {
 
 static int cmd_vm_delete(int argc, char** argv) {
 	if(argc < 1) {
-		return -100;
+		return CMD_STATUS_WRONG_NUMBER;
 	}
 
 	if(!is_uint64(argv[1])) {
@@ -400,7 +399,7 @@ static int cmd_vm_list(int argc, char** argv) {
 
 static int cmd_send(int argc, char** argv) {
 	if(argc < 3) {
-		return -100;
+		return CMD_STATUS_WRONG_NUMBER;
 	}
 
 	if(!is_uint64(argv[1])) {
@@ -428,7 +427,7 @@ static int cmd_status_set(int argc, char** argv) {
 	}
 
 	if(argc < 2) {
-		return 1;
+		return CMD_STATUS_WRONG_NUMBER;
 	}
 	if(!is_uint64(argv[1])) {
 		return -1;
@@ -448,12 +447,12 @@ static int cmd_status_set(int argc, char** argv) {
 	
 	vm_status_set(vmid, status, status_setted, NULL);
 	
-	return CMD_ASYNC_FUNC;
+	return CMD_STATUS_ASYNC_CALL;
 }
 
 static int cmd_status_get(int argc, char** argv) {
 	if(argc < 2) {
-		return -100;
+		return CMD_STATUS_WRONG_NUMBER;
 	}
 	
 	if(!is_uint64(argv[1])) {

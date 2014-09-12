@@ -14,6 +14,7 @@
 #include <util/list.h>
 #include <util/cmd.h>
 #include <util/types.h>
+
 #include "rpc_manager.h"
 #include "rpc_callback.h"
 
@@ -285,7 +286,7 @@ static int cmd_vm_create(int argc, char** argv) {
 
 static int cmd_vm_delete(int argc, char** argv) {
 	if(argc < 1) {
-		return -100;
+		return CMD_STATUS_WRONG_NUMBER;
 	}
 	
 	if(!is_uint64(argv[1])) {
@@ -337,7 +338,7 @@ static int cmd_vm_list(int argc, char** argv) {
 
 static int cmd_send(int argc, char** argv) {
 	if(argc < 3) {
-		return -100;
+		return CMD_STATUS_WRONG_NUMBER;
 	}
 	
 	if(!is_uint64(argv[1])) {
@@ -393,7 +394,7 @@ static int cmd_send(int argc, char** argv) {
 
 static int cmd_md5(int argc, char** argv) {
 	if(argc < 3) {
-		return -100;
+		return CMD_STATUS_WRONG_NUMBER;
 	}
 	
 	if(!is_uint64(argv[1])) {
@@ -432,7 +433,7 @@ static int cmd_md5(int argc, char** argv) {
 
 static int cmd_status_set(int argc, char** argv) {
 	if(argc < 2) {
-		return -100;
+		return CMD_STATUS_WRONG_NUMBER;
 	}
 	
 	if(!is_uint64(argv[1])) {
@@ -469,7 +470,7 @@ static int cmd_status_set(int argc, char** argv) {
 
 static int cmd_status_get(int argc, char** argv) {
 	if(argc < 2) {
-		return -100;
+		return CMD_STATUS_WRONG_NUMBER;
 	}
 	
 	if(!is_uint64(argv[1])) {
@@ -694,7 +695,7 @@ int main(int _argc, char** _argv) {
 
 	cmd_init();
 
-	void execute_cmd(char* line, bool is_dump) {
+	int execute_cmd(char* line, bool is_dump) {
 		//if is_dump == true then file cmd
 		//   is_dump == false then stdin cmd
 		if(is_dump == true)
@@ -702,14 +703,18 @@ int main(int _argc, char** _argv) {
 		
 		int exit_status = cmd_exec(line);
 		if(exit_status < 0) {
-			if(exit_status == -100)
+			if(exit_status == CMD_STATUS_WRONG_NUMBER)
 				printf("wrong number of arguments\n");
+			else if(exit_status == CMD_STATUS_NOT_FOUND)
+				printf("wrong name of command\n");
 			else
 				printf("%d'std argument type wrong\n", -exit_status);
 		}
 			
 		printf("> ");
 		fflush(stdout);
+
+		return exit_status;
 	}
 	
 	List* fd_list = list_create(NULL);
@@ -724,49 +729,45 @@ int main(int _argc, char** _argv) {
 
 	void get_cmd_line(int fd) {
 		static char line[MAX_LINE_SIZE] = {0, };
+		char* head;
 		int seek = 0;
 		static int eod = 0; //end of data
-		char* search_point;
 
-		while(1) {
-			if((eod += read(fd, &line[eod], MAX_LINE_SIZE - eod - 1)) != 0) {
-				seek = 0;
-				line[eod] = '\0';
-				while(1) {
-					if((search_point = strchr(&line[seek], '\n')) != NULL) { //find	
-						*search_point = '\0';
-						execute_cmd(&line[seek], fd != STDIN_FILENO);
-						seek = search_point - line + 1;
-						continue;
-					} else if(seek == 0){ //not found '\n' and seek == 0
-						line[eod] = '\0'; //set line
-						execute_cmd(&line[seek], fd != STDIN_FILENO);
-						seek = 0;
-						eod = 0; 
-						if(fd == STDIN_FILENO) {
-							return;
-						} else
-							break;
-					} else { //not found '\n' and seek != 0
-						memmove(line, line + seek, eod - seek);
+		while((eod += read(fd, &line[eod], MAX_LINE_SIZE - eod))) {
+			head = line;
+			for(; seek < eod; seek++) {
+				if(line[seek] == '\n') {
+					line[seek] = '\0';
+					int ret = execute_cmd(head, fd != STDIN_FILENO);
 
-						eod = eod - seek;
-						if(fd == STDIN_FILENO) {
-							return;
-						} else
-							break;
+					if(fd != STDIN_FILENO && ret != 0 && ret != CMD_STATUS_ASYNC_CALL) {//parsing file and return error code
+						printf("stop parsing file\n");
+						eod = 0;
+						return;
 					}
+					head = &line[seek] + 1;
 				}
-			} else { //not have read data == EOF
-				if(eod != 0) {//has last line
-					line[eod] = '\0';
-					execute_cmd(&line[0], fd != STDIN_FILENO);
-				}
-				seek = 0;
-				eod = 0;
+			}
+			if(head == line && eod == MAX_LINE_SIZE){ //not found '\n' and head == 0
+				printf("Command line is too long %d > %d\n", eod, MAX_LINE_SIZE);
+				eod = 0; 
 				return;
-			}		
+			} else { //not found '\n' and seek != 0
+				memmove(line, head, eod - (head - line));
+				eod -= head - line;
+				seek = eod;
+				if(fd == STDIN_FILENO) {
+					return;
+				} else
+					continue;
+			}
 		}
+		if(eod != 0) {
+			line[eod] = '\0';
+			execute_cmd(&line[0], fd != STDIN_FILENO);
+		}
+		eod = 0;
+		return;
 	}
 
 	int retval;

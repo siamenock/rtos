@@ -28,12 +28,15 @@
 #include "device.h"
 #include "driver/dummy.h"
 #include "driver/nic.h"
+#include "rootfs.h"
+#include "string.h"
 
 #include <net/ether.h>
 #include <net/ip.h>
 #include <net/icmp.h>
 #include <net/checksum.h>
 #include <net/udp.h>
+#include <util/cmd.h>
 
 #define VGA_BUFFER_PAGES	12
 
@@ -196,6 +199,46 @@ static void icc_stop(ICC_Message* msg) {
 	task_destroy(1);
 }
 
+static void exec(char* name) {
+	uint32_t len;
+	char* end = rootfs_file(name, &len);
+
+	if(!end) //init.psh is not exist
+		return;
+
+	char* eof = end + len;
+	char* head = end;
+	char line[CMD_SIZE];
+
+	bool exec_line(void) {
+		int line_len = end - head;
+		if(line_len < CMD_SIZE) {
+			memcpy(line, head, line_len);
+			line[line_len] = '\0';
+			printf("%s\n", line);
+			int ret = cmd_exec(line);
+			if(ret != 0 && ret != CMD_STATUS_ASYNC_CALL) {
+				printf("Error : Command return %d : Stop parsing %s\n", ret, name);
+				return false;
+			}
+		} else {
+			printf("Command line is too long %d > %d\n", line_len, CMD_SIZE);
+			return false;
+		}
+		return true;
+	}
+
+	for(; end < eof; end++) {
+		if(*end == '\n' || *end == '\0') {
+			if(!exec_line())
+				return;
+			head = end + 1;
+		}
+	}
+	if(head < end)
+		exec_line();
+}
+
 void main(void) {
 	cpu_init();
 	mp_init0();
@@ -340,6 +383,9 @@ void main(void) {
 	}
 	
 	mp_sync();
+	
+	if(core_id == 0)
+		exec("init.psh");
 	
 	while(1)
 		event_loop();

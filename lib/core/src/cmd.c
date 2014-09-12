@@ -2,7 +2,6 @@
 #include <stdbool.h>
 #include <string.h>
 #include <malloc.h>
-#include <limits.h>
 #include <util/cmd.h>
 #include <util/map.h>
 
@@ -168,11 +167,11 @@ int cmd_exec(char* line) {
 	cmd_parse_var(&argc, argv);
 	cmd_parse_arg(argc, argv);
 	Command* cmd = cmd_get(argc, argv);
-	int exit_status = 0;
+	int exit_status = CMD_STATUS_NOT_FOUND;
 	if(cmd) {
 		cmd_result[0] = '\0';
 		exit_status = cmd->func(argc, argv);
-		if(exit_status == CMD_ASYNC_FUNC) {
+		if(exit_status == CMD_STATUS_ASYNC_CALL) {
 			return exit_status;
 		}
 		cmd_update_var(exit_status);
