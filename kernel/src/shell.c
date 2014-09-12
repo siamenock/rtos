@@ -25,10 +25,12 @@
 #include "driver/charout.h"
 #include "driver/charin.h"
 #include "vm.h"
+#include "rootfs.h"
 
 #include "shell.h"
 
 #define CMD_SIZE 	512
+#define MAX_VM_COUNT	128
 #define MAX_NIC_COUNT	32
 
 static int cmd_clear() {
@@ -46,6 +48,16 @@ static int cmd_echo(int argc, char** argv) {
 		}
 	}
 
+	return 0;
+}
+
+static int cmd_sleep(int argc, char** argv) {
+	uint32_t time = 1;
+	if(argc >= 2 && is_uint32(argv[1])) {
+		time = parse_uint32(argv[1]);
+	}
+	cpu_mwait(time);
+	
 	return 0;
 }
 
@@ -213,6 +225,37 @@ static int cmd_arping(int argc, char** argv) {
 	return 0;
 }
 
+static int cmd_md5(int argc, char** argv) {
+	if(argc < 3) {
+		return -100;
+	}
+
+	if(!is_uint64(argv[1])) {
+		return -1;
+	}
+
+	if(!is_uint64(argv[2])) {
+		return -2;
+	}
+
+	uint64_t vmid = parse_uint64(argv[1]);
+	uint64_t size = parse_uint64(argv[2]);
+	uint32_t md5sum[4];
+	bool ret = vm_storage_md5(vmid, size, md5sum);
+
+	if(!ret) {
+		sprintf(cmd_result, "(nil)");
+	} else {
+		char* p = (char*)cmd_result;
+		for(int i = 0; i < 16; i++, p += 2) {
+			sprintf(p, "%02x", ((uint8_t*)md5sum)[i]);
+		}
+		*p = '\0';
+	}
+
+	return 0;
+}
+
 static int cmd_create(int argc, char** argv) {
 	if(argc < 2) {
 		return 1;
@@ -321,6 +364,64 @@ static int cmd_create(int argc, char** argv) {
 	return 0;
 }
 
+static int cmd_vm_delete(int argc, char** argv) {
+	if(argc < 1) {
+		return -100;
+	}
+
+	if(!is_uint64(argv[1])) {
+		return -1;
+	}
+
+	uint64_t vmid = parse_uint64(argv[1]);
+	bool ret = vm_delete(vmid);
+
+	sprintf(cmd_result, "%s", ret ? "true" : "false");
+
+	return 0;
+}
+
+static int cmd_vm_list(int argc, char** argv) {
+	u_quad_t vmids[MAX_VM_COUNT];
+	int len = vm_list(vmids, MAX_VM_COUNT);
+
+	char* p = cmd_result;
+	for(int i = 0; i < len; i++) {
+		p += sprintf(p, "%lu", vmids[i]) - 1;
+		if(i + 1 < len) {
+			*p++ = ' ';
+		} else {
+			*p++ = '\0';
+		}
+	}
+
+	return 0;
+}
+
+static int cmd_send(int argc, char** argv) {
+	if(argc < 3) {
+		return -100;
+	}
+
+	if(!is_uint64(argv[1])) {
+		return -1;
+	}
+
+	uint64_t vmid = parse_uint64(argv[1]);
+	uint32_t size = 0;
+	void* file = rootfs_file(argv[2], &size);
+	
+	if(file == NULL) {
+		printf("Cannot open file: %s\n", argv[2]);
+		return 1;
+	}
+
+	if(vm_storage_write(vmid, file, 0, size) != size)
+		return -1;
+
+	return 0;
+}
+
 static int cmd_status_set(int argc, char** argv) {
 	void status_setted(bool result, void* context) {
 		cmd_async_result(result ? "true" : "false", 0);
@@ -402,6 +503,12 @@ Command commands[] = {
 		.args = "[variable: string]*",
 		.func = cmd_echo 
 	},
+	{
+		.name = "sleep",
+		.desc = "Sleep n seconds",
+		.args = "[time: uint32]",
+		.func = cmd_sleep
+	},
 	{ 
 		.name = "date", 
 		.desc = "Print current date and time.", 
@@ -445,6 +552,30 @@ Command commands[] = {
 		.args = "vmid: uint64, core: (number: int) memory: (size: uint32) storage: (size: uint32) [nic: mac: (addr: uint64) ibuf: (size: uint32) obuf: (size: uint32) iband: (size: uint64) oband: (size: uint64) pool: (size: uint32)]* [args: [string]+ ]",
 		.func = cmd_create 
 	},
+	{
+		.name = "delete",
+		.desc = "Delete VM",
+		.args = "result: bool, vmid: uint64",
+		.func = cmd_vm_delete
+	},
+	{
+		.name = "list",
+		.desc = "List VM",
+		.args = "result: uint64[]",
+		.func = cmd_vm_list
+	},
+	{
+		.name = "send",
+		.desc = "Send file",
+		.args = "result: bool, vmid: uint64 path: string",
+		.func = cmd_send
+	},
+	{
+		.name = "md5",
+		.desc = "MD5 storage",
+		.args = "result: hex16 string, vmid: uint64 size: uint64",
+		.func = cmd_md5
+	},
 	{ 
 		.name = "start", 
 		.desc = "Start VM",
@@ -479,7 +610,6 @@ Command commands[] = {
 		.name = NULL
 	},
 };
-
 
 void shell_callback(int code) {
 	static char cmd[CMD_SIZE];
