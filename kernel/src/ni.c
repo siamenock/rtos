@@ -16,7 +16,7 @@
 
 #include "ni.h"
 
-#define DEBUG	1
+#define DEBUG	0
 
 #define ALIGN	16
 

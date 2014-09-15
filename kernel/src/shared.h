@@ -10,11 +10,6 @@ typedef struct {
 	volatile uint32_t	mp_sync_map;
 	volatile uint32_t	mp_wait_map;
 	
-	struct _PCI_Device*	pci_devices;
-	uint32_t		pci_devices_count;
-	
-	struct _List*		symbols;
-	
 	struct _ICC_Message*	icc_messages;
 } Shared;
 

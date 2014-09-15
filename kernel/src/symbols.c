@@ -5,6 +5,7 @@
 #include "symbols.h"
 
 static Symbol* symbols;
+//static Map* symbols2;
 
 void symbols_init() {
 	uint32_t size;
@@ -14,7 +15,7 @@ void symbols_init() {
 		symbols = malloc(size);
 		memcpy(symbols, mmap, size);
 		
-		// Reallocate
+		// Relocate
 		Symbol* s = symbols;
 		while(s->name && s->address) {
 			s->name += (uint64_t)symbols;
@@ -23,7 +24,8 @@ void symbols_init() {
 	} else {
 		printf("\tKernel symbol map not found.\n");
 	}
-
+	
+	//symbols2 = map_create(128, map_string_hash, map_string_equals, NULL);
 }
 
 Symbol* symbols_get(char* name) {
