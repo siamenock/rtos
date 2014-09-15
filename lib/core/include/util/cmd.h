@@ -3,7 +3,9 @@
 
 #define CMD_MAX_ARGC 256
 #define CMD_RESULT_SIZE 4096
-#define CMD_ASYNC_FUNC INT_MIN //limits.h
+#define CMD_STATUS_WRONG_NUMBER -1000
+#define CMD_STATUS_NOT_FOUND -1001
+#define CMD_STATUS_ASYNC_CALL -1002
 
 typedef struct {
 	char* name;
