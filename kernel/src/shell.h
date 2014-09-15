@@ -3,6 +3,8 @@
 
 #include <net/packet.h>
 
+#define CMD_SIZE        512
+
 void shell_init();
 bool shell_process(Packet* packet);
 
