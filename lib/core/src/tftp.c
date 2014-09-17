@@ -1,5 +1,4 @@
-#include <string.h>
-#include <strings.h>
+#include <_string.h>
 #include <malloc.h>
 #include <time.h>
 #include <net/ni.h>

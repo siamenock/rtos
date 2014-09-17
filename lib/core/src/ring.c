@@ -1,4 +1,4 @@
-#include <string.h>
+#include <_string.h>
 #include <util/ring.h>
 
 ssize_t ring_write(char* buf, size_t head, volatile size_t* tail, size_t size, const char* data, size_t len) {

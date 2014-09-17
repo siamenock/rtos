@@ -1,6 +1,6 @@
-#include <util/list.h>
-#include <malloc.h>
 #include <string.h>
+#include <malloc.h>
+#include <util/list.h>
 #include "rootfs.h"
 #include "symbols.h"
 

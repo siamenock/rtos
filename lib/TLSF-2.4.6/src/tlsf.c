@@ -56,8 +56,6 @@
 #define USE_PRINTF      (1)
 #endif
 
-#include <string.h>
-
 #ifndef TLSF_USE_LOCKS
 #define	TLSF_USE_LOCKS 	(0)
 #endif
@@ -244,34 +242,40 @@ typedef struct TLSF_struct {
 /**************     Helping functions    **************************/
 /******************************************************************/
 
-/*
-static void bzero(void* dest, uint32_t size) {
+static void bzero(void* dest, size_t size) {
 	uint64_t* d = dest;
-	while(size >= 8) {
+	
+	int count = size / 8;
+	while(count--)
 		*d++ = 0;
-		size -= 8;
-	}
 	
 	uint8_t* d2 = (uint8_t*)d;
-	while(size-- > 0)
+	count = size % 8;
+	while(count--)
 		*d2++ = 0;
 }
 
-static void memcpy(void* dest, const void* src, uint32_t size) {
-	uint64_t* d = dest;
-	const uint64_t* s = src;
-	
-	while(size >= 8) {
-		*d++ = *s++;
-		size -= 8;
-	}
-	
-	uint8_t* d2 = (uint8_t*)d;
-	uint8_t* s2 = (uint8_t*)s;
-	while(size-- > 0)
-		*d2++ = *s2++;
+static void* memcpy(void* dest, const void* src, size_t len) {
+	void *edi = dest;
+	const void *esi = src;
+	int discard_ecx;
+
+	/* We often do large dword-aligned and dword-length block
+	 * moves.  Using movsl rather than movsb speeds these up by
+	 * around 32%.
+	 */
+	__asm__ __volatile__ ( "rep movsl"
+			       : "=&D" ( edi ), "=&S" ( esi ),
+				 "=&c" ( discard_ecx )
+			       : "0" ( edi ), "1" ( esi ), "2" ( len >> 2 )
+			       : "memory" );
+	__asm__ __volatile__ ( "rep movsb"
+			       : "=&D" ( edi ), "=&S" ( esi ),
+				 "=&c" ( discard_ecx )
+			       : "0" ( edi ), "1" ( esi ), "2" ( len & 3 )
+			       : "memory" );
+	return dest;
 }
-*/
 
 static __inline__ void set_bit(int nr, u32_t * addr);
 static __inline__ void clear_bit(int nr, u32_t * addr);

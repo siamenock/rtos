@@ -5,7 +5,7 @@
  * http://nayuki.eigenstate.org/page/fast-md5-hash-implementation-in-x86-assembly
  */
 
-#include <string.h>
+#include <_string.h>
 #include <net/md5.h>
 
 void md5_compress(uint32_t *state, uint32_t *block);

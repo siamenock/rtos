@@ -1,6 +1,4 @@
 #ifndef LINUX
-#include <string.h>
-#include <strings.h>
 #include <malloc.h>
 #include <time.h>
 #include <errno.h>
@@ -703,4 +701,4 @@ bool rpc_call(NetworkInterface* ni, CLIENT* client, unsigned long procnum, xdrpr
 	
 	return true;
 }
-#endif
+#endif /* LINUX */

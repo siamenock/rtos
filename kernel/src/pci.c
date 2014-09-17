@@ -148,7 +148,6 @@ void pci_init() {
 	devices_count = pci_count();
 	
 	pci_analyze();
-	/*
 	for(int i = 0; i < devices_count; i++) {
 		PCI_Device* device = &devices[i];
 		printf("Bus: %d, Slot: %d, Function: %d\n", device->bus, device->slot, device->function);
@@ -157,8 +156,8 @@ void pci_init() {
 		printf("Command: %x, Status: %x\n", pci_read16(device, PCI_COMMAND), pci_read16(device, PCI_STATUS));
 		printf("Revision ID: %x, Prog IF: %x, Subclass: %x, Class code: %x\n", pci_read8(device, PCI_REVISION_ID), pci_read8(device, PCI_PROG_IF), pci_read8(device, PCI_SUB_CLASS), pci_read8(device, PCI_CLASS_CODE));
 		printf("Subsystem Vendor ID: %x, Subsystem ID: %x\n", pci_read16(device, PCI_SUBSYSTEM_VENDOR_ID), pci_read16(device, PCI_SUBSYSTEM_ID));
+		printf("header type: %x\n\n", pci_read8(device, PCI_HEADER_TYPE));
 	}
-	*/
 }
 
 uint32_t pci_device_size(uint16_t vendor_id, uint16_t device_id) {

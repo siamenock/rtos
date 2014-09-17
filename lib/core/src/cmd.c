@@ -1,6 +1,5 @@
-#include <stdio.h>
 #include <stdbool.h>
-#include <string.h>
+#include <_string.h>
 #include <malloc.h>
 #include <util/cmd.h>
 #include <util/map.h>

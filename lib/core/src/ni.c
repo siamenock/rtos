@@ -1,4 +1,4 @@
-#include <string.h>
+#include <_string.h>
 #include <lock.h>
 #include <util/map.h>
 #include <net/ni.h>

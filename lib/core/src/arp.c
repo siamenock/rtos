@@ -1,6 +1,4 @@
 #include <time.h>
-#include <string.h>
-#include <malloc.h>
 #include <tlsf.h>
 #include <net/ether.h>
 #include <net/arp.h>

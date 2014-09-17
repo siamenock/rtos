@@ -1,8 +1,7 @@
 #include <stdio.h>
 #include <malloc.h>
-#include <string.h>
-#include <strings.h>
 #include <errno.h>
+#include <string.h>
 #include <util/event.h>
 #include <net/md5.h>
 #include "icc.h"

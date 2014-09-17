@@ -1,7 +1,7 @@
 #include <string.h>
+#include <malloc.h>
 #include <util/fifo.h>
 #include <util/ring.h>
-#include <malloc.h>
 #include "../stdio.h"
 #include "../shared.h"
 #include "../gmalloc.h"

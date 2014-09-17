@@ -12,7 +12,8 @@
 #include "../../../../../core/include/util/ring.h"
 
 char **environ;
-void* __malloc_pool;
+// void* __malloc_pool; Moved to libcore
+extern void* __malloc_pool;
 uint64_t __pid;
 
 char* __stdin;
@@ -228,6 +229,7 @@ void* _calloc_r(struct _reent* r, size_t nmemb, size_t size) {
 		
 }
 
+/* malloc is moved to libcore
 void* malloc(size_t size) {
 	void* ptr = malloc_ex(size, __malloc_pool);
 	if(!ptr)
@@ -257,6 +259,7 @@ void* calloc(size_t nmemb, size_t size) {
 	
 	return ptr;
 }
+*/
 
 int __isoc99_sscanf(const char *str, const char *format, ...) {
 	int ret;

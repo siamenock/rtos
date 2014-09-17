@@ -1,6 +1,6 @@
 #include <stdio.h>
-#include <string.h>
 #include <errno.h>
+#include <string.h>
 #include <malloc.h>
 #include <tlsf.h>
 #include <net/ether.h>

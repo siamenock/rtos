@@ -29,7 +29,7 @@ int debug_malloc_count;
 int debug_free_count;
 #endif /* DEBUG */
 
-void* __malloc_pool;
+extern void* __malloc_pool;	// Defined in malloc.c from libcore
 
 void malloc_init() {
 	PNKC* pnkc = rootfs_file("kernel.bin", NULL);
@@ -143,6 +143,7 @@ void freed(void* ptr) {
 }
 #endif /* DEBUG */
 
+#if 0
 inline void* malloc(size_t size) {
 	void* ptr = malloc_ex(size, __malloc_pool);
 	
@@ -189,3 +190,4 @@ inline void* calloc(size_t nmemb, size_t size) {
 	#endif /* DEBUG */
 	return ptr;
 }
+#endif

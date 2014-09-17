@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <errno.h>
+#include <string.h>
 #include <util/event.h>
 #include "asm.h"
 #include "gdt.h"
@@ -29,7 +30,6 @@
 #include "driver/dummy.h"
 #include "driver/nic.h"
 #include "rootfs.h"
-#include "string.h"
 
 #include <net/ether.h>
 #include <net/ip.h>

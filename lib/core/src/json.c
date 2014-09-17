@@ -1,13 +1,12 @@
-#include <util/json.h>
-#include <jsmn.h>
+#include <_string.h>
 #include <malloc.h>
 #include <errno.h>
+#include <util/json.h>
+#include <jsmn.h>
 
 #if JSON_DUMP
 #include <stdio.h>
 #endif
-
-#include <string.h>
 
 #define JSMN_TOKEN_COUNT	2048
 

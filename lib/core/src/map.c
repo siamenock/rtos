@@ -1,4 +1,4 @@
-#include <string.h>
+#include <_string.h>
 #include <tlsf.h>
 #include <util/map.h>
 
