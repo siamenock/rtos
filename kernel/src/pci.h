@@ -330,6 +330,13 @@ typedef struct _PCI_Device {
 	void*		priv;
 } PCI_Device;
 
+#define PCI_MAX_DEVICES		32
+#define PCI_MAX_BUS		256
+#define PCI_MAX_SLOT		32
+#define PCI_MAX_FUNCTION	8
+
+extern void* pci_mmio[PCI_MAX_BUS];
+
 void pci_init();
 
 uint32_t pci_device_size(uint16_t vendor_id, uint16_t device_id);

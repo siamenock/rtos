@@ -4,7 +4,10 @@
 #include "cpu.h"
 #include "mp.h"
 #include "port.h"
+#include "pci.h"
 #include "acpi.h"
+
+// Ref: http://www.acpi.info/DOWNLOADS/ACPIspec50.pdf
 
 // Root system description pointer
 typedef struct {
@@ -123,6 +126,29 @@ typedef struct {
 	GenericAddressStructure	x_gpe0_block;
 	GenericAddressStructure	x_gpe1_block;
 } __attribute__((packed)) FADT;
+
+typedef struct {
+	uint64_t	address;
+	uint16_t	group;
+	uint8_t		start;
+	uint8_t		end;
+	uint32_t	reserved;
+} __attribute__((packed)) MMapConfigSpace;
+
+typedef struct {
+	uint8_t		signature[4];
+	uint32_t	length;
+	uint8_t		revision;
+	uint8_t		checksum;
+	uint8_t		oem_id[6];
+	uint8_t		oem_table_id[8];
+	uint32_t	oem_revision;
+	uint32_t	creator_id;
+	uint32_t	creator_revision;
+	
+	uint64_t	reserved;
+	MMapConfigSpace	mmaps[0];
+} __attribute__((packed)) MCFG;
 	
 static RSDP* find_RSDP() {
 	bool is_RSDP(uint8_t* p) {
@@ -149,6 +175,7 @@ static RSDP* find_RSDP() {
 
 static RSDP* rsdp;
 static FADT* fadt;
+static MCFG* mcfg;
 static uint16_t slp_typa;
 static uint16_t slp_typb;
 
@@ -165,15 +192,29 @@ void acpi_init() {
 	
 	RSDT* rsdt = (void*)(uint64_t)rsdp->address;
 	
-	// Find FADT
+	// Find FADT and MCFG
 	for(int i = 0; i < rsdt->length / 4; i++) {
 		void* p = (void*)(uint64_t)rsdt->table[i];
-		if(memcmp(p, "FACP", 4) == 0) {
+		
+		if(fadt == NULL && memcmp(p, "FACP", 4) == 0) {
 			fadt = p;
+		} else if(mcfg == NULL && memcmp(p, "MCFG", 4) == 0) {
+			mcfg = p;
+		} else if(fadt != NULL && mcfg != NULL) {
 			break;
 		}
 	}
 	
+	// MCFG
+	if(mcfg) {
+		int length = (mcfg->length - sizeof(ACPIHeader) - 8) / sizeof(MMapConfigSpace);
+		for(int i = 0; i < length; i++) {
+			for(int i = mcfg->mmaps[i].start; i <= mcfg->mmaps[i].end; i++)
+				pci_mmio[i] = (void*)mcfg->mmaps[i].address;
+		}
+	}
+	
+	// FACP
 	uint8_t* s5_addr  = NULL;;
 	if(fadt) {
 		ACPIHeader* dsdt = (void*)(uint64_t)(fadt->dsdt);

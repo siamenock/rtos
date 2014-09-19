@@ -13,15 +13,11 @@
 
 #define INVALID_VENDOR		0xffff
 
-#define MAX_DEVICES		32
-
-#define MAX_BUS			256
-#define MAX_SLOT		32
-#define MAX_FUNCTION		8
+void* pci_mmio[PCI_MAX_BUS];
 
 int pci_cache_line_size;
 
-PCI_Device devices[MAX_DEVICES];
+PCI_Device devices[PCI_MAX_DEVICES];
 int devices_count;
 	
 static uint8_t _pci_read8(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg);
@@ -35,16 +31,16 @@ static int pci_count() {
 	int count = 0;
 	
 	int bus, slot, function;
-	for(bus = 0; bus < MAX_BUS; bus++) {
-		for(slot = 0; slot < MAX_SLOT; slot++) {
-			for(function = 0; function < MAX_FUNCTION; function++) {
+	for(bus = 0; bus < PCI_MAX_BUS; bus++) {
+		for(slot = 0; slot < PCI_MAX_SLOT; slot++) {
+			for(function = 0; function < PCI_MAX_FUNCTION; function++) {
 				uint16_t vendor_id = _pci_read16(bus, slot, function, PCI_VENDOR_ID);
 				if(vendor_id == INVALID_VENDOR)
 					goto next_slot;
 				
 				uint8_t header_type = _pci_read8(bus, slot, function, PCI_HEADER_TYPE);
 				
-				if(++count > MAX_DEVICES)
+				if(++count > PCI_MAX_DEVICES)
 					goto done;
 				
 				if(!(header_type & 0x80))
@@ -62,9 +58,9 @@ done:
 static void pci_analyze() {
 	uint32_t count = 0;
 	uint32_t bus, slot, function;
-	for(bus = 0; bus < MAX_BUS; bus++) {
-		for(slot = 0; slot < MAX_SLOT; slot++) {
-			for(function = 0; function < MAX_FUNCTION; function++) {
+	for(bus = 0; bus < PCI_MAX_BUS; bus++) {
+		for(slot = 0; slot < PCI_MAX_SLOT; slot++) {
+			for(function = 0; function < PCI_MAX_FUNCTION; function++) {
 				//uint32_t address = (1 << 31) | (bus << 16) | (slot << 11) | (function << 8) | 0;
 				
 				uint16_t vendor_id = _pci_read16(bus, slot, function, PCI_VENDOR_ID);
@@ -130,7 +126,7 @@ static void pci_analyze() {
 				
 				device->priv = NULL;
 				
-				if(++count > MAX_DEVICES)
+				if(++count > PCI_MAX_DEVICES)
 					goto done;
 				
 				if(!(header_type & 0x80))
@@ -211,9 +207,19 @@ uint8_t pci_read8(PCI_Device* device, uint32_t reg) {
 }
 
 static uint8_t _pci_read8(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg) {
-	uint32_t address = (1 << 31) | (bus << 16) | (slot << 11) | (function << 8) | (reg & 0xfc);
-	port_out32(PCI_CONFIG_ADDRESS, address);
-	return (uint8_t)(port_in32(PCI_CONFIG_DATA) >> (reg & 0x3) * 8);
+	void* mmio = pci_mmio[bus];
+	if(mmio) {
+		mmio +=	((uint64_t)bus << 20) |
+			((uint64_t)slot << 15) |
+			((uint64_t)function << 12) |
+			((uint64_t)reg << 2);
+		
+		return *(uint8_t*)mmio;
+	} else {
+		uint32_t address = (1 << 31) | (bus << 16) | (slot << 11) | (function << 8) | (reg & 0xfc);
+		port_out32(PCI_CONFIG_ADDRESS, address);
+		return (uint8_t)(port_in32(PCI_CONFIG_DATA) >> (reg & 0x3) * 8);
+	}
 }
 
 void pci_write8(PCI_Device* device, uint32_t reg, uint8_t data) {
@@ -221,9 +227,19 @@ void pci_write8(PCI_Device* device, uint32_t reg, uint8_t data) {
 }
 
 static void _pci_write8(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, uint8_t data) {
-	uint32_t address = (1 << 31) | (bus << 16) | (slot << 11) | (function << 8) | (reg & 0xfc);
-	port_out32(PCI_CONFIG_ADDRESS, address);
-	port_out32(PCI_CONFIG_DATA, port_in32(PCI_CONFIG_DATA) | ((uint32_t)data) << ((reg & 0x03) * 8));
+	void* mmio = pci_mmio[bus];
+	if(mmio) {
+		mmio +=	((uint64_t)bus << 20) |
+			((uint64_t)slot << 15) |
+			((uint64_t)function << 12) |
+			((uint64_t)reg << 2);
+		
+		*(uint8_t*)mmio = data;
+	} else {
+		uint32_t address = (1 << 31) | (bus << 16) | (slot << 11) | (function << 8) | (reg & 0xfc);
+		port_out32(PCI_CONFIG_ADDRESS, address);
+		port_out32(PCI_CONFIG_DATA, port_in32(PCI_CONFIG_DATA) | ((uint32_t)data) << ((reg & 0x03) * 8));
+	}
 }
 
 uint16_t pci_read16(PCI_Device* device, uint32_t reg) {
@@ -231,9 +247,19 @@ uint16_t pci_read16(PCI_Device* device, uint32_t reg) {
 }
 
 static uint16_t _pci_read16(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg) {
-	uint32_t address = (1 << 31) | (bus << 16) | (slot << 11) | (function << 8) | (reg & 0xfc);
-	port_out32(PCI_CONFIG_ADDRESS, address);
-	return (uint16_t)(port_in32(PCI_CONFIG_DATA) >> (reg & 0x3) * 8);
+	void* mmio = pci_mmio[bus];
+	if(mmio) {
+		mmio +=	((uint64_t)bus << 20) |
+			((uint64_t)slot << 15) |
+			((uint64_t)function << 12) |
+			((uint64_t)reg << 2);
+		
+		return *(uint16_t*)mmio;
+	} else {
+		uint32_t address = (1 << 31) | (bus << 16) | (slot << 11) | (function << 8) | (reg & 0xfc);
+		port_out32(PCI_CONFIG_ADDRESS, address);
+		return (uint16_t)(port_in32(PCI_CONFIG_DATA) >> (reg & 0x3) * 8);
+	}
 }
 
 void pci_write16(PCI_Device* device, uint32_t reg, uint16_t data) {
@@ -241,9 +267,19 @@ void pci_write16(PCI_Device* device, uint32_t reg, uint16_t data) {
 }
 
 static void _pci_write16(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, uint16_t data) {
-	uint32_t address = (1 << 31) | (bus << 16) | (slot << 11) | (function << 8) | (reg & 0xfc);
-	port_out32(PCI_CONFIG_ADDRESS, address);
-	port_out32(PCI_CONFIG_DATA, port_in32(PCI_CONFIG_DATA) | ((uint32_t)data) << ((reg & 0x03) * 8));
+	void* mmio = pci_mmio[bus];
+	if(mmio) {
+		mmio +=	((uint64_t)bus << 20) |
+			((uint64_t)slot << 15) |
+			((uint64_t)function << 12) |
+			((uint64_t)reg << 2);
+		
+		*(uint16_t*)mmio = data;
+	} else {
+		uint32_t address = (1 << 31) | (bus << 16) | (slot << 11) | (function << 8) | (reg & 0xfc);
+		port_out32(PCI_CONFIG_ADDRESS, address);
+		port_out32(PCI_CONFIG_DATA, port_in32(PCI_CONFIG_DATA) | ((uint32_t)data) << ((reg & 0x03) * 8));
+	}
 }
 
 uint32_t pci_read32(PCI_Device* device, uint32_t reg) {
@@ -251,9 +287,19 @@ uint32_t pci_read32(PCI_Device* device, uint32_t reg) {
 }
 
 static uint32_t _pci_read32(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg) {
-	uint32_t address = (1 << 31) | (bus << 16) | (slot << 11) | (function << 8) | reg;
-	port_out32(PCI_CONFIG_ADDRESS, address);
-	return port_in32(PCI_CONFIG_DATA);
+	void* mmio = pci_mmio[bus];
+	if(mmio) {
+		mmio +=	((uint64_t)bus << 20) |
+			((uint64_t)slot << 15) |
+			((uint64_t)function << 12) |
+			((uint64_t)reg << 2);
+		
+		return *(uint32_t*)mmio;
+	} else {
+		uint32_t address = (1 << 31) | (bus << 16) | (slot << 11) | (function << 8) | reg;
+		port_out32(PCI_CONFIG_ADDRESS, address);
+		return port_in32(PCI_CONFIG_DATA);
+	}
 }
 
 void pci_write32(PCI_Device* device, uint32_t reg, uint32_t data) {
@@ -261,9 +307,19 @@ void pci_write32(PCI_Device* device, uint32_t reg, uint32_t data) {
 }
 
 static void _pci_write32(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, uint32_t data) {
-	uint32_t address = (1 << 31) | (bus << 16) | (slot << 11) | (function << 8) | reg;
-	port_out32(PCI_CONFIG_ADDRESS, address);
-	port_out32(PCI_CONFIG_DATA, data);
+	void* mmio = pci_mmio[bus];
+	if(mmio) {
+		mmio +=	((uint64_t)bus << 20) |
+			((uint64_t)slot << 15) |
+			((uint64_t)function << 12) |
+			((uint64_t)reg << 2);
+		
+		*(uint32_t*)mmio = data;
+	} else {
+		uint32_t address = (1 << 31) | (bus << 16) | (slot << 11) | (function << 8) | reg;
+		port_out32(PCI_CONFIG_ADDRESS, address);
+		port_out32(PCI_CONFIG_DATA, data);
+	}
 }
 
 int pci_probe(DeviceType type, PCI_ID* ids, void* driver) {
