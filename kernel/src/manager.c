@@ -72,10 +72,14 @@ u_quad_t * vm_create_1_svc(RPC_VM rpc_vm,  struct svc_req *rqstp) {
 			vm->argc++;
 	}
 	vm->argv = malloc(sizeof(char*) * vm->argc);
-	vm->argv[0] = args;
-	for(int i = 0, j = 1; i < rpc_vm.args.args_len - 1; i++) {
-		if(args[i] == '\0')
-			vm->argv[j++] = args + i + 1;
+	
+	if(rpc_vm.args.args_len > 0) {
+		vm->argv[0] = args;
+		
+		for(int i = 0, j = 1; i < rpc_vm.args.args_len - 1; i++) {
+			if(args[i] == '\0')
+				vm->argv[j++] = args + i + 1;
+		}
 	}
 	
 	result = vm_create(vm);
