@@ -1,8 +1,8 @@
-#ifndef __DRIVER_PCI__
-#define __DRIVER_PCI__
+#ifndef __DRIVER_PCI_H__
+#define __DRIVER_PCI_H__
 
-#include <stdint.h>
-
+#include <stdbool.h>
+/*
 #define PCI_ID_ANY	~(0)
 
 typedef struct _PCI_ID {
@@ -23,6 +23,11 @@ typedef struct _PCI_ID {
 	.vendor_id = _vendor_id, .device_id = _device_id, 				\
 	.subvendor_id = _subvendor_id, .subdevice_id = _subdevice_id,			\
 	.name = _name, .data = (void*)_data }
+*/
 
 
-#endif /* __DRIVER_PCI__ */
+typedef struct _PCI_Device PCI_Device;
+
+typedef bool(*PCI_DEVICE_PROBE)(PCI_Device* pci, char** name, void** data);
+
+#endif /* __DRIVER_PCI_H__ */

@@ -335,6 +335,9 @@ typedef struct _PCI_Device {
 #define PCI_MAX_SLOT		32
 #define PCI_MAX_FUNCTION	8
 
+
+extern PCI_Device pci_devices[PCI_MAX_DEVICES];
+extern int pci_devices_count;
 extern void* pci_mmio[PCI_MAX_BUS];
 
 void pci_init();
@@ -351,6 +354,6 @@ void pci_write16(PCI_Device* device, uint32_t reg, uint16_t data);
 uint32_t pci_read32(PCI_Device* device, uint32_t reg);
 void pci_write32(PCI_Device* device, uint32_t reg, uint32_t data);
 
-int pci_probe(DeviceType type, PCI_ID* ids, void* driver);
+int pci_probe(DeviceType type, PCI_DEVICE_PROBE probe, Driver* driver);
 
 #endif /* __PCI_H__ */

@@ -9,7 +9,7 @@
 
 typedef struct _Device {
 	DeviceType	type;
-	void*		driver;
+	void*		driver;	// Extends Driver
 	void*		device;
 	int		id;
 } Device;

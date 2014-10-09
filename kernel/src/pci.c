@@ -5,6 +5,7 @@
 #include "device.h"
 #include "port.h"
 #include "gmalloc.h"
+#include "driver/port.h"
 
 #include "pci.h"
 
@@ -17,8 +18,8 @@ void* pci_mmio[PCI_MAX_BUS];
 
 int pci_cache_line_size;
 
-PCI_Device devices[PCI_MAX_DEVICES];
-int devices_count;
+PCI_Device pci_devices[PCI_MAX_DEVICES];
+int pci_devices_count;
 	
 static uint8_t _pci_read8(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg);
 static void _pci_write8(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, uint8_t data);
@@ -36,7 +37,7 @@ static int pci_count() {
 			for(function = 0; function < PCI_MAX_FUNCTION; function++) {
 				uint16_t vendor_id = _pci_read16(bus, slot, function, PCI_VENDOR_ID);
 				if(vendor_id == INVALID_VENDOR)
-					goto next_slot;
+					goto next;
 				
 				uint8_t header_type = _pci_read8(bus, slot, function, PCI_HEADER_TYPE);
 				
@@ -46,9 +47,9 @@ static int pci_count() {
 				if(!(header_type & 0x80))
 					break;
 			}
-		}
-next_slot:
+next:
 		;
+		}
 	}
 done:
 	
@@ -65,12 +66,12 @@ static void pci_analyze() {
 				
 				uint16_t vendor_id = _pci_read16(bus, slot, function, PCI_VENDOR_ID);
 				if(vendor_id == INVALID_VENDOR)
-					goto next_slot;
+					goto next;
 				
 				uint16_t device_id = _pci_read16(bus, slot, function, PCI_DEVICE_ID);
 				uint8_t header_type = _pci_read8(bus, slot, function, PCI_HEADER_TYPE);
 				
-				PCI_Device* device = &devices[count];
+				PCI_Device* device = &pci_devices[count];
 				bzero(device, sizeof(PCI_Device));
 				device->vendor_id = vendor_id;
 				device->device_id = device_id;
@@ -132,20 +133,20 @@ static void pci_analyze() {
 				if(!(header_type & 0x80))
 					break;
 			}
+next:
+			;
 		}
-next_slot:
-		;
 	}
 done:
 	;
 }
 
 void pci_init() {
-	devices_count = pci_count();
+	pci_devices_count = pci_count();
 	
 	pci_analyze();
-	for(int i = 0; i < devices_count; i++) {
-		PCI_Device* device = &devices[i];
+	for(int i = 0; i < pci_devices_count; i++) {
+		PCI_Device* device = &pci_devices[i];
 		printf("Bus: %d, Slot: %d, Function: %d\n", device->bus, device->slot, device->function);
 		printf("Vendor ID: %x, Device ID: %x\n", device->vendor_id, device->device_id);
 		
@@ -154,13 +155,17 @@ void pci_init() {
 		printf("Subsystem Vendor ID: %x, Subsystem ID: %x\n", pci_read16(device, PCI_SUBSYSTEM_VENDOR_ID), pci_read16(device, PCI_SUBSYSTEM_ID));
 		printf("header type: %x\n\n", pci_read8(device, PCI_HEADER_TYPE));
 	}
+	
+	// Probe PCIe port
+	int count = pci_probe(port_device_type, port_device_probe, &port_device_driver);
+	printf("PCIe Port: %d\n", count);
 }
 
 uint32_t pci_device_size(uint16_t vendor_id, uint16_t device_id) {
 	uint32_t count = 0;
 	
-	for(int i = 0; i < devices_count; i++) {
-		PCI_Device* device = &devices[i];
+	for(int i = 0; i < pci_devices_count; i++) {
+		PCI_Device* device = &pci_devices[i];
 		if(device->vendor_id == vendor_id && device->device_id == device_id)
 			count++;
 	}
@@ -169,8 +174,8 @@ uint32_t pci_device_size(uint16_t vendor_id, uint16_t device_id) {
 }
 
 PCI_Device* pci_device(uint16_t vendor_id, uint16_t device_id, uint32_t index) {
-	for(int i = 0; i < devices_count; i++) {
-		PCI_Device* device = &devices[i];
+	for(int i = 0; i < pci_devices_count; i++) {
+		PCI_Device* device = &pci_devices[i];
 		if(device->vendor_id == vendor_id && device->device_id == device_id && index-- == 0)
 			return device;
 	}
@@ -322,29 +327,23 @@ static void _pci_write32(uint8_t bus, uint8_t slot, uint8_t function, uint32_t r
 	}
 }
 
-int pci_probe(DeviceType type, PCI_ID* ids, void* driver) {
+int pci_probe(DeviceType type, PCI_DEVICE_PROBE probe, Driver* driver) {
 	int count = 0;
 	
-	for(int i = 0; i < devices_count; i++) {
-		PCI_Device* pci = &devices[i];
-		if(pci->name)
-			continue;
+	for(int i = 0; i < pci_devices_count; i++) {
+		PCI_Device* pci = &pci_devices[i];
 		
 		// Try to probe
-		for(int j = 0; ids[j].vendor_id != 0 && ids[j].device_id != 0; j++) {
-			PCI_ID* id = &ids[j];
-			if(pci->vendor_id == id->vendor_id && pci->device_id == id->device_id) {
-				if(device_register(type, driver, pci, id->data)) {
-					int len = strlen(id->name) + 1;
-					pci->name = malloc(len);
-					memcpy(pci->name, id->name, len);
-					
-					printf("\tPCI device probed: id: %d, vendor: %04x, device: %04x, name: %s\n", i, pci->vendor_id, pci->device_id, pci->name);
-					
-					count++;
-					break;
-				}
-			}
+		void* data = NULL;
+		char* name;
+		if(!pci->name && probe(pci, &name, &data) && device_register(type, driver, pci, data)) {
+			int len = strlen(name) + 1;
+			pci->name = malloc(len);
+			memcpy(pci->name, name, len);
+			
+			printf("\tPCI device probed: id: %d, vendor: %04x, device: %04x, name: %s\n", i, pci->vendor_id, pci->device_id, pci->name);
+			
+			count++;
 		}
 	}
 	
