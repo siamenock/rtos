@@ -209,8 +209,9 @@ void acpi_init() {
 	if(mcfg) {
 		int length = (mcfg->length - sizeof(ACPIHeader) - 8) / sizeof(MMapConfigSpace);
 		for(int i = 0; i < length; i++) {
-			for(int i = mcfg->mmaps[i].start; i <= mcfg->mmaps[i].end; i++)
-				pci_mmio[i] = (void*)mcfg->mmaps[i].address;
+			for(int j = mcfg->mmaps[i].start; j <= mcfg->mmaps[i].end; j++) {
+				pci_mmio[j] = (void*)mcfg->mmaps[i].address;
+			}
 		}
 	}
 	

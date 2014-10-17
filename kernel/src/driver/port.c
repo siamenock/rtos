@@ -1,3 +1,5 @@
+#include <stdio.h>
+#include "../pci.h"
 #include "device.h"
 #include "port.h"
 
@@ -16,5 +18,13 @@ Driver port_device_driver = {
 };
 
 bool port_device_probe(PCI_Device* pci, char** name, void** data) {
-	return false;
+	uint8_t type = pci_pcie_type(pci);
+	if(!pci_is_pcie(pci) && 
+			(type != PCI_EXP_TYPE_ROOT_PORT &&
+			type != PCI_EXP_TYPE_UPSTREAM &&
+			type != PCI_EXP_TYPE_DOWNSTREAM))
+		return false;
+	
+	printf("vendor: %x, device: %x, ver: %d, type: %d\n", pci->vendor_id, pci->device_id, pci_pcie_ver(pci), pci_pcie_type(pci));
+	return true;
 }

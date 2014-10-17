@@ -276,11 +276,11 @@ void main(void) {
 		idt_init();
 		idt_load();
 		
-		printf("Initializing PCI...\n");
-		pci_init();
-		
 		printf("Initializing ACPI...\n");
 		acpi_init();
+		
+		printf("Initializing PCI...\n");
+		pci_init();
 		
 		printf("Initializing APICs...\n");
 		apic_activate();

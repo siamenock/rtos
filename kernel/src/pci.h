@@ -269,11 +269,6 @@
 #define PCI_EXP_LNKSTA2         50      /* Link Status 2 */
 #define PCI_EXP_SLTCTL2         56      /* Slot Control 2 */
 
-/* Extended Capabilities (PCI-X 2.0 and Express) */
-#define PCI_EXT_CAP_ID(header)          (header & 0x0000ffff)
-#define PCI_EXT_CAP_VER(header)         ((header >> 16) & 0xf)
-#define PCI_EXT_CAP_NEXT(header)        ((header >> 20) & 0xffc)
-
 #define PCI_EXT_CAP_ID_ERR      0x01    /* Advanced Error Reporting */
 #define PCI_EXT_CAP_ID_VC       0x02    /* Virtual Channel Capability */
 #define PCI_EXT_CAP_ID_DSN      0x03    /* Device Serial Number */
@@ -325,10 +320,18 @@ typedef struct _PCI_Device {
 	
 	uint8_t		irq;
 	
-	uint8_t		capabilities[PCI_CAP_ID_MAX + 1];
+	uint8_t		caps[PCI_CAP_ID_MAX + 1];	// PCI capabilities
+	uint16_t	capse[PCI_EXT_CAP_ID_MAX + 1];	// PCIe capabilities
 	
 	void*		priv;
 } PCI_Device;
+
+typedef struct {
+	uint16_t	id;
+	uint8_t		ver: 4;
+	uint16_t	next: 12;
+	uint8_t		data[0];
+} __attribute__((packed)) PCIeExtendedCapability;
 
 #define PCI_MAX_DEVICES		32
 #define PCI_MAX_BUS		256
@@ -353,6 +356,10 @@ uint16_t pci_read16(PCI_Device* device, uint32_t reg);
 void pci_write16(PCI_Device* device, uint32_t reg, uint16_t data);
 uint32_t pci_read32(PCI_Device* device, uint32_t reg);
 void pci_write32(PCI_Device* device, uint32_t reg, uint32_t data);
+
+bool pci_is_pcie(PCI_Device* device);
+uint8_t pci_pcie_ver(PCI_Device* device);
+uint8_t pci_pcie_type(PCI_Device* device);
 
 int pci_probe(DeviceType type, PCI_DEVICE_PROBE probe, Driver* driver);
 

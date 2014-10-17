@@ -21,12 +21,12 @@ int pci_cache_line_size;
 PCI_Device pci_devices[PCI_MAX_DEVICES];
 int pci_devices_count;
 	
-static uint8_t _pci_read8(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg);
-static void _pci_write8(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, uint8_t data);
-static uint16_t _pci_read16(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg);
-static void _pci_write16(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, uint16_t data);
-static uint32_t _pci_read32(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg);
-static void _pci_write32(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, uint32_t data);
+static uint8_t _pci_read8(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, bool is_pcix);
+static void _pci_write8(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, bool is_pcix, uint8_t data);
+static uint16_t _pci_read16(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, bool is_pcix);
+static void _pci_write16(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, bool is_pcix, uint16_t data);
+static uint32_t _pci_read32(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, bool is_pcix);
+static void _pci_write32(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, bool is_pcix, uint32_t data);
 
 static int pci_count() {
 	int count = 0;
@@ -35,11 +35,11 @@ static int pci_count() {
 	for(bus = 0; bus < PCI_MAX_BUS; bus++) {
 		for(slot = 0; slot < PCI_MAX_SLOT; slot++) {
 			for(function = 0; function < PCI_MAX_FUNCTION; function++) {
-				uint16_t vendor_id = _pci_read16(bus, slot, function, PCI_VENDOR_ID);
+				uint16_t vendor_id = _pci_read16(bus, slot, function, PCI_VENDOR_ID, false);
 				if(vendor_id == INVALID_VENDOR)
 					goto next;
 				
-				uint8_t header_type = _pci_read8(bus, slot, function, PCI_HEADER_TYPE);
+				uint8_t header_type = _pci_read8(bus, slot, function, PCI_HEADER_TYPE, false);
 				
 				if(++count > PCI_MAX_DEVICES)
 					goto done;
@@ -62,14 +62,12 @@ static void pci_analyze() {
 	for(bus = 0; bus < PCI_MAX_BUS; bus++) {
 		for(slot = 0; slot < PCI_MAX_SLOT; slot++) {
 			for(function = 0; function < PCI_MAX_FUNCTION; function++) {
-				//uint32_t address = (1 << 31) | (bus << 16) | (slot << 11) | (function << 8) | 0;
-				
-				uint16_t vendor_id = _pci_read16(bus, slot, function, PCI_VENDOR_ID);
+				uint16_t vendor_id = _pci_read16(bus, slot, function, PCI_VENDOR_ID, false);
 				if(vendor_id == INVALID_VENDOR)
 					goto next;
 				
-				uint16_t device_id = _pci_read16(bus, slot, function, PCI_DEVICE_ID);
-				uint8_t header_type = _pci_read8(bus, slot, function, PCI_HEADER_TYPE);
+				uint16_t device_id = _pci_read16(bus, slot, function, PCI_DEVICE_ID, false);
+				uint8_t header_type = _pci_read8(bus, slot, function, PCI_HEADER_TYPE, false);
 				
 				PCI_Device* device = &pci_devices[count];
 				bzero(device, sizeof(PCI_Device));
@@ -119,9 +117,26 @@ static void pci_analyze() {
 							break;
 						
 						if(id <= PCI_CAP_ID_MAX)
-							device->capabilities[id] = reg;
+							device->caps[id] = reg;
 						
 						reg += PCI_CAP_LIST_NEXT;
+					}
+				}
+				
+				// PCIe capabilities
+				if(device->caps[PCI_CAP_ID_EXP] && !!pci_mmio[device->bus]) {
+					void* mmio = pci_mmio[bus];
+					mmio +=	((uint64_t)device->bus << 20) |
+						((uint64_t)device->slot << 15) |
+						((uint64_t)device->function << 12);
+					
+					int reg = 0x100;
+					PCIeExtendedCapability* cap = mmio + reg;
+					while(cap->id != 0 && reg != 0) {
+						device->capse[cap->id] = reg;
+						
+						reg = cap->next;
+						cap = mmio + reg;
 					}
 				}
 				
@@ -147,18 +162,37 @@ void pci_init() {
 	pci_analyze();
 	for(int i = 0; i < pci_devices_count; i++) {
 		PCI_Device* device = &pci_devices[i];
-		printf("Bus: %d, Slot: %d, Function: %d\n", device->bus, device->slot, device->function);
+		if(!device->caps[PCI_CAP_ID_EXP])
+			continue;
+		
+		printf("Bus: %d, Slot: %d, Function: %d ", device->bus, device->slot, device->function);
 		printf("Vendor ID: %x, Device ID: %x\n", device->vendor_id, device->device_id);
 		
+		/*
 		printf("Command: %x, Status: %x\n", pci_read16(device, PCI_COMMAND), pci_read16(device, PCI_STATUS));
 		printf("Revision ID: %x, Prog IF: %x, Subclass: %x, Class code: %x\n", pci_read8(device, PCI_REVISION_ID), pci_read8(device, PCI_PROG_IF), pci_read8(device, PCI_SUB_CLASS), pci_read8(device, PCI_CLASS_CODE));
 		printf("Subsystem Vendor ID: %x, Subsystem ID: %x\n", pci_read16(device, PCI_SUBSYSTEM_VENDOR_ID), pci_read16(device, PCI_SUBSYSTEM_ID));
 		printf("header type: %x\n\n", pci_read8(device, PCI_HEADER_TYPE));
+		printf("\tcapability[%x] = %x\n", PCI_CAP_ID_EXP, device->caps[PCI_CAP_ID_EXP]);
+		*/
+		printf("\t Caps: ");
+		for(int i = 0; i <= PCI_CAP_ID_MAX; i++) {
+			if(device->caps[i])
+				printf("[%x] %x ", i, device->caps[i]);
+		}
+		printf("\n");
+		printf("\t ExCaps: ");
+		for(int i = 0; i <= PCI_CAP_ID_MAX; i++) {
+			if(device->capse[i])
+				printf("[%x] %x ", i, device->capse[i]);
+		}
+		printf("\n");
 	}
 	
 	// Probe PCIe port
 	int count = pci_probe(port_device_type, port_device_probe, &port_device_driver);
 	printf("PCIe Port: %d\n", count);
+	while(1) asm("hlt");
 }
 
 uint32_t pci_device_size(uint16_t vendor_id, uint16_t device_id) {
@@ -208,12 +242,12 @@ bool pci_power_set(PCI_Device* device) {
 }
 
 uint8_t pci_read8(PCI_Device* device, uint32_t reg) {
-	return _pci_read8(device->bus, device->slot, device->function, reg);
+	return _pci_read8(device->bus, device->slot, device->function, reg, !!device->caps[PCI_CAP_ID_EXP]);
 }
 
-static uint8_t _pci_read8(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg) {
+static uint8_t _pci_read8(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, bool is_pcix) {
 	void* mmio = pci_mmio[bus];
-	if(mmio) {
+	if(is_pcix && mmio) {
 		mmio +=	((uint64_t)bus << 20) |
 			((uint64_t)slot << 15) |
 			((uint64_t)function << 12) |
@@ -228,12 +262,12 @@ static uint8_t _pci_read8(uint8_t bus, uint8_t slot, uint8_t function, uint32_t 
 }
 
 void pci_write8(PCI_Device* device, uint32_t reg, uint8_t data) {
-	return _pci_write8(device->bus, device->slot, device->function, reg, data);
+	return _pci_write8(device->bus, device->slot, device->function, reg, data, !!device->caps[PCI_CAP_ID_EXP]);
 }
 
-static void _pci_write8(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, uint8_t data) {
+static void _pci_write8(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, bool is_pcix, uint8_t data) {
 	void* mmio = pci_mmio[bus];
-	if(mmio) {
+	if(is_pcix && mmio) {
 		mmio +=	((uint64_t)bus << 20) |
 			((uint64_t)slot << 15) |
 			((uint64_t)function << 12) |
@@ -248,12 +282,12 @@ static void _pci_write8(uint8_t bus, uint8_t slot, uint8_t function, uint32_t re
 }
 
 uint16_t pci_read16(PCI_Device* device, uint32_t reg) {
-	return _pci_read16(device->bus, device->slot, device->function, reg);
+	return _pci_read16(device->bus, device->slot, device->function, reg, !!device->caps[PCI_CAP_ID_EXP]);
 }
 
-static uint16_t _pci_read16(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg) {
+static uint16_t _pci_read16(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, bool is_pcix) {
 	void* mmio = pci_mmio[bus];
-	if(mmio) {
+	if(is_pcix && mmio) {
 		mmio +=	((uint64_t)bus << 20) |
 			((uint64_t)slot << 15) |
 			((uint64_t)function << 12) |
@@ -268,12 +302,12 @@ static uint16_t _pci_read16(uint8_t bus, uint8_t slot, uint8_t function, uint32_
 }
 
 void pci_write16(PCI_Device* device, uint32_t reg, uint16_t data) {
-	return _pci_write16(device->bus, device->slot, device->function, reg, data);
+	return _pci_write16(device->bus, device->slot, device->function, reg, data, !!device->caps[PCI_CAP_ID_EXP]);
 }
 
-static void _pci_write16(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, uint16_t data) {
+static void _pci_write16(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, bool is_pcix, uint16_t data) {
 	void* mmio = pci_mmio[bus];
-	if(mmio) {
+	if(is_pcix && mmio) {
 		mmio +=	((uint64_t)bus << 20) |
 			((uint64_t)slot << 15) |
 			((uint64_t)function << 12) |
@@ -288,12 +322,12 @@ static void _pci_write16(uint8_t bus, uint8_t slot, uint8_t function, uint32_t r
 }
 
 uint32_t pci_read32(PCI_Device* device, uint32_t reg) {
-	return _pci_read32(device->bus, device->slot, device->function, reg);
+	return _pci_read32(device->bus, device->slot, device->function, reg, !!device->caps[PCI_CAP_ID_EXP]);
 }
 
-static uint32_t _pci_read32(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg) {
+static uint32_t _pci_read32(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, bool is_pcix) {
 	void* mmio = pci_mmio[bus];
-	if(mmio) {
+	if(is_pcix && mmio) {
 		mmio +=	((uint64_t)bus << 20) |
 			((uint64_t)slot << 15) |
 			((uint64_t)function << 12) |
@@ -308,12 +342,12 @@ static uint32_t _pci_read32(uint8_t bus, uint8_t slot, uint8_t function, uint32_
 }
 
 void pci_write32(PCI_Device* device, uint32_t reg, uint32_t data) {
-	return _pci_write32(device->bus, device->slot, device->function, reg, data);
+	return _pci_write32(device->bus, device->slot, device->function, reg, data, !!device->caps[PCI_CAP_ID_EXP]);
 }
 
-static void _pci_write32(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, uint32_t data) {
+static void _pci_write32(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, bool is_pcix, uint32_t data) {
 	void* mmio = pci_mmio[bus];
-	if(mmio) {
+	if(is_pcix && mmio) {
 		mmio +=	((uint64_t)bus << 20) |
 			((uint64_t)slot << 15) |
 			((uint64_t)function << 12) |
@@ -325,6 +359,18 @@ static void _pci_write32(uint8_t bus, uint8_t slot, uint8_t function, uint32_t r
 		port_out32(PCI_CONFIG_ADDRESS, address);
 		port_out32(PCI_CONFIG_DATA, data);
 	}
+}
+
+bool pci_is_pcie(PCI_Device* device) {
+	return !!device->caps[PCI_CAP_ID_EXP];
+}
+
+uint8_t pci_pcie_ver(PCI_Device* device) {
+	return pci_read8(device, device->caps[PCI_CAP_ID_EXP] + PCI_EXP_FLAGS) & 0x0f;
+}
+
+uint8_t pci_pcie_type(PCI_Device* device) {
+	return (pci_read8(device, device->caps[PCI_CAP_ID_EXP] + PCI_EXP_FLAGS) >> 4) & 0x0f;
 }
 
 int pci_probe(DeviceType type, PCI_DEVICE_PROBE probe, Driver* driver) {
