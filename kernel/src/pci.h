@@ -357,7 +357,6 @@ void pci_write16(PCI_Device* device, uint32_t reg, uint16_t data);
 uint32_t pci_read32(PCI_Device* device, uint32_t reg);
 void pci_write32(PCI_Device* device, uint32_t reg, uint32_t data);
 
-bool pci_is_pcie(PCI_Device* device);
 uint8_t pci_pcie_ver(PCI_Device* device);
 uint8_t pci_pcie_type(PCI_Device* device);
 

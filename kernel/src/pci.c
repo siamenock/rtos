@@ -22,11 +22,11 @@ PCI_Device pci_devices[PCI_MAX_DEVICES];
 int pci_devices_count;
 	
 static uint8_t _pci_read8(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, bool is_pcix);
-static void _pci_write8(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, bool is_pcix, uint8_t data);
+static void _pci_write8(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, uint8_t data, bool is_pcix);
 static uint16_t _pci_read16(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, bool is_pcix);
-static void _pci_write16(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, bool is_pcix, uint16_t data);
+static void _pci_write16(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, uint16_t data, bool is_pcix);
 static uint32_t _pci_read32(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, bool is_pcix);
-static void _pci_write32(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, bool is_pcix, uint32_t data);
+static void _pci_write32(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, uint32_t data, bool is_pcix);
 
 static int pci_count() {
 	int count = 0;
@@ -160,6 +160,7 @@ void pci_init() {
 	pci_devices_count = pci_count();
 	
 	pci_analyze();
+		/*
 	for(int i = 0; i < pci_devices_count; i++) {
 		PCI_Device* device = &pci_devices[i];
 		if(!device->caps[PCI_CAP_ID_EXP])
@@ -168,13 +169,11 @@ void pci_init() {
 		printf("Bus: %d, Slot: %d, Function: %d ", device->bus, device->slot, device->function);
 		printf("Vendor ID: %x, Device ID: %x\n", device->vendor_id, device->device_id);
 		
-		/*
 		printf("Command: %x, Status: %x\n", pci_read16(device, PCI_COMMAND), pci_read16(device, PCI_STATUS));
 		printf("Revision ID: %x, Prog IF: %x, Subclass: %x, Class code: %x\n", pci_read8(device, PCI_REVISION_ID), pci_read8(device, PCI_PROG_IF), pci_read8(device, PCI_SUB_CLASS), pci_read8(device, PCI_CLASS_CODE));
 		printf("Subsystem Vendor ID: %x, Subsystem ID: %x\n", pci_read16(device, PCI_SUBSYSTEM_VENDOR_ID), pci_read16(device, PCI_SUBSYSTEM_ID));
 		printf("header type: %x\n\n", pci_read8(device, PCI_HEADER_TYPE));
 		printf("\tcapability[%x] = %x\n", PCI_CAP_ID_EXP, device->caps[PCI_CAP_ID_EXP]);
-		*/
 		printf("\t Caps: ");
 		for(int i = 0; i <= PCI_CAP_ID_MAX; i++) {
 			if(device->caps[i])
@@ -188,11 +187,10 @@ void pci_init() {
 		}
 		printf("\n");
 	}
+		*/
 	
 	// Probe PCIe port
-	int count = pci_probe(port_device_type, port_device_probe, &port_device_driver);
-	printf("PCIe Port: %d\n", count);
-	while(1) asm("hlt");
+	pci_probe(port_device_type, port_device_probe, &port_device_driver);
 }
 
 uint32_t pci_device_size(uint16_t vendor_id, uint16_t device_id) {
@@ -255,9 +253,8 @@ static uint8_t _pci_read8(uint8_t bus, uint8_t slot, uint8_t function, uint32_t 
 		
 		return *(uint8_t*)mmio;
 	} else {
-		uint32_t address = (1 << 31) | (bus << 16) | (slot << 11) | (function << 8) | (reg & 0xfc);
-		port_out32(PCI_CONFIG_ADDRESS, address);
-		return (uint8_t)(port_in32(PCI_CONFIG_DATA) >> (reg & 0x3) * 8);
+		port_out32(PCI_CONFIG_ADDRESS, (1 << 31) | (bus << 16) | (slot << 11) | (function << 8) | (reg & 0xfc));
+		return port_in8(PCI_CONFIG_DATA + (reg & 3));
 	}
 }
 
@@ -265,7 +262,7 @@ void pci_write8(PCI_Device* device, uint32_t reg, uint8_t data) {
 	return _pci_write8(device->bus, device->slot, device->function, reg, data, !!device->caps[PCI_CAP_ID_EXP]);
 }
 
-static void _pci_write8(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, bool is_pcix, uint8_t data) {
+static void _pci_write8(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, uint8_t data, bool is_pcix) {
 	void* mmio = pci_mmio[bus];
 	if(is_pcix && mmio) {
 		mmio +=	((uint64_t)bus << 20) |
@@ -275,9 +272,8 @@ static void _pci_write8(uint8_t bus, uint8_t slot, uint8_t function, uint32_t re
 		
 		*(uint8_t*)mmio = data;
 	} else {
-		uint32_t address = (1 << 31) | (bus << 16) | (slot << 11) | (function << 8) | (reg & 0xfc);
-		port_out32(PCI_CONFIG_ADDRESS, address);
-		port_out32(PCI_CONFIG_DATA, port_in32(PCI_CONFIG_DATA) | ((uint32_t)data) << ((reg & 0x03) * 8));
+		port_out32(PCI_CONFIG_ADDRESS, (1 << 31) | (bus << 16) | (slot << 11) | (function << 8) | (reg & 0xfc));
+		port_out8(PCI_CONFIG_DATA + (reg & 3), data);
 	}
 }
 
@@ -295,9 +291,8 @@ static uint16_t _pci_read16(uint8_t bus, uint8_t slot, uint8_t function, uint32_
 		
 		return *(uint16_t*)mmio;
 	} else {
-		uint32_t address = (1 << 31) | (bus << 16) | (slot << 11) | (function << 8) | (reg & 0xfc);
-		port_out32(PCI_CONFIG_ADDRESS, address);
-		return (uint16_t)(port_in32(PCI_CONFIG_DATA) >> (reg & 0x3) * 8);
+		port_out32(PCI_CONFIG_ADDRESS, (1 << 31) | (bus << 16) | (slot << 11) | (function << 8) | (reg & 0xfc));
+		return port_in16(PCI_CONFIG_DATA + (reg & 2));
 	}
 }
 
@@ -305,7 +300,7 @@ void pci_write16(PCI_Device* device, uint32_t reg, uint16_t data) {
 	return _pci_write16(device->bus, device->slot, device->function, reg, data, !!device->caps[PCI_CAP_ID_EXP]);
 }
 
-static void _pci_write16(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, bool is_pcix, uint16_t data) {
+static void _pci_write16(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, uint16_t data, bool is_pcix) {
 	void* mmio = pci_mmio[bus];
 	if(is_pcix && mmio) {
 		mmio +=	((uint64_t)bus << 20) |
@@ -315,9 +310,8 @@ static void _pci_write16(uint8_t bus, uint8_t slot, uint8_t function, uint32_t r
 		
 		*(uint16_t*)mmio = data;
 	} else {
-		uint32_t address = (1 << 31) | (bus << 16) | (slot << 11) | (function << 8) | (reg & 0xfc);
-		port_out32(PCI_CONFIG_ADDRESS, address);
-		port_out32(PCI_CONFIG_DATA, port_in32(PCI_CONFIG_DATA) | ((uint32_t)data) << ((reg & 0x03) * 8));
+		port_out32(PCI_CONFIG_ADDRESS, (1 << 31) | (bus << 16) | (slot << 11) | (function << 8) | (reg & 0xfc));
+		port_out16(PCI_CONFIG_DATA + (reg & 2), data);
 	}
 }
 
@@ -345,7 +339,7 @@ void pci_write32(PCI_Device* device, uint32_t reg, uint32_t data) {
 	return _pci_write32(device->bus, device->slot, device->function, reg, data, !!device->caps[PCI_CAP_ID_EXP]);
 }
 
-static void _pci_write32(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, bool is_pcix, uint32_t data) {
+static void _pci_write32(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, uint32_t data, bool is_pcix) {
 	void* mmio = pci_mmio[bus];
 	if(is_pcix && mmio) {
 		mmio +=	((uint64_t)bus << 20) |
@@ -359,10 +353,6 @@ static void _pci_write32(uint8_t bus, uint8_t slot, uint8_t function, uint32_t r
 		port_out32(PCI_CONFIG_ADDRESS, address);
 		port_out32(PCI_CONFIG_DATA, data);
 	}
-}
-
-bool pci_is_pcie(PCI_Device* device) {
-	return !!device->caps[PCI_CAP_ID_EXP];
 }
 
 uint8_t pci_pcie_ver(PCI_Device* device) {

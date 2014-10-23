@@ -19,7 +19,7 @@ Driver port_device_driver = {
 
 bool port_device_probe(PCI_Device* pci, char** name, void** data) {
 	uint8_t type = pci_pcie_type(pci);
-	if(!pci_is_pcie(pci) && 
+	if(!pci->caps[PCI_CAP_ID_EXP] && 
 			(type != PCI_EXP_TYPE_ROOT_PORT &&
 			type != PCI_EXP_TYPE_UPSTREAM &&
 			type != PCI_EXP_TYPE_DOWNSTREAM))
