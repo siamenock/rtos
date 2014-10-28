@@ -12,6 +12,7 @@ typedef struct {
 	NetworkInterface*	ni;
 	List*		pools;
 	void*		pool;
+	int		port;
 	
 	// Information
 	uint64_t	mac;

@@ -19,6 +19,7 @@ enum RPC_MessageDigestType {
 
 struct RPC_NIC {
 	unsigned hyper	mac;
+	unsigned int	port;
 	unsigned int	input_buffer_size;
 	unsigned int	output_buffer_size;
 	unsigned hyper	input_bandwidth;

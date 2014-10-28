@@ -60,10 +60,13 @@ static bool idle0_event(void* data) {
 	*/
 	
 	// Poll NICs
+	extern int ni_port;
 	int poll_count = 0;
 	for(int i = 0; i < nics_count; i++) {
 		Device* dev = nics[i];
 		NIC* nic = dev->driver;
+		
+		ni_port = i;
 		poll_count += nic->poll(dev->id);
 	}
 	
@@ -327,13 +330,14 @@ void main(void) {
 			nics[i] = device_get(DEVICE_TYPE_NIC, i);
 			NICStatus status;
 			((NIC*)nics[i]->driver)->get_status(nics[i]->id, &status);
-			printf("\tNIC[%d]: %02x:%02x:%02x:%02x:%02x:%02x\n", i,
+			printf("\tNIC[%d]: %02x:%02x:%02x:%02x:%02x:%02x %c\n", i,
 				(status.mac >> 40) & 0xff, 
 				(status.mac >> 32) & 0xff, 
 				(status.mac >> 24) & 0xff, 
 				(status.mac >> 16) & 0xff, 
 				(status.mac >> 8) & 0xff, 
-				(status.mac >> 0) & 0xff);
+				(status.mac >> 0) & 0xff,
+				ni_mac == 0 ? '*' : ' ');
 			
 			if(ni_mac == 0)
 				ni_mac = status.mac;

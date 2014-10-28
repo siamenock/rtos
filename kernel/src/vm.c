@@ -452,6 +452,7 @@ uint64_t vm_create(VMSpec* vm_spec) {
 		
 		uint64_t attrs[] = { 
 			NI_MAC, mac,
+			NI_PORT, nics[i].port,
 			NI_INPUT_BUFFER_SIZE, nics[i].input_buffer_size,
 			NI_OUTPUT_BUFFER_SIZE, nics[i].output_buffer_size,
 			NI_INPUT_BANDWIDTH, nics[i].input_bandwidth,

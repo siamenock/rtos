@@ -12,7 +12,6 @@
 #include "cpu.h"
 #include "pci.h"
 #include "device.h"
-#include "../../loader/src/page.h"	// TODO: Delete it
 
 #include "ni.h"
 
@@ -21,6 +20,8 @@
 #define ALIGN	16
 
 Map* nis;
+
+int ni_port;	// Current I/O port
 
 uint64_t ni_mac;
 uint64_t ni_rx;
@@ -90,7 +91,7 @@ NI* ni_create(uint64_t* attrs) {
 		errno = 3;
 		return NULL;
 	}
-	 
+	
 	// Allocate NI
 	NI* ni = gmalloc(sizeof(NI));
 	if(!ni)
@@ -164,6 +165,9 @@ NI* ni_create(uint64_t* attrs) {
 		switch(attrs[i * 2]) {
 			case NI_MAC:
 				ni->ni->mac = ni->mac = attrs[i * 2 + 1];
+				break;
+			case NI_PORT:
+				ni->port = (int)attrs[i * 2 + 1];
 				break;
 			case NI_POOL_SIZE:
 				break;
@@ -531,7 +535,8 @@ void ni_process_input(uint8_t* buf1, uint32_t size1, uint8_t* buf2, uint32_t siz
 	uint64_t time = cpu_tsc();
 	
 	#if DEBUG
-	printf("Input:  %02x:%02x:%02x:%02x:%02x:%02x %02x:%02x:%02x:%02x:%02x:%02x\n", 
+	printf("Input:  [%02d] %02x:%02x:%02x:%02x:%02x:%02x %02x:%02x:%02x:%02x:%02x:%02x\n", 
+		ni_port,
 		(dmac >> 40) & 0xff, (dmac >> 32) & 0xff, (dmac >> 24) & 0xff,
 		(dmac >> 16) & 0xff, (dmac >> 8) & 0xff, (dmac >> 0) & 0xff,
 		(smac >> 40) & 0xff, (smac >> 32) & 0xff, (smac >> 24) & 0xff,
@@ -609,17 +614,17 @@ dropped:
 	if(dmac & ETHER_MULTICAST) {
 		MapIterator iter;
 		map_iterator_init(&iter, nis);
-		bool result = false;
 		while(map_iterator_has_next(&iter)) {
 			MapEntry* entry = map_iterator_next(&iter);
 			NI* ni = entry->data;
-			result |= input(ni);
+			if(ni->port == ni_port) {
+				if(input(ni))
+					ni_rx++;
+			}
 		}
-		if(result)
-			ni_rx++;
 	} else {
 		NI* ni = map_get(nis, (void*)dmac);
-		if(ni) {
+		if(ni && ni->port == ni_port) {
 			if(input(ni))
 				ni_rx++;
 		}
@@ -634,6 +639,9 @@ Packet* ni_process_output() {
 	while(map_iterator_has_next(&iter)) {
 		MapEntry* entry = map_iterator_next(&iter);
 		NI* ni = entry->data;
+		if(ni->port != ni_port)
+			continue;
+		
 		if(ni->output_closed - ni->output_wait_grace > time) {
 			printf("output closed: %016lx\n", ni->mac);
 			continue;
@@ -665,7 +673,8 @@ Packet* ni_process_output() {
 		
 		#if DEBUG
 		uint64_t smac = ni->mac;
-		printf("Output: %02x:%02x:%02x:%02x:%02x:%02x %02x:%02x:%02x:%02x:%02x:%02x\n", 
+		printf("Output: [%02d] %02x:%02x:%02x:%02x:%02x:%02x %02x:%02x:%02x:%02x:%02x:%02x\n", 
+			ni_port,
 			(dmac >> 40) & 0xff, (dmac >> 32) & 0xff, (dmac >> 24) & 0xff,
 			(dmac >> 16) & 0xff, (dmac >> 8) & 0xff, (dmac >> 0) & 0xff,
 			(smac >> 40) & 0xff, (smac >> 32) & 0xff, (smac >> 24) & 0xff,

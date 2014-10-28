@@ -1,6 +1,6 @@
 .PHONY: all run deploy clean cleanall system.img mount umount
 
-QEMU=qemu-system-x86_64 $(shell util/qemu-params) -m 256 -hda system.img -M pc -smp 8 -d cpu_reset -net nic,model=rtl8139 -net tap,script=util/qemu-ifup
+QEMU=qemu-system-x86_64 $(shell util/qemu-params) -m 256 -hda system.img -M pc -smp 8 -d cpu_reset -net nic,model=rtl8139 -net tap,script=util/qemu-ifup -net nic,model=rtl8139 -net tap,script=util/qemu-ifup
 
 all: system.img
 
@@ -17,7 +17,7 @@ system.img:
 	util/pnkc kernel/kernel.elf kernel.bin
 	# Make root.img
 	dd if=/dev/zero of=root.img count=$(SYSTEM_IMG_SIZE)
-	mkdir mnt
+	mkdir -p mnt
 	sudo losetup /dev/loop0 root.img
 	sudo util/mkfs.bfs /dev/loop0
 	sudo mount /dev/loop0 mnt

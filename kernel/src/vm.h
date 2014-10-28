@@ -40,6 +40,7 @@ typedef struct {
 
 typedef struct {
 	uint64_t	mac;
+	uint32_t	port;
 	uint32_t	input_buffer_size;
 	uint32_t	output_buffer_size;
 	uint64_t	input_bandwidth;

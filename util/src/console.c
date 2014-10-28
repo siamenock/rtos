@@ -218,6 +218,13 @@ static int cmd_vm_create(int argc, char** argv) {
 						return -1;
 					}
 					nic->mac = parse_uint64(argv[i]);
+				} else if(strcmp(argv[i], "port:") == 0) {
+					i++;
+					if(!is_uint32(argv[i])) {
+						printf("port must be uint32\n");
+						return -1;
+					}
+					nic->port = parse_uint32(argv[i]);
 				} else if(strcmp(argv[i], "ibuf:") == 0) {
 					i++;
 					if(!is_uint32(argv[i])) {
@@ -554,7 +561,7 @@ Command commands[] = {
 	{
 		.name = "create",
 		.desc = "Create VM",
-		.args = "vmid: uint64, core: (number: int) memory: (size: uint32) storage: (size: uint32) [nic: mac: (addr: uint64) ibuf: (size: uint32) obuf: (size: uint32) iband: (size: uint64) oband: (size: uint64) pool: (size: uint32)]* [args: [string]+ ]",
+		.args = "vmid: uint64, core: (number: int) memory: (size: uint32) storage: (size: uint32) [nic: mac: (addr: uint64) port: (num: uint32) ibuf: (size: uint32) obuf: (size: uint32) iband: (size: uint64) oband: (size: uint64) pool: (size: uint32)]* [args: [string]+ ]",
 		.func = cmd_vm_create
 	},
 	{
