@@ -25,6 +25,7 @@ bool port_device_probe(PCI_Device* pci, char** name, void** data) {
 			type != PCI_EXP_TYPE_DOWNSTREAM))
 		return false;
 	
-	printf("vendor: %x, device: %x, ver: %d, type: %d\n", pci->vendor_id, pci->device_id, pci_pcie_ver(pci), pci_pcie_type(pci));
+	pci_enable(pci);
+	
 	return true;
 }
