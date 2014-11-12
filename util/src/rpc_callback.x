@@ -1,1 +1,0 @@
-../../kernel/src/rpc/rpc_callback.x
