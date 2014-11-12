@@ -1,10 +1,12 @@
 .PHONY: all kernel clean
 
-DIR = obj obj_linux
+DIR = obj obj_linux obj_linux_control
 
 OBJ_DIR = obj/
 
 LINUX_DIR = obj_linux/
+
+LINUX_CONTROL_DIR = obj_linux_control/
 
 OBJS = ether.o crc.o checksum.o ni.o status.o  md5.o md5_asm.o \
 	fifo.o vector.o list.o map.o ring.o errno.o thread.o \
@@ -12,13 +14,41 @@ OBJS = ether.o crc.o checksum.o ni.o status.o  md5.o md5_asm.o \
 	packet.o ip.o udp.o tcp.o rpc.o tftp.o event.o cmd.o \
 	malloc.o types.o _string.o
 
+OBJS_CONTROL = rpc_manager.o rpc_manager_xdr.o rpc_callback_clnt.o \
+	rpc_callback_svc.o rpc_callback_xdr.o rpc_callback_server.o control.o
+
 CFLAGS = -I include -I ../TLSF/src -I ../jsmn -O0 -Wall -Werror -m64 -nostdlib -ffreestanding -std=gnu99 -mcmodel=kernel
+
+CFLAGS_CONTROL =  -I include -Wall -Werror -std=gnu99 -Wno-unused-variable
 
 all: packetngin linux
 
 packetngin: libcore.a
 
 linux: libcore_linux.a
+
+src/rpc_manager.h: src/rpc_manager.x
+	cd src; rpcgen -N -C -h rpc_manager.x > rpc_manager.h
+
+src/rpc_manager.c: src/rpc_manager.h src/rpc_manager.x
+	cd src; rpcgen -N -C -l rpc_manager.x > rpc_manager.c
+
+src/rpc_manager_xdr.c: src/rpc_manager.h src/rpc_manager.x
+	cd src; rpcgen -N -C -c rpc_manager.x > rpc_manager_xdr.c
+
+src/rpc_callback.h: src/rpc_callback.x
+	cd src; rpcgen -N -C -h rpc_callback.x > rpc_callback.h
+
+src/rpc_callback_clnt.c: src/rpc_callback.h src/rpc_callback.x
+	cd src; rpcgen -N -C -l rpc_callback.x > rpc_callback_clnt.c
+
+src/rpc_callback_svc.c: src/rpc_callback.h src/rpc_callback.x
+	cd src; rpcgen -N -C -m rpc_callback.x > rpc_callback_svc.c
+
+src/rpc_callback_xdr.c: src/rpc_callback.h src/rpc_callback.x
+	cd src; rpcgen -N -C -c rpc_callback.x > rpc_callback_xdr.c
+
+src/rpc_callback_server.c: src/rpc_callback.h
 
 obj/%.o: src/%.c
 	mkdir -p $(DIR)
@@ -47,7 +77,11 @@ obj_linux/%.o: src/%.asm
 	mkdir -p $(DIR)
 	nasm -f elf64 -o $@ $<
 
-libcore_linux.a: $(addprefix $(LINUX_DIR), $(OBJS))
+obj_linux_control/%.o: src/%.c
+	mkdir -p $(DIR)
+	gcc $(CFLAGS_CONTROL) -DLINUX -Wno-unused-variable -c -o $@ $<
+
+libcore_linux.a: $(addprefix $(LINUX_DIR), $(OBJS)) $(addprefix $(LINUX_CONTROL_DIR), $(OBJS_CONTROL))
 	ar rcs $@ $^
 
 clean: 
@@ -55,3 +89,5 @@ clean:
 	rm -f libcore.a
 	rm -rf obj_linux
 	rm -f libcore_linux.a
+	rm -f src/rpc_manager.h src/rpc_manager.c src/rpc_manager_xdr.c
+	rm -f src/rpc_callback.h src/rpc_callback_clnt.c src/rpc_callback_svc.c src/rpc_callback_xdr.c
