@@ -2,32 +2,22 @@
 #include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
-#include <netdb.h>
 #include <time.h>
+#include <fcntl.h>
+#include <curl/curl.h>
 #include <sys/types.h>
-#include <sys/stat.h>
 #include <sys/mman.h>
 #include <signal.h>
-#include <fcntl.h>
-#include <rpc/pmap_clnt.h>
-#include <curl/curl.h>
 #include <util/list.h>
 #include <util/cmd.h>
 #include <util/types.h>
-
-#include "rpc_manager.h"
-#include "rpc_callback.h"
+#include <errno.h>
+#include <control/control.h>
 
 #define VERSION		"0.1.0"
 #define DEFAULT_HOST	"192.168.100.254"
 #define DEFAULT_PORT	111
 #define MAX_LINE_SIZE 2048
-
-static CLIENT *client;
-static CLIENT *ioclient;
-static char* client_host;
-static int client_port;
-static int server_port;
 
 static bool is_continue = true;
 
@@ -42,7 +32,6 @@ static int cmd_echo(int argc, char** argv) {
 
 	for(int i = 1; i < argc; i++) {
 		pos += sprintf(cmd_result + pos, "%s", argv[i]);
-
 		if(i + 1 < argc) {
 			cmd_result[pos++] = ' ';
 		}
@@ -61,6 +50,17 @@ static int cmd_sleep(int argc, char** argv) {
 	return 0;
 }
 
+static void connected(bool result) {
+	if(result)
+		sprintf(cmd_result, "Connect success");
+	else
+		sprintf(cmd_result, "Connect fail");
+}
+
+static void disconnected(void) {
+	sprintf(cmd_result, "Disconnected");
+}
+
 static int cmd_connect(int argc, char** argv) {
 	char* host = DEFAULT_HOST;
 	int port = DEFAULT_PORT;
@@ -71,68 +71,18 @@ static int cmd_connect(int argc, char** argv) {
 	if(argc >= 3 && is_uint16(argv[2]))
 		port = parse_uint16(argv[2]);
 	
-	struct hostent* hostent = gethostbyname(host);
-	if(!hostent) {
-		printf("Cannot resolve the host name: %s\n", host);
-		return 1;
-	}
-	
-	struct sockaddr_in addr;
-	memcpy(&addr.sin_addr, hostent->h_addr_list[0], hostent->h_length);
-	addr.sin_family = AF_INET;
-	addr.sin_port = htons(port);
-	
-	struct timeval time;
-	time.tv_sec = 2;
-	time.tv_usec = 0;
-	
-	int sock = RPC_ANYSOCK;
-	client = clntudp_create(&addr, MANAGER, MANAGER_APPLE, time, &sock);
-	if(!client) {
-		printf("Cannot make a connection to the host: %s:%d\n", host, port);
-		return 2;
-	}
-	
-	void* ret = manager_null_1(client);
-	if(ret == NULL) {
-		printf("Cannot connect to the host: %s:%d\n", host, port);
-		client = NULL;
-		return 3;
-	}
-	
-	ioclient = clntudp_create(&addr, CALLBACK, CALLBACK_APPLE, time, &sock);
-	if(!ioclient) {
-		printf("Cannot make a connection to the host: %s:%d\n", host, port);
-		return 2;
-	}
-	
-	ret = callback_null_1(ioclient);
-	if(ret == NULL) {
-		printf("Cannot connect to the host: %s:%d\n", host, port);
-		client = NULL;
-		return 3;
-	}
-	
-	RPC_Address cbaddr;
-	cbaddr.ip = 0;
-	cbaddr.port = server_port;
-	
-	bool_t* ret2 = callback_add_1(cbaddr, client);
-	if(ret2 == NULL || !*ret2) {
-		printf("Cannot register callback service to the host: %s:%d\n", host, port);
-		return 4;
-	}
-	
-	if(client_host) {
-		free(client_host);
-	}
-	int len = strlen(host) + 1;
-	client_host = malloc(len);
-	memcpy(client_host, host, len);
-	
-	client_port = port;
+	bool ret = ctrl_connect(host, port, connected, disconnected);
+	if(ret == false)
+		return errno;
+	else
+		return 0;
+}
 
-	return 0;
+void callback_ping(int count, clock_t delay) {
+	if(delay != -1)
+		printf("%d : time %ld ms\n", count, delay);
+	else
+		printf("%d : time out\n", count);
 }
 
 static int cmd_ping(int argc, char** argv) {
@@ -141,58 +91,46 @@ static int cmd_ping(int argc, char** argv) {
 		count = parse_uint64(argv[1]);
 	}
 	
-	if(!client) {
-		printf("Disconnected\n");
-		return 1;
-	}	
-	
-	clock_t total = clock();
-	for(int i = 0; i < count; i++) {
-		clock_t time = clock();
-		void* ret = manager_null_1(client);
-		if(ret != NULL) {
-			printf("time=%ld ms\n", clock() - time);
-		} else {
-			printf("timeout\n");
-		}
-	}
-	
-	printf("total: %ld ms\n", clock() - total);
+	bool ret = ctrl_ping(count, callback_ping);
+	if(ret == false)
+		return errno;
+	else
+		return 0;
+}
 
-	return 0;
+static void callback_vm_create(uint64_t vmid) {
+	if(vmid == 0)
+		sprintf(cmd_result, "fail");
+	else
+		sprintf(cmd_result, "%ld", vmid);
 }
 
 static int cmd_vm_create(int argc, char** argv) {
-	if(!client) {
-		printf("Disconnected\n");
-		return 1;
-	}
-	
-	RPC_VM vm;
-	vm.core_num = 1;
+	VMSpec vm;
+	vm.core_size = 1;
 	vm.memory_size = 0x1000000;	// 16MB
 	vm.storage_size = 0x1000000;	// 16MB
-	vm.nics.nics_len = 0;
-	RPC_NIC nics[RPC_MAX_NIC_COUNT];
-	vm.nics.nics_val = nics;
-	vm.args.args_len = 0;
-	char _args[RPC_MAX_ARGS_SIZE];
-	vm.args.args_val = _args;
+	vm.nic_size = 0;
+	NICSpec nics[PN_MAX_NIC_COUNT];
+	vm.nics = nics;
+	vm.argc = 0;
+	char* _args[32];
+	vm.argv = _args;
 	
 	for(int i = 1; i < argc; i++) {
 		if(strcmp(argv[i], "core:") == 0) {
 			i++;
 			if(!is_uint8(argv[i])) {
 				printf("core must be uint8\n");
-				return -1;
+				return i;
 			}
 			
-			vm.core_num = parse_uint8(argv[i]);
+			vm.core_size = parse_uint8(argv[i]);
 		} else if(strcmp(argv[i], "memory:") == 0) {
 			i++;
 			if(!is_uint32(argv[i])) {
 				printf("memory must be uint32\n");
-				return -1;
+				return i;
 			}
 			
 			vm.memory_size = parse_uint32(argv[i]);
@@ -200,64 +138,64 @@ static int cmd_vm_create(int argc, char** argv) {
 			i++;
 			if(!is_uint32(argv[i])) {
 				printf("storage must be uint32\n");
-				return -1;
+				return i;
 			}
 			
 			vm.storage_size = parse_uint32(argv[i]);
 		} else if(strcmp(argv[i], "nic:") == 0) {
 			i++;
 			
-			RPC_NIC* nic = &vm.nics.nics_val[vm.nics.nics_len];
-			vm.nics.nics_len++;
+			NICSpec* nic = &vm.nics[vm.nic_size];
+			vm.nic_size++;
 			
 			for( ; i < argc; i++) {
 				if(strcmp(argv[i], "mac:") == 0) {
 					i++;
 					if(!is_uint64(argv[i])) {
 						printf("mac must be uint64\n");
-						return -1;
+						return i;
 					}
 					nic->mac = parse_uint64(argv[i]);
 				} else if(strcmp(argv[i], "port:") == 0) {
 					i++;
 					if(!is_uint32(argv[i])) {
 						printf("port must be uint32\n");
-						return -1;
+						return i;
 					}
 					nic->port = parse_uint32(argv[i]);
 				} else if(strcmp(argv[i], "ibuf:") == 0) {
 					i++;
 					if(!is_uint32(argv[i])) {
 						printf("ibuf must be uint32\n");
-						return -1;
+						return i;
 					}
 					nic->input_buffer_size = parse_uint32(argv[i]);
 				} else if(strcmp(argv[i], "obuf:") == 0) {
 					i++;
 					if(!is_uint32(argv[i])) {
 						printf("obuf must be uint32\n");
-						return -1;
+						return i;
 					}
 					nic->output_buffer_size = parse_uint32(argv[i]);
 				} else if(strcmp(argv[i], "iband:") == 0) {
 					i++;
 					if(!is_uint64(argv[i])) {
 						printf("iband must be uint64\n");
-						return -1;
+						return i;
 					}
 					nic->input_bandwidth = parse_uint64(argv[i]);
 				} else if(strcmp(argv[i], "oband:") == 0) {
 					i++;
 					if(!is_uint64(argv[i])) {
 						printf("oband must be uint64\n");
-						return -1;
+						return i;
 					}
 					nic->output_bandwidth = parse_uint64(argv[i]);
 				} else if(strcmp(argv[i], "pool:") == 0) {
 					i++;
 					if(!is_uint32(argv[i])) {
 						printf("pool must be uint32\n");
-						return -1;
+						return i;
 					}
 					nic->pool_size = parse_uint32(argv[i]);
 				} else {
@@ -267,28 +205,20 @@ static int cmd_vm_create(int argc, char** argv) {
 			}
 		} else if(strcmp(argv[i], "args:") == 0) {
 			i++;
-			
-			void cpy(char* str, int len, char end) {
-				memcpy(vm.args.args_val + vm.args.args_len, str, len);
-				vm.args.args_len += len + 1;
-				vm.args.args_val[vm.args.args_len - 1] = end;
-			}
-			
-			for( ; i < argc; i++) {
-				cpy(argv[i], strlen(argv[i]), '\0');
-			}
+			for( ; i < argc; i++)
+				vm.argv[vm.argc++] = argv[i];
 		}
 	}
 	
-	u_quad_t* vmid = vm_create_1(vm, client);
-	if(vmid == NULL) {
-		printf("Timeout\n");
-		return 2;
-	}
-	
-	sprintf(cmd_result, "%ld", *vmid);
-	
-	return 0;
+	bool ret = ctrl_vm_create(&vm, callback_vm_create);
+	if(ret == false)
+		return errno;
+	else
+		return 0;
+}
+
+static void callback_vm_delete(uint64_t vmid, bool result) {
+	sprintf(cmd_result, "Machine %ld delete %s", vmid, result ? "success" : "fail");
 }
 
 static int cmd_vm_delete(int argc, char** argv) {
@@ -297,51 +227,50 @@ static int cmd_vm_delete(int argc, char** argv) {
 	}
 	
 	if(!is_uint64(argv[1])) {
-		return -1;
+		return 1;
 	}
 	
 	uint64_t vmid = parse_uint64(argv[1]);
-	
-	if(!client) {
-		printf("Disconnected\n");
-		return 1;
+
+	bool ret = ctrl_vm_delete(vmid, callback_vm_delete);
+	if(ret == false)
+		return errno;
+	else
+		return 0;
+}
+
+static void callback_vm_list(uint64_t* vmids, int count) {
+	int pos = 0;
+
+	for(int i = 0 ; i < count; i++) {
+		pos += sprintf(cmd_result + pos, "%ld ", vmids[i]);
 	}
-	
-	bool_t* ret = vm_delete_1(vmid, client);
-	if(ret == NULL) {
-		printf("Timeout\n");
-		return 2;
-	}
-	
-	sprintf(cmd_result, "%s", *ret ? "true" : "false");
-	
-	return 0;
 }
 
 static int cmd_vm_list(int argc, char** argv) {
-	if(!client) {
-		printf("Disconnected\n");
-		return 1;
-	}
-	
-	RPC_VMList* ret = vm_list_1(client);
-	if(ret == NULL) {
-		printf("Timeout\n");
-		return 2;
-	}
-	
-	char* p = cmd_result;
-	for(int i = 0; i < ret->RPC_VMList_len; i++) {
-		p += sprintf(p, "%lu", ret->RPC_VMList_val[i]);
-		if(i + 1 < ret->RPC_VMList_len) {
-			*p++ = ' ';
-		} else {
-			*p++ = '\0';
-		}
-	}
-	
-	return 0;
+	bool ret = ctrl_vm_list(callback_vm_list);
+	if(ret == false)
+		return errno;
+	else
+		return 0;
 }	
+
+void progress(uint64_t vmid, uint32_t progress, uint32_t total) {
+	static bool state;
+	if(total == 0) {
+		state = true;
+		return;
+	}
+
+	if(state == true) {
+		printf("\rprogress : %d total : %d => Machine %ld", progress, total, vmid);
+		if(total == progress) {
+			printf("\nCompleted\n");
+			state = false;
+		}
+		return;
+	}
+}
 
 static int cmd_send(int argc, char** argv) {
 	if(argc < 3) {
@@ -349,54 +278,24 @@ static int cmd_send(int argc, char** argv) {
 	}
 	
 	if(!is_uint64(argv[1])) {
-		return -1;
-	}
-	
-	CURL* curl = curl_easy_init();
-	if(!curl) {
-		printf("Cannot make CURL\n");
 		return 1;
 	}
-	
-	FILE* file = fopen(argv[2], "r");
-	if(file == NULL) {
-		printf("Cannot open file: %s\n", argv[2]);
-		return 1;
+	uint64_t vmid = parse_uint64(argv[1]);
+
+	bool ret = ctrl_storage_upload(vmid, argv[2], progress);
+	if(ret == false)
+		return errno;
+	else
+		return 0;
+}
+
+void callback_md5(uint64_t vmid, uint32_t _md5[4]) {
+	uint8_t md5[16];
+	int pos = 0;
+	memcpy(md5, _md5, 16);
+	for(int i = 0; i < 16; i++) {
+		pos += sprintf(cmd_result + pos, "%2x", md5[i]);
 	}
-	
-	struct stat stat;
-	if(fstat(fileno(file), &stat) < 0) {
-		printf("Cannot get state of file: %s\n", argv[2]);
-		return 2;
-	}
-	
-	char url[1024];
-	snprintf(url, 1024, "tftp://%s/%s\n", client_host, argv[1]);
-	
-	curl_easy_setopt(curl, CURLOPT_URL, url);
-	curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
-	curl_easy_setopt(curl, CURLOPT_READDATA, file);
-	curl_easy_setopt(curl, CURLOPT_INFILESIZE_LARGE, (curl_off_t)stat.st_size);
-	//curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
-	
-	CURLcode res;
-	if((res = curl_easy_perform(curl)) == CURLE_OK) {
-		sprintf(cmd_result, "true");
-		
-		double speed, total;
-		curl_easy_getinfo(curl, CURLINFO_SPEED_UPLOAD, &speed);
-		curl_easy_getinfo(curl, CURLINFO_TOTAL_TIME, &total);
-		
-		printf("%.3f bytes/sec total %.3f seconds\n", speed, total);
-	} else {
-		printf("Send failed: %s\n", curl_easy_strerror(res));
-		sprintf(cmd_result, "false");
-	}
-	
-	curl_easy_cleanup(curl);
-	fclose(file);
-	
-	return 0;
 }
 
 static int cmd_md5(int argc, char** argv) {
@@ -405,37 +304,35 @@ static int cmd_md5(int argc, char** argv) {
 	}
 	
 	if(!is_uint64(argv[1])) {
-		return -1;
-	}
-	
-	if(!is_uint64(argv[2])) {
-		return -2;
-	}
-	
-	uint64_t vmid = parse_uint64(argv[1]);
-	uint64_t size = parse_uint64(argv[2]);
-	
-	if(!client) {
-		printf("Disconnected\n");
 		return 1;
 	}
 	
-	RPC_Digest* ret = storage_digest_1(vmid, RPC_MD5, size, client);
-	if(ret == NULL) {
-		return -3;
+	if(!is_uint64(argv[2])) {
+		return 2;
 	}
-	
-	if(ret->RPC_Digest_len == 0) {
-		sprintf(cmd_result, "(nil)");
-	} else {
-		char* p = (char*)cmd_result;
-		for(int i = 0; i < ret->RPC_Digest_len; i++, p += 2) {
-			sprintf(p, "%02x", ((uint8_t*)ret->RPC_Digest_val)[i]);
-		}
-		*p = '\0';
+
+	uint64_t vmid = parse_uint64(argv[1]);
+	uint64_t size = parse_uint64(argv[2]);
+	bool ret = ctrl_storage_md5(vmid, size, callback_md5);
+
+	if(ret == false)
+		return errno;
+	else
+		return 0;
+}
+
+static void callback_status_set(uint64_t vmid, int status) {
+	if(status == VM_STATUS_INVALID)
+		sprintf(cmd_result, "Machine %ld status set fail", vmid);
+	else if(status == VM_STATUS_STOP){
+		sprintf(cmd_result, "Machine %ld : stop", vmid);
+	} else if(status == VM_STATUS_PAUSE) {
+		sprintf(cmd_result, "Machine %ld : pause", vmid);
+	} else if(status == VM_STATUS_RESUME) {
+		sprintf(cmd_result, "Machine %ld : resume", vmid);
+	} else if(status == VM_STATUS_START) {
+		sprintf(cmd_result, "Machine %ld : start", vmid);
 	}
-	
-	return 0;
 }
 
 static int cmd_status_set(int argc, char** argv) {
@@ -444,35 +341,37 @@ static int cmd_status_set(int argc, char** argv) {
 	}
 	
 	if(!is_uint64(argv[1])) {
-		return -1;
-	}
-	
-	uint64_t vmid = parse_uint64(argv[1]);
-	RPC_VMStatus status = RPC_STOP;
-	if(strcmp(argv[0], "start") == 0) {
-		status = RPC_START;
-	} else if(strcmp(argv[0], "pause") == 0) {
-		status = RPC_PAUSE;
-	} else if(strcmp(argv[0], "resume") == 0) {
-		status = RPC_RESUME;
-	} else if(strcmp(argv[0], "stop") == 0) {
-		status = RPC_STOP;
-	}
-	
-	if(!client) {
-		printf("Disconnected\n");
 		return 1;
 	}
 	
-	bool_t* ret = status_set_1(vmid, status, client);
-	if(ret == NULL) {
-		printf("Timeout\n");
-		return 2;
+	uint64_t vmid = parse_uint64(argv[1]);
+	int status = VM_STATUS_STOP;
+
+	if(strcmp(argv[0], "start") == 0) {
+		status = VM_STATUS_START;
+	} else if(strcmp(argv[0], "pause") == 0) {
+		status = VM_STATUS_PAUSE;
+	} else if(strcmp(argv[0], "resume") == 0) {
+		status = VM_STATUS_RESUME;
+	} else if(strcmp(argv[0], "stop") == 0) {
+		status = VM_STATUS_STOP;
 	}
 	
-	sprintf(cmd_result, "%s", *ret ? "true" : "false");
-	
-	return 0;
+	bool ret = ctrl_status_set(vmid, status, callback_status_set);
+	if(ret == false)
+		return errno;
+	else
+		return 0;
+}
+
+static void callback_status_get(uint64_t vmid, int status) {
+	if(status == VM_STATUS_STOP){
+		sprintf(cmd_result, "Machine %ld : stop", vmid);
+	} else if(status == VM_STATUS_PAUSE) {
+		sprintf(cmd_result, "Machine %ld : pause", vmid);
+	} else if(status == VM_STATUS_START) {
+		sprintf(cmd_result, "Machine %ld : start", vmid);
+	}
 }
 
 static int cmd_status_get(int argc, char** argv) {
@@ -481,41 +380,16 @@ static int cmd_status_get(int argc, char** argv) {
 	}
 	
 	if(!is_uint64(argv[1])) {
-		return -1;
+		return 1;
 	}
 	
 	uint64_t vmid = parse_uint64(argv[1]);
 	
-	if(!client) {
-		printf("Disconnected\n");
-		return 1;
-	}
-	
-	RPC_VMStatus* status = status_get_1(vmid, client);
-	if(status == NULL) {
-		printf("Timeout\n");
-		return 2;
-	}
-	
-	char* ret;
-	switch(*status) {
-		case RPC_START:
-			ret = "start";
-			break;
-		case RPC_PAUSE:
-			ret = "pause";
-			break;
-		case RPC_STOP:
-			ret = "stop";
-			break;
-		case RPC_NONE:
-		default:
-			ret = "none";
-	}
-	
-	sprintf(cmd_result, "%s", ret);
-	
-	return 0;
+	bool ret = ctrl_status_get(vmid, callback_status_get);
+	if(ret == false)
+		return errno;
+	else
+		return 0;
 }
 
 Command commands[] = {
@@ -625,81 +499,7 @@ Command commands[] = {
 
 size_t cmd_count = sizeof(commands) / sizeof(Command);
 
-static void *
-_callback_null_1 (void  *argp, struct svc_req *rqstp)
-{
-	return (callback_null_1_svc(rqstp));
-}
-
-static void *
-_stdio_1 (RPC_Message  *argp, struct svc_req *rqstp)
-{
-	return (stdio_1_svc(*argp, rqstp));
-}
-
-static void
-callback_1(struct svc_req *rqstp, register SVCXPRT *transp)
-{
-	union {
-		RPC_Message stdio_1_arg;
-	} argument;
-	char *result;
-	xdrproc_t _xdr_argument, _xdr_result;
-	char *(*local)(char *, struct svc_req *);
-
-	switch (rqstp->rq_proc) {
-	case CALLBACK_NULL:
-		_xdr_argument = (xdrproc_t) xdr_void;
-		_xdr_result = (xdrproc_t) xdr_void;
-		local = (char *(*)(char *, struct svc_req *)) _callback_null_1;
-		break;
-
-	case STDIO:
-		_xdr_argument = (xdrproc_t) xdr_RPC_Message;
-		_xdr_result = (xdrproc_t) xdr_void;
-		local = (char *(*)(char *, struct svc_req *)) _stdio_1;
-		break;
-
-	default:
-		svcerr_noproc (transp);
-		return;
-	}
-	memset ((char *)&argument, 0, sizeof (argument));
-	if (!svc_getargs (transp, (xdrproc_t) _xdr_argument, (caddr_t) &argument)) {
-		svcerr_decode (transp);
-		return;
-	}
-	result = (*local)((char *)&argument, rqstp);
-	if (result != NULL && !svc_sendreply(transp, (xdrproc_t) _xdr_result, result)) {
-		svcerr_systemerr (transp);
-	}
-	if (!svc_freeargs (transp, (xdrproc_t) _xdr_argument, (caddr_t) &argument)) {
-		fprintf (stderr, "%s", "unable to free arguments");
-		exit (1);
-	}
-	return;
-}
-
 int main(int _argc, char** _argv) {
-	server_port = 0;
-	
-	pmap_unset(CALLBACK, CALLBACK_APPLE);
-		
-	SVCXPRT* transp = svcudp_create(RPC_ANYSOCK);
-	server_port = transp->xp_port;
-		
-	printf("Callback service on %d\n", server_port);
-	if(transp == NULL) {
-		fprintf (stderr, "%s", "cannot create udp service.\n");
-		exit(1);
-	}
-
-	FILE* temp = stderr;
-	stderr = fopen("/dev/null","w"); //not print stderr message
-	svc_register(transp, CALLBACK, CALLBACK_APPLE, callback_1, IPPROTO_UDP);
-	fclose(stderr);
-	stderr = temp;
-
 	cmd_init();
 
 	int execute_cmd(char* line, bool is_dump) {
@@ -709,15 +509,16 @@ int main(int _argc, char** _argv) {
 			printf("%s\n", line);
 		
 		int exit_status = cmd_exec(line);
-		if(exit_status < 0) {
+		if(exit_status != 0) {
 			if(exit_status == CMD_STATUS_WRONG_NUMBER)
 				printf("wrong number of arguments\n");
 			else if(exit_status == CMD_STATUS_NOT_FOUND)
 				printf("wrong name of command\n");
+			else if(exit_status < 0)
+				printf("Error Code : %d\n", exit_status);
 			else
-				printf("%d'std argument type wrong\n", -exit_status);
+				printf("%d'std argument type wrong\n", exit_status);
 		}
-			
 		printf("> ");
 		fflush(stdout);
 
@@ -732,6 +533,7 @@ int main(int _argc, char** _argv) {
 			list_add(fd_list, (void*)(int64_t)fd);
 		}
 	}
+
 	list_add(fd_list, STDIN_FILENO); //fd of stdin
 
 	void get_cmd_line(int fd) {
@@ -757,7 +559,7 @@ int main(int _argc, char** _argv) {
 			}
 			if(head == line && eod == MAX_LINE_SIZE){ //not found '\n' and head == 0
 				printf("Command line is too long %d > %d\n", eod, MAX_LINE_SIZE);
-				eod = 0; 
+				eod = 0;
 				return;
 			} else { //not found '\n' and seek != 0
 				memmove(line, head, eod - (head - line));
@@ -769,6 +571,7 @@ int main(int _argc, char** _argv) {
 					continue;
 			}
 		}
+
 		if(eod != 0) {
 			line[eod] = '\0';
 			execute_cmd(&line[0], fd != STDIN_FILENO);
@@ -781,30 +584,29 @@ int main(int _argc, char** _argv) {
 	fd_set in_put;
 	fd_set temp_in;
 
-	int svc_sock = transp->xp_sock;
 	int fd = (int)(int64_t)list_remove_first(fd_list);
 	FD_ZERO(&in_put);
-	FD_SET(svc_sock, &in_put);
 	FD_SET(fd, &in_put);
 
 	printf("> ");
 	fflush(stdout);
+
+	struct timeval time;
+	
 	while(is_continue) {
 		temp_in = in_put;
+		time.tv_sec = 0;
+		time.tv_usec = 10000;
 
-		retval = select(fd > svc_sock ? (fd + 1) : (svc_sock + 1), &temp_in, 0, 0, NULL);
+		retval = select(fd + 1, &temp_in, 0, 0, &time);//add timer
 
 		if(retval == -1) {
 			printf("selector error \n");
 			return -1;
 		} else if(retval == 0) {
 			//select time over
-			continue;
 		} else {
-			if(FD_ISSET(svc_sock, &temp_in) != 0) {
-				svc_getreqset(&temp_in);
-			}
-			if(FD_ISSET(fd, &temp_in) != 0) {	
+			if(FD_ISSET(fd, &temp_in) != 0) {
 				get_cmd_line(fd);
 				if(fd != STDIN_FILENO) { //Not stdin fd
 					FD_CLR(fd, &in_put);
@@ -814,6 +616,8 @@ int main(int _argc, char** _argv) {
 				}
 			}
 		}
+		ctrl_poll();
 	}
+	ctrl_disconnect();
 	return 0;
 }

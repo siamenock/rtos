@@ -505,7 +505,7 @@ bool ctrl_poll() {
 	ctrl_fd.events = POLLIN;
 	ctrl_fd.revents = 0;
 
-	state = poll(&ctrl_fd, 1, 50);
+	state = poll(&ctrl_fd, 1, 0);
 	if(state > 0) {
 		switch(state) {
 			case -1:
