@@ -10,6 +10,7 @@ LIBS = ../../lib/libpacketngin.a
 
 all: $(OBJS)
 	ld -melf_x86_64 -nostdlib -e main -o main $^ $(LIBS)
+	make -C util
 
 obj/%.o: src/%.c
 	mkdir -p $(DIR)
@@ -18,6 +19,8 @@ obj/%.o: src/%.c
 clean:
 	rm -rf obj
 	rm -f main
+	rm -f configure
+	make -C util clean
 
 run: all
 	../../bin/console script
