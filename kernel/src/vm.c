@@ -10,7 +10,7 @@
 #include "cpu.h"
 #include "vm.h"
 
-static uint64_t	last_vmid = 1;
+static uint32_t	last_vmid = 1;
 static Map*	vms;
 
 // Core status
@@ -258,7 +258,7 @@ static bool vm_destroy(VM* vm, int core) {
 		}
 		
 		if(vm->nics) {
-			for(uint16_t i = 0; i < vm->nic_size; i++) {
+			for(uint16_t i = 0; i < vm->nic_count; i++) {
 				if(vm->nics[i])
 					ni_destroy(vm->nics[i]);
 			}
@@ -361,7 +361,7 @@ void vm_init() {
 	event_idle_add(vm_loop, NULL);
 }
 
-uint64_t vm_create(VMSpec* vm_spec) {
+uint32_t vm_create(VMSpec* vm_spec) {
 	VM* vm = gmalloc(sizeof(VM));
 	bzero(vm, sizeof(VM));
 	
@@ -402,7 +402,7 @@ uint64_t vm_create(VMSpec* vm_spec) {
 	}
 	
 	// Allocate memory
-	uint64_t memory_size = vm_spec->memory_size;
+	uint32_t memory_size = vm_spec->memory_size;
 	memory_size = (memory_size + (VM_MEMORY_SIZE_ALIGN - 1)) & ~(VM_MEMORY_SIZE_ALIGN - 1);
 	vm->memory.count = memory_size / VM_MEMORY_SIZE_ALIGN;
 	vm->memory.blocks = gmalloc(vm->memory.count * sizeof(void*));
@@ -417,7 +417,7 @@ uint64_t vm_create(VMSpec* vm_spec) {
 	}
 	
 	// Allocate storage
-	uint64_t storage_size = vm_spec->storage_size;
+	uint32_t storage_size = vm_spec->storage_size;
 	storage_size = (storage_size + (VM_STORAGE_SIZE_ALIGN - 1)) & ~(VM_STORAGE_SIZE_ALIGN - 1);
 	vm->storage.count = storage_size / VM_STORAGE_SIZE_ALIGN;
 	vm->storage.blocks = gmalloc(vm->storage.count * sizeof(void*));
@@ -433,11 +433,11 @@ uint64_t vm_create(VMSpec* vm_spec) {
 	
 	// Allocate NICs
 	NICSpec* nics = vm_spec->nics;
-	vm->nic_size = vm_spec->nic_size;
-	vm->nics = gmalloc(sizeof(NI) * vm->nic_size);
-	bzero(vm->nics, sizeof(NI) * vm->nic_size);
+	vm->nic_count = vm_spec->nic_count;
+	vm->nics = gmalloc(sizeof(NI) * vm->nic_count);
+	bzero(vm->nics, sizeof(NI) * vm->nic_count);
 	
-	for(int i = 0; i < vm->nic_size; i++) {
+	for(int i = 0; i < vm->nic_count; i++) {
 		uint64_t mac = nics[i].mac;
 		if(mac == 0) {
 			do {
@@ -473,13 +473,13 @@ uint64_t vm_create(VMSpec* vm_spec) {
 	}
 	
 	// Allocate vmid
-	uint64_t vmid;
+	uint32_t vmid;
 	while(true) {
 		vmid = last_vmid++;
 		
-		if(vmid != 0 && !map_contains(vms, (void*)vmid)) {
+		if(vmid != 0 && !map_contains(vms, (void*)(uint64_t)vmid)) {
 			vm->id = vmid;
-			map_put(vms, (void*)vmid, vm);
+			map_put(vms, (void*)(uint64_t)vmid, vm);
 			break;
 		}
 	}
@@ -493,9 +493,9 @@ uint64_t vm_create(VMSpec* vm_spec) {
 	}
 	printf("], %dMBs memory, %dMBs storage, NICs: %d\n",
 		vm->memory.count * VM_MEMORY_SIZE_ALIGN / 0x100000,
-		vm->storage.count * VM_STORAGE_SIZE_ALIGN / 0x100000, vm->nic_size);
+		vm->storage.count * VM_STORAGE_SIZE_ALIGN / 0x100000, vm->nic_count);
 	
-	for(int i = 0; i < vm->nic_size; i++) {
+	for(int i = 0; i < vm->nic_count; i++) {
 		NI* ni = vm->nics[i];
 		printf("\t");
 		for(int j = 5; j >= 0; j--) {
@@ -521,8 +521,8 @@ uint64_t vm_create(VMSpec* vm_spec) {
 	return vmid;
 }
 
-bool vm_delete(uint64_t vmid) {
-	VM* vm = map_get(vms, (void*)vmid);
+bool vm_delete(uint32_t vmid) {
+	VM* vm = map_get(vms, (void*)(uint64_t)vmid);
 	if(!vm)
 		return false;
 	
@@ -532,7 +532,7 @@ bool vm_delete(uint64_t vmid) {
 		}
 	}
 	
-	map_remove(vms, (void*)vmid);
+	map_remove(vms, (void*)(uint64_t)vmid);
 	
 	printf("Manager: Delete vm[%d] on cores [", vmid);
 	for(int i = 0; i < vm->core_size; i++) {
@@ -547,22 +547,22 @@ bool vm_delete(uint64_t vmid) {
 	return true;
 }
 
-bool vm_contains(uint64_t vmid) {
-	return map_contains(vms, (void*)vmid);
+bool vm_contains(uint32_t vmid) {
+	return map_contains(vms, (void*)(uint64_t)vmid);
 }
 
 int vm_count() {
 	return map_size(vms);
 }
 
-int vm_list(uint64_t* vmids, int size) {
+int vm_list(uint32_t* vmids, int size) {
 	int i = 0;
 	
 	MapIterator iter;
 	map_iterator_init(&iter, vms);
 	while(i < size && map_iterator_has_next(&iter)) {
 		MapEntry* entry = map_iterator_next(&iter);
-		vmids[i++] = (uint64_t)entry->key;
+		vmids[i++] = (uint32_t)(uint64_t)entry->key;
 	}
 	
 	return i;
@@ -602,8 +602,8 @@ static bool status_changed(uint64_t event_type, void* event, void* context) {
 	return false;
 }
 
-void vm_status_set(uint64_t vmid, int status, VM_STATUS_CALLBACK callback, void* context) {
-	VM* vm = map_get(vms, (void*)vmid);
+void vm_status_set(uint32_t vmid, int status, VM_STATUS_CALLBACK callback, void* context) {
+	VM* vm = map_get(vms, (void*)(uint64_t)vmid);
 	if(!vm) {
 		callback(false, context);
 		return;
@@ -662,30 +662,33 @@ void vm_status_set(uint64_t vmid, int status, VM_STATUS_CALLBACK callback, void*
 	}
 }
 
-int vm_status_get(uint64_t vmid) {
-	VM* vm = map_get(vms, (void*)vmid);
+int vm_status_get(uint32_t vmid) {
+	VM* vm = map_get(vms, (void*)(uint64_t)vmid);
 	if(!vm)
 		return -1;
 	
 	return vm->status;
 }
 
-size_t vm_storage_read(uint64_t vmid, void* buf, size_t offset, size_t size) {
-	VM* vm = map_get(vms, (void*)vmid);
+size_t vm_storage_read(uint32_t vmid, void** buf, size_t offset, size_t size) {
+	VM* vm = map_get(vms, (void*)(uint64_t)vmid);
 	if(!vm)
 		return -1;
 	
 	// TODO: Calc block index, fragmented block
-	if((uint64_t)offset + size > (uint64_t)vm->storage.count * VM_STORAGE_SIZE_ALIGN)
-		return -1;
+	if(offset < vm->storage.count * VM_STORAGE_SIZE_ALIGN)
+		*buf = vm->storage.blocks[0] + offset;
+	else
+		*buf = NULL;
 	
-	memcpy(buf, vm->storage.blocks[0] + offset, size);
-	
-	return size;
+	if(offset + size > vm->storage.count * VM_STORAGE_SIZE_ALIGN)
+		return vm->storage.count * VM_STORAGE_SIZE_ALIGN - offset;
+	else
+		return size;
 }
 
-size_t vm_storage_write(uint64_t vmid, void* buf, size_t offset, size_t size) {
-	VM* vm = map_get(vms, (void*)vmid);
+size_t vm_storage_write(uint32_t vmid, void* buf, size_t offset, size_t size) {
+	VM* vm = map_get(vms, (void*)(uint64_t)vmid);
 	if(!vm)
 		return -1;
 	
@@ -698,8 +701,8 @@ size_t vm_storage_write(uint64_t vmid, void* buf, size_t offset, size_t size) {
 	return size;
 }
 
-bool vm_storage_md5(uint64_t vmid, uint32_t size, uint32_t digest[4]) {
-	VM* vm = map_get(vms, (void*)vmid);
+bool vm_storage_md5(uint32_t vmid, uint32_t size, uint32_t digest[4]) {
+	VM* vm = map_get(vms, (void*)(uint64_t)vmid);
 	if(!vm)
 		return false;
 	

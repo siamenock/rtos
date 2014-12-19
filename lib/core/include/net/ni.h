@@ -86,12 +86,10 @@ typedef struct _NetworkInterface {
 
 typedef Packet*(*NI_DPI)(Packet*);
 
-/*
 struct netif;
-struct netif* ni_init(int idx, uint32_t ip, uint32_t netmask, uint32_t gw, bool is_default, 
-		NI_DPI preprocessor, NI_DPI postprocessor);
+struct netif* ni_init(NetworkInterface* ni, NI_DPI preprocessor, NI_DPI postprocessor);
 bool ni_poll();
-*/
+void ni_timer();	// Must be called every 100ms
 
 int ni_count();
 NetworkInterface* ni_get(int idx);

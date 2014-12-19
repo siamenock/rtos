@@ -59,7 +59,7 @@ libpacketngin.a: libc.a libm.a libtlsf.a libcore.a
 	cp -rL core/include/* ../sdk/include/
 	cp libpacketngin.a ../sdk/lib/
 
-libz.a: 
+libz.a: zlib/libz.a
 	cd zlib; ./configure --static
 	make -C zlib
 	cp zlib/libz.a .
@@ -75,7 +75,7 @@ libssl.a: openssl/libssl.a
 	cp libssl.a ../sdk/lib/
 	cp libcrypto.a ../sdk/lib/
 
-liblwip.a: 
+liblwip.a: lwip/liblwip.a
 	make -C lwip
 	cp lwip/liblwip.a .
 	

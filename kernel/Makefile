@@ -1,8 +1,8 @@
 .PHONY: all clean mkver
 
-CFLAGS = -I ../lib/TLSF/src -I ../lib/core/include -O0 -Wall -Werror -m64 -ffreestanding -std=gnu99 -mcmodel=kernel
+CFLAGS = -I ../lib/TLSF/src -I ../lib/core/include -I ../lib/lwip/include -I ../lib/lwip/src/include -I ../lib/lwip/src/include/ipv4 -O0 -Wall -Werror -m64 -ffreestanding -std=gnu99 -mcmodel=kernel
 
-DIR = obj obj/driver obj/rpc
+DIR = obj obj/driver
 
 OBJS = obj/entry.o \
 	obj/main.o obj/stdio.o obj/shell.o obj/port.o obj/asm.o obj/gdt.o obj/idt.o \
@@ -14,26 +14,17 @@ OBJS = obj/entry.o \
 	obj/driver/linux.o obj/driver/dummy.o \
 	obj/driver/vga.o obj/driver/keyboard.o obj/driver/stdin.o obj/driver/stdout.o obj/driver/bfs.o \
 	obj/driver/port.o \
-	obj/rpc/rpc_manager.o obj/rpc/rpc_manager_xdr.o obj/rpc/rpc_callback.o obj/rpc/rpc_callback_xdr.o \
 	obj/vm.o obj/manager.o
 
-LIBS = --start-group -ltlsf -ljsmn -lcore --end-group -lxdr
-
-LIBFILES = ../lib/libtlsf.a ../lib/libjsmn.a ../lib/libcore.a ../lib/libxdr.a
+LIBS = ../lib/libtlsf.a ../lib/libcore.a ../lib/liblwip.a
 
 all: kernel.elf
 
-mkver:
+src/version.h:
 	./mkver.sh > src/version.h
 
 $(DIR):
 	mkdir -p $@
-
-src/rpc/%.c: 
-	make -C src/rpc
-
-obj/rpc/%.o: src/rpc/%.c
-	gcc -Wno-unused-variable $(CFLAGS) -c -o $@ $<
 
 obj/shell.o: src/version.h
 
@@ -45,11 +36,10 @@ obj/%.o: src/%.asm
 obj/%.o: src/%.c
 	gcc $(CFLAGS) -c -o $@ $<
 
-kernel.elf: mkver $(DIR) $(OBJS) $(LIBFILES)
-	ld -melf_x86_64 -T elf_x86_64.ld -nostdlib -e main -o kernel.elf -L ../lib $(OBJS) $(LIBFILES) $(LIBS)
+kernel.elf: src/version.h $(DIR) $(OBJS) $(LIBS)
+	ld -melf_x86_64 -T elf_x86_64.ld -nostdlib -e main -o kernel.elf $(OBJS) $(LIBS)
 
 clean:
-	make -C src/rpc clean
 	rm -f src/version.h
 	rm -rf obj
 	rm -f kernel.bin

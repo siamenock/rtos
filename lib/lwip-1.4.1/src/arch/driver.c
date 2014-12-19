@@ -301,10 +301,17 @@ static struct netif netifs[NIS_SIZE];
 static struct netif_private privates[NIS_SIZE];
 static int netif_count;
 
-struct netif* ni_init(int idx, uint32_t ip, uint32_t netmask, uint32_t gw, bool is_default, NI_DPI preprocessor, NI_DPI postprocessor) {
-	
+struct netif* ni_init(NetworkInterface* ni, NI_DPI preprocessor, NI_DPI postprocessor) {
 	if(netif_count >= NIS_SIZE)
 		return NULL;
+	
+	if(!ni_config_contains(ni, "ip") || !ni_config_contains(ni, "netmask") || !ni_config_contains(ni, "gateway"))
+		return NULL;
+	
+	uint32_t ip = (uint32_t)(uint64_t)ni_config_get(ni, "ip");
+	uint32_t netmask = (uint32_t)(uint64_t)ni_config_get(ni, "netmask");
+	uint32_t gw = (uint32_t)(uint64_t)ni_config_get(ni, "gateway");
+	bool is_default = !!ni_config_get(ni, "default");
 	
 	if(!is_lwip_inited) {
 		lwip_init();
@@ -313,7 +320,7 @@ struct netif* ni_init(int idx, uint32_t ip, uint32_t netmask, uint32_t gw, bool 
 	
 	struct netif* netif = &netifs[netif_count];
 	struct netif_private* private = &privates[netif_count++];
-	private->ni = ni_get(idx);
+	private->ni = ni;
 	private->preprocessor = preprocessor;
 	private->postprocessor = postprocessor;
 	
@@ -335,8 +342,8 @@ bool ni_poll() {
 	
 	bool result = false;
 	
-	if(ni_count() == 0)
-		goto done2;
+	if(netif_count <= 0)
+		return result;
 	
 	struct netif* netif = &netifs[netif_index];
 	NetworkInterface* ni = ((struct netif_private*)netif->state)->ni;
@@ -354,10 +361,11 @@ bool ni_poll() {
 	result = true;
 	
 done:
-	netif_index++;
-	netif_index %= ni_count();
+	netif_index = (netif_index + 1) % netif_count;
 	
-done2:
-	sys_check_timeouts();
 	return result;
+}
+
+void ni_timer() {
+	sys_check_timeouts();
 }

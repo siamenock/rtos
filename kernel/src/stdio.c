@@ -943,15 +943,13 @@ int sprintf(char *str, const char *format, ...) {
 	return len;
 }
 
-int __printf_chk (int flag, const char *format, ...) {
-	char buf[4096];
-	
+int __sprintf_chk(int flag, char *str, const char *format, ...) {
 	va_list va;
 	va_start(va, format);
-	int len = vsprintf(buf, format, va);
+	int len = vsprintf(str, format, va);
 	va_end(va);
 	
-	return write1(buf, len);
+	return len;
 }
 
 int printf(const char* format, ...) {
@@ -965,7 +963,7 @@ int printf(const char* format, ...) {
 	return write1(buf, len);
 }
 
-int __fprintf_chk(FILE* stream, int flag, const char* format, ...) {
+int __printf_chk(int flag, const char *format, ...) {
 	char buf[4096];
 	
 	va_list va;
@@ -987,13 +985,24 @@ int fprintf(FILE* stream, const char* format, ...) {
 	return write1(buf, len);
 }
 
+int __fprintf_chk(FILE* stream, int flag, const char* format, ...) {
+	char buf[4096];
+	
+	va_list va;
+	va_start(va, format);
+	int len = vsprintf(buf, format, va);
+	va_end(va);
+	
+	return write1(buf, len);
+}
+
 void exit(int status) {
 	printf("Exit is called: %d\n", status);
 	while(1) asm("hlt");
 }
 
 clock_t clock() {
-       return (clock_t)(cpu_tsc() / (cpu_frequency / CLOCKS_PER_SEC));
+       return (clock_t)(cpu_tsc() / cpu_clock);
 }
 
 int putchar(int c) {

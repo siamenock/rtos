@@ -263,7 +263,7 @@ static int cmd_create(int argc, char** argv) {
 	vm->core_size = 1;
 	vm->memory_size = 0x1000000;	// 16MB
 	vm->storage_size = 0x1000000;	// 16MB
-	vm->nic_size = 0;
+	vm->nic_count = 0;
 	vm->nics = malloc(sizeof(NICSpec) * MAX_NIC_COUNT);
 	vm->argc = 0;
 	vm->argv = malloc(sizeof(char*) * CMD_MAX_ARGC);
@@ -296,7 +296,7 @@ static int cmd_create(int argc, char** argv) {
 		} else if(strcmp(argv[i], "nic:") == 0) {
 			i++;
 			
-			NICSpec* nic = &(vm->nics[vm->nic_size++]);
+			NICSpec* nic = &(vm->nics[vm->nic_count++]);
 			for( ; i < argc; i++) {
 				if(strcmp(argv[i], "mac:") == 0) {
 					i++;
@@ -381,7 +381,7 @@ static int cmd_vm_delete(int argc, char** argv) {
 }
 
 static int cmd_vm_list(int argc, char** argv) {
-	u_quad_t vmids[MAX_VM_COUNT];
+	uint32_t vmids[MAX_VM_COUNT];
 	int len = vm_list(vmids, MAX_VM_COUNT);
 
 	char* p = cmd_result;

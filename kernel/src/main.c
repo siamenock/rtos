@@ -151,9 +151,9 @@ static void icc_start(ICC_Message* msg) {
 		printf("Execution FAILED: %x\n", errno);
 	}
 	
-	*(uint32_t*)task_addr(id, SYM_NIS_COUNT) = vm->nic_size;
+	*(uint32_t*)task_addr(id, SYM_NIS_COUNT) = vm->nic_count;
 	NetworkInterface** nis = (NetworkInterface**)task_addr(id, SYM_NIS);
-	for(uint32_t i = 0; i < vm->nic_size; i++) {
+	for(int i = 0; i < vm->nic_count; i++) {
 		task_resource(id, RESOURCE_NI, vm->nics[i]);
 		nis[i] = vm->nics[i]->ni;
 	}

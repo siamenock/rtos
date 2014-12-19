@@ -229,50 +229,6 @@ void* _calloc_r(struct _reent* r, size_t nmemb, size_t size) {
 		
 }
 
-/* malloc is moved to libcore
-void* malloc(size_t size) {
-	void* ptr = malloc_ex(size, __malloc_pool);
-	if(!ptr)
-		return gmalloc(size);
-	else
-		return ptr;
-}
-
-void free(void* ptr) {
-	if(ptr > __malloc_pool && ptr < __malloc_pool + get_total_size(__malloc_pool))
-		free_ex(ptr, __malloc_pool);
-	else
-		gfree(ptr);
-}
-
-void* realloc(void* ptr, size_t size) {
-	if(ptr > __malloc_pool && ptr < __malloc_pool + get_total_size(__malloc_pool))
-		return realloc_ex(ptr, size, __malloc_pool);
-	else
-		return grealloc(ptr, size);
-}
-
-void* calloc(size_t nmemb, size_t size) {
-	void* ptr = calloc_ex(nmemb, size, __malloc_pool);
-	if(!ptr)
-		ptr = gcalloc(nmemb, size);
-	
-	return ptr;
-}
-*/
-
-int __isoc99_sscanf(const char *str, const char *format, ...) {
-	int ret;
-	va_list ap;
-	struct _reent *ptr = _REENT;
-	
-	va_start(ap, format);
-	ret = _vscanf_r(ptr, format, ap);
-	va_end(ap);
-	
-	return ret;
-}
-
 // GNU C ctype.h imitation
 // Below source code is from https://github.com/evanphx/ulysses-libc/, MIT license
 
@@ -419,6 +375,30 @@ void* __memcpy_chk(void* dest, const void* src, size_t size, size_t bos) {
 	return memcpy(dest, src, size);
 }
 */
+
+int __isoc99_scanf(const char *format, ...) {
+	int ret;
+	va_list ap;
+	struct _reent *ptr = _REENT;
+	
+	va_start(ap, format);
+	ret = _vscanf_r(ptr, format, ap);
+	va_end(ap);
+	
+	return ret;
+}
+
+int __isoc99_sscanf(const char *str, const char *format, ...) {
+	int ret;
+	va_list ap;
+	struct _reent *ptr = _REENT;
+	
+	va_start(ap, format);
+	ret = _vsscanf_r(ptr, str, format, ap);
+	va_end(ap);
+	
+	return ret;
+}
 
 void __stack_chk_fail() {
 	printf("Stack overflow\n");

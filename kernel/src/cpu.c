@@ -7,6 +7,7 @@
 uint64_t cpu_ms;
 uint64_t cpu_us;
 uint64_t cpu_ns;
+clock_t cpu_clock;
 
 uint64_t cpu_frequency;
 char cpu_brand[4 * 4 * 3 + 1];
@@ -97,6 +98,7 @@ void cpu_init() {
 	cpu_ms = cpu_frequency / 1000;
 	cpu_us = cpu_ms / 1000;
 	cpu_ns = cpu_us / 1000;
+	cpu_clock = cpu_frequency / CLOCKS_PER_SEC;
 }
 
 void cpu_info() {

@@ -1,704 +1,1125 @@
-#ifndef LINUX
+#include <string.h>
 #include <malloc.h>
-#include <time.h>
-#include <errno.h>
-#include <rpc/xdr.h>
-#include <rpc/rpc_msg.h>
-#include <rpc/svc.h>
-#include <rpc/auth.h>
+#include "control/rpc.h"
 
-#include <net/ether.h>
-#include <net/arp.h>
-#undef IP_TTL
-#include <net/ip.h>
-#include <net/udp.h>
-#include <net/checksum.h>
-#include <net/ni.h>
-#include <util/fifo.h>
-#include <util/map.h>
+struct {
+	uint32_t 	id;
+	bool(*callback)(RPC* rpc, void* context);
+	void*		context;
+} RPC_Callback;
 
-typedef struct {
-	uint32_t		ip;
-	uint16_t		port;
-	unsigned long		prognum;
-	unsigned long		versnum;
-} ClientPrivate;
-
-typedef struct {
-	uint32_t		xid;
-	xdrproc_t		outproc;
-	char*			out;
-	struct timeval		tout;
-	
-	void			(*succeed)(void* context, void* result);
-	void			(*failed)(void* context, int stat1, int stat2);
-	void			(*timeout)(void* context);
-	void*			context;
-} Call;
-
-static SVCXPRT xprt;
-struct xp_ops ops;
-
-// TODO: Below in SVCXPRT
-static Map* services;
-static Map* calls;
-static FIFO* history_fifo;
-static Map* history_map;
-
-static bool_t xdr_msg_type (XDR *xdrs, enum msg_type *objp) {
-	 if (!xdr_enum (xdrs, (enum_t *) objp))
-		 return FALSE;
-	return TRUE;
+#define MAKE_WRITE(TYPE)					\
+static int write_##TYPE(RPC* rpc, TYPE##_t v) {			\
+	int len = sizeof(TYPE##_t);				\
+	if(rpc->wbuf_index + len > RPC_BUFFER_SIZE)		\
+		return 0;					\
+								\
+	memcpy(rpc->wbuf + rpc->wbuf_index, &v, len);		\
+	rpc->wbuf_index += len;					\
+								\
+	return len;						\
 }
 
-static bool_t xdr_reply_stat (XDR *xdrs, enum reply_stat *objp) {
-	 if (!xdr_enum (xdrs, (enum_t *) objp))
-		 return FALSE;
-	return TRUE;
+#define MAKE_READ(TYPE)						\
+static int read_##TYPE(RPC* rpc, TYPE##_t* v) {			\
+	int len = sizeof(TYPE##_t);				\
+	if(rpc->rbuf_read + len > rpc->rbuf_index) {		\
+		int len2 = rpc->read(rpc, 			\
+			rpc->rbuf + rpc->rbuf_index, 		\
+			RPC_BUFFER_SIZE - rpc->rbuf_index);	\
+		if(len2 < 0) {					\
+			return len2;				\
+		}						\
+								\
+		rpc->rbuf_index += len2;			\
+	}							\
+								\
+	if(rpc->rbuf_read + len > rpc->rbuf_index)		\
+		return 0;					\
+								\
+	memcpy(v, rpc->rbuf + rpc->rbuf_read, len);		\
+	rpc->rbuf_read += len;					\
+								\
+	return len;						\
 }
 
-static bool_t xdr_accept_stat (XDR *xdrs, enum accept_stat *objp) {
-	 if (!xdr_enum (xdrs, (enum_t *) objp))
-		 return FALSE;
-	return TRUE;
+MAKE_READ(uint8)
+MAKE_WRITE(uint8)
+MAKE_READ(uint16)
+MAKE_WRITE(uint16)
+MAKE_READ(uint32)
+MAKE_WRITE(uint32)
+MAKE_READ(uint64)
+MAKE_WRITE(uint64)
+
+#define read_bool(RPC, DATA)	read_uint8((RPC), (uint8_t*)(DATA))
+#define write_bool(RPC, DATA)	write_uint8((RPC), (uint8_t)(DATA))
+
+static int write_string(RPC* rpc, char* v) {
+	uint16_t len0 = strlen(v);
+	uint16_t len = sizeof(uint16_t) + len0;
+	if(rpc->wbuf_index + len > RPC_BUFFER_SIZE)
+		return 0;
+	
+	memcpy(rpc->wbuf + rpc->wbuf_index, &len0, sizeof(uint16_t));
+	memcpy(rpc->wbuf + rpc->wbuf_index + sizeof(uint16_t), v, len0);
+	rpc->wbuf_index += len;
+	
+	return len;
 }
 
-static bool_t xdr_reject_stat (XDR *xdrs, enum reject_stat *objp) {
-	 if (!xdr_enum (xdrs, (enum_t *) objp))
-		 return FALSE;
-	return TRUE;
-}
-
-static bool_t xdr_auth_stat (XDR *xdrs, enum auth_stat *objp) {
-	 if (!xdr_enum (xdrs, (enum_t *) objp))
-		 return FALSE;
-	return TRUE;
-}
-
-static bool_t xdr_call_body (XDR *xdrs, struct call_body *objp) {
-	register int32_t *buf;
-
-	if (xdrs->x_op == XDR_ENCODE) {
-		buf = XDR_INLINE (xdrs, 4 * BYTES_PER_XDR_UNIT);
-		if (buf == NULL) {
-			 if (!xdr_u_long (xdrs, &objp->cb_rpcvers))
-				 return FALSE;
-			 if (!xdr_u_long (xdrs, &objp->cb_prog))
-				 return FALSE;
-			 if (!xdr_u_long (xdrs, &objp->cb_vers))
-				 return FALSE;
-			 if (!xdr_u_long (xdrs, &objp->cb_proc))
-				 return FALSE;
-
-		} else {
-		IXDR_PUT_U_LONG(buf, objp->cb_rpcvers);
-		IXDR_PUT_U_LONG(buf, objp->cb_prog);
-		IXDR_PUT_U_LONG(buf, objp->cb_vers);
-		IXDR_PUT_U_LONG(buf, objp->cb_proc);
-		}
-		 if (!xdr_opaque_auth (xdrs, &objp->cb_cred))
-			 return FALSE;
-		 if (!xdr_opaque_auth (xdrs, &objp->cb_verf))
-			 return FALSE;
-		return TRUE;
-	} else if (xdrs->x_op == XDR_DECODE) {
-		buf = XDR_INLINE (xdrs, 4 * BYTES_PER_XDR_UNIT);
-		if (buf == NULL) {
-			 if (!xdr_u_long (xdrs, &objp->cb_rpcvers))
-				 return FALSE;
-			 if (!xdr_u_long (xdrs, &objp->cb_prog))
-				 return FALSE;
-			 if (!xdr_u_long (xdrs, &objp->cb_vers))
-				 return FALSE;
-			 if (!xdr_u_long (xdrs, &objp->cb_proc))
-				 return FALSE;
-
-		} else {
-		objp->cb_rpcvers = IXDR_GET_U_LONG(buf);
-		objp->cb_prog = IXDR_GET_U_LONG(buf);
-		objp->cb_vers = IXDR_GET_U_LONG(buf);
-		objp->cb_proc = IXDR_GET_U_LONG(buf);
-		}
-		 if (!xdr_opaque_auth (xdrs, &objp->cb_cred))
-			 return FALSE;
-		 if (!xdr_opaque_auth (xdrs, &objp->cb_verf))
-			 return FALSE;
-	 return TRUE;
-	}
-
-	 if (!xdr_u_long (xdrs, &objp->cb_rpcvers))
-		 return FALSE;
-	 if (!xdr_u_long (xdrs, &objp->cb_prog))
-		 return FALSE;
-	 if (!xdr_u_long (xdrs, &objp->cb_vers))
-		 return FALSE;
-	 if (!xdr_u_long (xdrs, &objp->cb_proc))
-		 return FALSE;
-	 if (!xdr_opaque_auth (xdrs, &objp->cb_cred))
-		 return FALSE;
-	 if (!xdr_opaque_auth (xdrs, &objp->cb_verf))
-		 return FALSE;
-	return TRUE;
-}
-
-static bool_t xdr_accepted_reply (XDR *xdrs, struct accepted_reply *objp) {
-	 if (!xdr_opaque_auth (xdrs, &objp->ar_verf))
-		 return FALSE;
-	 if (!xdr_accept_stat (xdrs, &objp->ar_stat))
-		 return FALSE;
-	switch (objp->ar_stat) {
-	case SUCCESS:
-		if(xdrs->x_op == XDR_ENCODE) {
-			 if (!objp->ru.AR_results.proc (xdrs, objp->ru.AR_results.where))
-				 return FALSE;
-		}
-		break;
-	case PROG_MISMATCH:
-		 if (!xdr_u_long(xdrs, &objp->ru.AR_versions.low))
-			 return FALSE;
-		 if (!xdr_u_long(xdrs, &objp->ru.AR_versions.high))
-			 return FALSE;
-		break;
-	case PROG_UNAVAIL:
-	case PROC_UNAVAIL:
-	case GARBAGE_ARGS:
-	case SYSTEM_ERR:
-		return TRUE;
-	default:
-		return FALSE;
-	}
-	return TRUE;
-}
-
-static bool_t xdr_rejected_reply (XDR *xdrs, struct rejected_reply *objp) {
-	 if (!xdr_reject_stat (xdrs, &objp->rj_stat))
-		 return FALSE;
-	switch (objp->rj_stat) {
-	case RPC_MISMATCH:
-		 if (!xdr_u_long(xdrs, &objp->ru.RJ_versions.low))
-			 return FALSE;
-		 if (!xdr_u_long(xdrs, &objp->ru.RJ_versions.high))
-			 return FALSE;
-		break;
-	case AUTH_ERROR:
-		 if (!xdr_auth_stat (xdrs, &objp->ru.RJ_why))
-			 return FALSE;
-		break;
-	default:
-		return FALSE;
-	}
-	return TRUE;
-}
-
-static bool_t xdr_reply_body (XDR *xdrs, struct reply_body *objp) {
-	 if (!xdr_reply_stat (xdrs, &objp->rp_stat))
-		 return FALSE;
-	switch (objp->rp_stat) {
-	case MSG_ACCEPTED:
-		 if (!xdr_accepted_reply (xdrs, &objp->ru.RP_ar))
-			 return FALSE;
-		break;
-	case MSG_DENIED:
-		 if (!xdr_rejected_reply (xdrs, &objp->ru.RP_dr))
-			 return FALSE;
-		break;
-	default:
-		return FALSE;
-	}
-	return TRUE;
-}
-
-static bool_t xdr_rpc_msg (XDR *xdrs, struct rpc_msg *objp) {
-	 if (!xdr_u_long (xdrs, &objp->rm_xid))
-		 return FALSE;
-	 if (!xdr_msg_type (xdrs, &objp->rm_direction))
-		 return FALSE;
-	switch (objp->rm_direction) {
-	case CALL:
-		 if (!xdr_call_body (xdrs, &objp->ru.RM_cmb))
-			 return FALSE;
-		break;
-	case REPLY:
-		 if (!xdr_reply_body (xdrs, &objp->ru.RM_rmb))
-			 return FALSE;
-		break;
-	default:
-		return FALSE;
-	}
-	return TRUE;
-}
-
-bool_t xdr_opaque_auth (XDR *xdrs, struct opaque_auth *objp) {
-	 if (!xdr_enum (xdrs, &objp->oa_flavor))
-		 return FALSE;
-	 if (!xdr_bytes (xdrs, &objp->oa_base, &objp->oa_length, MAX_AUTH_BYTES))
-		 return FALSE;
-	return TRUE;
-}
-
-static bool_t sendreply(SVCXPRT *xprt, struct rpc_msg* msg) {
-	Packet* packet = (void*)xprt->xp_p2;
+static int read_string(RPC* rpc, char** v, uint16_t* len) {
+	*len = 0;
 	
-	Ether* ether = (Ether*)(packet->buffer + packet->start);
-	IP* ip = (IP*)ether->payload;
-	UDP* udp = (UDP*)ip->body;
+	uint16_t len0;
+	memcpy(&len0, rpc->rbuf + rpc->rbuf_read, sizeof(uint16_t));
+	uint16_t len1 = sizeof(uint16_t) + len0;
 	
-	XDR xdr;
-	xdrmem_create(&xdr, (char*)udp->body, packet->buffer + packet->size - udp->body, XDR_ENCODE);
-	
-	memcpy(&msg->rm_xid, udp->body, sizeof(msg->rm_xid));
-	msg->rm_xid = endian32(msg->rm_xid);
-	
-	if(!xdr_rpc_msg(&xdr, msg)) {
-		svcerr_systemerr(xprt);
-		return FALSE;
-	}
-	int len = UDP_LEN + xdr_getpos(&xdr);
-	xdr_destroy(&xdr);
-	
-	swap16(udp->source, udp->destination);
-	udp->length = endian16(len);
-	udp->checksum = 0;
-	packet->end = ((void*)udp + len) - (void*)packet->buffer;
-	
-	swap32(ip->source, ip->destination);
-	ip->ttl = 64;
-	ip->length = endian16(ip->ihl * 4 + len);
-	ip->checksum = 0;
-	ip->checksum = endian16(checksum(ip, ip->ihl * 4));
-	
-	swap48(ether->smac, ether->dmac);
-	
-	ni_output_dup(packet->ni, packet);
-	
-	map_update(history_map, (void*)(uint64_t)msg->rm_xid, packet);
-	
-	return TRUE;
-}
-
-bool_t svc_sendreply(SVCXPRT *xprt, xdrproc_t outproc, char *out) {
-	struct rpc_msg msg;
-	msg.rm_direction = REPLY;
-	msg.ru.RM_rmb.rp_stat = MSG_ACCEPTED;
-	msg.ru.RM_rmb.ru.RP_ar.ar_verf = xprt->xp_verf;
-	msg.ru.RM_rmb.ru.RP_ar.ar_stat = SUCCESS;
-	msg.ru.RM_rmb.ru.RP_ar.ru.AR_results.where = (caddr_t)out;
-	msg.ru.RM_rmb.ru.RP_ar.ru.AR_results.proc = outproc;
-	
-	return sendreply(xprt, &msg);
-}
-
-void svcerr_noproc(SVCXPRT *xprt) {
-	struct rpc_msg msg;
-	
-	msg.rm_direction = REPLY;
-	msg.ru.RM_rmb.rp_stat = MSG_ACCEPTED;
-	msg.ru.RM_rmb.ru.RP_ar.ar_verf = xprt->xp_verf;
-	msg.ru.RM_rmb.ru.RP_ar.ar_stat = PROC_UNAVAIL;
-	
-	sendreply(xprt, &msg);
-}
-
-void svcerr_decode(SVCXPRT *xprt) {
-	struct rpc_msg msg;
-	
-	msg.rm_direction = REPLY;
-	msg.ru.RM_rmb.rp_stat = MSG_ACCEPTED;
-	msg.ru.RM_rmb.ru.RP_ar.ar_verf = xprt->xp_verf;
-	msg.ru.RM_rmb.ru.RP_ar.ar_stat = GARBAGE_ARGS;
-	
-	sendreply(xprt, &msg);
-}
-
-void svcerr_systemerr(SVCXPRT *xprt) {
-	struct rpc_msg msg;
-	
-	msg.rm_direction = REPLY;
-	msg.ru.RM_rmb.rp_stat = MSG_ACCEPTED;
-	msg.ru.RM_rmb.ru.RP_ar.ar_verf = xprt->xp_verf;
-	msg.ru.RM_rmb.ru.RP_ar.ar_stat = SYSTEM_ERR;
-	
-	sendreply(xprt, &msg);
-}
-
-typedef struct {
-	unsigned long prognum;
-	unsigned long versnum;
-	void (*dispatch)(struct svc_req *, SVCXPRT *);
-	unsigned long protocol;
-} Service;
-
-static uint64_t service_hash(void* key) {
-	Service* service = key;
-	return service->prognum + service->versnum;
-}
-
-static bool service_equals(void* key1, void* key2) {
-	Service* service1 = key1;
-	Service* service2 = key2;
-	
-	return service1->prognum == service2->prognum &&
-		service1->versnum == service2->versnum;
-}
-
-bool_t pmap_unset(unsigned long prognum, unsigned long versnum) {
-	if(!services)
-		return FALSE;
-	
-	Service key;
-	key.prognum = prognum;
-	key.versnum = versnum;
-	
-	Service* service = map_get(services, &key);
-	if(service) {
-		free(service);
-		return TRUE;
-	}
-	
-	return FALSE;
-}
-
-static bool_t getargs(SVCXPRT *xprt, xdrproc_t inproc, char *in) {
-	XDR* xdr = (void*)xprt->xp_p1;
-	return inproc(xdr, in);
-}
-
-static bool_t freeargs(SVCXPRT *xprt, xdrproc_t inproc, char *in) {
-	XDR* xdr = (void*)xprt->xp_p1;
-	xdr->x_op = XDR_FREE;
-	return inproc(xdr, in);
-}
-// TODO: Create SVCXPRT dynamically
-SVCXPRT *svcudp_create(int sock) {
-	if(!services) {
-		services = map_create(4, service_hash, service_equals, NULL);
-	}
-	
-	if(!history_fifo) {
-		history_fifo = fifo_create(16, NULL);
-	}
-	
-	if(!history_map) {
-		history_map = map_create(15, map_uint64_hash, map_uint64_equals, NULL);
-	}
-	
-	ops.xp_getargs = getargs;
-	ops.xp_freeargs = freeargs;
-	xprt.xp_ops = &ops;
-	
-	return &xprt;
-}
-
-bool_t svc_register(SVCXPRT *xprt, unsigned long prognum, unsigned long versnum, 
-		void (*dispatch)(struct svc_req *, SVCXPRT *), unsigned long protocol) {
-	
-	if(!services)
-		return FALSE;
-	
-	Service* service = malloc(sizeof(Service));
-	bzero(service, sizeof(Service));
-	
-	service->prognum = prognum;
-	service->versnum = versnum;
-	service->dispatch = dispatch;
-	service->protocol = protocol;
-	
-	map_put(services, service, service);
-	
-	return TRUE;
-}
-
-bool rpc_process(Packet* packet) {
-	uint32_t addr = (uint32_t)(uint64_t)ni_config_get(packet->ni, "ip");
-	if(!addr)
-		return false;
-	
-	// Parse packet
-	Ether* ether = (Ether*)(packet->buffer + packet->start);
-	if(endian16(ether->type) != ETHER_TYPE_IPv4)
-		return false;
-	
-	IP* ip = (IP*)ether->payload;
-	if(endian32(ip->destination) != addr || ip->protocol != IP_PROTOCOL_UDP)
-		return false;
-	
-	UDP* udp = (UDP*)ip->body;
-	if(endian16(udp->destination) != 111)
-		return false;
-	
-	// Parse message
-	XDR xdr;
-	xdrmem_create(&xdr, (char*)udp->body, endian16(udp->length) - UDP_LEN, XDR_DECODE);
-	
-	struct rpc_msg msg;
-	if(!xdr_rpc_msg(&xdr, &msg)) {
-		ni_free(packet);
-		return true;
-	}
-	
-	if(msg.rm_direction == CALL) {
-		// Duplicated XID
-		if(map_contains(history_map, (void*)(uint64_t)msg.rm_xid)) {
-			Packet* back = map_get(history_map, (void*)(uint64_t)msg.rm_xid);
-			
-			if(back) {
-				ni_output_dup(back->ni, back);
-			}
-			
-			ni_free(packet);
-			
-			return true;
+	if(rpc->rbuf_read + len1 > rpc->rbuf_index) {
+		int len2 = rpc->read(rpc, rpc->rbuf + rpc->rbuf_index, 
+			RPC_BUFFER_SIZE - rpc->rbuf_index);
+		if(len2 < 0) {
+			return len2;
 		}
 		
-		// Make a room for history
-		if(fifo_size(history_fifo) >= 15) {
-			uint64_t xid = (uint64_t)fifo_pop(history_fifo);
-			Packet* back = map_remove(history_map, (void*)xid);
-			if(back)
-				ni_free(back);
-		}
-		
-		// Add history
-		fifo_push(history_fifo, (void*)(uint64_t)msg.rm_xid);
-		map_put(history_map, (void*)(uint64_t)msg.rm_xid, NULL);
-		
-		if(msg.ru.RM_cmb.cb_rpcvers != 2)
-			return false;
-		
-		// Find service
-		Service key;
-		key.prognum = msg.ru.RM_cmb.cb_prog;
-		key.versnum = msg.ru.RM_cmb.cb_vers;
-		
-		Service* service = map_get(services, &key);
-		if(!service)
-			return false;
-		
-		// Make svc_req
-		struct svc_req req;
-		req.rq_prog = msg.ru.RM_cmb.cb_prog;
-		req.rq_vers = msg.ru.RM_cmb.cb_vers;
-		req.rq_proc = msg.ru.RM_cmb.cb_proc;
-		req.rq_clntcred = (caddr_t)&msg.ru.RM_cmb.cb_cred;
-		req.rq_xprt = &xprt;
-		
-		// Set svc xprt
-		xprt.xp_verf = msg.ru.RM_cmb.cb_verf;
-		xprt.xp_p1 = (caddr_t)&xdr;
-		xprt.xp_p2 = (caddr_t)packet;
-		
-		service->dispatch(&req, &xprt);
-		
-		return true;
-	} else if(calls && msg.rm_direction == REPLY) {
-		Call* call = map_remove(calls, (void*)(uint64_t)msg.rm_xid);
-		if(!call) {
-			ni_free(packet);
-			return true;
-		}
-		
-		int stat1 = msg.ru.RM_rmb.rp_stat;
-		int stat2 = 0;
-		if(msg.ru.RM_rmb.rp_stat == MSG_ACCEPTED) {
-			stat2 = msg.ru.RM_rmb.ru.RP_ar.ar_stat;
-			if(msg.ru.RM_rmb.ru.RP_ar.ar_stat == SUCCESS) {
-				if(call->outproc(&xdr, call->out)) {
-					if(call->succeed)
-						call->succeed(call->context, call->out);
-					goto done;
-				}
-			}
-		} else {
-			stat2 = msg.ru.RM_rmb.ru.RP_dr.rj_stat;
-		}
-		
-		if(call->failed)
-			call->failed(call->context, stat1, stat2);
-		
-done:
-		free(call);
-		
-		return true;
-	} else {	// Illegal RPC packet
-		ni_free(packet);
-		return true;
+		rpc->rbuf_index += len2;
 	}
+	
+	if(rpc->rbuf_read + len1 > rpc->rbuf_index)
+		return 0;
+	
+	*len = len0;
+	if(v != NULL)
+		*v = (char*)(rpc->rbuf + rpc->rbuf_read + sizeof(uint16_t));
+	rpc->rbuf_read += len1;
+	
+	return len1;
 }
 
-static void cl_destroy(CLIENT* clnt) {
-	free(clnt);
+static int write_bytes(RPC* rpc, void* v, uint16_t size) {
+	uint16_t len = sizeof(uint16_t) + size;
+	if(rpc->wbuf_index + len > RPC_BUFFER_SIZE)
+		return 0;
+	
+	memcpy(rpc->wbuf + rpc->wbuf_index, &size, sizeof(uint16_t));
+	memcpy(rpc->wbuf + rpc->wbuf_index + sizeof(uint16_t), v, size);
+	rpc->wbuf_index += len;
+	
+	return len;
 }
 
-struct clnt_ops cl_ops = {
-	.cl_destroy = cl_destroy
+#define read_bytes(RPC, DATA, LEN)	read_string((RPC), (char**)(DATA), (LEN))
+
+#define INIT()					\
+	int _len = 0;				\
+	int _size = 0;				\
+	int _rbuf_read = rpc->rbuf_read;	\
+	int _wbuf_index = rpc->wbuf_index;
+
+#define ROLLBACK()			\
+	rpc->rbuf_read = _rbuf_read;	\
+	rpc->wbuf_index = _wbuf_index;
+	
+#define READ(VALUE)			\
+if((_len = (VALUE)) <= 0) {		\
+	ROLLBACK();			\
+	return _len; 			\
+} else {				\
+	_size += _len;			\
+}
+
+#define READ2(VALUE, FAILED)		\
+if((_len = (VALUE)) <= 0) {		\
+	ROLLBACK();			\
+	FAILED();			\
+	return _len; 			\
+} else {				\
+	_size += _len;			\
+}
+
+#define WRITE(VALUE)			\
+if((_len = (VALUE)) <= 0) {		\
+	ROLLBACK();			\
+	return _len; 			\
+} else {				\
+	_size += _len;			\
+}
+
+#define RETURN()	return _size;
+
+static int write_vm(RPC* rpc, VMSpec* vm) {
+	INIT();
+	
+	WRITE(write_bool(rpc, vm != NULL));
+	if(vm == NULL)
+		RETURN();
+	
+	WRITE(write_uint32(rpc, vm->id));
+	WRITE(write_uint32(rpc, vm->core_size));
+	WRITE(write_uint32(rpc, vm->memory_size));
+	WRITE(write_uint32(rpc, vm->storage_size));
+	
+	WRITE(write_uint16(rpc, vm->nic_count));
+	for(int i = 0; i < vm->nic_count; i++) {
+		WRITE(write_uint64(rpc, vm->nics[i].mac));
+		WRITE(write_uint32(rpc, vm->nics[i].port));
+		WRITE(write_uint32(rpc, vm->nics[i].input_buffer_size));
+		WRITE(write_uint32(rpc, vm->nics[i].output_buffer_size));
+		WRITE(write_uint64(rpc, vm->nics[i].input_bandwidth));
+		WRITE(write_uint64(rpc, vm->nics[i].output_bandwidth));
+		WRITE(write_uint32(rpc, vm->nics[i].pool_size));
+	}
+	
+	WRITE(write_uint16(rpc, vm->argc));
+	for(int i = 0; i < vm->argc; i++) {
+		WRITE(write_string(rpc, vm->argv[i]));
+	}
+	
+	RETURN();
+}
+
+static void vm_free(VMSpec* vm);
+
+static int read_vm(RPC* rpc, VMSpec** vm2) {
+	INIT();
+	
+	bool is_not_null;
+	READ(read_bool(rpc, &is_not_null));
+	if(!is_not_null) {
+		*vm2 = NULL;
+		RETURN();
+	}
+	
+	VMSpec* vm = malloc(sizeof(VMSpec));
+	if(!vm) {
+		return -10;
+	}
+	bzero(vm, sizeof(VMSpec));
+	
+	void failed() {
+		if(vm)
+			vm_free(vm);
+	}
+	
+	READ2(read_uint32(rpc, &vm->id), failed);
+	READ2(read_uint32(rpc, &vm->core_size), failed);
+	READ2(read_uint32(rpc, &vm->memory_size), failed);
+	READ2(read_uint32(rpc, &vm->storage_size), failed);
+	READ2(read_uint16(rpc, &vm->nic_count), failed);
+	
+	vm->nics = malloc(vm->nic_count * sizeof(NICSpec));
+	if(!vm->nics) {
+		failed();
+		return -10;
+	}
+	for(int i = 0; i < vm->nic_count; i++) {
+		READ2(read_uint64(rpc, &vm->nics[i].mac), failed);
+		READ2(read_uint32(rpc, &vm->nics[i].port), failed);
+		READ2(read_uint32(rpc, &vm->nics[i].input_buffer_size), failed);
+		READ2(read_uint32(rpc, &vm->nics[i].output_buffer_size), failed);
+		READ2(read_uint64(rpc, &vm->nics[i].input_bandwidth), failed);
+		READ2(read_uint64(rpc, &vm->nics[i].output_bandwidth), failed);
+		READ2(read_uint32(rpc, &vm->nics[i].pool_size), failed);
+	}
+	
+	READ2(read_uint16(rpc, &vm->argc), failed);
+	
+	int rbuf_read = rpc->rbuf_read;
+	int argv_size = sizeof(char**) * vm->argc;
+	for(int i = 0; i < vm->argc; i++) {
+		uint16_t len2;
+		READ2(read_string(rpc, NULL, &len2), failed);
+		
+		argv_size += len2 + 1;
+	}
+	
+	vm->argv = malloc(argv_size);
+	if(!vm->argv) {
+		failed();
+		return -2;
+	}
+	bzero(vm->argv, argv_size);
+	char* str = (void*)vm->argv + sizeof(char**) * vm->argc;
+	
+	rpc->rbuf_read = rbuf_read;
+	for(int i = 0; i < vm->argc; i++) {
+		char* ch;
+		uint16_t len2;
+		READ2(read_string(rpc, &ch, &len2), failed);
+		
+		vm->argv[i] = str;
+		memcpy(str, ch, len2);
+		str += len2 + 1;
+	}
+	
+	*vm2 = vm;
+	
+	RETURN();
+}
+
+static int rbuf_flush(RPC* rpc) {
+	int len = rpc->rbuf_read;
+	memmove(rpc->rbuf, rpc->rbuf + len, rpc->rbuf_index - len);
+	
+	rpc->rbuf_index -= len;
+	rpc->rbuf_read = 0;
+	
+	return len;
+}
+
+static int wbuf_flush(RPC* rpc) {
+	int len = rpc->write(rpc, rpc->wbuf, rpc->wbuf_index);
+	if(len < 0) {
+		return len;
+	}
+	memmove(rpc->wbuf, rpc->wbuf + len, rpc->wbuf_index - len);
+	
+	rpc->wbuf_index -= len;
+	
+	return len;
+}
+
+// API
+// hello client API
+int rpc_hello(RPC* rpc, void(*callback)(void* context), void* context) {
+	INIT();
+	
+	WRITE(write_uint16(rpc, RPC_TYPE_HELLO_REQ));
+	WRITE(write_string(rpc, RPC_MAGIC));
+	WRITE(write_uint32(rpc, RPC_VERSION));
+	
+	rpc->hello_callback = callback;
+	rpc->hello_context = context;
+	
+	RETURN();
+}
+
+static int hello_res_handler(RPC* rpc) {
+	if(rpc->hello_callback) {
+		rpc->hello_callback(rpc->hello_context);
+		rpc->hello_callback = NULL;
+		rpc->hello_context = NULL;
+	}
+	
+	return true;
+}
+
+// hello server API
+static int hello_req_handler(RPC* rpc) {
+	INIT();
+	
+	char* magic;
+	uint16_t len;
+	READ(read_string(rpc, &magic, &len));
+	if(len != RPC_MAGIC_SIZE) {
+		return -1;
+	}
+	
+	if(memcmp(magic, RPC_MAGIC, RPC_MAGIC_SIZE) != 0) {
+		return -1;
+	}
+	
+	uint32_t ver;
+	READ(read_uint32(rpc, &ver));
+	if(ver == RPC_VERSION) {
+		rpc->ver = ver;
+	} else {
+		return -1;
+	}
+	
+	WRITE(write_uint16(rpc, RPC_TYPE_HELLO_RES));
+	
+	RETURN();
+}
+
+// vm_create client API
+int rpc_vm_create(RPC* rpc, VMSpec* vm, void(*callback)(uint32_t id, void* context), void* context) {
+	INIT();
+	
+	WRITE(write_uint16(rpc, RPC_TYPE_VM_CREATE_REQ));
+	WRITE(write_vm(rpc, vm));
+	
+	rpc->vm_create_callback = callback;
+	rpc->vm_create_context = context;
+	
+	RETURN();
+}
+
+static int vm_create_res_handler(RPC* rpc) {
+	INIT();
+	
+	uint32_t id;
+	READ(read_uint32(rpc, &id));
+	
+	if(rpc->vm_create_callback) {
+		rpc->vm_create_callback(id, rpc->vm_create_context);
+		rpc->vm_create_callback = NULL;
+		rpc->vm_create_context = NULL;
+	}
+	
+	RETURN();
+}
+
+// vm_create server API
+void rpc_vm_create_handler(RPC* rpc, uint32_t(*handler)(VMSpec* vm, void* context), void* context) {
+	rpc->vm_create_handler = handler;
+	rpc->vm_create_handler_context = context;
+}
+
+static int vm_create_req_handler(RPC* rpc) {
+	INIT();
+	
+	VMSpec* vm;
+	READ(read_vm(rpc, &vm));
+	
+	uint32_t id = 0;
+	if(rpc->vm_create_handler) {
+		id = rpc->vm_create_handler(vm, rpc->vm_create_handler_context);
+	}
+	
+	if(vm)
+		vm_free(vm);
+	
+	WRITE(write_uint16(rpc, RPC_TYPE_VM_CREATE_RES));
+	WRITE(write_uint32(rpc, id));
+	
+	RETURN();
+}
+
+// vm_get client API
+int rpc_vm_get(RPC* rpc, uint32_t id, void(*callback)(VMSpec* vm, void* context), void* context) {
+	INIT();
+	
+	WRITE(write_uint16(rpc, RPC_TYPE_VM_GET_REQ));
+	WRITE(write_uint32(rpc, id));
+	
+	rpc->vm_get_callback = callback;
+	rpc->vm_get_context = context;
+	
+	RETURN();
+}
+
+static int vm_get_res_handler(RPC* rpc) {
+	INIT();
+	
+	VMSpec* vm;
+	READ(read_vm(rpc, &vm));
+	
+	if(rpc->vm_get_callback) {
+		rpc->vm_get_callback(vm, rpc->vm_get_context);
+		rpc->vm_get_callback = NULL;
+		rpc->vm_get_context = NULL;
+	}
+	
+	if(vm)
+		vm_free(vm);
+	
+	RETURN();
+}
+
+// vm_get server API
+void rpc_vm_get_handler(RPC* rpc, VMSpec*(*handler)(uint32_t id, void* context), void* context) {
+	rpc->vm_get_handler = handler;
+	rpc->vm_get_handler_context = context;
+}
+
+static int vm_get_req_handler(RPC* rpc) {
+	INIT();
+	
+	uint32_t id;
+	READ(read_uint32(rpc, &id));
+	
+	VMSpec* vm = NULL;
+	if(rpc->vm_get_handler) {
+		vm = rpc->vm_get_handler(id, rpc->vm_get_handler_context);
+	}
+	
+	WRITE(write_uint16(rpc, RPC_TYPE_VM_GET_RES));
+	WRITE(write_vm(rpc, vm));
+	
+	RETURN();
+}
+
+// vm_set client API
+int rpc_vm_set(RPC* rpc, VMSpec* vm, void(*callback)(bool result, void* context), void* context) {
+	INIT();
+	
+	WRITE(write_uint16(rpc, RPC_TYPE_VM_SET_REQ));
+	WRITE(write_vm(rpc, vm));
+	
+	rpc->vm_set_callback = callback;
+	rpc->vm_set_context = context;
+	
+	return true;
+}
+
+static int vm_set_res_handler(RPC* rpc) {
+	INIT();
+	
+	bool result;
+	READ(read_bool(rpc, &result));
+	
+	if(rpc->vm_set_callback) {
+		rpc->vm_set_callback(result, rpc->vm_set_context);
+		rpc->vm_set_callback = NULL;
+		rpc->vm_set_context = NULL;
+	}
+	
+	RETURN();
+}
+
+// vm_set server API
+void rpc_vm_set_handler(RPC* rpc, bool(*handler)(VMSpec* vm, void* context), void* context) {
+	rpc->vm_set_handler = handler;
+	rpc->vm_set_handler_context = context;
+}
+
+static int vm_set_req_handler(RPC* rpc) {
+	INIT();
+	
+	VMSpec* vm;
+	READ(read_vm(rpc, &vm));
+	
+	bool result = false;
+	if(rpc->vm_set_handler) {
+		result = rpc->vm_set_handler(vm, rpc->vm_set_handler_context);
+	}
+	
+	if(vm)
+		vm_free(vm);
+	
+	WRITE(write_uint16(rpc, RPC_TYPE_VM_SET_RES));
+	WRITE(write_bool(rpc, result));
+	
+	RETURN();
+}
+
+// vm_delete client API
+int rpc_vm_delete(RPC* rpc, uint32_t id, void(*callback)(bool result, void* context), void* context) {
+	INIT();
+	
+	WRITE(write_uint16(rpc, RPC_TYPE_VM_DELETE_REQ));
+	WRITE(write_uint32(rpc, id));
+	
+	rpc->vm_delete_callback = callback;
+	rpc->vm_delete_context = context;
+	
+	RETURN();
+}
+
+static int vm_delete_res_handler(RPC* rpc) {
+	INIT();
+	
+	bool result = false;
+	READ(read_bool(rpc, &result));
+	
+	if(rpc->vm_delete_callback) {
+		rpc->vm_delete_callback(result, rpc->vm_delete_context);
+		rpc->vm_delete_callback = NULL;
+		rpc->vm_delete_context = NULL;
+	}
+	
+	RETURN();
+}
+
+// vm_delete server API
+void rpc_vm_delete_handler(RPC* rpc, bool(*handler)(uint32_t id, void* context), void* context) {
+	rpc->vm_delete_handler = handler;
+	rpc->vm_delete_handler_context = context;
+}
+
+static int vm_delete_req_handler(RPC* rpc) {
+	INIT();
+	
+	uint32_t id;
+	READ(read_uint32(rpc, &id));
+	
+	bool result = false;
+	if(rpc->vm_delete_handler) {
+		result = rpc->vm_delete_handler(id, rpc->vm_delete_handler_context);
+	}
+	
+	WRITE(write_uint16(rpc, RPC_TYPE_VM_DELETE_RES));
+	WRITE(write_bool(rpc, result));
+	
+	RETURN();
+}
+
+// vm_list client API
+int rpc_vm_list(RPC* rpc, void(*callback)(uint32_t* ids, uint16_t count, void* context), void* context) {
+	INIT();
+	
+	WRITE(write_uint16(rpc, RPC_TYPE_VM_LIST_REQ));
+	
+	rpc->vm_list_callback = callback;
+	rpc->vm_list_context = context;
+	
+	RETURN();
+}
+
+static int vm_list_res_handler(RPC* rpc) {
+	INIT();
+	
+	uint16_t size;
+	uint32_t* list;
+	READ(read_bytes(rpc, &list, &size));
+	
+	if(rpc->vm_list_callback) {
+		rpc->vm_list_callback(list, size / sizeof(uint32_t), rpc->vm_list_context);
+		rpc->vm_list_callback = NULL;
+		rpc->vm_list_context = NULL;
+	}
+	
+	RETURN();
+}
+
+// vm_list server API
+void rpc_vm_list_handler(RPC* rpc, int(*handler)(uint32_t* ids, int size, void* context), void* context) {
+	rpc->vm_list_handler = handler;
+	rpc->vm_list_handler_context = context;
+}
+
+static int vm_list_req_handler(RPC* rpc) {
+	INIT();
+	
+	uint32_t ids[255];
+	int size = 0;
+	if(rpc->vm_list_handler) {
+		size = rpc->vm_list_handler(ids, 255, rpc->vm_list_handler_context);
+	}
+	
+	WRITE(write_uint16(rpc, RPC_TYPE_VM_LIST_RES));
+	WRITE(write_bytes(rpc, ids, sizeof(uint32_t) * size));
+	
+	RETURN();
+}
+
+// status_get client API
+int rpc_status_get(RPC* rpc, uint32_t id, void(*callback)(VMStatus status, void* context), void* context) {
+	INIT();
+	
+	WRITE(write_uint16(rpc, RPC_TYPE_STATUS_GET_REQ));
+	WRITE(write_uint32(rpc, id));
+	
+	rpc->status_get_callback = callback;
+	rpc->status_get_context = context;
+	
+	RETURN();
+}
+
+static int status_get_res_handler(RPC* rpc) {
+	INIT();
+	
+	uint32_t status;
+	READ(read_uint32(rpc, &status));
+	
+	if(rpc->status_get_callback) {
+		rpc->status_get_callback(status, rpc->status_get_context);
+		rpc->status_get_callback = NULL;
+		rpc->status_get_context = NULL;
+	}
+	
+	RETURN();
+}
+
+// status_get server API
+void rpc_status_get_handler(RPC* rpc, VMStatus(*handler)(uint32_t id, void* context), void* context) {
+	rpc->status_get_handler = handler;
+	rpc->status_get_handler_context = context;
+}
+
+static int status_get_req_handler(RPC* rpc) {
+	INIT();
+	
+	uint32_t id;
+	READ(read_uint32(rpc, &id));
+	
+	uint32_t status = (uint32_t)VM_STATUS_INVALID;
+	if(rpc->status_get_handler) {
+		status = rpc->status_get_handler(id, rpc->status_get_handler_context);
+	}
+	
+	WRITE(write_uint16(rpc, RPC_TYPE_STATUS_GET_RES));
+	WRITE(write_uint32(rpc, status));
+	
+	RETURN();
+}
+
+// status_set client API
+int rpc_status_set(RPC* rpc, uint32_t id, VMStatus status, void(*callback)(bool result, void* context), void* context) {
+	INIT();
+	
+	WRITE(write_uint16(rpc, RPC_TYPE_STATUS_SET_REQ));
+	WRITE(write_uint32(rpc, id));
+	WRITE(write_uint32(rpc, (uint32_t)status));
+	
+	rpc->status_set_callback = callback;
+	rpc->status_set_context = context;
+	
+	RETURN();
+}
+
+static int status_set_res_handler(RPC* rpc) {
+	INIT();
+	
+	bool result = false;
+	READ(read_bool(rpc, &result));
+	
+	if(rpc->status_set_callback) {
+		rpc->status_set_callback(result, rpc->status_set_context);
+		rpc->status_set_callback = NULL;
+		rpc->status_set_context = NULL;
+	}
+	
+	RETURN();
+}
+
+// status_set server API
+void rpc_status_set_handler(RPC* rpc, bool(*handler)(uint32_t id, VMStatus status, void* context), void* context) {
+	rpc->status_set_handler = handler;
+	rpc->status_set_handler_context = context;
+}
+
+static int status_set_req_handler(RPC* rpc) {
+	INIT();
+	
+	uint32_t id;
+	READ(read_uint32(rpc, &id))
+	
+	uint32_t status;
+	READ(read_uint32(rpc, &status));
+	
+	bool result = false;
+	if(rpc->status_set_handler) {
+		result = rpc->status_set_handler(id, status, rpc->status_set_handler_context);
+	}
+	
+	WRITE(write_uint16(rpc, RPC_TYPE_STATUS_SET_RES));
+	WRITE(write_bool(rpc, result));
+	
+	RETURN();
+}
+
+// storage_download client API
+int rpc_storage_download(RPC* rpc, uint32_t id, uint16_t(*callback)(uint32_t offset, void* buf, uint16_t size, void* context), void* context) {
+	INIT();
+	
+	WRITE(write_uint16(rpc, RPC_TYPE_STORAGE_DOWNLOAD_REQ));
+	WRITE(write_uint32(rpc, id));
+	
+	rpc->storage_download_callback = callback;
+	rpc->storage_download_context = context;
+	
+	RETURN();
+}
+
+static int storage_download_res_handler(RPC* rpc) {
+	INIT();
+	
+	uint32_t offset;
+	READ(read_uint32(rpc, &offset));
+	
+	void* buf;
+	uint16_t size;
+	READ(read_bytes(rpc, &buf, &size));
+	
+	if(rpc->storage_download_callback) {
+		rpc->storage_download_callback(offset, buf, size, rpc->storage_download_context);
+		if(size == 0) {
+			printf("download done: %d %d %02x %02x %02x %02x\n", rpc->rbuf_read, rpc->rbuf_index, 
+				rpc->rbuf[rpc->rbuf_read],
+				rpc->rbuf[rpc->rbuf_read + 1],
+				rpc->rbuf[rpc->rbuf_read + 2],
+				rpc->rbuf[rpc->rbuf_read + 3]);
+			rpc->storage_download_callback = NULL;
+			rpc->storage_download_context = NULL;
+		}
+	}
+	
+	RETURN();
+}
+
+// storage_download server API
+void rpc_storage_download_handler(RPC* rpc, uint16_t(*handler)(uint32_t id, uint32_t offset, void** buf, uint16_t size, void* context), void* context) {
+	rpc->storage_download_handler = handler;
+	rpc->storage_download_handler_context = context;
+}
+
+static int storage_download_req_handler(RPC* rpc) {
+	INIT();
+	
+	READ(read_uint32(rpc, &rpc->storage_download_id));
+	
+	rpc->storage_download_offset = 0;
+	
+	RETURN();
+}
+
+static int download(RPC* rpc) {
+	INIT();
+	
+	void* buf;
+	uint16_t size;
+	if(rpc->storage_download_handler) {
+		size = rpc->storage_download_handler(rpc->storage_download_id, rpc->storage_download_offset, &buf, 1460, rpc->storage_download_handler_context);
+		
+		WRITE(write_uint16(rpc, RPC_TYPE_STORAGE_DOWNLOAD_RES));
+		WRITE(write_uint32(rpc, rpc->storage_download_offset));
+		WRITE(write_bytes(rpc, buf, size));
+	} else {
+		size = 0;
+	}
+	
+	rpc->storage_download_offset += size;
+	
+	if(size == 0) {
+		rpc->storage_download_id = 0;
+		rpc->storage_download_offset = 0;
+	}
+	
+	RETURN();
+}
+
+// storage_upload client API
+int rpc_storage_upload(RPC* rpc, uint32_t id, uint16_t(*callback)(uint32_t offset, void** buf, uint16_t size, void* context), void* context) {
+	rpc->storage_upload_id = id;
+	rpc->storage_upload_offset = 0;
+	rpc->storage_upload_callback = callback;
+	rpc->storage_upload_context = context;
+	
+	return true;
+}
+
+static int upload(RPC* rpc) {
+	INIT();
+	
+	void* buf;
+	uint16_t size;
+	if(rpc->storage_upload_callback) {
+		size = rpc->storage_upload_callback(rpc->storage_upload_offset, &buf, 1460, rpc->storage_upload_context);
+		
+		WRITE(write_uint16(rpc, RPC_TYPE_STORAGE_UPLOAD_REQ));
+		WRITE(write_uint32(rpc, rpc->storage_upload_id));
+		WRITE(write_uint32(rpc, rpc->storage_upload_offset));
+		WRITE(write_bytes(rpc, buf, size));
+	} else {
+		size = 0;
+	}
+	
+	rpc->storage_upload_offset += size;
+	
+	if(size == 0) {
+		rpc->storage_upload_id = 0;
+		rpc->storage_upload_offset = 0;
+		rpc->storage_upload_context = NULL;
+	}
+	
+	RETURN();
+}	
+
+// storage_upload server API
+void rpc_storage_upload_handler(RPC* rpc, uint16_t(*handler)(uint32_t id, uint32_t offset, void* buf, uint16_t size, void* context), void* context) {
+	rpc->storage_upload_handler = handler;
+	rpc->storage_upload_handler_context = context;
+}
+
+static int storage_upload_req_handler(RPC* rpc) {
+	INIT();
+	
+	uint32_t id;
+	READ(read_uint32(rpc, &id));
+	
+	uint32_t offset;
+	READ(read_uint32(rpc, &offset));
+	
+	void* buf;
+	uint16_t size;
+	READ(read_bytes(rpc, &buf, &size));
+	
+	if(rpc->storage_upload_handler) {
+		rpc->storage_upload_handler(id, offset, buf, size, rpc->storage_upload_handler_context);
+	}
+	
+	RETURN();
+}
+
+// Handlers
+typedef int(*Handler)(RPC*);
+
+static Handler handlers[] = {
+	NULL,
+	hello_req_handler,
+	hello_res_handler,
+	vm_create_req_handler,
+	vm_create_res_handler,
+	vm_get_req_handler,
+	vm_get_res_handler,
+	vm_set_req_handler,
+	vm_set_res_handler,
+	vm_delete_req_handler,
+	vm_delete_res_handler,
+	vm_list_req_handler,
+	vm_list_res_handler,
+	status_get_req_handler,
+	status_get_res_handler,
+	status_set_req_handler,
+	status_set_res_handler,
+	storage_download_req_handler,
+	storage_download_res_handler,
+	storage_upload_req_handler,
+	download,
+	upload,
 };
 
-CLIENT* rpc_client(uint32_t ip, uint16_t port, unsigned long prognum, unsigned long versnum) {
-	CLIENT* clnt = malloc(sizeof(CLIENT) + sizeof(ClientPrivate));
-	if(!clnt)
+bool rpc_is_active(RPC* rpc) {
+	return rpc->storage_download_id > 0 || rpc->storage_upload_id > 0;
+}
+
+bool rpc_loop(RPC* rpc) {
+	INIT();
+	
+	if(rpc->wbuf_index > 0 && rpc->write) {
+		if(wbuf_flush(rpc) < 0 && rpc->close) {
+			rpc->close(rpc);
+			return false;
+		}
+	}
+	
+	uint16_t type = (uint16_t)-1;
+	_len = read_uint16(rpc, &type);
+	
+	if(_len > 0) {
+		if(type >= RPC_TYPE_END || !handlers[type]) {
+			printf("Type: %d %d %d\n", type, rpc->rbuf_read, rpc->rbuf_index);
+			if(rpc->close)
+				rpc->close(rpc);
+			
+			return _size > 0;
+		}
+	} else if(_len < 0) {
+		if(rpc->close)
+			rpc->close(rpc);
+		
+		return _size > 0;
+	} else {
+		if(rpc->storage_download_id > 0) {
+			type = RPC_TYPE_END;	// download
+		} else if(rpc->storage_upload_id > 0) {
+			type = RPC_TYPE_END + 1;// upload
+		}
+	}
+	
+	if(type != (uint16_t)-1) {
+		_len = handlers[type](rpc);
+		if(_len > 0) {
+			_size += _len;
+			
+			if(rpc->wbuf_index > 0 && rpc->write && wbuf_flush(rpc) < 0 && rpc->close) {
+				rpc->close(rpc);
+				return false;
+			}
+			
+			if(rbuf_flush(rpc) < 0 && rpc->close) {
+				rpc->close(rpc);
+				return false;
+			}
+		} else if(_len == 0) {
+			ROLLBACK();
+		} else if(rpc->close) {
+			rpc->close(rpc);
+			return false;
+		}
+	}
+	
+	return _size > 0;
+}
+
+static void vm_free(VMSpec* vm) {
+	if(vm->argv)
+		free(vm->argv);
+	
+	if(vm->nics)
+		free(vm->nics);
+	
+	free(vm);
+}
+
+void rpc_vm_dump(VMSpec* vm) {
+	if(vm == NULL) {
+		printf("vm = %p\n", vm);
+		return;
+	}
+	
+	printf("id = %d\n", vm->id);
+	printf("core_size = %d\n", vm->core_size);
+	printf("memory_size = %x\n", vm->memory_size);
+	printf("storage_size = %x\n", vm->storage_size);
+	for(int i = 0; i < vm->nic_count; i++) {
+		printf("\tnic[%d].mac = %lx\n", i, vm->nics[i].mac);
+		printf("\tnic[%d].port = %d\n", i, vm->nics[i].port);
+		printf("\tnic[%d].input_buffer_size = %d\n", i, vm->nics[i].input_buffer_size);
+		printf("\tnic[%d].output_buffer_size = %d\n", i, vm->nics[i].output_buffer_size);
+		printf("\tnic[%d].input_bandwidth = %lx\n", i, vm->nics[i].input_bandwidth);
+		printf("\tnic[%d].output_bandwidth = %lx\n", i, vm->nics[i].output_bandwidth);
+		printf("\tnic[%d].pool_size = %x\n", i, vm->nics[i].pool_size);
+	}
+	printf("argv: ");
+	for(int i = 0; i < vm->argc; i++) {
+		if(strchr(vm->argv[i], ' ')) {
+			printf("\"%s\" ", vm->argv[i]);
+		} else {
+			printf("%s ", vm->argv[i]);
+		}
+	}
+	printf("\n");
+}
+
+#ifdef LINUX
+#define DEBUG 0
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
+typedef struct {
+	int	fd;
+	bool	is_closed;
+} RPCData;
+
+static int sock_read(RPC* rpc, void* buf, int size) {
+	RPCData* data = (RPCData*)rpc->data;
+	int len = recv(data->fd, buf, size, MSG_DONTWAIT);
+	#if DEBUG
+	if(len > 0) {
+		printf("Read: ");
+		for(int i = 0; i < len; i++) {
+			printf("%02x ", ((uint8_t*)buf)[i]);
+		}
+		printf("\n");
+	}
+	#endif /* DEBUG */
+	
+	if(len == -1) {
+		return 0;
+	} else if(len == 0) {
+		return -1;
+	} else {
+		return len;
+	}
+}
+
+static int sock_write(RPC* rpc, void* buf, int size) {
+	RPCData* data = (RPCData*)rpc->data;
+	int len = send(data->fd, buf, size, MSG_DONTWAIT);
+	#if DEBUG
+	if(len > 0) {
+		printf("Write: ");
+		for(int i = 0; i < len; i++) {
+			printf("%02x ", ((uint8_t*)buf)[i]);
+		}
+		printf("\n");
+	}
+	#endif /* DEBUG */
+	
+	if(len == -1) {
+		return 0;
+	} else if(len == 0) {
+		return -1;
+	} else {
+		return len;
+	}
+}
+
+static void sock_close(RPC* rpc) {
+	RPCData* data = (RPCData*)rpc->data;
+	data->is_closed = true;
+}
+
+RPC* rpc_open(const char* host, int port) {
+	int fd = socket(AF_INET, SOCK_STREAM, 0);
+	if(fd < 0) {
 		return NULL;
-	bzero(clnt, sizeof(CLIENT) + sizeof(ClientPrivate));
+	}
 	
-	ClientPrivate* priv = (void*)clnt + sizeof(CLIENT);
-	priv->ip = ip;
-	priv->port = port;
-	priv->prognum = prognum;
-	priv->versnum = versnum;
+	struct sockaddr_in addr;
+	bzero(&addr, sizeof(struct sockaddr_in));
+	addr.sin_family = AF_INET;
+	addr.sin_addr.s_addr = inet_addr(host);
+	addr.sin_port = htons(port);
 	
-	clnt->cl_ops = &cl_ops;
-	clnt->cl_private = (caddr_t)priv;
+	if(connect(fd, (struct sockaddr*)&addr, sizeof(struct sockaddr_in)) < 0) {
+		return NULL;
+	}
 	
-	return clnt;
+	RPC* rpc = malloc(sizeof(RPC) + sizeof(RPCData));
+	rpc->read = sock_read;
+	rpc->write = sock_write;
+	rpc->close = sock_close;
+	
+	RPCData* data = (RPCData*)rpc->data;
+	data->fd = fd;
+	
+	return rpc;
 }
 
-bool rpc_call_async(NetworkInterface* ni, CLIENT* client, unsigned long procnum, xdrproc_t inproc, char* in) {
-	if(!ni_output_available(ni)) {
-		errno = 1;
-		return false;
+RPC* rpc_listen(int port) {
+	int fd = socket(AF_INET, SOCK_STREAM, 0);
+	if(fd < 0) {
+		return NULL;
 	}
 	
-	ClientPrivate* priv = (void*)client + sizeof(CLIENT);
+	struct sockaddr_in addr;
+	bzero(&addr, sizeof(struct sockaddr_in));
+	addr.sin_family = AF_INET;
+	addr.sin_addr.s_addr = htonl(INADDR_ANY);
+	addr.sin_port = htons(port);
 	
-	Packet* packet = ni_alloc(ni, 1500);
-	Ether* ether = (Ether*)(packet->buffer + packet->start);
-	ether->dmac = endian48(arp_get_mac(ni, priv->ip));
-	ether->smac = endian48(ni->mac);
-	ether->type = endian16(ETHER_TYPE_IPv4);
-	
-	IP* ip = (IP*)ether->payload;
-	ip->version = endian8(4);
-	ip->ihl = endian8(IP_LEN / 4);
-	ip->dscp = 0;
-	ip->ecn = 0;
-	ip->length = 0;//endian16(packet_size - ETHER_LEN);
-	ip->id = clock() & 0xffff;
-	ip->flags_offset = endian16(0x02 << 13);
-	ip->ttl = endian8(0x40);
-	ip->protocol = endian8(IP_PROTOCOL_UDP);
-	ip->source = endian32((uint32_t)(uint64_t)ni_config_get(ni, "ip"));
-	ip->destination = endian32(priv->ip);
-	ip->checksum = 0;
-	
-	UDP* udp = (UDP*)ip->body;
-	udp->source = endian16(111);
-	udp->destination = endian16(priv->port);
-	udp->checksum = 0;
-	
-	XDR xdr;
-	xdrmem_create(&xdr, (char*)udp->body, packet->buffer + packet->end - udp->body, XDR_ENCODE);
-	
-	struct rpc_msg msg;
-	msg.rm_xid = (uint32_t)clock();
-	msg.rm_direction = CALL;
-	msg.ru.RM_cmb.cb_rpcvers = 2;
-	msg.ru.RM_cmb.cb_prog = priv->prognum;
-	msg.ru.RM_cmb.cb_vers = priv->versnum;
-	msg.ru.RM_cmb.cb_proc = procnum;
-	bzero(&msg.ru.RM_cmb.cb_cred, sizeof(struct opaque_auth));
-	bzero(&msg.ru.RM_cmb.cb_verf, sizeof(struct opaque_auth));
-	
-	if(!xdr_rpc_msg(&xdr, &msg)) {
-		ni_free(packet);
-		errno = 2;
-		return false;
+	if(bind(fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+		return NULL;
 	}
 	
-	if(!inproc(&xdr, in)) {
-		ni_free(packet);
-		errno = 3;
-		return false;
-	}
+	RPC* rpc = malloc(sizeof(RPC) + sizeof(RPCData));
+	bzero(rpc, sizeof(RPC));
+	RPCData* data = (RPCData*)rpc->data;
+	data->fd = fd;
 	
-	udp_pack(packet, xdr_getpos(&xdr));
-	xdr_destroy(&xdr);
-	
-	if(!ni_output(ni, packet)) {
-		errno = 4;
-		return false;
-	}
-	
-	return true;
+	return rpc;
 }
 
-bool rpc_call(NetworkInterface* ni, CLIENT* client, unsigned long procnum, xdrproc_t inproc, char* in, xdrproc_t outproc, char* out, struct timeval tout, void(*succeed)(void* context, void* result), void(*failed)(void* context, int stat1, int stat2), void(*timeout)(void* context), void* context) {
-	// TODO: timeout using event
-	if(!ni_output_available(ni))
-		return false;
+RPC* rpc_accept(RPC* srpc) {
+	RPCData* data = (RPCData*)srpc->data;
 	
-	ClientPrivate* priv = (void*)client + sizeof(CLIENT);
-	
-	Packet* packet = ni_alloc(ni, 1500);
-	Ether* ether = (Ether*)(packet->buffer + packet->start);
-	ether->dmac = endian48(arp_get_mac(ni, priv->ip));
-	ether->smac = endian48(ni->mac);
-	ether->type = endian16(ETHER_TYPE_IPv4);
-	
-	IP* ip = (IP*)ether->payload;
-	ip->version = endian8(4);
-	ip->ihl = endian8(IP_LEN / 4);
-	ip->dscp = 0;
-	ip->ecn = 0;
-	ip->length = 0;//endian16(packet_size - ETHER_LEN);
-	ip->id = clock() & 0xffff;
-	ip->flags_offset = endian16(0x02 << 13);
-	ip->ttl = endian8(0x40);
-	ip->protocol = endian8(IP_PROTOCOL_UDP);
-	ip->source = endian32((uint32_t)(uint64_t)ni_config_get(ni, "ip"));
-	ip->destination = endian32(priv->ip);
-	ip->checksum = 0;
-	
-	UDP* udp = (UDP*)ip->body;
-	udp->source = endian16(111);
-	udp->destination = endian16(priv->port);
-	udp->checksum = 0;
-	
-	XDR xdr;
-	xdrmem_create(&xdr, (char*)udp->body, packet->buffer + packet->size - udp->body, XDR_ENCODE);
-	
-	struct rpc_msg msg;
-	msg.rm_xid = (uint32_t)clock();
-	msg.rm_direction = CALL;
-	msg.ru.RM_cmb.cb_rpcvers = 2;
-	msg.ru.RM_cmb.cb_prog = priv->prognum;
-	msg.ru.RM_cmb.cb_vers = priv->versnum;
-	msg.ru.RM_cmb.cb_proc = procnum;
-	bzero(&msg.ru.RM_cmb.cb_cred, sizeof(struct opaque_auth));
-	bzero(&msg.ru.RM_cmb.cb_verf, sizeof(struct opaque_auth));
-	
-	if(!xdr_rpc_msg(&xdr, &msg)) {
-		ni_free(packet);
-		return false;
+	if(listen(data->fd, 5) < 0) {
+		return NULL;
 	}
 	
-	if(!inproc(&xdr, in)) {
-		ni_free(packet);
-		return false;
+	struct sockaddr_in caddr;
+	socklen_t len = sizeof(struct sockaddr_in);
+	int fd = accept(data->fd, (struct sockaddr*)&caddr, &len);
+	if(fd < 0) {
+		return NULL;
 	}
 	
-	udp_pack(packet, xdr_getpos(&xdr));
-	xdr_destroy(&xdr);
+	RPC* rpc = malloc(sizeof(RPC) + sizeof(RPCData));
+	memcpy(rpc, srpc, sizeof(RPC));
+	rpc->ver = 0;
+	rpc->rbuf_read = 0;
+	rpc->rbuf_index = 0;
+	rpc->wbuf_index = 0;
+	rpc->read = sock_read;
+	rpc->write = sock_write;
+	rpc->close = sock_close;
 	
-	if(!ni_output(ni, packet)) {
-		return false;
-	}
+	data = (RPCData*)rpc->data;
+	data->fd = fd;
 	
-	Call* call = malloc(sizeof(Call));
-	bzero(call, sizeof(Call));
-	call->xid = msg.rm_xid;
-	call->outproc = outproc;
-	call->out = out;
-	call->tout = tout;
-	call->succeed = succeed;
-	call->failed = failed;
-	call->timeout = timeout;
-	call->context = context;
+	return rpc;
+}
+
+bool rpc_is_closed(RPC* rpc) {
+	RPCData* data = (RPCData*)rpc->data;
+	return data->is_closed;
 	
-	if(!calls) {
-		calls = map_create(16, map_uint64_hash, map_uint64_equals, NULL);
-	}
-	
-	map_put(calls, (void*)(uint64_t)call->xid, call);
-	
-	return true;
 }
 #endif /* LINUX */

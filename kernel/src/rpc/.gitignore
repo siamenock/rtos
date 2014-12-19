@@ -1,6 +1,0 @@
-rpc_manager.h
-rpc_manager.c
-rpc_manager_xdr.c
-rpc_callback.h
-rpc_callback.c
-rpc_callback_xdr.c
