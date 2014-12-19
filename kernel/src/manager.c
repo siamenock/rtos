@@ -485,6 +485,11 @@ static uint16_t storage_upload_handler(uint32_t vmid, uint32_t offset, void* buf
 	return vm_storage_write(vmid, buf, offset, size);
 }
 
+static uint16_t stdio_handler(uint32_t id, uint8_t thread_id, int fd, char* str, uint16_t size, void* context) {
+	ssize_t len = vm_stdio(id, thread_id, fd, str, size);
+	return len < 0 ? 0 : len;
+}
+
 // PCB utility
 static int pcb_read(RPC* rpc, void* buf, int size) {
 	RPCData* data = (RPCData*)rpc->data;
@@ -549,6 +554,7 @@ static err_t manager_accept(void* arg, struct tcp_pcb* pcb, err_t err) {
 	rpc_status_set_handler(rpc, status_set_handler, NULL);
 	rpc_storage_download_handler(rpc, storage_download_handler, NULL);
 	rpc_storage_upload_handler(rpc, storage_upload_handler, NULL);
+	rpc_stdio_handler(rpc, stdio_handler, NULL);
 	
 	RPCData* data = (RPCData*)rpc->data;
 	data->pcb = pcb;
@@ -576,41 +582,39 @@ static Packet* manage(Packet* packet) {
 	return packet;
 }
 
-//static void stdio_callback(uint64_t vmid, int thread_id, int fd, char* buffer, volatile size_t* head, volatile size_t* tail, size_t size) {
-	/*
-	RPC_Message msg;
-	msg.vmid = vmid;
-	msg.coreid = thread_id;
-	msg.fd = fd;
-	
-	#define MAX_MESSAGE (1500 - 14 - 20 - 8 - 62)
-	
-	int text_len = ring_readable(*head, *tail, size);
-	if(text_len > MAX_MESSAGE) {
-		text_len = MAX_MESSAGE;
-	}
-	
-	char* buf = malloc(text_len);
-	ring_read(buffer, head, *tail, size, buf, text_len);
-	
-	if(vmid == 0) {
-		printf("Core %d%c ", thread_id, fd == 1 ? '>' : '!');
-		write(1, buf, text_len);
-	}
-	
-	msg.message.message_len = text_len;
-	msg.message.message_val = buf;
-	
+static void stdio_callback(uint32_t vmid, int thread_id, int fd, char* buffer, volatile size_t* head, volatile size_t* tail, size_t size) {
 	ListIterator iter;
-	list_iterator_init(&iter, callbacks);
+	list_iterator_init(&iter, clients);
 	while(list_iterator_has_next(&iter)) {
-		Callback* cb = list_iterator_next(&iter);
-		if(!rpc_call_async(manager_ni->ni, cb->client, STDIO, (xdrproc_t)xdr_RPC_Message, (char*)&msg))
-			printf("Cannot send Std I/O message: %d\n", errno);
+		struct tcp_pcb* pcb = list_iterator_next(&iter);
+		RPC* rpc = pcb->callback_arg;
+		
+		if(*head <= *tail) {
+			size_t len0 = *tail - *head;
+			
+			// TODO: check missed data (via callback);
+			rpc_stdio(rpc, vmid, thread_id, fd, buffer + *head, len0, NULL, NULL);
+		} else {
+			size_t len1 = size - *head;
+			size_t len2 = *tail;
+
+			// TODO: check missed data (via callback);
+			rpc_stdio(rpc, vmid, thread_id, fd, buffer + *head, len1, NULL, NULL);
+			rpc_stdio(rpc, vmid, thread_id, fd, buffer, len2, NULL, NULL);
+		}
 	}
-	free(buf);
-	*/
-//}
+	
+	if(*head <= *tail) {
+		size_t len0 = *tail - *head;
+		
+		*head += len0;
+	} else {
+		size_t len1 = size - *head;
+		size_t len2 = *tail;
+		
+		*head = (*head + len1 + len2) % size;
+	}
+}
 
 void manager_init() {
 	uint64_t attrs[] = { 
@@ -685,8 +689,7 @@ void manager_init() {
 	event_idle_add(manager_loop, NULL);
 	event_timer_add(manager_timer, NULL, 100000, 100000);
 	
-	// TODO: VM std I/O
-	//vm_stdio(stdio_callback);
+	vm_stdio_handler(stdio_callback);
 }
 
 uint32_t manager_get_ip() {

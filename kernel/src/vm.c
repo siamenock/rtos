@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <string.h>
 #include <util/event.h>
+#include <util/ring.h>
 #include <net/md5.h>
 #include "icc.h"
 #include "gmalloc.h"
@@ -711,6 +712,30 @@ bool vm_storage_md5(uint32_t vmid, uint32_t size, uint32_t digest[4]) {
 	return true;
 }
 
-void vm_stdio(VM_STDIO_CALLBACK callback) {
+ssize_t vm_stdio(uint32_t vmid, int thread_id, int fd, const char* str, size_t size) {
+	VM* vm = map_get(vms, (void*)(uint64_t)vmid);
+	if(!vm)
+		return -1;
+	
+	if(thread_id < 0 || thread_id >= vm->core_size)
+		return -1;
+	
+	Core* core = &cores[vm->cores[thread_id]];
+	if(core->status != VM_STATUS_PAUSE && core->status != VM_STATUS_START)
+		return -1;
+	
+	switch(fd) {
+		case 0:
+			return ring_write(core->stdin, *core->stdout_head, core->stdout_tail, core->stdout_size, str, size);
+		case 1:
+			return ring_write(core->stdout, *core->stdout_head, core->stdout_tail, core->stdout_size, str, size);
+		case 2:
+			return ring_write(core->stderr, *core->stdout_head, core->stdout_tail, core->stdout_size, str, size);
+		default:
+			return -1;
+	}
+}
+
+void vm_stdio_handler(VM_STDIO_CALLBACK callback) {
 	stdio_callback = callback;
 }

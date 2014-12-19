@@ -29,6 +29,8 @@ typedef enum {
 	RPC_TYPE_STORAGE_DOWNLOAD_REQ,
 	RPC_TYPE_STORAGE_DOWNLOAD_RES,
 	RPC_TYPE_STORAGE_UPLOAD_REQ,
+	RPC_TYPE_STDIO_REQ,
+	RPC_TYPE_STDIO_RES,
 	RPC_TYPE_END,	// 20
 } RPC_TYPE;
 
@@ -93,6 +95,10 @@ struct _RPC {
 	void* storage_upload_context;
 	uint16_t(*storage_upload_handler)(uint32_t id, uint32_t offset, void* buf, uint16_t size, void* context);
 	void* storage_upload_handler_context;
+	void(*stdio_callback)(uint16_t written, void* context);
+	void* stdio_context;
+	uint16_t(*stdio_handler)(uint32_t id, uint8_t thread_id, int fd, char* str, uint16_t size, void* context);
+	void* stdio_handler_context;
 	
 	// Private data
 	uint8_t		data[0];
@@ -120,6 +126,8 @@ int rpc_status_set(RPC* rpc, uint32_t id, VMStatus status, void(*callback)(bool 
 int rpc_storage_download(RPC* rpc, uint32_t id, uint16_t(*callback)(uint32_t offset, void* buf, uint16_t size, void* context), void* context);
 int rpc_storage_upload(RPC* rpc, uint32_t id, uint16_t(*callback)(uint32_t offset, void** buf, uint16_t size, void* context), void* context);
 
+int rpc_stdio(RPC* rpc, uint32_t id, uint8_t thread_id, int fd, const char* str, uint16_t size, void(*callback)(uint16_t written, void* context), void* context);
+
 // Server side APIs
 void rpc_vm_create_handler(RPC* rpc, uint32_t(*handler)(VMSpec* vm, void* context), void* context);
 void rpc_vm_get_handler(RPC* rpc, VMSpec*(*handler)(uint32_t id, void* context), void* context);
@@ -132,6 +140,8 @@ void rpc_status_set_handler(RPC* rpc, bool(*handler)(uint32_t id, VMStatus statu
 
 void rpc_storage_download_handler(RPC* rpc, uint16_t(*handler)(uint32_t id, uint32_t offset, void** buf, uint16_t size, void* context), void* context);
 void rpc_storage_upload_handler(RPC* rpc, uint16_t(*handler)(uint32_t id, uint32_t offset, void* buf, uint16_t size, void* context), void* context);
+
+void rpc_stdio_handler(RPC* rpc, uint16_t(*handler)(uint32_t id, uint8_t thread_id, int fd, char* str, uint16_t size, void* context), void* context);
 
 bool rpc_is_active(RPC* rpc);
 bool rpc_loop(RPC* rpc);

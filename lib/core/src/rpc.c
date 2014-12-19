@@ -55,7 +55,7 @@ MAKE_WRITE(uint64)
 #define read_bool(RPC, DATA)	read_uint8((RPC), (uint8_t*)(DATA))
 #define write_bool(RPC, DATA)	write_uint8((RPC), (uint8_t)(DATA))
 
-static int write_string(RPC* rpc, char* v) {
+static int write_string(RPC* rpc, const char* v) {
 	uint16_t len0 = strlen(v);
 	uint16_t len = sizeof(uint16_t) + len0;
 	if(rpc->wbuf_index + len > RPC_BUFFER_SIZE)
@@ -787,7 +787,7 @@ int rpc_storage_upload(RPC* rpc, uint32_t id, uint16_t(*callback)(uint32_t offse
 	rpc->storage_upload_callback = callback;
 	rpc->storage_upload_context = context;
 	
-	return true;
+	return 1;
 }
 
 static int upload(RPC* rpc) {
@@ -843,6 +843,68 @@ static int storage_upload_req_handler(RPC* rpc) {
 	RETURN();
 }
 
+// stdio client API
+int rpc_stdio(RPC* rpc, uint32_t id, uint8_t thread_id, int fd, const char* str, uint16_t size, void(*callback)(uint16_t written, void* context), void* context) {
+	INIT();
+	
+	WRITE(write_uint16(rpc, RPC_TYPE_STDIO_REQ));
+	WRITE(write_uint32(rpc, id));
+	WRITE(write_uint8(rpc, thread_id));
+	WRITE(write_uint8(rpc, fd));
+	WRITE(write_bytes(rpc, (void*)str, size));
+	
+	rpc->stdio_callback = callback;
+	rpc->stdio_context = context;
+	
+	RETURN();
+}
+
+static int stdio_res_handler(RPC* rpc) {
+	INIT();
+	
+	uint16_t written;
+	READ(read_uint16(rpc, &written));
+	
+	if(rpc->stdio_callback) {
+		rpc->stdio_callback(written, rpc->stdio_context);
+	}
+	
+	RETURN();
+}
+
+// stdio server API
+void rpc_stdio_handler(RPC* rpc, uint16_t(*handler)(uint32_t id, uint8_t thread_id, int fd, char* str, uint16_t size, void* context), void* context) {
+	rpc->stdio_handler = handler;
+	rpc->stdio_handler_context = context;
+}
+
+static int stdio_req_handler(RPC* rpc) {
+	INIT();
+	
+	uint32_t id;
+	READ(read_uint32(rpc, &id));
+	
+	uint8_t thread_id;
+	READ(read_uint8(rpc, &thread_id));
+	
+	uint8_t fd;
+	READ(read_uint8(rpc, &fd));
+	
+	char* str;
+	uint16_t len;
+	READ(read_string(rpc, &str, &len));
+	
+	uint16_t size = 0;
+	if(rpc->stdio_handler) {
+		size = rpc->stdio_handler(id, thread_id, fd, str, len, rpc->stdio_handler_context);
+	}
+	
+	WRITE(write_uint16(rpc, RPC_TYPE_STDIO_RES));
+	WRITE(write_uint16(rpc, size));
+	
+	RETURN();
+}
+
 // Handlers
 typedef int(*Handler)(RPC*);
 
@@ -867,6 +929,8 @@ static Handler handlers[] = {
 	storage_download_req_handler,
 	storage_download_res_handler,
 	storage_upload_req_handler,
+	stdio_req_handler,
+	stdio_res_handler,
 	download,
 	upload,
 };

@@ -49,7 +49,8 @@ size_t vm_storage_read(uint32_t vmid, void** buf, size_t offset, size_t size);
 size_t vm_storage_write(uint32_t vmid, void* buf, size_t offset, size_t size);
 bool vm_storage_md5(uint32_t vmid, uint32_t size, uint32_t digest[4]);
 
+ssize_t vm_stdio(uint32_t vmid, int thread_id, int fd, const char* str, size_t size);
 typedef void(*VM_STDIO_CALLBACK)(uint32_t vmid, int thread_id, int fd, char* buffer, volatile size_t* head, volatile size_t* tail, size_t size);
-void vm_stdio(VM_STDIO_CALLBACK callback);
+void vm_stdio_handler(VM_STDIO_CALLBACK callback);
 
 #endif /* __VM_H__ */
