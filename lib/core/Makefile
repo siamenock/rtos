@@ -1,10 +1,12 @@
 .PHONY: all kernel clean
 
-DIR = obj obj_linux
+DIR = obj obj_linux obj_linux_control
 
 OBJ_DIR = obj/
 
 LINUX_DIR = obj_linux/
+
+LINUX_CONTROL_DIR = obj_linux_control/
 
 OBJS = ether.o crc.o checksum.o ni.o status.o  md5.o md5_asm.o \
 	fifo.o vector.o list.o map.o ring.o errno.o thread.o \
@@ -13,6 +15,8 @@ OBJS = ether.o crc.o checksum.o ni.o status.o  md5.o md5_asm.o \
 	malloc.o types.o _string.o rpc.o
 
 CFLAGS = -I include -I ../TLSF/src -I ../jsmn -O2 -Wall -Werror -m64 -nostdlib -ffreestanding -std=gnu99 -mcmodel=kernel
+
+CFLAGS_CONTROL =  -I include -Wall -Werror -std=gnu99 -Wno-unused-variable
 
 all: packetngin linux
 
@@ -51,7 +55,11 @@ obj_linux/%.o: src/%.asm
 	mkdir -p $(DIR)
 	nasm -f elf64 -o $@ $<
 
-libcore_linux.a: $(addprefix $(LINUX_DIR), $(OBJS))
+obj_linux_control/%.o: src/%.c
+	mkdir -p $(DIR)
+	gcc $(CFLAGS_CONTROL) -DLINUX -Wno-unused-variable -c -o $@ $<
+
+libcore_linux.a: $(addprefix $(LINUX_DIR), $(OBJS)) $(addprefix $(LINUX_CONTROL_DIR), $(OBJS_CONTROL))
 	ar rcs $@ $^
 
 clean: 
@@ -59,3 +67,5 @@ clean:
 	rm -f libcore.a
 	rm -rf obj_linux
 	rm -f libcore_linux.a
+	rm -f src/rpc_manager.h src/rpc_manager.c src/rpc_manager_xdr.c
+	rm -f src/rpc_callback.h src/rpc_callback_clnt.c src/rpc_callback_svc.c src/rpc_callback_xdr.c
