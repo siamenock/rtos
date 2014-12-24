@@ -949,49 +949,53 @@ bool rpc_loop(RPC* rpc) {
 		}
 	}
 	
-	uint16_t type = (uint16_t)-1;
-	_len = read_uint16(rpc, &type);
-	
-	if(_len > 0) {
-		if(type >= RPC_TYPE_END || !handlers[type]) {
-			printf("Type: %d %d %d\n", type, rpc->rbuf_read, rpc->rbuf_index);
+	while(true) {
+		uint16_t type = (uint16_t)-1;
+		_len = read_uint16(rpc, &type);
+		
+		if(_len > 0) {
+			if(type >= RPC_TYPE_END || !handlers[type]) {
+				printf("Type: %d %d %d\n", type, rpc->rbuf_read, rpc->rbuf_index);
+				if(rpc->close)
+					rpc->close(rpc);
+				
+				break;
+			}
+		} else if(_len < 0) {
 			if(rpc->close)
 				rpc->close(rpc);
 			
-			return _size > 0;
+			break;
+		} else {
+			if(rpc->storage_download_id > 0) {
+				type = RPC_TYPE_END;	// download
+			} else if(rpc->storage_upload_id > 0) {
+				type = RPC_TYPE_END + 1;// upload
+			}
 		}
-	} else if(_len < 0) {
-		if(rpc->close)
-			rpc->close(rpc);
 		
-		return _size > 0;
-	} else {
-		if(rpc->storage_download_id > 0) {
-			type = RPC_TYPE_END;	// download
-		} else if(rpc->storage_upload_id > 0) {
-			type = RPC_TYPE_END + 1;// upload
-		}
-	}
-	
-	if(type != (uint16_t)-1) {
-		_len = handlers[type](rpc);
-		if(_len > 0) {
-			_size += _len;
-			
-			if(rpc->wbuf_index > 0 && rpc->write && wbuf_flush(rpc) < 0 && rpc->close) {
+		if(type != (uint16_t)-1) {
+			_len = handlers[type](rpc);
+			if(_len > 0) {
+				_size += _len;
+				
+				if(rpc->wbuf_index > 0 && rpc->write && wbuf_flush(rpc) < 0 && rpc->close) {
+					rpc->close(rpc);
+					return false;
+				}
+				
+				if(rbuf_flush(rpc) < 0 && rpc->close) {
+					rpc->close(rpc);
+					return false;
+				}
+			} else if(_len == 0) {
+				ROLLBACK();
+			} else if(rpc->close) {
 				rpc->close(rpc);
 				return false;
 			}
-			
-			if(rbuf_flush(rpc) < 0 && rpc->close) {
-				rpc->close(rpc);
-				return false;
-			}
-		} else if(_len == 0) {
-			ROLLBACK();
-		} else if(rpc->close) {
-			rpc->close(rpc);
-			return false;
+		} else {
+			break;
 		}
 	}
 	
@@ -1132,6 +1136,9 @@ RPC* rpc_listen(int port) {
 	if(fd < 0) {
 		return NULL;
 	}
+	
+	bool reuse = true;
+	setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
 	
 	struct sockaddr_in addr;
 	bzero(&addr, sizeof(struct sockaddr_in));
