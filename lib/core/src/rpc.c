@@ -726,11 +726,6 @@ static int storage_download_res_handler(RPC* rpc) {
 	if(rpc->storage_download_callback) {
 		rpc->storage_download_callback(offset, buf, size, rpc->storage_download_context);
 		if(size == 0) {
-			printf("download done: %d %d %02x %02x %02x %02x\n", rpc->rbuf_read, rpc->rbuf_index, 
-				rpc->rbuf[rpc->rbuf_read],
-				rpc->rbuf[rpc->rbuf_read + 1],
-				rpc->rbuf[rpc->rbuf_read + 2],
-				rpc->rbuf[rpc->rbuf_read + 3]);
 			rpc->storage_download_callback = NULL;
 			rpc->storage_download_context = NULL;
 		}
@@ -940,8 +935,6 @@ bool rpc_is_active(RPC* rpc) {
 }
 
 bool rpc_loop(RPC* rpc) {
-	INIT();
-	
 	if(rpc->wbuf_index > 0 && rpc->write) {
 		if(wbuf_flush(rpc) < 0 && rpc->close) {
 			rpc->close(rpc);
@@ -950,22 +943,23 @@ bool rpc_loop(RPC* rpc) {
 	}
 	
 	while(true) {
+		INIT();
+		
 		uint16_t type = (uint16_t)-1;
 		_len = read_uint16(rpc, &type);
 		
 		if(_len > 0) {
 			if(type >= RPC_TYPE_END || !handlers[type]) {
-				printf("Type: %d %d %d\n", type, rpc->rbuf_read, rpc->rbuf_index);
 				if(rpc->close)
 					rpc->close(rpc);
 				
-				break;
+				return _size > 0;
 			}
 		} else if(_len < 0) {
 			if(rpc->close)
 				rpc->close(rpc);
 			
-			break;
+			return _size > 0;
 		} else {
 			if(rpc->storage_download_id > 0) {
 				type = RPC_TYPE_END;	// download
@@ -990,16 +984,15 @@ bool rpc_loop(RPC* rpc) {
 				}
 			} else if(_len == 0) {
 				ROLLBACK();
+				return _size > 0;
 			} else if(rpc->close) {
 				rpc->close(rpc);
-				return false;
+				return _size > 0;
 			}
 		} else {
-			break;
+			return _size > 0;
 		}
 	}
-	
-	return _size > 0;
 }
 
 static void vm_free(VMSpec* vm) {

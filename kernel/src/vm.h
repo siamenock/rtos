@@ -1,6 +1,7 @@
 #ifndef __VM_H__
 #define __VM_H__
 
+#include <sys/types.h>
 #include <control/vmspec.h>
 #include "mp.h"
 #include "ni.h"
