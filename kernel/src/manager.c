@@ -487,11 +487,6 @@ static uint16_t storage_upload_handler(uint32_t vmid, uint32_t offset, void* buf
 
 static uint16_t stdio_handler(uint32_t id, uint8_t thread_id, int fd, char* str, uint16_t size, void* context) {
 	ssize_t len = vm_stdio(id, thread_id, fd, str, size);
-	
-	RPC* rpc = context;
-	if(list_index_of(actives, rpc, NULL) < 0)
-		list_add(actives, rpc);
-	
 	return len >= 0 ? len : 0;
 }
 
@@ -559,7 +554,7 @@ static err_t manager_accept(void* arg, struct tcp_pcb* pcb, err_t err) {
 	rpc_status_set_handler(rpc, status_set_handler, NULL);
 	rpc_storage_download_handler(rpc, storage_download_handler, NULL);
 	rpc_storage_upload_handler(rpc, storage_upload_handler, NULL);
-	rpc_stdio_handler(rpc, stdio_handler, rpc);
+	rpc_stdio_handler(rpc, stdio_handler, NULL);
 	
 	RPCData* data = (RPCData*)rpc->data;
 	data->pcb = pcb;
@@ -607,6 +602,9 @@ static void stdio_callback(uint32_t vmid, int thread_id, int fd, char* buffer, v
 			rpc_stdio(rpc, vmid, thread_id, fd, buffer + *head, len1, NULL, NULL);
 			rpc_stdio(rpc, vmid, thread_id, fd, buffer, len2, NULL, NULL);
 		}
+		
+		if(list_index_of(actives, rpc, NULL) < 0)
+			list_add(actives, rpc);
 	}
 	
 	if(*head <= *tail) {
