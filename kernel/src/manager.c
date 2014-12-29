@@ -603,8 +603,7 @@ static void stdio_callback(uint32_t vmid, int thread_id, int fd, char* buffer, v
 			rpc_stdio(rpc, vmid, thread_id, fd, buffer, len2, NULL, NULL);
 		}
 		
-		if(list_index_of(actives, rpc, NULL) < 0)
-			list_add(actives, rpc);
+		rpc_loop(rpc);
 	}
 	
 	if(*head <= *tail) {
