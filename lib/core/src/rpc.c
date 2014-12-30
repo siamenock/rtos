@@ -1105,6 +1105,9 @@ RPC* rpc_open(const char* host, int port, int timeout) {
 	}
 	
 	void handler(int signo) {
+		while(1) {
+			printf("I'm in handler!!!\n");
+		}
 		// Do nothing just interrupt
 	}
 	
@@ -1126,6 +1129,12 @@ RPC* rpc_open(const char* host, int port, int timeout) {
 	
 	alarm(timeout);
 	if(connect(fd, (struct sockaddr*)&addr, sizeof(struct sockaddr_in)) < 0) {
+		close(fd);
+		return NULL;
+	}
+	
+	alarm(0);
+	if(sigaction(SIGALRM, &old_sigact, NULL) < 0) {
 		close(fd);
 		return NULL;
 	}
