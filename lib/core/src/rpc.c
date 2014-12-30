@@ -1105,9 +1105,6 @@ RPC* rpc_open(const char* host, int port, int timeout) {
 	}
 	
 	void handler(int signo) {
-		while(1) {
-			printf("I'm in handler!!!\n");
-		}
 		// Do nothing just interrupt
 	}
 	
