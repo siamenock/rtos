@@ -931,7 +931,7 @@ static Handler handlers[] = {
 };
 
 bool rpc_is_active(RPC* rpc) {
-	return rpc->storage_download_id > 0 || rpc->storage_upload_id > 0;
+	return rpc->storage_download_id > 0 || rpc->storage_upload_id > 0 || rpc->wbuf_index > 0;
 }
 
 bool rpc_loop(RPC* rpc) {
@@ -1042,6 +1042,7 @@ void rpc_vm_dump(VMSpec* vm) {
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <signal.h>
 
 typedef struct {
 	int	fd;
@@ -1097,9 +1098,23 @@ static void sock_close(RPC* rpc) {
 	data->is_closed = true;
 }
 
-RPC* rpc_open(const char* host, int port) {
+RPC* rpc_open(const char* host, int port, int timeout) {
 	int fd = socket(AF_INET, SOCK_STREAM, 0);
 	if(fd < 0) {
+		return NULL;
+	}
+	
+	void handler(int signo) {
+		// Do nothing just interrupt
+	}
+	
+	struct sigaction sigact, old_sigact;
+	sigact.sa_handler = handler;
+	sigemptyset(&sigact.sa_mask);
+	sigact.sa_flags = SA_INTERRUPT;
+	
+	if(sigaction(SIGALRM, &sigact, &old_sigact) < 0) {
+		close(fd);
 		return NULL;
 	}
 	
@@ -1109,7 +1124,9 @@ RPC* rpc_open(const char* host, int port) {
 	addr.sin_addr.s_addr = inet_addr(host);
 	addr.sin_port = htons(port);
 	
+	alarm(timeout);
 	if(connect(fd, (struct sockaddr*)&addr, sizeof(struct sockaddr_in)) < 0) {
+		close(fd);
 		return NULL;
 	}
 	
