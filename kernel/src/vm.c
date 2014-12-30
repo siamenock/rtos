@@ -671,7 +671,7 @@ int vm_status_get(uint32_t vmid) {
 	return vm->status;
 }
 
-size_t vm_storage_read(uint32_t vmid, void** buf, size_t offset, size_t size) {
+ssize_t vm_storage_read(uint32_t vmid, void** buf, size_t offset, size_t size) {
 	VM* vm = map_get(vms, (void*)(uint64_t)vmid);
 	if(!vm)
 		return -1;
@@ -688,7 +688,7 @@ size_t vm_storage_read(uint32_t vmid, void** buf, size_t offset, size_t size) {
 		return size;
 }
 
-size_t vm_storage_write(uint32_t vmid, void* buf, size_t offset, size_t size) {
+ssize_t vm_storage_write(uint32_t vmid, void* buf, size_t offset, size_t size) {
 	VM* vm = map_get(vms, (void*)(uint64_t)vmid);
 	if(!vm)
 		return -1;
