@@ -96,19 +96,51 @@ static int read_string(RPC* rpc, char** v, uint16_t* len) {
 	return len1;
 }
 
-static int write_bytes(RPC* rpc, void* v, uint16_t size) {
-	uint16_t len = sizeof(uint16_t) + size;
+static int write_bytes(RPC* rpc, void* v, int32_t size) {
+	int32_t len = sizeof(int32_t) + (size < 0 ? 0 : size);
 	if(rpc->wbuf_index + len > RPC_BUFFER_SIZE)
 		return 0;
 	
-	memcpy(rpc->wbuf + rpc->wbuf_index, &size, sizeof(uint16_t));
-	memcpy(rpc->wbuf + rpc->wbuf_index + sizeof(uint16_t), v, size);
+	memcpy(rpc->wbuf + rpc->wbuf_index, &size, sizeof(int32_t));
+	if(size > 0)
+		memcpy(rpc->wbuf + rpc->wbuf_index + sizeof(int32_t), v, size);
 	rpc->wbuf_index += len;
 	
 	return len;
 }
 
-#define read_bytes(RPC, DATA, LEN)	read_string((RPC), (char**)(DATA), (LEN))
+static int read_bytes(RPC* rpc, void** v, int32_t* len) {
+	*len = 0;
+	
+	int32_t len0;
+	memcpy(&len0, rpc->rbuf + rpc->rbuf_read, sizeof(int32_t));
+	int32_t len1 = sizeof(int32_t) + (len0 < 0 ? 0 : len0);
+	
+	if(rpc->rbuf_read + len1 > rpc->rbuf_index) {
+		int len2 = rpc->read(rpc, rpc->rbuf + rpc->rbuf_index, 
+			RPC_BUFFER_SIZE - rpc->rbuf_index);
+		if(len2 < 0) {
+			return len2;
+		}
+		
+		rpc->rbuf_index += len2;
+	}
+	
+	if(rpc->rbuf_read + len1 > rpc->rbuf_index)
+		return 0;
+	
+	*len = len0;
+	if(v != NULL) {
+		if(len0 > 0) {
+			*v = (void*)(rpc->rbuf + rpc->rbuf_read + sizeof(int32_t));
+		} else {
+			*v = NULL;
+		}
+	}
+	rpc->rbuf_read += len1;
+	
+	return len1;
+}
 
 #define INIT()					\
 	int _len = 0;				\
@@ -560,12 +592,12 @@ int rpc_vm_list(RPC* rpc, void(*callback)(uint32_t* ids, uint16_t count, void* c
 static int vm_list_res_handler(RPC* rpc) {
 	INIT();
 	
-	uint16_t size;
+	int32_t size;
 	uint32_t* list;
-	READ(read_bytes(rpc, &list, &size));
+	READ(read_bytes(rpc, (void**)&list, &size));
 	
 	if(rpc->vm_list_callback) {
-		rpc->vm_list_callback(list, size / sizeof(uint32_t), rpc->vm_list_context);
+		rpc->vm_list_callback(list, (size < 0 ? 0 : size) / sizeof(uint32_t), rpc->vm_list_context);
 		rpc->vm_list_callback = NULL;
 		rpc->vm_list_context = NULL;
 	}
@@ -701,7 +733,7 @@ static int status_set_req_handler(RPC* rpc) {
 }
 
 // storage_download client API
-int rpc_storage_download(RPC* rpc, uint32_t id, uint16_t(*callback)(uint32_t offset, void* buf, uint16_t size, void* context), void* context) {
+int rpc_storage_download(RPC* rpc, uint32_t id, int32_t(*callback)(uint32_t offset, void* buf, int32_t size, void* context), void* context) {
 	INIT();
 	
 	WRITE(write_uint16(rpc, RPC_TYPE_STORAGE_DOWNLOAD_REQ));
@@ -720,12 +752,13 @@ static int storage_download_res_handler(RPC* rpc) {
 	READ(read_uint32(rpc, &offset));
 	
 	void* buf;
-	uint16_t size;
+	int32_t size;
 	READ(read_bytes(rpc, &buf, &size));
 	
 	if(rpc->storage_download_callback) {
-		rpc->storage_download_callback(offset, buf, size, rpc->storage_download_context);
-		if(size == 0) {
+		int size2 = rpc->storage_download_callback(offset, buf, size, rpc->storage_download_context);
+		
+		if(size <= 0 || size2 <= 0) {
 			rpc->storage_download_callback = NULL;
 			rpc->storage_download_context = NULL;
 		}
@@ -735,7 +768,7 @@ static int storage_download_res_handler(RPC* rpc) {
 }
 
 // storage_download server API
-void rpc_storage_download_handler(RPC* rpc, uint16_t(*handler)(uint32_t id, uint32_t offset, void** buf, uint16_t size, void* context), void* context) {
+void rpc_storage_download_handler(RPC* rpc, int32_t(*handler)(uint32_t id, uint32_t offset, void** buf, int32_t size, void* context), void* context) {
 	rpc->storage_download_handler = handler;
 	rpc->storage_download_handler_context = context;
 }
@@ -754,20 +787,18 @@ static int download(RPC* rpc) {
 	INIT();
 	
 	void* buf;
-	uint16_t size;
+	int32_t size = 0;
 	if(rpc->storage_download_handler) {
 		size = rpc->storage_download_handler(rpc->storage_download_id, rpc->storage_download_offset, &buf, 1460, rpc->storage_download_handler_context);
 		
 		WRITE(write_uint16(rpc, RPC_TYPE_STORAGE_DOWNLOAD_RES));
 		WRITE(write_uint32(rpc, rpc->storage_download_offset));
 		WRITE(write_bytes(rpc, buf, size));
-	} else {
-		size = 0;
 	}
 	
 	rpc->storage_download_offset += size;
 	
-	if(size == 0) {
+	if(size <= 0) {
 		rpc->storage_download_id = 0;
 		rpc->storage_download_offset = 0;
 	}
@@ -776,7 +807,7 @@ static int download(RPC* rpc) {
 }
 
 // storage_upload client API
-int rpc_storage_upload(RPC* rpc, uint32_t id, uint16_t(*callback)(uint32_t offset, void** buf, uint16_t size, void* context), void* context) {
+int rpc_storage_upload(RPC* rpc, uint32_t id, int32_t(*callback)(uint32_t offset, void** buf, int32_t size, void* context), void* context) {
 	rpc->storage_upload_id = id;
 	rpc->storage_upload_offset = 0;
 	rpc->storage_upload_callback = callback;
@@ -785,11 +816,24 @@ int rpc_storage_upload(RPC* rpc, uint32_t id, uint16_t(*callback)(uint32_t offse
 	return 1;
 }
 
+static int storage_upload_res_handler(RPC* rpc) {
+	if(rpc->storage_upload_callback) {
+		rpc->storage_upload_callback(rpc->storage_upload_offset, NULL, -1, rpc->storage_upload_context);
+		
+		rpc->storage_upload_id = 0;
+		rpc->storage_upload_offset = 0;
+		rpc->storage_upload_callback = NULL;
+		rpc->storage_upload_context = NULL;
+	}
+	
+	return true;
+}
+
 static int upload(RPC* rpc) {
 	INIT();
 	
 	void* buf;
-	uint16_t size;
+	int32_t size = 0;
 	if(rpc->storage_upload_callback) {
 		size = rpc->storage_upload_callback(rpc->storage_upload_offset, &buf, 1460, rpc->storage_upload_context);
 		
@@ -797,13 +841,11 @@ static int upload(RPC* rpc) {
 		WRITE(write_uint32(rpc, rpc->storage_upload_id));
 		WRITE(write_uint32(rpc, rpc->storage_upload_offset));
 		WRITE(write_bytes(rpc, buf, size));
-	} else {
-		size = 0;
 	}
 	
 	rpc->storage_upload_offset += size;
 	
-	if(size == 0) {
+	if(size <= 0) {
 		rpc->storage_upload_id = 0;
 		rpc->storage_upload_offset = 0;
 		rpc->storage_upload_context = NULL;
@@ -813,7 +855,7 @@ static int upload(RPC* rpc) {
 }	
 
 // storage_upload server API
-void rpc_storage_upload_handler(RPC* rpc, uint16_t(*handler)(uint32_t id, uint32_t offset, void* buf, uint16_t size, void* context), void* context) {
+void rpc_storage_upload_handler(RPC* rpc, int32_t(*handler)(uint32_t id, uint32_t offset, void* buf, int32_t size, void* context), void* context) {
 	rpc->storage_upload_handler = handler;
 	rpc->storage_upload_handler_context = context;
 }
@@ -828,11 +870,16 @@ static int storage_upload_req_handler(RPC* rpc) {
 	READ(read_uint32(rpc, &offset));
 	
 	void* buf;
-	uint16_t size;
+	int32_t size;
 	READ(read_bytes(rpc, &buf, &size));
 	
+	int32_t len = 0;
 	if(rpc->storage_upload_handler) {
-		rpc->storage_upload_handler(id, offset, buf, size, rpc->storage_upload_handler_context);
+		len = rpc->storage_upload_handler(id, offset, buf, size, rpc->storage_upload_handler_context);
+	}
+	
+	if(len < 0) {
+		WRITE(write_uint16(rpc, RPC_TYPE_STORAGE_UPLOAD_RES));
 	}
 	
 	RETURN();
@@ -924,6 +971,7 @@ static Handler handlers[] = {
 	storage_download_req_handler,
 	storage_download_res_handler,
 	storage_upload_req_handler,
+	storage_upload_res_handler,
 	stdio_req_handler,
 	stdio_res_handler,
 	download,

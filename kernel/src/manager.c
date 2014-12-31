@@ -167,14 +167,18 @@ static bool status_set_handler(uint32_t vmid, VMStatus status, void* context) {
 	return true;
 }
 
-static uint16_t storage_download_handler(uint32_t vmid, uint32_t offset, void** buf, uint16_t size, void* context) {
-	ssize_t len = vm_storage_read(vmid, buf, offset, size);
-	return len >= 0 ? len : 0;
+static int32_t storage_download_handler(uint32_t vmid, uint32_t offset, void** buf, int32_t size, void* context) {
+	if(size < 0)
+		return size;
+	
+	return vm_storage_read(vmid, buf, offset, size);
 }
 
-static uint16_t storage_upload_handler(uint32_t vmid, uint32_t offset, void* buf, uint16_t size, void* context) {
-	ssize_t len = vm_storage_write(vmid, buf, offset, size);
-	return len >= 0 ? len : 0;
+static int32_t storage_upload_handler(uint32_t vmid, uint32_t offset, void* buf, int32_t size, void* context) {
+	if(size < 0)
+		return size;
+	
+	return vm_storage_write(vmid, buf, offset, size);
 }
 
 static uint16_t stdio_handler(uint32_t id, uint8_t thread_id, int fd, char* str, uint16_t size, void* context) {
