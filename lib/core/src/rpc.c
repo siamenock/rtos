@@ -933,8 +933,8 @@ static int stdio_req_handler(RPC* rpc) {
 	READ(read_uint8(rpc, &fd));
 	
 	char* str;
-	uint16_t len;
-	READ(read_string(rpc, &str, &len));
+	int32_t len;
+	READ(read_bytes(rpc, (void**)&str, &len));
 	
 	uint16_t size = 0;
 	if(rpc->stdio_handler) {
@@ -1094,7 +1094,6 @@ void rpc_vm_dump(VMSpec* vm) {
 
 typedef struct {
 	int	fd;
-	bool	is_closed;
 } RPCData;
 
 static int sock_read(RPC* rpc, void* buf, int size) {
@@ -1143,7 +1142,8 @@ static int sock_write(RPC* rpc, void* buf, int size) {
 
 static void sock_close(RPC* rpc) {
 	RPCData* data = (RPCData*)rpc->data;
-	data->is_closed = true;
+	close(data->fd);
+	data->fd = -1;
 }
 
 RPC* rpc_open(const char* host, int port, int timeout) {
@@ -1254,7 +1254,7 @@ RPC* rpc_accept(RPC* srpc) {
 
 bool rpc_is_closed(RPC* rpc) {
 	RPCData* data = (RPCData*)rpc->data;
-	return data->is_closed;
+	return data->fd < 0;
 	
 }
 #endif /* LINUX */
