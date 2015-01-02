@@ -848,6 +848,7 @@ static int upload(RPC* rpc) {
 	if(size <= 0) {
 		rpc->storage_upload_id = 0;
 		rpc->storage_upload_offset = 0;
+		rpc->storage_upload_callback = NULL;
 		rpc->storage_upload_context = NULL;
 	}
 	
@@ -1084,7 +1085,7 @@ void rpc_vm_dump(VMSpec* vm) {
 }
 
 #ifdef LINUX
-#define DEBUG 0
+#define DEBUG 1
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
