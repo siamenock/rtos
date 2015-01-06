@@ -95,7 +95,7 @@ static err_t manager_recv(void* arg, struct tcp_pcb* pcb, struct pbuf* p, err_t 
 			}
 		}
 	}
-
+	
 	return ERR_OK;
 }
 
@@ -129,61 +129,73 @@ static err_t manager_poll(void* arg, struct tcp_pcb* pcb) {
 }
 
 // Handlers
-static uint32_t vm_create_handler(VMSpec* vm, void* context) {
-	return vm_create(vm);
+static void vm_create_handler(VMSpec* vm, void* context, void(*callback)(uint32_t id)) {
+	uint32_t id = vm_create(vm);
+	callback(id);
 }
 
-static VMSpec* vm_get_handler(uint32_t vmid, void* context) {
+static void vm_get_handler(uint32_t vmid, void* context, void(*callback)(VMSpec* vm)) {
 	// TODO: Implement it
-	return NULL;
+	callback(NULL);
 }
 
-static bool vm_set_handler(VMSpec* vm, void* context) {
+static void vm_set_handler(VMSpec* vm, void* context, void(*callback)(bool result)) {
 	// TODO: Implement it
-	return false;
+	callback(false);
 }
 
-static bool vm_delete_handler(uint32_t vmid, void* context) {
-	return vm_delete(vmid);
+static void vm_delete_handler(uint32_t vmid, void* context, void(*callback)(bool result)) {
+	bool result = vm_delete(vmid);
+	callback(result);
 }
 
-static int vm_list_handler(uint32_t* ids, int size, void* context) {
-	return vm_list(ids, size);
+static void vm_list_handler(uint32_t* ids, int size, void* context, void(*callback)(int size)) {
+	size = vm_list(ids, size);
+	callback(size);
 }
 
-static VMStatus status_get_handler(uint32_t vmid, void* context) {
-	return vm_status_get(vmid);
+static void status_get_handler(uint32_t vmid, void* context, void(*callback)(VMStatus status)) {
+	VMStatus status = vm_status_get(vmid);
+	callback(status);
 }
 
-static bool status_set_handler(uint32_t vmid, VMStatus status, void* context) {
+static void status_set_handler(uint32_t vmid, VMStatus status, void* context, void(*callback)(bool result)) {
 	void status_setted(bool result, void* context) {
-		uint32_t id = (uint32_t)(uint64_t)context;
-		printf("Status set: %d %d\n", id, result);
+		callback(result);
 	}
 	
-	// TODO: Async call
-	vm_status_set(vmid, status, status_setted, (void*)(uint64_t)vmid);
-	
-	return true;
+	vm_status_set(vmid, status, status_setted, NULL);
 }
 
-static int32_t storage_download_handler(uint32_t vmid, uint32_t offset, void** buf, int32_t size, void* context) {
-	if(size < 0)
-		return size;
-	
-	return vm_storage_read(vmid, buf, offset, size);
+static void storage_download_handler(uint32_t vmid, uint32_t offset, void** buf, int32_t size, void* context, void(*callback)(int32_t size)) {
+	if(size < 0) {
+		callback(size);
+	} else {
+		size = vm_storage_read(vmid, buf, offset, size);
+		callback(size);
+	}
 }
 
-static int32_t storage_upload_handler(uint32_t vmid, uint32_t offset, void* buf, int32_t size, void* context) {
-	if(size < 0)
-		return size;
-	
-	return vm_storage_write(vmid, buf, offset, size);
+static void storage_upload_handler(uint32_t vmid, uint32_t offset, void* buf, int32_t size, void* context, void(*callback)(int32_t size)) {
+	if(size < 0) {
+		callback(size);
+	} else {
+		if(offset == 0) {
+			ssize_t len;
+			if((len = vm_storage_clear(vmid)) < 0) {
+				callback(len);
+				return;
+			}
+		}
+		
+		size = vm_storage_write(vmid, buf, offset, size);
+		callback(size);
+	}
 }
 
-static uint16_t stdio_handler(uint32_t id, uint8_t thread_id, int fd, char* str, uint16_t size, void* context) {
+static void stdio_handler(uint32_t id, uint8_t thread_id, int fd, char* str, uint16_t size, void* context, void(*callback)(uint16_t size)) {
 	ssize_t len = vm_stdio(id, thread_id, fd, str, size);
-	return len >= 0 ? len : 0;
+	callback(len >= 0 ? len : 0);
 }
 
 // PCB utility
@@ -332,7 +344,6 @@ void manager_init() {
 	ni_config_put(manager_ni->ni, "gateway", (void*)(uint64_t)DEFAULT_MANAGER_GW);
 	ni_config_put(manager_ni->ni, "netmask", (void*)(uint64_t)DEFAULT_MANAGER_NETMASK);
 	ni_config_put(manager_ni->ni, "default", (void*)(uint64_t)true);
-//	ni_config_put(manager_ni->ni, TFTP_CALLBACK, &tftp_callback);
 	
 	ni_init(manager_ni->ni, manage, NULL);
 	

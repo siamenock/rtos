@@ -15,7 +15,7 @@
 #define VM_STORAGE_SIZE_ALIGN	0x200000
 
 typedef struct {
-	uint32_t	count;
+	int		count;
 	void**		blocks;	// gmalloc(array), bmalloc(content)
 } Block;
 
@@ -48,6 +48,7 @@ int vm_status_get(uint32_t vmid);
 
 ssize_t vm_storage_read(uint32_t vmid, void** buf, size_t offset, size_t size);
 ssize_t vm_storage_write(uint32_t vmid, void* buf, size_t offset, size_t size);
+ssize_t vm_storage_clear(uint32_t vmid);
 bool vm_storage_md5(uint32_t vmid, uint32_t size, uint32_t digest[4]);
 
 ssize_t vm_stdio(uint32_t vmid, int thread_id, int fd, const char* str, size_t size);

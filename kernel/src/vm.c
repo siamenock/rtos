@@ -702,6 +702,20 @@ ssize_t vm_storage_write(uint32_t vmid, void* buf, size_t offset, size_t size) {
 	return size;
 }
 
+ssize_t vm_storage_clear(uint32_t vmid) {
+	VM* vm = map_get(vms, (void*)(uint64_t)vmid);
+	if(!vm)
+		return -1;
+	
+	ssize_t size = 0;
+	for(int i = 0; i < vm->storage.count; i++) {
+		bzero(vm->storage.blocks[i], VM_STORAGE_SIZE_ALIGN);
+		size += VM_STORAGE_SIZE_ALIGN;
+	}
+	
+	return size;
+}
+
 bool vm_storage_md5(uint32_t vmid, uint32_t size, uint32_t digest[4]) {
 	VM* vm = map_get(vms, (void*)(uint64_t)vmid);
 	if(!vm)

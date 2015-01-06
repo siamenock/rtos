@@ -177,6 +177,11 @@ if((_len = (VALUE)) <= 0) {		\
 	_size += _len;			\
 }
 
+#define WRITE2(VALUE)			\
+if((_len = (VALUE)) <= 0) {		\
+	ROLLBACK();			\
+}
+
 #define RETURN()	return _size;
 
 static int write_vm(RPC* rpc, VMSpec* vm) {
@@ -393,7 +398,7 @@ static int vm_create_res_handler(RPC* rpc) {
 }
 
 // vm_create server API
-void rpc_vm_create_handler(RPC* rpc, uint32_t(*handler)(VMSpec* vm, void* context), void* context) {
+void rpc_vm_create_handler(RPC* rpc, void(*handler)(VMSpec* vm, void* context, void(*callback)(uint32_t id)), void* context) {
 	rpc->vm_create_handler = handler;
 	rpc->vm_create_handler_context = context;
 }
@@ -404,16 +409,19 @@ static int vm_create_req_handler(RPC* rpc) {
 	VMSpec* vm;
 	READ(read_vm(rpc, &vm));
 	
-	uint32_t id = 0;
-	if(rpc->vm_create_handler) {
-		id = rpc->vm_create_handler(vm, rpc->vm_create_handler_context);
+	void callback(uint32_t id) {
+		if(vm)
+			vm_free(vm);
+		
+		WRITE2(write_uint16(rpc, RPC_TYPE_VM_CREATE_RES));
+		WRITE2(write_uint32(rpc, id));
 	}
 	
-	if(vm)
-		vm_free(vm);
-	
-	WRITE(write_uint16(rpc, RPC_TYPE_VM_CREATE_RES));
-	WRITE(write_uint32(rpc, id));
+	if(rpc->vm_create_handler) {
+		rpc->vm_create_handler(vm, rpc->vm_create_handler_context, callback);
+	} else {
+		callback(0);
+	}
 	
 	RETURN();
 }
@@ -450,7 +458,7 @@ static int vm_get_res_handler(RPC* rpc) {
 }
 
 // vm_get server API
-void rpc_vm_get_handler(RPC* rpc, VMSpec*(*handler)(uint32_t id, void* context), void* context) {
+void rpc_vm_get_handler(RPC* rpc, void(*handler)(uint32_t id, void* context, void(*callback)(VMSpec* vm)), void* context) {
 	rpc->vm_get_handler = handler;
 	rpc->vm_get_handler_context = context;
 }
@@ -461,13 +469,16 @@ static int vm_get_req_handler(RPC* rpc) {
 	uint32_t id;
 	READ(read_uint32(rpc, &id));
 	
-	VMSpec* vm = NULL;
-	if(rpc->vm_get_handler) {
-		vm = rpc->vm_get_handler(id, rpc->vm_get_handler_context);
+	void callback(VMSpec* vm) {
+		WRITE2(write_uint16(rpc, RPC_TYPE_VM_GET_RES));
+		WRITE2(write_vm(rpc, vm));
 	}
 	
-	WRITE(write_uint16(rpc, RPC_TYPE_VM_GET_RES));
-	WRITE(write_vm(rpc, vm));
+	if(rpc->vm_get_handler) {
+		rpc->vm_get_handler(id, rpc->vm_get_handler_context, callback);
+	} else {
+		callback(NULL);
+	}
 	
 	RETURN();
 }
@@ -501,7 +512,7 @@ static int vm_set_res_handler(RPC* rpc) {
 }
 
 // vm_set server API
-void rpc_vm_set_handler(RPC* rpc, bool(*handler)(VMSpec* vm, void* context), void* context) {
+void rpc_vm_set_handler(RPC* rpc, void(*handler)(VMSpec* vm, void* context, void(*callback)(bool result)), void* context) {
 	rpc->vm_set_handler = handler;
 	rpc->vm_set_handler_context = context;
 }
@@ -512,16 +523,19 @@ static int vm_set_req_handler(RPC* rpc) {
 	VMSpec* vm;
 	READ(read_vm(rpc, &vm));
 	
-	bool result = false;
-	if(rpc->vm_set_handler) {
-		result = rpc->vm_set_handler(vm, rpc->vm_set_handler_context);
+	void callback(bool result) {
+		if(vm)
+			vm_free(vm);
+		
+		WRITE2(write_uint16(rpc, RPC_TYPE_VM_SET_RES));
+		WRITE2(write_bool(rpc, result));
 	}
 	
-	if(vm)
-		vm_free(vm);
-	
-	WRITE(write_uint16(rpc, RPC_TYPE_VM_SET_RES));
-	WRITE(write_bool(rpc, result));
+	if(rpc->vm_set_handler) {
+		rpc->vm_set_handler(vm, rpc->vm_set_handler_context, callback);
+	} else {
+		callback(false);
+	}
 	
 	RETURN();
 }
@@ -555,7 +569,7 @@ static int vm_delete_res_handler(RPC* rpc) {
 }
 
 // vm_delete server API
-void rpc_vm_delete_handler(RPC* rpc, bool(*handler)(uint32_t id, void* context), void* context) {
+void rpc_vm_delete_handler(RPC* rpc, void(*handler)(uint32_t id, void* context, void(*callback)(bool result)), void* context) {
 	rpc->vm_delete_handler = handler;
 	rpc->vm_delete_handler_context = context;
 }
@@ -566,13 +580,16 @@ static int vm_delete_req_handler(RPC* rpc) {
 	uint32_t id;
 	READ(read_uint32(rpc, &id));
 	
-	bool result = false;
-	if(rpc->vm_delete_handler) {
-		result = rpc->vm_delete_handler(id, rpc->vm_delete_handler_context);
+	void callback(bool result) {
+		WRITE2(write_uint16(rpc, RPC_TYPE_VM_DELETE_RES));
+		WRITE2(write_bool(rpc, result));
 	}
 	
-	WRITE(write_uint16(rpc, RPC_TYPE_VM_DELETE_RES));
-	WRITE(write_bool(rpc, result));
+	if(rpc->vm_delete_handler) {
+		rpc->vm_delete_handler(id, rpc->vm_delete_handler_context, callback);
+	} else {
+		callback(false);
+	}
 	
 	RETURN();
 }
@@ -606,7 +623,7 @@ static int vm_list_res_handler(RPC* rpc) {
 }
 
 // vm_list server API
-void rpc_vm_list_handler(RPC* rpc, int(*handler)(uint32_t* ids, int size, void* context), void* context) {
+void rpc_vm_list_handler(RPC* rpc, void(*handler)(uint32_t* ids, int size, void* context, void(*callback)(int size)), void* context) {
 	rpc->vm_list_handler = handler;
 	rpc->vm_list_handler_context = context;
 }
@@ -615,13 +632,17 @@ static int vm_list_req_handler(RPC* rpc) {
 	INIT();
 	
 	uint32_t ids[255];
-	int size = 0;
-	if(rpc->vm_list_handler) {
-		size = rpc->vm_list_handler(ids, 255, rpc->vm_list_handler_context);
+	
+	void callback(int size) {
+		WRITE2(write_uint16(rpc, RPC_TYPE_VM_LIST_RES));
+		WRITE2(write_bytes(rpc, ids, sizeof(uint32_t) * size));
 	}
 	
-	WRITE(write_uint16(rpc, RPC_TYPE_VM_LIST_RES));
-	WRITE(write_bytes(rpc, ids, sizeof(uint32_t) * size));
+	if(rpc->vm_list_handler) {
+		rpc->vm_list_handler(ids, 255, rpc->vm_list_handler_context, callback);
+	} else {
+		callback(0);
+	}
 	
 	RETURN();
 }
@@ -655,7 +676,7 @@ static int status_get_res_handler(RPC* rpc) {
 }
 
 // status_get server API
-void rpc_status_get_handler(RPC* rpc, VMStatus(*handler)(uint32_t id, void* context), void* context) {
+void rpc_status_get_handler(RPC* rpc, void(*handler)(uint32_t id, void* context, void(*callback)(VMStatus status)), void* context) {
 	rpc->status_get_handler = handler;
 	rpc->status_get_handler_context = context;
 }
@@ -666,13 +687,16 @@ static int status_get_req_handler(RPC* rpc) {
 	uint32_t id;
 	READ(read_uint32(rpc, &id));
 	
-	uint32_t status = (uint32_t)VM_STATUS_INVALID;
-	if(rpc->status_get_handler) {
-		status = rpc->status_get_handler(id, rpc->status_get_handler_context);
+	void callback(VMStatus status) {
+		WRITE2(write_uint16(rpc, RPC_TYPE_STATUS_GET_RES));
+		WRITE2(write_uint32(rpc, status));
 	}
 	
-	WRITE(write_uint16(rpc, RPC_TYPE_STATUS_GET_RES));
-	WRITE(write_uint32(rpc, status));
+	if(rpc->status_get_handler) {
+		rpc->status_get_handler(id, rpc->status_get_handler_context, callback);
+	} else {
+		callback(VM_STATUS_INVALID);
+	}
 	
 	RETURN();
 }
@@ -707,7 +731,7 @@ static int status_set_res_handler(RPC* rpc) {
 }
 
 // status_set server API
-void rpc_status_set_handler(RPC* rpc, bool(*handler)(uint32_t id, VMStatus status, void* context), void* context) {
+void rpc_status_set_handler(RPC* rpc, void(*handler)(uint32_t id, VMStatus status, void* context, void(*callback)(bool result)), void* context) {
 	rpc->status_set_handler = handler;
 	rpc->status_set_handler_context = context;
 }
@@ -721,13 +745,16 @@ static int status_set_req_handler(RPC* rpc) {
 	uint32_t status;
 	READ(read_uint32(rpc, &status));
 	
-	bool result = false;
-	if(rpc->status_set_handler) {
-		result = rpc->status_set_handler(id, status, rpc->status_set_handler_context);
+	void callback(bool result) {
+		WRITE2(write_uint16(rpc, RPC_TYPE_STATUS_SET_RES));
+		WRITE2(write_bool(rpc, result));
 	}
 	
-	WRITE(write_uint16(rpc, RPC_TYPE_STATUS_SET_RES));
-	WRITE(write_bool(rpc, result));
+	if(rpc->status_set_handler) {
+		rpc->status_set_handler(id, status, rpc->status_set_handler_context, callback);
+	} else {
+		callback(false);
+	}
 	
 	RETURN();
 }
@@ -768,7 +795,7 @@ static int storage_download_res_handler(RPC* rpc) {
 }
 
 // storage_download server API
-void rpc_storage_download_handler(RPC* rpc, int32_t(*handler)(uint32_t id, uint32_t offset, void** buf, int32_t size, void* context), void* context) {
+void rpc_storage_download_handler(RPC* rpc, void(*handler)(uint32_t id, uint32_t offset, void** buf, int32_t size, void* context, void(*callback)(int32_t size)), void* context) {
 	rpc->storage_download_handler = handler;
 	rpc->storage_download_handler_context = context;
 }
@@ -787,20 +814,28 @@ static int download(RPC* rpc) {
 	INIT();
 	
 	void* buf;
-	int32_t size = 0;
-	if(rpc->storage_download_handler) {
-		size = rpc->storage_download_handler(rpc->storage_download_id, rpc->storage_download_offset, &buf, 1460, rpc->storage_download_handler_context);
+	
+	void callback(int32_t size) {
+		if(size > 0) {
+			WRITE2(write_uint16(rpc, RPC_TYPE_STORAGE_DOWNLOAD_RES));
+			WRITE2(write_uint32(rpc, rpc->storage_download_offset));
+			WRITE2(write_bytes(rpc, buf, size));
+			
+			rpc->storage_download_offset += size;
+		} else {
+			WRITE2(write_uint16(rpc, RPC_TYPE_STORAGE_DOWNLOAD_RES));
+			WRITE2(write_uint32(rpc, 0));
+			WRITE2(write_bytes(rpc, NULL, size));
 		
-		WRITE(write_uint16(rpc, RPC_TYPE_STORAGE_DOWNLOAD_RES));
-		WRITE(write_uint32(rpc, rpc->storage_download_offset));
-		WRITE(write_bytes(rpc, buf, size));
+			rpc->storage_download_id = 0;
+			rpc->storage_download_offset = 0;
+		}
 	}
 	
-	rpc->storage_download_offset += size;
-	
-	if(size <= 0) {
-		rpc->storage_download_id = 0;
-		rpc->storage_download_offset = 0;
+	if(rpc->storage_download_handler) {
+		rpc->storage_download_handler(rpc->storage_download_id, rpc->storage_download_offset, &buf, 1460, rpc->storage_download_handler_context, callback);
+	} else {
+		callback(-1);
 	}
 	
 	RETURN();
@@ -856,7 +891,7 @@ static int upload(RPC* rpc) {
 }	
 
 // storage_upload server API
-void rpc_storage_upload_handler(RPC* rpc, int32_t(*handler)(uint32_t id, uint32_t offset, void* buf, int32_t size, void* context), void* context) {
+void rpc_storage_upload_handler(RPC* rpc, void(*handler)(uint32_t id, uint32_t offset, void* buf, int32_t size, void* context, void(*callback)(int32_t size)), void* context) {
 	rpc->storage_upload_handler = handler;
 	rpc->storage_upload_handler_context = context;
 }
@@ -874,13 +909,15 @@ static int storage_upload_req_handler(RPC* rpc) {
 	int32_t size;
 	READ(read_bytes(rpc, &buf, &size));
 	
-	int32_t len = 0;
-	if(rpc->storage_upload_handler) {
-		len = rpc->storage_upload_handler(id, offset, buf, size, rpc->storage_upload_handler_context);
+	void callback(int32_t len) {
+		if(len < 0)
+			WRITE2(write_uint16(rpc, RPC_TYPE_STORAGE_UPLOAD_RES));
 	}
 	
-	if(len < 0) {
-		WRITE(write_uint16(rpc, RPC_TYPE_STORAGE_UPLOAD_RES));
+	if(rpc->storage_upload_handler) {
+		rpc->storage_upload_handler(id, offset, buf, size, rpc->storage_upload_handler_context, callback);
+	} else {
+		callback(-1);
 	}
 	
 	RETURN();
@@ -916,7 +953,7 @@ static int stdio_res_handler(RPC* rpc) {
 }
 
 // stdio server API
-void rpc_stdio_handler(RPC* rpc, uint16_t(*handler)(uint32_t id, uint8_t thread_id, int fd, char* str, uint16_t size, void* context), void* context) {
+void rpc_stdio_handler(RPC* rpc, void(*handler)(uint32_t id, uint8_t thread_id, int fd, char* str, uint16_t size, void* context, void(*callback)(uint16_t size)), void* context) {
 	rpc->stdio_handler = handler;
 	rpc->stdio_handler_context = context;
 }
@@ -937,13 +974,16 @@ static int stdio_req_handler(RPC* rpc) {
 	int32_t len;
 	READ(read_bytes(rpc, (void**)&str, &len));
 	
-	uint16_t size = 0;
-	if(rpc->stdio_handler) {
-		size = rpc->stdio_handler(id, thread_id, fd, str, len, rpc->stdio_handler_context);
+	void callback(uint16_t size) {
+		WRITE2(write_uint16(rpc, RPC_TYPE_STDIO_RES));
+		WRITE2(write_uint16(rpc, size));
 	}
-	
-	WRITE(write_uint16(rpc, RPC_TYPE_STDIO_RES));
-	WRITE(write_uint16(rpc, size));
+	 
+	if(rpc->stdio_handler) {
+		rpc->stdio_handler(id, thread_id, fd, str, len, rpc->stdio_handler_context, callback);
+	} else {
+		callback(0);
+	}
 	
 	RETURN();
 }
