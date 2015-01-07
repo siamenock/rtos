@@ -161,11 +161,23 @@ static void status_get_handler(RPC* rpc, uint32_t vmid, void* context, void(*cal
 }
 
 static void status_set_handler(RPC* rpc, uint32_t vmid, VMStatus status, void* context, void(*callback)(RPC* rpc, bool result)) {
+	typedef struct {
+		RPC* rpc;
+		void(*callback)(RPC* rpc, bool result);
+	} Data;
+	
 	void status_setted(bool result, void* context) {
-		callback(rpc, result);
+		Data* data = context;
+		
+		data->callback(data->rpc, result);
+		free(data);
 	}
 	
-	vm_status_set(vmid, status, status_setted, NULL);
+	Data* data = malloc(sizeof(Data));
+	data->rpc = rpc;
+	data->callback = callback;
+	
+	vm_status_set(vmid, status, status_setted, data);
 }
 
 static void storage_download_handler(RPC* rpc, uint32_t vmid, uint32_t offset, int32_t size, void* context, void(*callback)(RPC* rpc, void* buf, int32_t size)) {
