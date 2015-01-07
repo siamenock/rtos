@@ -31,8 +31,8 @@ typedef enum {
 	RPC_TYPE_STORAGE_UPLOAD_REQ,
 	RPC_TYPE_STORAGE_UPLOAD_RES,	// 20
 	RPC_TYPE_STDIO_REQ,
-	RPC_TYPE_STDIO_RES,		// 22
-	RPC_TYPE_END,
+	RPC_TYPE_STDIO_RES,
+	RPC_TYPE_END,			// 22
 } RPC_TYPE;
 
 typedef struct _RPC RPC;
@@ -58,47 +58,47 @@ struct _RPC {
 	void* hello_context;
 	void(*vm_create_callback)(uint32_t id, void* context);
 	void* vm_create_context;
-	void(*vm_create_handler)(VMSpec* vm, void* context, void(*callback)(uint32_t id));
+	void(*vm_create_handler)(RPC* rpc, VMSpec* vm, void* context, void(*callback)(RPC* rpc, uint32_t id));
 	void* vm_create_handler_context;
 	void(*vm_get_callback)(VMSpec* vm, void* context);
 	void* vm_get_context;
-	void(*vm_get_handler)(uint32_t id, void* context, void(*callback)(VMSpec* vm));
+	void(*vm_get_handler)(RPC* rpc, uint32_t id, void* context, void(*callback)(RPC* rpc, VMSpec* vm));
 	void* vm_get_handler_context;
 	void(*vm_set_callback)(bool result, void* context);
 	void* vm_set_context;
-	void(*vm_set_handler)(VMSpec* vm, void* context, void(*callback)(bool result));
+	void(*vm_set_handler)(RPC* rpc, VMSpec* vm, void* context, void(*callback)(RPC* rpc, bool result));
 	void* vm_set_handler_context;
 	void(*vm_delete_callback)(bool result, void* context);
 	void* vm_delete_context;
-	void(*vm_delete_handler)(uint32_t id, void* context, void(*callback)(bool result));
+	void(*vm_delete_handler)(RPC* rpc, uint32_t id, void* context, void(*callback)(RPC* rpc, bool result));
 	void* vm_delete_handler_context;
 	void(*vm_list_callback)(uint32_t* ids, uint16_t count, void* context);
 	void* vm_list_context;
-	void(*vm_list_handler)(uint32_t* ids, int size, void* context, void(*callback)(int size));
+	void(*vm_list_handler)(RPC* rpc, int size, void* context, void(*callback)(RPC* rpc, uint32_t* ids, int size));
 	void* vm_list_handler_context;
 	void(*status_get_callback)(VMStatus status, void* context);
 	void* status_get_context;
-	void(*status_get_handler)(uint32_t id, void* context, void(*callback)(VMStatus status));
+	void(*status_get_handler)(RPC* rpc, uint32_t id, void* context, void(*callback)(RPC* rpc, VMStatus status));
 	void* status_get_handler_context;
 	void(*status_set_callback)(bool result, void* context);
 	void* status_set_context;
-	void(*status_set_handler)(uint32_t id, VMStatus status, void* context, void(*callback)(bool result));
+	void(*status_set_handler)(RPC* rpc, uint32_t id, VMStatus status, void* context, void(*callback)(RPC* rpc, bool result));
 	void* status_set_handler_context;
 	int32_t(*storage_download_callback)(uint32_t offset, void* buf, int32_t size, void* context);
 	void* storage_download_context;
 	uint32_t storage_download_id;
 	uint32_t storage_download_offset;
-	void(*storage_download_handler)(uint32_t id, uint32_t offset, void** buf, int32_t size, void* context, void(*callback)(int32_t size));
+	void(*storage_download_handler)(RPC* rpc, uint32_t id, uint32_t offset, int32_t size, void* context, void(*callback)(RPC* rpc, void* buf, int32_t size));
 	void* storage_download_handler_context;
 	uint32_t storage_upload_id;
 	uint32_t storage_upload_offset;
 	int32_t(*storage_upload_callback)(uint32_t offset, void** buf, int32_t size, void* context);
 	void* storage_upload_context;
-	void(*storage_upload_handler)(uint32_t id, uint32_t offset, void* buf, int32_t size, void* context, void(*callback)(int32_t size));
+	void(*storage_upload_handler)(RPC* rpc, uint32_t id, uint32_t offset, void* buf, int32_t size, void* context, void(*callback)(RPC* rpc, int32_t size));
 	void* storage_upload_handler_context;
 	void(*stdio_callback)(uint16_t written, void* context);
 	void* stdio_context;
-	void(*stdio_handler)(uint32_t id, uint8_t thread_id, int fd, char* str, uint16_t size, void* context, void(*callback)(uint16_t size));
+	void(*stdio_handler)(RPC* rpc, uint32_t id, uint8_t thread_id, int fd, char* str, uint16_t size, void* context, void(*callback)(RPC* rpc, uint16_t size));
 	void* stdio_handler_context;
 	
 	// Private data
@@ -130,19 +130,19 @@ int rpc_storage_upload(RPC* rpc, uint32_t id, int32_t(*callback)(uint32_t offset
 int rpc_stdio(RPC* rpc, uint32_t id, uint8_t thread_id, int fd, const char* str, uint16_t size, void(*callback)(uint16_t written, void* context), void* context);
 
 // Server side APIs
-void rpc_vm_create_handler(RPC* rpc, void(*handler)(VMSpec* vm, void* context, void(*callback)(uint32_t id)), void* context);
-void rpc_vm_get_handler(RPC* rpc, void(*handler)(uint32_t id, void* context, void(*callback)(VMSpec* vm)), void* context);
-void rpc_vm_set_handler(RPC* rpc, void(*handler)(VMSpec* vm, void* context, void(*callback)(bool result)), void* context);
-void rpc_vm_delete_handler(RPC* rpc, void(*handler)(uint32_t id, void* context, void(*callback)(bool result)), void* context);
-void rpc_vm_list_handler(RPC* rpc, void(*handler)(uint32_t* ids, int size, void* context, void(*callback)(int size)), void* context);
+void rpc_vm_create_handler(RPC* rpc, void(*handler)(RPC* rpc, VMSpec* vm, void* context, void(*callback)(RPC* rpc, uint32_t id)), void* context);
+void rpc_vm_get_handler(RPC* rpc, void(*handler)(RPC* rpc, uint32_t id, void* context, void(*callback)(RPC* rpc, VMSpec* vm)), void* context);
+void rpc_vm_set_handler(RPC* rpc, void(*handler)(RPC* rpc, VMSpec* vm, void* context, void(*callback)(RPC* rpc, bool result)), void* context);
+void rpc_vm_delete_handler(RPC* rpc, void(*handler)(RPC* rpc, uint32_t id, void* context, void(*callback)(RPC* rpc, bool result)), void* context);
+void rpc_vm_list_handler(RPC* rpc, void(*handler)(RPC* rpc, int size, void* context, void(*callback)(RPC* rpc, uint32_t* ids, int size)), void* context);
 
-void rpc_status_get_handler(RPC* rpc, void(*handler)(uint32_t id, void* context, void(*callback)(VMStatus status)), void* context);
-void rpc_status_set_handler(RPC* rpc, void(*handler)(uint32_t id, VMStatus status, void* context, void(*callback)(bool result)), void* context);
+void rpc_status_get_handler(RPC* rpc, void(*handler)(RPC* rpc, uint32_t id, void* context, void(*callback)(RPC* rpc, VMStatus status)), void* context);
+void rpc_status_set_handler(RPC* rpc, void(*handler)(RPC* rpc, uint32_t id, VMStatus status, void* context, void(*callback)(RPC* rpc, bool result)), void* context);
 
-void rpc_storage_download_handler(RPC* rpc, void(*handler)(uint32_t id, uint32_t offset, void** buf, int32_t size, void* context, void(*callback)(int32_t size)), void* context);
-void rpc_storage_upload_handler(RPC* rpc, void(*handler)(uint32_t id, uint32_t offset, void* buf, int32_t size, void* context, void(*callback)(int32_t size)), void* context);
+void rpc_storage_download_handler(RPC* rpc, void(*handler)(RPC* rpc, uint32_t id, uint32_t offset, int32_t size, void* context, void(*callback)(RPC* rpc, void* buf, int32_t size)), void* context);
+void rpc_storage_upload_handler(RPC* rpc, void(*handler)(RPC* rpc, uint32_t id, uint32_t offset, void* buf, int32_t size, void* context, void(*callback)(RPC* rpc, int32_t size)), void* context);
 
-void rpc_stdio_handler(RPC* rpc, void(*handler)(uint32_t id, uint8_t thread_id, int fd, char* str, uint16_t size, void* context, void(*callback)(uint16_t size)), void* context);
+void rpc_stdio_handler(RPC* rpc, void(*handler)(RPC* rpc, uint32_t id, uint8_t thread_id, int fd, char* str, uint16_t size, void* context, void(*callback)(RPC* rpc, uint16_t size)), void* context);
 
 bool rpc_is_active(RPC* rpc);
 bool rpc_loop(RPC* rpc);

@@ -99,7 +99,7 @@ int event_loop() {
 				free(node);
 				
 				printf("Timer event lost unexpectedly cause of memory lack!!!\n");
-				while(1) asm("hlt");
+				while(1) __asm__ __volatile__  ("hlt");
 			}
 		} else {
 			free(node);

@@ -31,5 +31,5 @@ void thread_barrior() {
 	lock_unlock(__barrior_lock);
 	
 	while(*__barrior != full && *__barrior & map)
-		asm volatile("nop");
+		__asm__ __volatile__ ("nop");
 }

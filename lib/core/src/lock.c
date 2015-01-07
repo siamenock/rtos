@@ -8,7 +8,7 @@ bool cmpxchg(uint8_t volatile* s1, uint8_t s2, uint8_t d);
 
 void lock_lock(uint8_t volatile* lock) {
 	while(!lock_trylock(lock))
-		asm volatile("nop");
+		__asm__ __volatile__  ("nop");
 }
 
 bool lock_trylock(uint8_t volatile* lock) {
