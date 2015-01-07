@@ -325,7 +325,7 @@ static int wbuf_flush(RPC* rpc) {
 
 // API
 // hello client API
-int rpc_hello(RPC* rpc, void(*callback)(void* context), void* context) {
+int rpc_hello(RPC* rpc, bool(*callback)(void* context), void* context) {
 	INIT();
 	
 	WRITE(write_uint16(rpc, RPC_TYPE_HELLO_REQ));
@@ -339,8 +339,7 @@ int rpc_hello(RPC* rpc, void(*callback)(void* context), void* context) {
 }
 
 static int hello_res_handler(RPC* rpc) {
-	if(rpc->hello_callback) {
-		rpc->hello_callback(rpc->hello_context);
+	if(rpc->hello_callback && !rpc->hello_callback(rpc->hello_context)) {
 		rpc->hello_callback = NULL;
 		rpc->hello_context = NULL;
 	}
@@ -377,7 +376,7 @@ static int hello_req_handler(RPC* rpc) {
 }
 
 // vm_create client API
-int rpc_vm_create(RPC* rpc, VMSpec* vm, void(*callback)(uint32_t id, void* context), void* context) {
+int rpc_vm_create(RPC* rpc, VMSpec* vm, bool(*callback)(uint32_t id, void* context), void* context) {
 	INIT();
 	
 	WRITE(write_uint16(rpc, RPC_TYPE_VM_CREATE_REQ));
@@ -395,8 +394,7 @@ static int vm_create_res_handler(RPC* rpc) {
 	uint32_t id;
 	READ(read_uint32(rpc, &id));
 	
-	if(rpc->vm_create_callback) {
-		rpc->vm_create_callback(id, rpc->vm_create_context);
+	if(rpc->vm_create_callback && !rpc->vm_create_callback(id, rpc->vm_create_context)) {
 		rpc->vm_create_callback = NULL;
 		rpc->vm_create_context = NULL;
 	}
@@ -436,7 +434,7 @@ static int vm_create_req_handler(RPC* rpc) {
 }
 
 // vm_get client API
-int rpc_vm_get(RPC* rpc, uint32_t id, void(*callback)(VMSpec* vm, void* context), void* context) {
+int rpc_vm_get(RPC* rpc, uint32_t id, bool(*callback)(VMSpec* vm, void* context), void* context) {
 	INIT();
 	
 	WRITE(write_uint16(rpc, RPC_TYPE_VM_GET_REQ));
@@ -454,8 +452,7 @@ static int vm_get_res_handler(RPC* rpc) {
 	VMSpec* vm;
 	READ(read_vm(rpc, &vm));
 	
-	if(rpc->vm_get_callback) {
-		rpc->vm_get_callback(vm, rpc->vm_get_context);
+	if(rpc->vm_get_callback && !rpc->vm_get_callback(vm, rpc->vm_get_context)) {
 		rpc->vm_get_callback = NULL;
 		rpc->vm_get_context = NULL;
 	}
@@ -495,7 +492,7 @@ static int vm_get_req_handler(RPC* rpc) {
 }
 
 // vm_set client API
-int rpc_vm_set(RPC* rpc, VMSpec* vm, void(*callback)(bool result, void* context), void* context) {
+int rpc_vm_set(RPC* rpc, VMSpec* vm, bool(*callback)(bool result, void* context), void* context) {
 	INIT();
 	
 	WRITE(write_uint16(rpc, RPC_TYPE_VM_SET_REQ));
@@ -513,8 +510,7 @@ static int vm_set_res_handler(RPC* rpc) {
 	bool result;
 	READ(read_bool(rpc, &result));
 	
-	if(rpc->vm_set_callback) {
-		rpc->vm_set_callback(result, rpc->vm_set_context);
+	if(rpc->vm_set_callback && !rpc->vm_set_callback(result, rpc->vm_set_context)) {
 		rpc->vm_set_callback = NULL;
 		rpc->vm_set_context = NULL;
 	}
@@ -554,7 +550,7 @@ static int vm_set_req_handler(RPC* rpc) {
 }
 
 // vm_delete client API
-int rpc_vm_delete(RPC* rpc, uint32_t id, void(*callback)(bool result, void* context), void* context) {
+int rpc_vm_delete(RPC* rpc, uint32_t id, bool(*callback)(bool result, void* context), void* context) {
 	INIT();
 	
 	WRITE(write_uint16(rpc, RPC_TYPE_VM_DELETE_REQ));
@@ -572,8 +568,7 @@ static int vm_delete_res_handler(RPC* rpc) {
 	bool result = false;
 	READ(read_bool(rpc, &result));
 	
-	if(rpc->vm_delete_callback) {
-		rpc->vm_delete_callback(result, rpc->vm_delete_context);
+	if(rpc->vm_delete_callback && !rpc->vm_delete_callback(result, rpc->vm_delete_context)) {
 		rpc->vm_delete_callback = NULL;
 		rpc->vm_delete_context = NULL;
 	}
@@ -610,7 +605,7 @@ static int vm_delete_req_handler(RPC* rpc) {
 }
 
 // vm_list client API
-int rpc_vm_list(RPC* rpc, void(*callback)(uint32_t* ids, uint16_t count, void* context), void* context) {
+int rpc_vm_list(RPC* rpc, bool(*callback)(uint32_t* ids, uint16_t count, void* context), void* context) {
 	INIT();
 	
 	WRITE(write_uint16(rpc, RPC_TYPE_VM_LIST_REQ));
@@ -628,8 +623,7 @@ static int vm_list_res_handler(RPC* rpc) {
 	uint32_t* list;
 	READ(read_bytes(rpc, (void**)&list, &size));
 	
-	if(rpc->vm_list_callback) {
-		rpc->vm_list_callback(list, (size < 0 ? 0 : size) / sizeof(uint32_t), rpc->vm_list_context);
+	if(rpc->vm_list_callback && !rpc->vm_list_callback(list, (size < 0 ? 0 : size) / sizeof(uint32_t), rpc->vm_list_context)) {
 		rpc->vm_list_callback = NULL;
 		rpc->vm_list_context = NULL;
 	}
@@ -666,7 +660,7 @@ static int vm_list_req_handler(RPC* rpc) {
 }
 
 // status_get client API
-int rpc_status_get(RPC* rpc, uint32_t id, void(*callback)(VMStatus status, void* context), void* context) {
+int rpc_status_get(RPC* rpc, uint32_t id, bool(*callback)(VMStatus status, void* context), void* context) {
 	INIT();
 	
 	WRITE(write_uint16(rpc, RPC_TYPE_STATUS_GET_REQ));
@@ -684,8 +678,7 @@ static int status_get_res_handler(RPC* rpc) {
 	uint32_t status;
 	READ(read_uint32(rpc, &status));
 	
-	if(rpc->status_get_callback) {
-		rpc->status_get_callback(status, rpc->status_get_context);
+	if(rpc->status_get_callback && !rpc->status_get_callback(status, rpc->status_get_context)) {
 		rpc->status_get_callback = NULL;
 		rpc->status_get_context = NULL;
 	}
@@ -722,7 +715,7 @@ static int status_get_req_handler(RPC* rpc) {
 }
 
 // status_set client API
-int rpc_status_set(RPC* rpc, uint32_t id, VMStatus status, void(*callback)(bool result, void* context), void* context) {
+int rpc_status_set(RPC* rpc, uint32_t id, VMStatus status, bool(*callback)(bool result, void* context), void* context) {
 	INIT();
 	
 	WRITE(write_uint16(rpc, RPC_TYPE_STATUS_SET_REQ));
@@ -741,8 +734,7 @@ static int status_set_res_handler(RPC* rpc) {
 	bool result = false;
 	READ(read_bool(rpc, &result));
 	
-	if(rpc->status_set_callback) {
-		rpc->status_set_callback(result, rpc->status_set_context);
+	if(rpc->status_set_callback && !rpc->status_set_callback(result, rpc->status_set_context)) {
 		rpc->status_set_callback = NULL;
 		rpc->status_set_context = NULL;
 	}
@@ -951,7 +943,7 @@ static int storage_upload_req_handler(RPC* rpc) {
 }
 
 // stdio client API
-int rpc_stdio(RPC* rpc, uint32_t id, uint8_t thread_id, int fd, const char* str, uint16_t size, void(*callback)(uint16_t written, void* context), void* context) {
+int rpc_stdio(RPC* rpc, uint32_t id, uint8_t thread_id, int fd, const char* str, uint16_t size, bool(*callback)(uint16_t written, void* context), void* context) {
 	INIT();
 	
 	WRITE(write_uint16(rpc, RPC_TYPE_STDIO_REQ));
@@ -972,8 +964,9 @@ static int stdio_res_handler(RPC* rpc) {
 	uint16_t written;
 	READ(read_uint16(rpc, &written));
 	
-	if(rpc->stdio_callback) {
-		rpc->stdio_callback(written, rpc->stdio_context);
+	if(rpc->stdio_callback && !rpc->stdio_callback(written, rpc->stdio_context)) {
+		rpc->stdio_callback = NULL;
+		rpc->stdio_context = NULL;
 	}
 	
 	RETURN();
@@ -1154,7 +1147,7 @@ void rpc_vm_dump(VMSpec* vm) {
 }
 
 #ifdef LINUX
-#define DEBUG 1
+#define DEBUG 0
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
