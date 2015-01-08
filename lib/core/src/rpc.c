@@ -180,12 +180,17 @@ if((_len = (VALUE)) <= 0) {		\
 
 #define RETURN()	return _size;
 
+#define INIT2()					\
+	int _len = 0;				\
+	int _wbuf_index = rpc->wbuf_index;
+
 #define WRITE2(VALUE)			\
 if((VALUE) <= 0) {			\
+	rpc->wbuf_index = _wbuf_index;	\
 	return;				\
 }
 
-#define WFLUSH()			\
+#define RETURN2()			\
 if(rpc->wbuf_index > 0 && rpc->write && wbuf_flush(rpc) < 0 && rpc->close) {	\
 	rpc->close(rpc);							\
 	return;									\
@@ -415,10 +420,12 @@ static int vm_create_req_handler(RPC* rpc) {
 	READ(read_vm(rpc, &vm));
 	
 	void callback(RPC* rpc, uint32_t id) {
+		INIT2();
+		
 		WRITE2(write_uint16(rpc, RPC_TYPE_VM_CREATE_RES));
 		WRITE2(write_uint32(rpc, id));
 		
-		WFLUSH();
+		RETURN2();
 	}
 	
 	if(rpc->vm_create_handler) {
@@ -476,10 +483,12 @@ static int vm_get_req_handler(RPC* rpc) {
 	READ(read_uint32(rpc, &id));
 	
 	void callback(RPC* rpc, VMSpec* vm) {
+		INIT2();
+		
 		WRITE2(write_uint16(rpc, RPC_TYPE_VM_GET_RES));
 		WRITE2(write_vm(rpc, vm));
 		
-		WFLUSH();
+		RETURN2();
 	}
 	
 	if(rpc->vm_get_handler) {
@@ -531,10 +540,12 @@ static int vm_set_req_handler(RPC* rpc) {
 	READ(read_vm(rpc, &vm));
 	
 	void callback(RPC* rpc, bool result) {
+		INIT2();
+		
 		WRITE2(write_uint16(rpc, RPC_TYPE_VM_SET_RES));
 		WRITE2(write_bool(rpc, result));
 		
-		WFLUSH();
+		RETURN2();
 	}
 	
 	if(rpc->vm_set_handler) {
@@ -589,10 +600,12 @@ static int vm_delete_req_handler(RPC* rpc) {
 	READ(read_uint32(rpc, &id));
 	
 	void callback(RPC* rpc, bool result) {
+		INIT2();
+		
 		WRITE2(write_uint16(rpc, RPC_TYPE_VM_DELETE_RES));
 		WRITE2(write_bool(rpc, result));
 		
-		WFLUSH();
+		RETURN2();
 	}
 	
 	if(rpc->vm_delete_handler) {
@@ -641,11 +654,13 @@ static int vm_list_req_handler(RPC* rpc) {
 	INIT();
 	
 	void callback(RPC* rpc, uint32_t* ids, int size) {
+		INIT2();
+		
 		printf("vm_list callback: %d %d, %d\n", ids[0], ids[1], size);
 		WRITE2(write_uint16(rpc, RPC_TYPE_VM_LIST_RES));
 		WRITE2(write_bytes(rpc, ids, sizeof(uint32_t) * size));
 		
-		WFLUSH();
+		RETURN2();
 	}
 	
 	_size++;	// To avoid rollback
@@ -699,10 +714,12 @@ static int status_get_req_handler(RPC* rpc) {
 	READ(read_uint32(rpc, &id));
 	
 	void callback(RPC* rpc, VMStatus status) {
+		INIT2();
+		
 		WRITE2(write_uint16(rpc, RPC_TYPE_STATUS_GET_RES));
 		WRITE2(write_uint32(rpc, status));
 		
-		WFLUSH();
+		RETURN2();
 	}
 	
 	if(rpc->status_get_handler) {
@@ -758,10 +775,12 @@ static int status_set_req_handler(RPC* rpc) {
 	READ(read_uint32(rpc, &status));
 	
 	void callback(RPC* rpc, bool result) {
+		INIT2();
+		
 		WRITE2(write_uint16(rpc, RPC_TYPE_STATUS_SET_RES));
 		WRITE2(write_bool(rpc, result));
 		
-		WFLUSH();
+		RETURN2();
 	}
 	
 	if(rpc->status_set_handler) {
@@ -828,6 +847,8 @@ static int download(RPC* rpc) {
 	INIT();
 	
 	void callback(RPC* rpc, void* buf, int32_t size) {
+		INIT2();
+		
 		if(size > 0) {
 			WRITE2(write_uint16(rpc, RPC_TYPE_STORAGE_DOWNLOAD_RES));
 			WRITE2(write_uint32(rpc, rpc->storage_download_offset));
@@ -843,7 +864,7 @@ static int download(RPC* rpc) {
 			rpc->storage_download_offset = 0;
 		}
 		
-		WFLUSH();
+		RETURN2();
 	}
 	
 	_size++;	// To avoid rollback
@@ -927,9 +948,11 @@ static int storage_upload_req_handler(RPC* rpc) {
 	
 	void callback(RPC* rpc, int32_t len) {
 		if(len < 0) {
+			INIT2();
+			
 			WRITE2(write_uint16(rpc, RPC_TYPE_STORAGE_UPLOAD_RES));
 			
-			WFLUSH();
+			RETURN2();
 		}
 	}
 	
@@ -995,10 +1018,12 @@ static int stdio_req_handler(RPC* rpc) {
 	READ(read_bytes(rpc, (void**)&str, &len));
 	
 	void callback(RPC* rpc, uint16_t size) {
+		INIT2();
+		
 		WRITE2(write_uint16(rpc, RPC_TYPE_STDIO_RES));
 		WRITE2(write_uint16(rpc, size));
 		
-		WFLUSH();
+		RETURN2();
 	}
 	 
 	if(rpc->stdio_handler) {
@@ -1053,6 +1078,7 @@ bool rpc_loop(RPC* rpc) {
 		}
 	}
 	
+	bool is_first = true;
 	while(true) {
 		INIT();
 		
@@ -1072,6 +1098,9 @@ bool rpc_loop(RPC* rpc) {
 			
 			return _size > 0;
 		} else {
+			if(!is_first)
+				return _size > 0;
+			
 			if(rpc->storage_download_id > 0) {
 				type = RPC_TYPE_END;	// download
 			} else if(rpc->storage_upload_id > 0) {
@@ -1103,6 +1132,8 @@ bool rpc_loop(RPC* rpc) {
 		} else {
 			return _size > 0;
 		}
+		
+		is_first = false;
 	}
 }
 
@@ -1236,7 +1267,10 @@ RPC* rpc_open(const char* host, int port, int timeout) {
 	addr.sin_port = htons(port);
 	
 	alarm(timeout);
+	
 	if(connect(fd, (struct sockaddr*)&addr, sizeof(struct sockaddr_in)) < 0) {
+		alarm(0);
+		sigaction(SIGALRM, &old_sigact, NULL);
 		close(fd);
 		return NULL;
 	}
