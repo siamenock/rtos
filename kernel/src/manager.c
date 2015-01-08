@@ -213,6 +213,7 @@ static void storage_upload_handler(RPC* rpc, uint32_t vmid, uint32_t offset, voi
 			printf(". Aborted: %d\n", size);
 		} else if(size == 0) {
 			printf(". Done\n");
+			callback(rpc, 0);
 		} else {
 			size = vm_storage_write(vmid, buf, offset, size);
 			callback(rpc, size);
