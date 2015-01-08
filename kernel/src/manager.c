@@ -211,6 +211,12 @@ static void storage_upload_handler(RPC* rpc, uint32_t vmid, uint32_t offset, voi
 		
 		size = vm_storage_write(vmid, buf, offset, size);
 		callback(rpc, size);
+		if(size > 0)
+			printf(".");
+		else if(size < 0)
+			printf(". Error: %d\n", size);
+		else
+			printf(". Done\n");
 	}
 }
 
@@ -292,10 +298,6 @@ static err_t manager_accept(void* arg, struct tcp_pcb* pcb, err_t err) {
 	tcp_err(pcb, manager_err);
 	tcp_poll(pcb, manager_poll, 2);
 	
-	if(list_index_of(clients, pcb, NULL) >= 0) {
-		printf("Error: Same pcb: %p %d\n", pcb, list_index_of(clients, pcb, NULL));
-		while(1) asm("hlt");
-	}
 	list_add(clients, pcb);
 	
 	return ERR_OK;

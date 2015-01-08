@@ -53,6 +53,9 @@ MAKE_WRITE(uint32)
 MAKE_READ(uint64)
 MAKE_WRITE(uint64)
 
+MAKE_READ(int32)
+MAKE_WRITE(int32)
+
 #define read_bool(RPC, DATA)	read_uint8((RPC), (uint8_t*)(DATA))
 #define write_bool(RPC, DATA)	write_uint8((RPC), (uint8_t)(DATA))
 
@@ -349,7 +352,7 @@ static int hello_res_handler(RPC* rpc) {
 		rpc->hello_context = NULL;
 	}
 	
-	return true;
+	return 1;
 }
 
 // hello server API
@@ -510,7 +513,7 @@ int rpc_vm_set(RPC* rpc, VMSpec* vm, bool(*callback)(bool result, void* context)
 	rpc->vm_set_callback = callback;
 	rpc->vm_set_context = context;
 	
-	return true;
+	RETURN();
 }
 
 static int vm_set_res_handler(RPC* rpc) {
@@ -888,8 +891,13 @@ int rpc_storage_upload(RPC* rpc, uint32_t id, int32_t(*callback)(uint32_t offset
 }
 
 static int storage_upload_res_handler(RPC* rpc) {
+	INIT();
+	
+	int32_t size;
+	READ(read_int32(rpc, &size));
+	
 	if(rpc->storage_upload_callback) {
-		rpc->storage_upload_callback(rpc->storage_upload_offset, NULL, -1, rpc->storage_upload_context);
+		rpc->storage_upload_callback(rpc->storage_upload_offset, NULL, size, rpc->storage_upload_context);
 		
 		rpc->storage_upload_id = 0;
 		rpc->storage_upload_offset = 0;
@@ -897,7 +905,7 @@ static int storage_upload_res_handler(RPC* rpc) {
 		rpc->storage_upload_context = NULL;
 	}
 	
-	return true;
+	RETURN();
 }
 
 static int upload(RPC* rpc) {
@@ -912,16 +920,12 @@ static int upload(RPC* rpc) {
 		WRITE(write_uint32(rpc, rpc->storage_upload_id));
 		WRITE(write_uint32(rpc, rpc->storage_upload_offset));
 		WRITE(write_bytes(rpc, buf, size));
+		
+		if(size <= 0)
+			rpc->storage_upload_offset = (uint32_t)-1;
 	}
 	
 	rpc->storage_upload_offset += size;
-	
-	if(size <= 0) {
-		rpc->storage_upload_id = 0;
-		rpc->storage_upload_offset = 0;
-		rpc->storage_upload_callback = NULL;
-		rpc->storage_upload_context = NULL;
-	}
 	
 	RETURN();
 }	
@@ -945,11 +949,15 @@ static int storage_upload_req_handler(RPC* rpc) {
 	int32_t size;
 	READ(read_bytes(rpc, &buf, &size));
 	
-	void callback(RPC* rpc, int32_t len) {
-		if(len < 0) {
+	void callback(RPC* rpc, int32_t size) {
+		if(size <= 0) {
+			rpc->storage_upload_id = 0;
+			rpc->storage_upload_offset = 0;
+			
 			INIT2();
 			
 			WRITE2(write_uint16(rpc, RPC_TYPE_STORAGE_UPLOAD_RES));
+			WRITE2(write_int32(rpc, size));
 			
 			RETURN2();
 		}
@@ -1102,7 +1110,7 @@ bool rpc_loop(RPC* rpc) {
 			
 			if(rpc->storage_download_id > 0) {
 				type = RPC_TYPE_END;	// download
-			} else if(rpc->storage_upload_id > 0) {
+			} else if(rpc->storage_upload_id > 0 && rpc->storage_upload_offset != (uint32_t)-1) {
 				type = RPC_TYPE_END + 1;// upload
 			}
 		}
