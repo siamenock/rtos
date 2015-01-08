@@ -656,7 +656,6 @@ static int vm_list_req_handler(RPC* rpc) {
 	void callback(RPC* rpc, uint32_t* ids, int size) {
 		INIT2();
 		
-		printf("vm_list callback: %d %d, %d\n", ids[0], ids[1], size);
 		WRITE2(write_uint16(rpc, RPC_TYPE_VM_LIST_RES));
 		WRITE2(write_bytes(rpc, ids, sizeof(uint32_t) * size));
 		

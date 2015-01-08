@@ -40,12 +40,29 @@ typedef struct {
 	int		poll_count;
 } RPCData;
 
-static List* clients;
-static List* actives;
+static List* clients;	/* pcb */
+static List* actives;	/* rpc */
 
 static err_t manager_poll(void* arg, struct tcp_pcb* pcb);
 
-static void manager_close(struct tcp_pcb* pcb, RPC* rpc) {
+static void rpc_free(RPC* rpc) {
+	RPCData* data = (RPCData*)rpc->data;
+	
+	ListIterator iter;
+	list_iterator_init(&iter, data->pbufs);
+	while(list_iterator_has_next(&iter)) {
+		struct pbuf* pbuf = list_iterator_next(&iter);
+		list_iterator_remove(&iter);
+		pbuf_free(pbuf);
+	}
+	list_destroy(data->pbufs);
+	list_remove_data(actives, rpc);
+	free(rpc);
+	
+	list_remove_data(clients, data->pcb);
+}
+
+static void manager_close(struct tcp_pcb* pcb, RPC* rpc, bool is_force) {
 	printf("Close connection: %p\n", pcb);
 	tcp_arg(pcb, NULL);
 	tcp_sent(pcb, NULL);
@@ -54,32 +71,24 @@ static void manager_close(struct tcp_pcb* pcb, RPC* rpc) {
 	tcp_poll(pcb, NULL, 0);
 	
 	if(rpc) {
-		RPCData* data = (RPCData*)rpc->data;
-		
-		ListIterator iter;
-		list_iterator_init(&iter, data->pbufs);
-		while(list_iterator_has_next(&iter)) {
-			struct pbuf* pbuf = list_iterator_next(&iter);
-			list_iterator_remove(&iter);
-			pbuf_free(pbuf);
-		}
-		list_destroy(data->pbufs);
-		list_remove_data(actives, rpc);
-		free(rpc);
+		rpc_free(rpc);
+	} else {
+		list_remove_data(clients, pcb);
 	}
 	
-	if(tcp_close(pcb) != ERR_OK) {
-		tcp_poll(pcb, manager_poll, 2);
+	if(is_force) {
+		tcp_abort(pcb);
+	} else if(tcp_close(pcb) != ERR_OK) {
+		printf("Cannot close pcb: %p %p\n", pcb, rpc);
+		//tcp_poll(pcb, manager_poll, 2);
 	}
-	
-	list_remove_data(clients, pcb);
 }
 
 static err_t manager_recv(void* arg, struct tcp_pcb* pcb, struct pbuf* p, err_t err) {
 	RPC* rpc = arg;
 	
 	if(p == NULL) {	// Remote host closed the connection
-		manager_close(pcb, rpc);
+		manager_close(pcb, rpc, false);
 	} else if(err != ERR_OK) {
 		pbuf_free(p);
 	} else {
@@ -100,11 +109,11 @@ static err_t manager_recv(void* arg, struct tcp_pcb* pcb, struct pbuf* p, err_t 
 }
 
 static void manager_err(void* arg, err_t err) {
-	printf("Error: %d %p\n", err, arg);
 	RPC* rpc = arg;
 	if(rpc != NULL) {
 		RPCData* data = (RPCData*)rpc->data;
-		manager_close(data->pcb, rpc);
+		printf("Error closed: %d %p\n", err, data->pcb);
+		rpc_free(rpc);
 	}
 }
 
@@ -112,16 +121,14 @@ static err_t manager_poll(void* arg, struct tcp_pcb* pcb) {
 	RPC* rpc = arg;
 	
 	if(rpc == NULL) {
-		manager_close(pcb, NULL);
+		manager_close(pcb, NULL, true);
 	} else {
 		RPCData* data = (RPCData*)rpc->data;
+		data->poll_count++;
 		
-		if(rpc->ver == 0) {
-			data->poll_count++;
-		}
-		
-		if(data->poll_count >= 4) {
-			manager_close(pcb, rpc);
+		if(rpc->ver == 0 && data->poll_count++ >= 4) {	// 2 seconds
+			printf("Close connection: not receiving hello in 2 secs.\n");
+			manager_close(pcb, rpc, false);
 		}
 	}
 	
@@ -251,9 +258,7 @@ static int pcb_write(RPC* rpc, void* buf, int size) {
 
 static void pcb_close(RPC* rpc) {
 	RPCData* data = (RPCData*)rpc->data;
-	
-	printf("closing: %d\n", errno);
-	manager_close(data->pcb, rpc);
+	manager_close(data->pcb, rpc, false);
 }
 
 static err_t manager_accept(void* arg, struct tcp_pcb* pcb, err_t err) {
@@ -287,6 +292,10 @@ static err_t manager_accept(void* arg, struct tcp_pcb* pcb, err_t err) {
 	tcp_err(pcb, manager_err);
 	tcp_poll(pcb, manager_poll, 2);
 	
+	if(list_index_of(clients, pcb, NULL) >= 0) {
+		printf("Error: Same pcb: %p %d\n", pcb, list_index_of(clients, pcb, NULL));
+		while(1) asm("hlt");
+	}
 	list_add(clients, pcb);
 	
 	return ERR_OK;
