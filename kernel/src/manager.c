@@ -211,15 +211,15 @@ static void storage_upload_handler(RPC* rpc, uint32_t vmid, uint32_t offset, voi
 		
 		if(size < 0) {
 			printf(". Aborted: %d\n", size);
-		} else if(size == 0) {
-			printf(". Done\n");
-			callback(rpc, 0);
+			callback(rpc, size);
 		} else {
 			size = vm_storage_write(vmid, buf, offset, size);
 			callback(rpc, size);
 			 
 			if(size > 0)
 				printf(".");
+			else if(size == 0)
+				printf(". Done\n");
 			else if(size < 0)
 				printf(". Error: %d\n", size);
 		}
