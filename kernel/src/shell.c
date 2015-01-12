@@ -32,13 +32,13 @@
 #define MAX_VM_COUNT	128
 #define MAX_NIC_COUNT	32
 
-static int cmd_clear() {
+static int cmd_clear(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	printf("\f");
 
 	return 0;
 }
 
-static int cmd_echo(int argc, char** argv) {
+static int cmd_echo(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	int pos = 0;
 	for(int i = 1; i < argc; i++) {
 		pos += sprintf(cmd_result + pos, "%s", argv[i]) - 1;
@@ -46,11 +46,12 @@ static int cmd_echo(int argc, char** argv) {
 			cmd_result[pos++] = ' ';
 		}
 	}
+	callback(cmd_result, 0);
 
 	return 0;
 }
 
-static int cmd_sleep(int argc, char** argv) {
+static int cmd_sleep(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	uint32_t time = 1;
 	if(argc >= 2 && is_uint32(argv[1])) {
 		time = parse_uint32(argv[1]);
@@ -87,7 +88,7 @@ static char* weeks[] = {
 	"Sat",
 };
 
-static int cmd_date(int argc, char** argv) {
+static int cmd_date(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	uint32_t date = rtc_date();
 	uint32_t time = rtc_time();
 	
@@ -97,7 +98,7 @@ static int cmd_date(int argc, char** argv) {
 	return 0;
 }
 
-static int cmd_ip(int argc, char** argv) {
+static int cmd_ip(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	uint32_t old = manager_get_ip();
 	if(argc == 1) {
 		printf("%d.%d.%d.%d\n", (old >> 24) & 0xff, (old >> 16) & 0xff, (old >> 8) & 0xff, (old >> 0) & 0xff);
@@ -119,13 +120,13 @@ static int cmd_ip(int argc, char** argv) {
 	return 0;
 }
 
-static int cmd_version(int argc, char** argv) {
+static int cmd_version(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	printf("%d.%d.%d\n", VERSION_MAJOR, VERSION_MINOR, VERSION_MICRO);
 	
 	return 0;
 }
 
-static int cmd_lsni() {
+static int cmd_lsni(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	extern Map* nis;
 	extern uint64_t ni_mac;
 	
@@ -147,7 +148,7 @@ static int cmd_lsni() {
 	return 0;
 }
 
-static int cmd_reboot() {
+static int cmd_reboot(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	asm volatile("cli");
 	
 	uint8_t code;
@@ -165,7 +166,7 @@ static int cmd_reboot() {
 	return 0;
 }
 
-static int cmd_shutdown() {
+static int cmd_shutdown(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	printf("Shutting down\n");
 	acpi_shutdown();
 	
@@ -194,7 +195,7 @@ static bool arping_timeout(void* context) {
 	}
 }
 
-static int cmd_arping(int argc, char** argv) {
+static int cmd_arping(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	if(argc < 2) {
 		return CMD_STATUS_WRONG_NUMBER;
 	}
@@ -224,12 +225,12 @@ static int cmd_arping(int argc, char** argv) {
 	return 0;
 }
 
-static int cmd_md5(int argc, char** argv) {
+static int cmd_md5(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	if(argc < 3) {
 		return CMD_STATUS_WRONG_NUMBER;
 	}
 
-	if(!is_uint64(argv[1])) {
+	if(!is_uint32(argv[1])) {
 		return -1;
 	}
 
@@ -237,7 +238,7 @@ static int cmd_md5(int argc, char** argv) {
 		return -2;
 	}
 
-	uint64_t vmid = parse_uint64(argv[1]);
+	uint32_t vmid = parse_uint32(argv[1]);
 	uint64_t size = parse_uint64(argv[2]);
 	uint32_t md5sum[4];
 	bool ret = vm_storage_md5(vmid, size, md5sum);
@@ -252,10 +253,12 @@ static int cmd_md5(int argc, char** argv) {
 		*p = '\0';
 	}
 
+	if(ret)
+		callback(cmd_result, 0);
 	return 0;
 }
 
-static int cmd_create(int argc, char** argv) {
+static int cmd_create(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	if(argc < 2) {
 		return CMD_STATUS_WRONG_NUMBER;
 	}
@@ -353,34 +356,37 @@ static int cmd_create(int argc, char** argv) {
 		}
 	}
 	
-	uint64_t vmid = vm_create(vm);
+	uint32_t vmid = vm_create(vm);
 	if(vmid == 0) {
-		return 2;
+		callback(NULL, -1);
+	} else {
+		sprintf(cmd_result, "%d", vmid);
+		callback(cmd_result, 0);
 	}
-	
-	sprintf(cmd_result, "%ld", vmid);
-	
 	return 0;
 }
 
-static int cmd_vm_delete(int argc, char** argv) {
+static int cmd_vm_delete(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	if(argc < 1) {
 		return CMD_STATUS_WRONG_NUMBER;
 	}
 
-	if(!is_uint64(argv[1])) {
+	if(!is_uint32(argv[1])) {
 		return -1;
 	}
 
-	uint64_t vmid = parse_uint64(argv[1]);
+	uint32_t vmid = parse_uint32(argv[1]);
 	bool ret = vm_delete(vmid);
 
-	sprintf(cmd_result, "%s", ret ? "true" : "false");
+	if(ret)
+		callback("true", 0);
+	else
+		callback("false", -1);
 
 	return 0;
 }
 
-static int cmd_vm_list(int argc, char** argv) {
+static int cmd_vm_list(int argc, char** argv, void(*callback)(char* result, int eixt_status)) {
 	uint32_t vmids[MAX_VM_COUNT];
 	int len = vm_list(vmids, MAX_VM_COUNT);
 
@@ -394,19 +400,20 @@ static int cmd_vm_list(int argc, char** argv) {
 		}
 	}
 
+	callback(cmd_result, 0);
 	return 0;
 }
 
-static int cmd_send(int argc, char** argv) {
+static int cmd_send(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	if(argc < 3) {
 		return CMD_STATUS_WRONG_NUMBER;
 	}
 
-	if(!is_uint64(argv[1])) {
+	if(!is_uint32(argv[1])) {
 		return -1;
 	}
 
-	uint64_t vmid = parse_uint64(argv[1]);
+	uint32_t vmid = parse_uint32(argv[1]);
 	uint32_t size = 0;
 	void* file = rootfs_file(argv[2], &size);
 	
@@ -415,25 +422,29 @@ static int cmd_send(int argc, char** argv) {
 		return 1;
 	}
 
-	if(vm_storage_write(vmid, file, 0, size) != size)
+	if(vm_storage_write(vmid, file, 0, size) != size) {
+		callback("false", -1);
 		return -1;
-
+	}
+	
+	callback("true", 0);
 	return 0;
 }
 
-static int cmd_status_set(int argc, char** argv) {
+static int cmd_status_set(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	void status_setted(bool result, void* context) {
-		cmd_async_result(result ? "true" : "false", 0);
+		void(*callback)(char* result, int exit_status) = context;
+		callback(result ? "true" : "false", 0);
 	}
 
 	if(argc < 2) {
 		return CMD_STATUS_WRONG_NUMBER;
 	}
-	if(!is_uint64(argv[1])) {
+	if(!is_uint32(argv[1])) {
 		return -1;
 	}
 	
-	uint64_t vmid = parse_uint64(argv[1]);
+	uint32_t vmid = parse_uint32(argv[1]);
 	int status = 0;
 	if(strcmp(argv[0], "start") == 0) {
 		status = VM_STATUS_START;
@@ -445,38 +456,36 @@ static int cmd_status_set(int argc, char** argv) {
 		status = VM_STATUS_STOP;
 	}
 	
-	vm_status_set(vmid, status, status_setted, NULL);
+	vm_status_set(vmid, status, status_setted, callback);
 	
-	return CMD_STATUS_ASYNC_CALL;
+	return 0;
 }
 
-static int cmd_status_get(int argc, char** argv) {
+static int cmd_status_get(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	if(argc < 2) {
 		return CMD_STATUS_WRONG_NUMBER;
 	}
 	
-	if(!is_uint64(argv[1])) {
+	if(!is_uint32(argv[1])) {
 		return -1;
 	}
 
-	uint64_t vmid = parse_uint64(argv[1]);
-	char* ret;
+	uint32_t vmid = parse_uint32(argv[1]);
 	switch(vm_status_get(vmid)) {
 		case VM_STATUS_START:
-			ret = "start";
+			callback("start", 0);
 			break;
 		case VM_STATUS_PAUSE:
-			ret = "pause";
+			callback("pause", 0);
 			break;
 		case VM_STATUS_STOP:
-			ret = "stop";
+			callback("stop", 0);
 			break;
 		default:
-			ret = "none";
+			callback("invalid", -1);
 			break;
 	}
 
-	sprintf(cmd_result, "%s", ret);
 	return 0;
 }
 
@@ -548,13 +557,13 @@ Command commands[] = {
 	{ 
 		.name = "create", 
 		.desc = "Create VM",
-		.args = "vmid: uint64, core: (number: int) memory: (size: uint32) storage: (size: uint32) [nic: mac: (addr: uint64) ibuf: (size: uint32) obuf: (size: uint32) iband: (size: uint64) oband: (size: uint64) pool: (size: uint32)]* [args: [string]+ ]",
+		.args = "vmid: uint32, core: (number: int) memory: (size: uint32) storage: (size: uint32) [nic: mac: (addr: uint64) ibuf: (size: uint32) obuf: (size: uint32) iband: (size: uint64) oband: (size: uint64) pool: (size: uint32)]* [args: [string]+ ]",
 		.func = cmd_create 
 	},
 	{
 		.name = "delete",
 		.desc = "Delete VM",
-		.args = "result: bool, vmid: uint64",
+		.args = "result: bool, vmid: uint32",
 		.func = cmd_vm_delete
 	},
 	{
@@ -566,49 +575,54 @@ Command commands[] = {
 	{
 		.name = "send",
 		.desc = "Send file",
-		.args = "result: bool, vmid: uint64 path: string",
+		.args = "result: bool, vmid: uint32 path: string",
 		.func = cmd_send
 	},
 	{
 		.name = "md5",
 		.desc = "MD5 storage",
-		.args = "result: hex16 string, vmid: uint64 size: uint64",
+		.args = "result: hex16 string, vmid: uint32 size: uint64",
 		.func = cmd_md5
 	},
 	{ 
 		.name = "start", 
 		.desc = "Start VM",
-		.args = "result: bool, vmid: uint64",
+		.args = "result: bool, vmid: uint32",
 		.func = cmd_status_set 
 	},
 	{
 		.name = "pause",
 		.desc = "Pause VM",
-		.args = "result: bool, vmid: uint64",
+		.args = "result: bool, vmid: uint32",
 		.func = cmd_status_set
 	},
 	{
 		.name = "resume",
 		.desc = "Resume VM",
-		.args = "result: bool, vmid: uint64",
+		.args = "result: bool, vmid: uint32",
 		.func = cmd_status_set
 	},
 	{
 		.name = "stop",
 		.desc = "Stop VM",
-		.args = "result: bool, vmid: uint64",
+		.args = "result: bool, vmid: uint32",
 		.func = cmd_status_set
 	},
 	{
 		.name = "status",
 		.desc = "Get VM's status",
-		.args = "result: string(\"start\", \"pause\", or \"stop\") vmid: uint64",
+		.args = "result: string(\"start\", \"pause\", or \"stop\") vmid: uint32",
 		.func = cmd_status_get
 	},
 	{
 		.name = NULL
 	},
 };
+
+static void cmd_callback(char* result, int exit_status) {
+	cmd_update_var(result, exit_status);
+	printf("%s\n", result);
+}
 
 void shell_callback(int code) {
 	static char cmd[CMD_SIZE];
@@ -622,7 +636,7 @@ void shell_callback(int code) {
 			case '\n':
 				cmd[cmd_idx] = '\0';
 				putchar(ch);
-				cmd_exec(cmd);
+				cmd_exec(cmd, cmd_callback);
 				printf("# ");
 				cmd_idx = 0;
 				break;
