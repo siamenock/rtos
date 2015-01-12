@@ -121,7 +121,7 @@ static int cmd_ip(int argc, char** argv, void(*callback)(char* result, int exit_
 }
 
 static int cmd_version(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
-	printf("%d.%d.%d\n", VERSION_MAJOR, VERSION_MINOR, VERSION_MICRO);
+	printf("%d.%d.%d-%s\n", VERSION_MAJOR, VERSION_MINOR, VERSION_MICRO, VERSION_TAG);
 	
 	return 0;
 }
@@ -690,7 +690,7 @@ void shell_callback(int code) {
 }
 
 void shell_init() {
-	printf("\nPacketNgin ver %d.%d.%d\n", VERSION_MAJOR, VERSION_MINOR, VERSION_MICRO);
+	printf("\nPacketNgin ver %d.%d.%d-%s\n", VERSION_MAJOR, VERSION_MINOR, VERSION_MICRO, VERSION_TAG);
 	printf("# ");
 	
 	extern Device* device_stdin;
