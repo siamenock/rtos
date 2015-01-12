@@ -202,6 +202,11 @@ static void icc_stop(ICC_Message* msg) {
 	task_destroy(1);
 }
 
+static void cmd_callback(char* result, int exit_status) {
+	cmd_update_var(result, exit_status);
+	printf("%s\n", result);
+}
+
 static void exec(char* name) {
 	uint32_t len;
 	char* end = rootfs_file(name, &len);
@@ -219,11 +224,9 @@ static void exec(char* name) {
 			memcpy(line, head, line_len);
 			line[line_len] = '\0';
 			printf("%s\n", line);
-			int ret = cmd_exec(line);
-			if(ret != 0 && ret != CMD_STATUS_ASYNC_CALL) {
-				printf("Error : Command return %d : Stop parsing %s\n", ret, name);
+			int ret = cmd_exec(line, cmd_callback);
+			if(ret != 0)
 				return false;
-			}
 		} else {
 			printf("Command line is too long %d > %d\n", line_len, CMD_SIZE);
 			return false;

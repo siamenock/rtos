@@ -14,7 +14,7 @@ smap: src/smap.c
 	gcc $(CFLAGS) -o $@ $<
 
 console: src/console.c
-	gcc $(CFLAGS) -Wno-unused-variable -o $@ $^ ../lib/libcore_linux.a -lcurl
+	gcc $(CFLAGS) -Wno-unused-variable -o $@ $^ ../lib/libcore_linux.a -lcurl -DLINUX
 	cp console ../sdk/bin/
 
 clean:

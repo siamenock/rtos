@@ -1,67 +1,109 @@
 #include <stdio.h>
-#include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
+#include <malloc.h>
 #include <time.h>
 #include <fcntl.h>
-#include <curl/curl.h>
-#include <sys/types.h>
-#include <sys/mman.h>
-#include <signal.h>
+#include <sys/time.h>
 #include <util/list.h>
 #include <util/cmd.h>
 #include <util/types.h>
-#include <errno.h>
-#include <control/control.h>
+#include <control/rpc.h>
+#include <control/vmspec.h>
 
 #define VERSION		"0.1.0"
 #define DEFAULT_HOST	"192.168.100.254"
 #define DEFAULT_PORT	111
-#define MAX_LINE_SIZE 2048
+#define MAX_LINE_SIZE	2048
 
+#define ERROR_RPC_DISCONNECTED	-10000
+#define ERROR_CMD_EXECUTE	-10001
+#define ERROR_MALLOC_NULL	-10002
+
+#define END_OF_FILE -1
+
+static RPC* rpc;
+static bool sync_status = true;
 static bool is_continue = true;
 
-static int cmd_exit(int argc, char** argv) {
+static int cmd_exit(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	is_continue = false;
 
 	return 0;
 }
 
-static int cmd_echo(int argc, char** argv) {
+static int cmd_echo(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	int pos = 0;
 
 	for(int i = 1; i < argc; i++) {
 		pos += sprintf(cmd_result + pos, "%s", argv[i]);
-		if(i + 1 < argc) {
+		if(i + 1 < argc)
 			cmd_result[pos++] = ' ';
-		}
 	}
+
+	callback(cmd_result, 0);
 
 	return 0;
 }
 
-static int cmd_sleep(int argc, char** argv) {
+static int cmd_sleep(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	uint32_t time = 1;
-	if(argc >= 2 && is_uint32(argv[1])) {
+
+	if(argc >= 2 && is_uint32(argv[1]))
 		time = parse_uint32(argv[1]);
-	}
+
 	sleep(time);
 
 	return 0;
 }
 
-static void connected(bool result) {
-	if(result)
-		sprintf(cmd_result, "Connect success");
-	else
-		sprintf(cmd_result, "Connect fail");
+static void stdio_handler(RPC* rpc, uint32_t id, uint8_t thread_id, int fd, char* str, uint16_t size, void* context, void(*callback)(RPC* rpc, uint16_t size)) {
+	static uint32_t current_id = -1;
+	static uint8_t current_thread_id = -1;
+
+	if(!(current_id == id && current_thread_id == thread_id)) {
+		current_id = id;
+		current_thread_id = thread_id;
+		printf( "***** vmid=%d thread=%d standard %s *****\n", current_id, current_thread_id, fd == 1 ? "Output" : "Error");
+		fflush(stdout);
+	}
+
+	size = write(0, str, size);
+	fflush(stdout);
+	
+	callback(rpc, size);
 }
 
-static void disconnected(void) {
-	sprintf(cmd_result, "Disconnected");
+typedef struct {
+	uint16_t count;
+	uint64_t current;
+} HelloContext;
+
+static bool callback_hello(void* context) {
+	HelloContext* context_hello = context;
+
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	uint64_t current = tv.tv_sec * 1000 * 1000 + tv.tv_usec;
+
+	printf("Ping PacketNgin time = %0.3f ms\n", (float)(current - context_hello->current) / (float)1000);
+	context_hello->current = current;
+
+	context_hello->count--;
+
+	if(context_hello->count == 0) {
+		free(context_hello);
+		sync_status = true;
+
+		return false;
+	}
+
+	rpc_hello(rpc, callback_hello, context_hello);
+	
+	return true;
 }
 
-static int cmd_connect(int argc, char** argv) {
+static int cmd_connect(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	char* host = DEFAULT_HOST;
 	int port = DEFAULT_PORT;
 	
@@ -71,50 +113,82 @@ static int cmd_connect(int argc, char** argv) {
 	if(argc >= 3 && is_uint16(argv[2]))
 		port = parse_uint16(argv[2]);
 	
-	bool ret = ctrl_connect(host, port, connected, disconnected);
-	if(ret == false)
-		return errno;
-	else
-		return 0;
-}
-
-void callback_ping(int count, clock_t delay) {
-	if(delay != -1)
-		printf("%d : time %ld ms\n", count, delay);
-	else
-		printf("%d : time out\n", count);
-}
-
-static int cmd_ping(int argc, char** argv) {
-	int count = 1;
-	if(argc >= 2 && is_uint64(argv[1])) {
-		count = parse_uint64(argv[1]);
+	if(rpc) {
+		rpc->close(rpc);
+		rpc = NULL;
 	}
+
+	rpc = rpc_open(host, port, 3);
+	if(rpc == NULL)
+		return ERROR_RPC_DISCONNECTED;
+
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	HelloContext* context_hello = malloc(sizeof(HelloContext));
+	if(context_hello == NULL)
+		return ERROR_MALLOC_NULL;
 	
-	bool ret = ctrl_ping(count, callback_ping);
-	if(ret == false)
-		return errno;
-	else
-		return 0;
+	context_hello->count = 1;
+	context_hello->current = tv.tv_sec * 1000 * 1000 + tv.tv_usec;
+
+	rpc_hello(rpc, callback_hello, context_hello);
+
+	rpc_stdio_handler(rpc, stdio_handler, NULL);
+	sync_status = false;
+
+	return 0;
 }
 
-static void callback_vm_create(uint64_t vmid) {
-	if(vmid == 0)
-		sprintf(cmd_result, "fail");
-	else
-		sprintf(cmd_result, "%ld", vmid);
+static int cmd_ping(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	if(rpc == NULL)
+		return ERROR_RPC_DISCONNECTED;
+
+	uint16_t count = 1;
+	if(argc >= 2 && is_uint16(argv[1])) {
+		count = parse_uint16(argv[1]);
+	}
+
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+
+	HelloContext* context_hello = malloc(sizeof(HelloContext));
+	if(context_hello == NULL)
+		return ERROR_MALLOC_NULL;
+
+	context_hello->current = tv.tv_sec * 1000 * 1000 + tv.tv_usec;
+	context_hello->count = count;
+
+	rpc_hello(rpc, callback_hello, context_hello);
+
+	return 0;
 }
 
-static int cmd_vm_create(int argc, char** argv) {
+static int cmd_vm_create(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	bool callback_vm_create(uint32_t id, void* context) {
+		void(*callback)(char* result, int exit_status) = context;
+
+		if(id == 0)
+			callback("fail", -1);
+		else {
+			sprintf(cmd_result, "%d", id);
+			callback(cmd_result, 0);
+		}
+
+		return false;
+	}
+
+	if(rpc == NULL)
+		return ERROR_RPC_DISCONNECTED;
+
 	VMSpec vm;
 	vm.core_size = 1;
 	vm.memory_size = 0x1000000;	// 16MB
 	vm.storage_size = 0x1000000;	// 16MB
-	vm.nic_size = 0;
-	NICSpec nics[PN_MAX_NIC_COUNT];
+	vm.nic_count = 0;
+	NICSpec nics[VM_MAX_NIC_COUNT];
 	vm.nics = nics;
 	vm.argc = 0;
-	char* _args[32];
+	char* _args[VM_MAX_ARGC];
 	vm.argv = _args;
 	
 	for(int i = 1; i < argc; i++) {
@@ -145,8 +219,8 @@ static int cmd_vm_create(int argc, char** argv) {
 		} else if(strcmp(argv[i], "nic:") == 0) {
 			i++;
 			
-			NICSpec* nic = &vm.nics[vm.nic_size];
-			vm.nic_size++;
+			NICSpec* nic = &vm.nics[vm.nic_count];
+			vm.nic_count++;
 			
 			for( ; i < argc; i++) {
 				if(strcmp(argv[i], "mac:") == 0) {
@@ -210,186 +284,419 @@ static int cmd_vm_create(int argc, char** argv) {
 		}
 	}
 	
-	bool ret = ctrl_vm_create(&vm, callback_vm_create);
-	if(ret == false)
-		return errno;
-	else
-		return 0;
+	rpc_vm_create(rpc, &vm, callback_vm_create, callback);
+	sync_status = false;
+	
+	return 0;
 }
 
-static void callback_vm_delete(uint64_t vmid, bool result) {
-	sprintf(cmd_result, "Machine %ld delete %s", vmid, result ? "success" : "fail");
-}
+static int cmd_vm_delete(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	bool callback_vm_delete(bool result, void* context) {
+		void(*callback)(char* result, int exit_status) = context;
 
-static int cmd_vm_delete(int argc, char** argv) {
-	if(argc < 1) {
+		if(result)
+			callback("true", 0);
+		else
+			callback("false", -1);
+
+		return false;
+	}
+
+	if(rpc == NULL)
+		return ERROR_RPC_DISCONNECTED;
+
+	if(argc < 2)
 		return CMD_STATUS_WRONG_NUMBER;
-	}
 	
-	if(!is_uint64(argv[1])) {
+	if(!is_uint32(argv[1]))
 		return 1;
-	}
 	
-	uint64_t vmid = parse_uint64(argv[1]);
+	uint32_t vmid = parse_uint32(argv[1]);
 
-	bool ret = ctrl_vm_delete(vmid, callback_vm_delete);
-	if(ret == false)
-		return errno;
-	else
-		return 0;
+	rpc_vm_delete(rpc, vmid, callback_vm_delete, callback);
+	sync_status = false;
+
+	return 0;
 }
 
-static void callback_vm_list(uint64_t* vmids, int count) {
-	int pos = 0;
+static int cmd_vm_list(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	bool callback_vm_list(uint32_t* ids, uint16_t count, void* context) {
+		void(*callback)(char* result, int exit_status) = context;
 
-	for(int i = 0 ; i < count; i++) {
-		pos += sprintf(cmd_result + pos, "%ld ", vmids[i]);
+		int pos = 0;
+		for(int i = 0 ; i < count; i++)
+			pos += sprintf(cmd_result + pos, "%d ", ids[i]);
+
+		callback(cmd_result, 0);
+
+		return false;
 	}
-}
 
-static int cmd_vm_list(int argc, char** argv) {
-	bool ret = ctrl_vm_list(callback_vm_list);
-	if(ret == false)
-		return errno;
-	else
-		return 0;
+	if(rpc == NULL)
+		return ERROR_RPC_DISCONNECTED;
+
+	rpc_vm_list(rpc, callback_vm_list, callback);
+	sync_status = false; 
+	return 0;
 }	
 
-void progress(uint64_t vmid, uint32_t progress, uint32_t total) {
-	static bool state;
-	if(total == 0) {
-		state = true;
-		return;
-	}
+//size's size & success or fail
+typedef struct {
+	char path[256];
+	int fd;
+	uint32_t file_size;
+	uint32_t offset;
+	uint64_t current_time;
+	void(*callback)(char* result, int eixt_status);
+} FileInfo;
 
-	if(state == true) {
-		printf("\rprogress : %d total : %d => Machine %ld", progress, total, vmid);
-		if(total == progress) {
-			printf("\nCompleted\n");
-			state = false;
+static int cmd_upload(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	int32_t callback_storage_upload(uint32_t offset, void** buf, int32_t size, void* context) {
+		FileInfo* file_info = context;
+		static uint8_t ubuf[2048];
+		
+		if(size < 0) {
+			printf("Storage Upload Error\n");
+			fflush(stdout);
+
+			close(file_info->fd);
+			file_info->callback("false", -1);
+			free(file_info);
+
+			return 0;
 		}
-		return;
-	}
-}
 
-static int cmd_send(int argc, char** argv) {
-	if(argc < 3) {
+		if(size == 0) {
+			printf("\nStorage Upload Completed\n");
+			fflush(stdout);
+
+			struct timeval tv;
+			gettimeofday(&tv, NULL);
+			uint64_t current = tv.tv_sec * 1000 * 1000 + tv.tv_usec;
+			printf("time = %0.3f ms\n", (float)(current - file_info->current_time) / (float)1000);
+
+			close(file_info->fd);
+			file_info->callback("true", 0);
+			free(file_info);
+
+			return 0;
+		}
+
+		if(offset == 0) {
+			printf("Total Size : %d Byte\n", file_info->file_size);
+		}
+		
+		if(file_info->offset != offset) {
+			lseek(file_info->fd, offset, SEEK_SET);
+			file_info->offset = offset;
+		}
+		
+		size = read(file_info->fd, ubuf, size);
+
+		if(size < 0) {
+			printf("\nFile Read Error\n");
+			fflush(stdout);
+			buf = NULL;
+
+			return -1;
+		}
+
+		file_info->offset += size;
+		*buf = ubuf;
+		
+		printf(".");
+		fflush(stdout);
+
+		return size;
+	}
+
+	if(rpc == NULL)
+		return ERROR_RPC_DISCONNECTED;
+
+	if(argc < 3)
 		return CMD_STATUS_WRONG_NUMBER;
-	}
 	
-	if(!is_uint64(argv[1])) {
-		return 1;
-	}
-	uint64_t vmid = parse_uint64(argv[1]);
+	if(!is_uint32(argv[1]))
+		return -1;
 
-	bool ret = ctrl_storage_upload(vmid, argv[2], progress);
-	if(ret == false)
-		return errno;
-	else
-		return 0;
+	if(strlen(argv[2]) >= 256)
+		return -2;
+
+	uint32_t vmid = parse_uint32(argv[1]);
+	
+	FileInfo* file_info = malloc(sizeof(FileInfo));
+	if(file_info == NULL) {
+		return ERROR_MALLOC_NULL;
+	}
+
+	file_info->fd = open(argv[2], O_RDONLY);
+
+	if(file_info->fd < 0) {
+		free(file_info);
+
+		return -2;
+	}
+
+	file_info->file_size = lseek(file_info->fd, 0, SEEK_END);
+	lseek(file_info->fd, 0, SEEK_SET);
+	file_info->offset = 0;
+	file_info->callback = callback;
+
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	file_info->current_time = tv.tv_sec * 1000 * 1000 + tv.tv_usec;
+
+	rpc_storage_upload(rpc, vmid, callback_storage_upload, file_info);
+	sync_status = false;
+
+	return 0;
 }
 
-void callback_md5(uint64_t vmid, uint32_t _md5[4]) {
-	uint8_t md5[16];
-	int pos = 0;
-	memcpy(md5, _md5, 16);
-	for(int i = 0; i < 16; i++) {
-		pos += sprintf(cmd_result + pos, "%2x", md5[i]);
-	}
-}
+static int cmd_download(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	int callback_storage_download(uint32_t offset, void* buf, int32_t size, void* context) {
+		FileInfo* file_info = context;
 
-static int cmd_md5(int argc, char** argv) {
-	if(argc < 3) {
+		if(size < 0) {
+			printf("Storage Download Error\n");
+			close(file_info->fd);
+			file_info->callback("false", -1);
+			remove(file_info->path);
+			free(file_info);
+			return 0;
+		}
+
+		if(file_info->offset != offset) {
+			lseek(file_info->fd, offset, SEEK_SET);
+			file_info->offset = offset;
+		}
+
+		size = write(file_info->fd, buf, size);
+
+		if(size < 0) {
+			printf("Write Error!\n");
+			close(file_info->fd);
+			file_info->callback("false", -1);
+			remove(file_info->path);
+			free(file_info);
+			return 0;
+		}
+
+		if(size == 0) {
+			printf("\nStorage Upload Completed\n");
+			printf("Total Size : %d Byte\n", file_info->file_size);
+			close(file_info->fd);
+
+			struct timeval tv;
+			gettimeofday(&tv, NULL);
+			uint64_t current = tv.tv_sec * 1000 * 1000 + tv.tv_usec;
+			printf("time = %0.3f ms\n", (float)(current - file_info->current_time) / (float)1000);
+
+			file_info->callback("true", 0);
+			free(file_info);
+
+			return 0;
+		}
+
+		file_info->offset += size;
+
+		printf(".");
+		fflush(stdout);
+
+		return size;
+	}
+
+	if(rpc == NULL)
+		return ERROR_RPC_DISCONNECTED;
+
+	if(argc < 3)
 		return CMD_STATUS_WRONG_NUMBER;
-	}
 	
-	if(!is_uint64(argv[1])) {
-		return 1;
-	}
+	if(!is_uint32(argv[1]))
+		return -1;
+
+	if(strlen(argv[2]) >= 256)
+		return -2;
+
+	uint32_t vmid = parse_uint32(argv[1]);
 	
-	if(!is_uint64(argv[2])) {
-		return 2;
+	FileInfo* file_info = (FileInfo*)malloc(sizeof(FileInfo));;
+	if(file_info == NULL) {
+		return ERROR_MALLOC_NULL;
 	}
 
-	uint64_t vmid = parse_uint64(argv[1]);
+	file_info->fd = open(argv[2], O_WRONLY | O_CREAT | O_TRUNC, 0755);
+	
+	if(file_info->fd < 0) {
+		free(file_info);
+		return -2;
+	}
+
+	strcpy(file_info->path, argv[2]);
+	file_info->file_size = 0;
+	lseek(file_info->fd, 0, SEEK_SET);
+	file_info->offset = 0;
+	file_info->callback = callback;
+
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	file_info->current_time = tv.tv_sec * 1000 * 1000 + tv.tv_usec;
+	
+	rpc_storage_download(rpc, vmid, callback_storage_download, file_info);
+	sync_status = false;
+
+	return 0;
+}
+
+static int cmd_md5(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	/*
+	void callback_md5(uint64_t vmid, uint32_t _md5[4]) {
+		uint8_t md5[16];
+		int pos = 0;
+		memcpy(md5, _md5, 16);
+		for(int i = 0; i < 16; i++) {
+			pos += sprintf(cmd_result + pos, "%2x", md5[i]);
+		}
+	}
+	*/
+	if(rpc == NULL)
+		return ERROR_RPC_DISCONNECTED;
+
+	if(argc < 3)
+		return CMD_STATUS_WRONG_NUMBER;
+	
+	if(!is_uint32(argv[1]))
+		return -1;
+	
+	if(!is_uint64(argv[2]))
+		return -2;
+
+	/*
+	uint32_t vmid = parse_uint32(argv[1]);
 	uint64_t size = parse_uint64(argv[2]);
 	bool ret = ctrl_storage_md5(vmid, size, callback_md5);
 
 	if(ret == false)
 		return errno;
 	else
-		return 0;
+	*/
+	sync_status = false;
+
+	return 0;
 }
 
-static void callback_status_set(uint64_t vmid, int status) {
-	if(status == VM_STATUS_INVALID)
-		sprintf(cmd_result, "Machine %ld status set fail", vmid);
-	else if(status == VM_STATUS_STOP){
-		sprintf(cmd_result, "Machine %ld : stop", vmid);
-	} else if(status == VM_STATUS_PAUSE) {
-		sprintf(cmd_result, "Machine %ld : pause", vmid);
-	} else if(status == VM_STATUS_RESUME) {
-		sprintf(cmd_result, "Machine %ld : resume", vmid);
-	} else if(status == VM_STATUS_START) {
-		sprintf(cmd_result, "Machine %ld : start", vmid);
+static int cmd_status_set(int argc, char** argv, void(callback)(char* result, int exit_status)) {
+	bool callback_status_set(bool result, void* context) {
+		void(*callback)(char* result, int exit_status) = context;
+
+		if(result) {
+			callback("true", 0);
+		} else {
+			callback("false", -1);
+		}
+
+		return false;
 	}
-}
 
-static int cmd_status_set(int argc, char** argv) {
+	if(rpc == NULL) {
+		return ERROR_RPC_DISCONNECTED;
+	}
+
 	if(argc < 2) {
 		return CMD_STATUS_WRONG_NUMBER;
 	}
 	
-	if(!is_uint64(argv[1])) {
-		return 1;
+	if(!is_uint32(argv[1])) {
+		return -1;
 	}
 	
-	uint64_t vmid = parse_uint64(argv[1]);
-	int status = VM_STATUS_STOP;
+	uint32_t vmid = parse_uint32(argv[1]);
+	VMStatus vmstatus;
 
-	if(strcmp(argv[0], "start") == 0) {
-		status = VM_STATUS_START;
-	} else if(strcmp(argv[0], "pause") == 0) {
-		status = VM_STATUS_PAUSE;
-	} else if(strcmp(argv[0], "resume") == 0) {
-		status = VM_STATUS_RESUME;
-	} else if(strcmp(argv[0], "stop") == 0) {
-		status = VM_STATUS_STOP;
-	}
-	
-	bool ret = ctrl_status_set(vmid, status, callback_status_set);
-	if(ret == false)
-		return errno;
+	if(strcmp(argv[0], "start") == 0)
+		vmstatus = VM_STATUS_START;
+	else if(strcmp(argv[0], "pause") == 0)
+		vmstatus = VM_STATUS_PAUSE;
+	else if(strcmp(argv[0], "resume") == 0)
+		vmstatus = VM_STATUS_RESUME;
+	else if(strcmp(argv[0], "stop") == 0)
+		vmstatus = VM_STATUS_STOP;
 	else
-		return 0;
+		return -1;
+	
+	rpc_status_set(rpc, vmid, vmstatus, callback_status_set, callback);
+	sync_status = false;
+
+	return 0;
 }
 
-static void callback_status_get(uint64_t vmid, int status) {
-	if(status == VM_STATUS_STOP){
-		sprintf(cmd_result, "Machine %ld : stop", vmid);
-	} else if(status == VM_STATUS_PAUSE) {
-		sprintf(cmd_result, "Machine %ld : pause", vmid);
-	} else if(status == VM_STATUS_START) {
-		sprintf(cmd_result, "Machine %ld : start", vmid);
+
+static int cmd_status_get(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	bool callback_status_get(VMStatus status, void* context) {
+		void(*callback)(char* result, int exit_status) = context;
+
+		if(status == VM_STATUS_STOP)
+			callback("stop", 0);
+		else if(status == VM_STATUS_PAUSE)
+			callback("pause", 0);
+		else if(status == VM_STATUS_START)
+			callback("start", 0);
+		else if(status == VM_STATUS_RESUME)
+			callback("resume", 0);
+		else if(status == VM_STATUS_INVALID)
+			callback("invalid", -1);
+
+		return false;
 	}
-}
 
-static int cmd_status_get(int argc, char** argv) {
-	if(argc < 2) {
+	if(rpc == NULL)
+		return ERROR_RPC_DISCONNECTED;
+
+	if(argc < 2)
 		return CMD_STATUS_WRONG_NUMBER;
+	
+	if(!is_uint32(argv[1]))
+		return -1;
+	
+	uint32_t vmid = parse_uint32(argv[1]);
+	
+	rpc_status_get(rpc, vmid, callback_status_get, callback);
+	sync_status = false;
+
+	return 0;
+}
+
+static int cmd_stdin(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	bool callback_stdin(uint16_t written, void* context) {
+		void(*callback)(char* result, int exit_status) = context;
+
+		if(written == 0)
+			callback("false", -1);
+		else
+			callback("true", 0);
+
+		return false;
 	}
+
+	if(rpc == NULL)
+		return ERROR_RPC_DISCONNECTED;
+
+	if(argc < 4)
+		return CMD_STATUS_WRONG_NUMBER;
 	
-	if(!is_uint64(argv[1])) {
-		return 1;
-	}
+	if(!is_uint32(argv[1]))
+		return -1;
 	
-	uint64_t vmid = parse_uint64(argv[1]);
-	
-	bool ret = ctrl_status_get(vmid, callback_status_get);
-	if(ret == false)
-		return errno;
-	else
-		return 0;
+	if(!is_uint8(argv[2]))
+		return -2;
+
+	uint32_t vmid = parse_uint32(argv[1]);
+	uint8_t thread_id = parse_uint8(argv[2]);
+	uint16_t length = strlen(argv[3]);
+
+	rpc_stdio(rpc, vmid, thread_id, 0, argv[3], length, callback_stdin, callback);
+	sync_status = false;
+
+	return 0;
 }
 
 Command commands[] = {
@@ -417,80 +724,94 @@ Command commands[] = {
 	{
 		.name = "sleep",
 		.desc = "Sleep n seconds",
-		.args = "[time: uint32]",
+		.args = "time: uint32",
 		.func = cmd_sleep
 	},
 	{
 		.name = "connect",
 		.desc = "Connect to the host",
-		.args = "[ (host: string) [port: uint16] ]",
+		.args = "host: string port: uint16",
 		.func = cmd_connect
 	},
 	{
 		.name = "ping",
 		.desc = "RPC ping to host",
-		.args = "[count: uint64]",
+		.args = "count: uint16",
 		.func = cmd_ping
 	},
 	{
 		.name = "create",
 		.desc = "Create VM",
-		.args = "vmid: uint64, core: (number: int) memory: (size: uint32) storage: (size: uint32) [nic: mac: (addr: uint64) port: (num: uint32) ibuf: (size: uint32) obuf: (size: uint32) iband: (size: uint64) oband: (size: uint64) pool: (size: uint32)]* [args: [string]+ ]",
+		.args = "vmid: uint32, core: uint8 memory: uint32 storage: uint32 "
+			"[nic: mac: uint64 port: uint32 ibuf: uint32 obuf: uint32 "
+			"iband: uint64 oband: uint64 pool: uint32]* [args: [string]+ ]",
 		.func = cmd_vm_create
 	},
 	{
 		.name = "delete",
 		.desc = "Delete VM",
-		.args = "result: bool, vmid: uint64",
+		.args = "result: bool, vmid: uint32",
 		.func = cmd_vm_delete
 	},
 	{
 		.name = "list",
 		.desc = "List VM",
-		.args = "result: uint64[]",
+		.args = "result: uint32[]",
 		.func = cmd_vm_list
 	},
 	{
-		.name = "send",
-		.desc = "Send file",
-		.args = "result: bool, vmid: uint64 path: string",
-		.func = cmd_send
+		.name = "upload",
+		.desc = "Upload file",
+		.args = "result: bool, vmid: uint32 path: string",
+		.func = cmd_upload
+	},
+	{
+		.name = "download",
+		.desc = "Download file",
+		.args = "result: bool, vmid: uint32 path: string",
+		.func = cmd_download
 	},
 	{
 		.name = "md5",
 		.desc = "MD5 storage",
-		.args = "result: hex16 string, vmid: uint64 size: uint64",
+		.args = "result: hex16 string, vmid: uint32 size: uint64",
 		.func = cmd_md5
 	},
 	{
 		.name = "start",
 		.desc = "Start VM",
-		.args = "result: bool, vmid: uint64",
+		.args = "result: bool, vmid: uint32",
 		.func = cmd_status_set
 	},
 	{
 		.name = "pause",
 		.desc = "Pause VM",
-		.args = "result: bool, vmid: uint64",
+		.args = "result: bool, vmid: uint32",
 		.func = cmd_status_set
 	},
 	{
 		.name = "resume",
 		.desc = "Resume VM",
-		.args = "result: bool, vmid: uint64",
+		.args = "result: bool, vmid: uint32",
 		.func = cmd_status_set
 	},
 	{
 		.name = "stop",
 		.desc = "Stop VM",
-		.args = "result: bool, vmid: uint64",
+		.args = "result: bool, vmid: uint32",
 		.func = cmd_status_set
 	},
 	{
 		.name = "status",
 		.desc = "Get VM's status",
-		.args = "result: string(\"start\", \"pause\", or \"stop\") vmid: uint64",
+		.args = "result: string(\"start\", \"pause\", or \"stop\") vmid: uint32",
 		.func = cmd_status_get
+	},
+	{
+		.name = "stdin",
+		.desc = "Send Standard Input Message",
+		.args = "vmid: uint32 threadid: uint8 message: string",
+		.func = cmd_stdin
 	},
 	{
 		.name = NULL
@@ -502,23 +823,51 @@ size_t cmd_count = sizeof(commands) / sizeof(Command);
 int main(int _argc, char** _argv) {
 	cmd_init();
 
+	void cmd_callback(char* result, int exit_status) {
+		cmd_update_var(result, exit_status);
+
+		printf("%s\n", result);
+		fflush(stdout);
+
+		sync_status = true;
+	}
+
 	int execute_cmd(char* line, bool is_dump) {
 		//if is_dump == true then file cmd
 		//   is_dump == false then stdin cmd
 		if(is_dump == true)
 			printf("%s\n", line);
 		
-		int exit_status = cmd_exec(line);
+		int exit_status = cmd_exec(line, cmd_callback);
+
 		if(exit_status != 0) {
-			if(exit_status == CMD_STATUS_WRONG_NUMBER)
+			if(exit_status == CMD_STATUS_WRONG_NUMBER) {
 				printf("wrong number of arguments\n");
-			else if(exit_status == CMD_STATUS_NOT_FOUND)
-				printf("wrong name of command\n");
-			else if(exit_status < 0)
-				printf("Error Code : %d\n", exit_status);
-			else
-				printf("%d'std argument type wrong\n", exit_status);
+
+				return ERROR_CMD_EXECUTE;
+			} else if(exit_status == CMD_STATUS_NOT_FOUND) {
+				printf("Can not found command\n");
+
+				return ERROR_CMD_EXECUTE;
+			} else if(exit_status == CMD_VARIABLE_NOT_FOUND) {
+				printf("Variable not found\n");
+
+				return ERROR_CMD_EXECUTE;
+			} else if(exit_status == ERROR_MALLOC_NULL) {
+				printf("Can not Malloc\n");
+
+				return ERROR_MALLOC_NULL;
+			}else if(exit_status == ERROR_RPC_DISCONNECTED) {
+				printf("RPC Disconnected\n");
+
+				return ERROR_RPC_DISCONNECTED;
+			} else if(exit_status < 0) {
+				printf("Wrong value of argument : %d\n", -exit_status);
+
+				return ERROR_CMD_EXECUTE;
+			}
 		}
+
 		printf("> ");
 		fflush(stdout);
 
@@ -526,7 +875,7 @@ int main(int _argc, char** _argv) {
 	}
 	
 	List* fd_list = list_create(NULL);
-	
+
 	for(int i = 1; i < _argc; i++) {
 		int fd = open(_argv[i], O_RDONLY);
 		if(fd != -1) {
@@ -535,49 +884,51 @@ int main(int _argc, char** _argv) {
 	}
 
 	list_add(fd_list, STDIN_FILENO); //fd of stdin
-
-	void get_cmd_line(int fd) {
+	int get_cmd_line(int fd) {
 		static char line[MAX_LINE_SIZE] = {0, };
 		char* head;
 		int seek = 0;
 		static int eod = 0; //end of data
-
-		while((eod += read(fd, &line[eod], MAX_LINE_SIZE - eod))) {
+		
+		while(eod += read(fd, &line[eod], MAX_LINE_SIZE - eod)) {
 			head = line;
 			for(; seek < eod; seek++) {
-				if(line[seek] == '\n') {
+				if(line[seek] == '\n' || line[seek] == '\0') {
 					line[seek] = '\0';
 					int ret = execute_cmd(head, fd != STDIN_FILENO);
 
-					if(fd != STDIN_FILENO && ret != 0 && ret != CMD_STATUS_ASYNC_CALL) {//parsing file and return error code
-						printf("stop parsing file\n");
+					if(ret == 0) {
+						head = &line[seek] + 1;
+					} else {
 						eod = 0;
-						return;
+						return ret;
 					}
-					head = &line[seek] + 1;
+
+					if(sync_status == false) {
+						memmove(line, head, eod - (head - line));
+						eod -= head - line;
+						return 0;
+					}
 				}
 			}
+
 			if(head == line && eod == MAX_LINE_SIZE){ //not found '\n' and head == 0
 				printf("Command line is too long %d > %d\n", eod, MAX_LINE_SIZE);
 				eod = 0;
-				return;
+				return ERROR_CMD_EXECUTE;
 			} else { //not found '\n' and seek != 0
 				memmove(line, head, eod - (head - line));
 				eod -= head - line;
 				seek = eod;
-				if(fd == STDIN_FILENO) {
-					return;
-				} else
-					continue;
+			}
+
+			if(fd == STDIN_FILENO) {
+				return 0;
 			}
 		}
 
-		if(eod != 0) {
-			line[eod] = '\0';
-			execute_cmd(&line[0], fd != STDIN_FILENO);
-		}
 		eod = 0;
-		return;
+		return END_OF_FILE;
 	}
 
 	int retval;
@@ -596,28 +947,50 @@ int main(int _argc, char** _argv) {
 	while(is_continue) {
 		temp_in = in_put;
 		time.tv_sec = 0;
-		time.tv_usec = 10000;
+		time.tv_usec = 1000;
 
 		retval = select(fd + 1, &temp_in, 0, 0, &time);//add timer
 
 		if(retval == -1) {
-			printf("selector error \n");
 			return -1;
 		} else if(retval == 0) {
 			//select time over
 		} else {
-			if(FD_ISSET(fd, &temp_in) != 0) {
-				get_cmd_line(fd);
-				if(fd != STDIN_FILENO) { //Not stdin fd
-					FD_CLR(fd, &in_put);
-					close(fd);
-					fd = (int)(int64_t)list_remove_first(fd_list);
-					FD_SET(fd, &in_put);
+			if(sync_status == true) {
+				if(FD_ISSET(fd, &temp_in) != 0) {
+					int ret = get_cmd_line(fd);
+
+					if((fd != STDIN_FILENO) && (ret < 0)) {
+						FD_CLR(fd, &in_put);
+						close(fd);
+						fd = (int)(int64_t)list_remove_first(fd_list);
+						FD_SET(fd, &in_put);
+					}
+
+					if(sync_status == false) {
+						FD_CLR(fd, &in_put);
+						list_add_at(fd_list, 0, (void*)(int64_t)fd);
+						fd = -1;
+					}
 				}
 			}
 		}
-		ctrl_poll();
-	}
-	ctrl_disconnect();
+
+		if(rpc == NULL)
+			continue;
+
+		if(rpc_is_closed(rpc)) {
+			rpc = NULL;
+			continue;
+		}
+
+		rpc_loop(rpc);
+
+		if(sync_status == true && fd == -1) {
+			fd = (int)(int64_t)list_remove_first(fd_list);
+			FD_SET(fd, &in_put);
+		}
+	} 
+	
 	return 0;
 }
