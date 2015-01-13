@@ -75,4 +75,8 @@ void apic_write64(int reg, uint64_t v);
 
 #define apic_eoi()	apic_write32(APIC_REG_EOIR, 0)
 
+uint64_t apic_user_rip();
+uint64_t apic_user_rsp();
+uint64_t apic_user_return_code();
+
 #endif /* __APIC_H__ */

@@ -78,6 +78,7 @@ typedef struct {
 	List*		mmap;
 	List*		resources;
 	uint64_t	symbols[SYM_END];
+	uint64_t	stack;
 	
 	uint8_t		padding[0] __attribute__((aligned(16)));
 } Task;
@@ -144,7 +145,9 @@ void task_entry(uint32_t id, uint64_t entry) {
 }
 
 void task_stack(uint32_t id, uint64_t stack) {
-	tasks[id].cpu[CTX_RSP] = stack;
+	tasks[id].stack = stack;
+	((uint64_t*)(void*)stack)[-1] = 0x00;
+	tasks[id].cpu[CTX_RSP] = stack - 8;
  	tasks[id].cpu[CTX_RBP] = stack;
 }
 
@@ -322,6 +325,10 @@ void task_switch(uint32_t id) {
 
 bool task_is_active(uint32_t id) {
 	return tasks[id].mmap != NULL;
+}
+
+uint64_t task_get_stack(uint32_t id) {
+	return tasks[id].stack;
 }
 
 void task_dump(uint32_t id) {

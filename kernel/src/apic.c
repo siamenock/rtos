@@ -162,6 +162,21 @@ typedef struct {
 	uint64_t	ss;
 } __attribute__ ((packed)) Frame;
 
+uint64_t apic_user_rip() {
+	Frame* frame = (void*)(0xffffffff805b0000 - sizeof(Frame));
+	return frame->rip;
+}
+
+uint64_t apic_user_rsp() {
+	Frame* frame = (void*)(0xffffffff805b0000 - sizeof(Frame));
+	return frame->rsp;
+}
+
+uint64_t apic_user_return_code() {
+	Frame* frame = (void*)(0xffffffff805b0000 - sizeof(Frame));
+	return frame->rbx;
+}
+
 void apic_dump(uint64_t vector, uint64_t error_code) {
 	Frame* frame = (void*)(0xffffffff805b0000 - sizeof(Frame));
 	
@@ -175,6 +190,10 @@ void apic_dump(uint64_t vector, uint64_t error_code) {
 	
 	printf("\n");
 	uint64_t* p = (void*)frame->rsp;
+	for(int i = -20; i < 0; i += 4) {
+		printf("%016lx %016lx %016lx %016lx\n", p[i], p[i + 1], p[i + 2], p[i + 3]);
+	}
+	printf("----------------------------\n");
 	for(int i = 0; i < 40; i += 4) {
 		printf("%016lx %016lx %016lx %016lx\n", p[i], p[i + 1], p[i + 2], p[i + 3]);
 	}

@@ -45,6 +45,10 @@ typedef struct _ICC_Message {
 			size_t*	stderr_tail;
 			size_t	stderr_size;
 		} started;
+		
+		struct {
+			int return_code;
+		} stopped;
 	} data;
 } ICC_Message;
 

@@ -53,6 +53,7 @@ void task_destroy(uint32_t id);
 uint32_t task_id();
 void task_switch(uint32_t id);
 bool task_is_active(uint32_t id);
+uint64_t task_get_stack(uint32_t id);
 
 void task_dump(uint32_t id);
 

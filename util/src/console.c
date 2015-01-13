@@ -688,11 +688,12 @@ static int cmd_stdin(int argc, char** argv, void(*callback)(char* result, int ex
 	
 	if(!is_uint8(argv[2]))
 		return -2;
-
+	
 	uint32_t vmid = parse_uint32(argv[1]);
 	uint8_t thread_id = parse_uint8(argv[2]);
 	uint16_t length = strlen(argv[3]);
-
+	argv[3][length++] = '\0';
+	
 	rpc_stdio(rpc, vmid, thread_id, 0, argv[3], length, callback_stdin, callback);
 	sync_status = false;
 

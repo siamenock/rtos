@@ -99,13 +99,13 @@ int _open_r(struct _reent* r, const char *name, int flags, ...) {
 int _read_r(struct _reent* r, int file, char *ptr, int len) {
 	switch(file) {
 		case 0: // stdin
-			while(__stdin_head == __stdin_tail);
+			//while(__stdin_head == __stdin_tail);
 			return ring_read(__stdin, &__stdin_head, __stdin_tail, __stdin_size, ptr, len);
 		case 1: // stdout
-			while(__stdout_head == __stdout_tail);
+			//while(__stdout_head == __stdout_tail);
 			return ring_read(__stdout, &__stdout_head, __stdout_tail, __stdout_size, ptr, len);
 		case 2: // stderr
-			while(__stderr_head == __stderr_tail);
+			//while(__stderr_head == __stderr_tail);
 			return ring_read(__stderr, &__stderr_head, __stderr_tail, __stderr_size, ptr, len);
 		default:
 			return -1;
@@ -144,8 +144,10 @@ inline static uint64_t cpu_tsc() {
 	return time;
 }
 
+#define LINUX_CLOCKS_PER_SEC	1000000
+
 clock_t _times_r(struct _reent* r, struct tms *buf) {
-	clock_t time = (clock_t)(cpu_tsc() / (__cpu_frequency / CLOCKS_PER_SEC));
+	clock_t time = (clock_t)(cpu_tsc() / (__cpu_frequency / LINUX_CLOCKS_PER_SEC));
 	
 	if(buf) {
 		buf->tms_utime = time;
@@ -162,7 +164,7 @@ clock_t times(struct tms *buf) {
 }
 
 clock_t clock() {
-	return times(NULL);
+	return (clock_t)(cpu_tsc() / (__cpu_frequency / LINUX_CLOCKS_PER_SEC));
 }
 
 int _unlink_r(struct _reent* r, char *name) {
@@ -348,7 +350,6 @@ int _IO_putc(int ch, struct _IO_FILE* fp) {
 */
 
 // Ubuntu's libc compatible functions
-/*
 int __printf_chk (int flag, const char *fmt, ...) {
 	int ret;
 	va_list ap;
@@ -374,7 +375,6 @@ int __fprintf_chk(FILE* fp, int flag, const char* fmt, ...) {
 void* __memcpy_chk(void* dest, const void* src, size_t size, size_t bos) {
 	return memcpy(dest, src, size);
 }
-*/
 
 int __isoc99_scanf(const char *format, ...) {
 	int ret;

@@ -92,10 +92,11 @@ static void context_switch() {
 	APIC_Handler old_exception_handlers[32];
 	
 	void exception_handler(uint64_t vector, uint64_t err) {
-		printf("* User VM exception handler");
-		if(err != 0) {	// Err zero means, user vm termination
+		if(apic_user_rip() == 0 && apic_user_rsp() == task_get_stack(1)) {
+			// Do nothing
+		} else {
+			printf("* User VM exception handler");
 			apic_dump(vector, err);
-			while(1);
 			errno = err;
 		}
 		
@@ -130,8 +131,11 @@ static void context_switch() {
 	
 	ICC_Message* msg3 = icc_sending(is_paused ? ICC_TYPE_PAUSED : ICC_TYPE_STOPPED, 0);
 	msg3->result = errno;
-	icc_send(msg3);
+	if(!is_paused) {
+		msg3->data.stopped.return_code = apic_user_return_code();
+	}
 	errno = 0;
+	icc_send(msg3);
 	
 	printf("VM %s...\n", is_paused ? "paused" : "stopped");
 }

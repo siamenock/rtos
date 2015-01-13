@@ -18,6 +18,7 @@ static Map*	vms;
 typedef struct {
 	int			status;		// VM_STATUS_XXX
 	int			error_code;
+	int			return_code;
 	
 	VM*			vm;
 	
@@ -190,6 +191,8 @@ static void icc_stopped(ICC_Message* msg) {
 	VM* vm = cores[msg->core_id].vm;
 	
 	cores[msg->core_id].status = VM_STATUS_STOP;
+	cores[msg->core_id].error_code = msg->result;
+	cores[msg->core_id].return_code = msg->data.stopped.return_code;
 	
 	printf("Execution completed on core[%d].\n", msg->core_id);
 	
@@ -206,7 +209,7 @@ static void icc_stopped(ICC_Message* msg) {
 	
 	printf("VM stopped on cores[");
 	for(int i = 0; i < vm->core_size; i++) {
-		printf("%d", vm->cores[i]);
+		printf("%d(%d/%d)", vm->cores[i], cores[vm->cores[i]].error_code, cores[vm->cores[i]].return_code);
 		if(i + 1 < vm->core_size) {
 			printf(", ");
 		}
@@ -740,11 +743,11 @@ ssize_t vm_stdio(uint32_t vmid, int thread_id, int fd, const char* str, size_t s
 	
 	switch(fd) {
 		case 0:
-			return ring_write(core->stdin, *core->stdout_head, core->stdout_tail, core->stdout_size, str, size);
+			return ring_write(core->stdin, *core->stdin_head, core->stdin_tail, core->stdin_size, str, size);
 		case 1:
 			return ring_write(core->stdout, *core->stdout_head, core->stdout_tail, core->stdout_size, str, size);
 		case 2:
-			return ring_write(core->stderr, *core->stdout_head, core->stdout_tail, core->stdout_size, str, size);
+			return ring_write(core->stderr, *core->stderr_head, core->stderr_tail, core->stderr_size, str, size);
 		default:
 			return -1;
 	}

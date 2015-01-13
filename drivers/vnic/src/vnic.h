@@ -2,6 +2,7 @@
 #define __VNIC_H__
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #define VNIC_ID_TYPE_MAC	0
 #define VNIC_ID_TYPE_VLAN	1
