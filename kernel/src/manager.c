@@ -23,6 +23,7 @@
 #include "cpu.h"
 #include "shell.h"
 #include "vm.h"
+#include "stdio.h"
 
 #include "manager.h"
 
@@ -336,7 +337,7 @@ static void stdio_callback(uint32_t vmid, int thread_id, int fd, char* buffer, v
 		} else {
 			size_t len1 = size - *head;
 			size_t len2 = *tail;
-
+			
 			// TODO: check missed data (via callback);
 			rpc_stdio(rpc, vmid, thread_id, fd, buffer + *head, len1, NULL, NULL);
 			rpc_stdio(rpc, vmid, thread_id, fd, buffer, len2, NULL, NULL);

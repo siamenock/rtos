@@ -330,7 +330,7 @@ static bool vm_loop(void* context) {
 		size_t size = *(size_t*)MP_CORE(&__stdout_size, i);
 		
 		while(*head != *tail) {
-			stdio_callback(0, i, 1, buffer, head, tail, size);
+			stdio_dump(i, 1, buffer, head, tail, size);
 		}
 		
 		buffer = (char*)MP_CORE(__stderr, i);
@@ -339,7 +339,7 @@ static bool vm_loop(void* context) {
 		size = *(size_t*)MP_CORE(&__stderr_size, i);
 		
 		while(*head != *tail) {
-			stdio_callback(0, i, 2, buffer, head, tail, size);
+			stdio_dump(i, 2, buffer, head, tail, size);
 		}
 	}
 	

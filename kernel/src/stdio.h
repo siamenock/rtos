@@ -21,7 +21,7 @@ extern size_t __stderr_size;
 
 void stdio_init();
 void stdio_init2(void* buf, size_t size);
-bool stdio_event(void*);
+void stdio_dump(int coreno, int fd, char* buffer, volatile size_t* head, volatile size_t* tail, size_t size);
 
 void stdio_scancode(int code);
 int stdio_getchar();

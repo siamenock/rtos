@@ -61,7 +61,17 @@ void stdio_init2(void* buf, size_t size) {
 	((CharOut*)device_stdout->driver)->set_buffer(device_stdout->id, buf, size);
 }
 
-static void stdio_dump_ring(char* header, char* buffer, volatile size_t* head, volatile size_t tail, size_t size) {
+void stdio_dump(int coreno, int fd, char* buffer, volatile size_t* head, volatile size_t* tail, size_t size) {
+	#define HEX(v)	(((v) & 0x0f) > 9 ? ((v) & 0x0f) - 10 + 'a' : ((v) & 0x0f) + '0')
+	
+	if(*head == *tail)
+		return;
+	
+	char header[10] = "Core 01> ";
+	header[5] = HEX(coreno >> 4);
+	header[6] = HEX(coreno >> 0);
+	header[7] = '>';
+	
 	int header_len = strlen(header);
 	int body_len = 80 - header_len;
 	
@@ -106,8 +116,8 @@ static void stdio_dump_ring(char* header, char* buffer, volatile size_t* head, v
 	}
 	
 	char* h = buffer + *head;
-	char* e = buffer + tail;
-	if(*head > tail) {
+	char* e = buffer + *tail;
+	if(*head > *tail) {
 		h = dump_lines(h, buffer + size);
 		if(h) {
 			int len1 = buffer + size - h;
@@ -115,8 +125,8 @@ static void stdio_dump_ring(char* header, char* buffer, volatile size_t* head, v
 			write1(h, len1);
 			
 			int len2 = body_len - len1;
-			if(len2 > tail)
-				len2 = tail;
+			if(len2 > *tail)
+				len2 = *tail;
 			
 			char* t = strchrn(h, buffer + len2, '\n');
 			if(t) {
@@ -140,44 +150,7 @@ static void stdio_dump_ring(char* header, char* buffer, volatile size_t* head, v
 		write1("\n", 1);
 	}
 	
-	*head = tail;
-}
-
-bool stdio_event(void* data) {
-	#define HEX(v)	(((v) & 0x0f) > 9 ? ((v) & 0x0f) - 10 + 'a' : ((v) & 0x0f) + '0')
-	
-	char header[10] = "Core 01> ";
-	int count = mp_core_count();
-	
-	for(int i = 1; i < count; i++) {
-		char* buffer = (char*)MP_CORE(__stdout, i);
-		volatile size_t* head = (size_t*)MP_CORE(&__stdout_head, i);
-		volatile size_t tail = *(size_t*)MP_CORE(&__stdout_tail, i);
-		size_t size = *(size_t*)MP_CORE(&__stdout_size, i);
-		
-		if(*head != tail) {
-			header[5] = HEX(i >> 4);
-			header[6] = HEX(i >> 0);
-			header[7] = '>';
-			
-			stdio_dump_ring(header, buffer, head, tail, size);
-		}
-		
-		buffer = (char*)MP_CORE(__stderr, i);
-		head = (size_t*)MP_CORE(&__stderr_head, i);
-		tail = *(size_t*)MP_CORE(&__stderr_tail, i);
-		size = *(size_t*)MP_CORE(&__stderr_size, i);
-		
-		if(*head != tail) {
-			header[5] = HEX(i >> 4);
-			header[6] = HEX(i >> 0);
-			header[7] = '!';
-			
-			stdio_dump_ring(header, buffer, head, tail, size);
-		}
-	}
-	
-	return true;
+	*head = *tail;
 }
 
 // Ref: http://www.powerindex.net/U_convt/ascii/ascii.htm
