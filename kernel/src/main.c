@@ -383,14 +383,6 @@ void main(void) {
 		apic_register(49, icc_pause);
 		
 		event_idle_add(idle_event, NULL);
-		
-		bool tick(void* context) {
-			static int counter;
-			printf("[%d] Tick %d\n", mp_core_id(), counter++);
-			return true;
-		}
-		tick(NULL);
-		event_timer_add(tick, NULL, 10000000, 10000000);
 	}
 	
 	mp_sync();
