@@ -171,18 +171,22 @@ static void status_get_handler(RPC* rpc, uint32_t vmid, void* context, void(*cal
 static void status_set_handler(RPC* rpc, uint32_t vmid, VMStatus status, void* context, void(*callback)(RPC* rpc, bool result)) {
 	typedef struct {
 		RPC* rpc;
+		struct tcp_pcb*	pcb;
 		void(*callback)(RPC* rpc, bool result);
 	} Data;
 	
 	void status_setted(bool result, void* context) {
 		Data* data = context;
 		
-		data->callback(data->rpc, result);
+		if(list_index_of(clients, data->pcb, NULL) >= 0) {
+			data->callback(data->rpc, result);
+		}
 		free(data);
 	}
 	
 	Data* data = malloc(sizeof(Data));
 	data->rpc = rpc;
+	data->pcb = context;
 	data->callback = callback;
 	
 	vm_status_set(vmid, status, status_setted, data);
@@ -291,7 +295,7 @@ static err_t manager_accept(void* arg, struct tcp_pcb* pcb, err_t err) {
 	rpc_vm_delete_handler(rpc, vm_delete_handler, NULL);
 	rpc_vm_list_handler(rpc, vm_list_handler, NULL);
 	rpc_status_get_handler(rpc, status_get_handler, NULL);
-	rpc_status_set_handler(rpc, status_set_handler, NULL);
+	rpc_status_set_handler(rpc, status_set_handler, pcb);
 	rpc_storage_download_handler(rpc, storage_download_handler, NULL);
 	rpc_storage_upload_handler(rpc, storage_upload_handler, NULL);
 	rpc_stdio_handler(rpc, stdio_handler, NULL);
