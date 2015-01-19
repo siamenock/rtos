@@ -68,7 +68,7 @@ static void destroy(int id) {
 
 static void set_callback(int id, CharInCallback cb) {
 	callback = cb;
-	event_timer_add(event, NULL, 1, 1);
+	event_timer_add(event, NULL, 100000, 100000);
 }
 
 DeviceType keyboard_type = DEVICE_TYPE_CHAR_IN;
