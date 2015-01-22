@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <string.h>
 #include <util/event.h>
 #include "asm.h"
@@ -30,17 +31,15 @@ static bool icc_event(void* context) {
 static void icc(uint64_t vector, uint64_t err) {
 	icc_msg->status = ICC_STATUS_RECEIVED;
 	
-	if(icc_events[icc_msg->type]) {
+	if(icc_events[icc_msg->type])
 		is_event = true;
-	} else {
+	else
 		icc_msg->status = ICC_STATUS_DONE;
-	}
 	
 	apic_eoi();
-	
-	if(is_event && task_id() != 0) {
+
+	if(is_event && task_id() != 0)
 		icc_event(NULL);
-	}
 }
 
 void icc_init() {
@@ -72,23 +71,24 @@ uint32_t icc_send(ICC_Message* msg) {
 	msg->status = ICC_STATUS_SENT;
 	
 	uint64_t core_id = msg - shared->icc_messages;
-	while(1) {
-		apic_write64(APIC_REG_ICR, ((uint64_t)core_id << 56) |
-					APIC_DSH_NONE | 
-					APIC_TM_EDGE | 
-					APIC_LV_DEASSERT | 
-					APIC_DM_PHYSICAL | 
-					APIC_DMODE_FIXED |
-					(msg->type == ICC_TYPE_PAUSE ? 49 : 48));
-		
-		uint64_t time = cpu_tsc() + cpu_ms;
-		
-		while(cpu_tsc() < time) {
-			if(msg->status != ICC_STATUS_SENT) {
-				return msg->id;
-			}
+	apic_write64(APIC_REG_ICR, ((uint64_t)core_id << 56) |
+				APIC_DSH_NONE | 
+				APIC_TM_EDGE | 
+				APIC_LV_DEASSERT | 
+				APIC_DM_PHYSICAL | 
+				APIC_DMODE_FIXED |
+				(msg->type == ICC_TYPE_PAUSE ? 49 : 48));
+	
+	uint64_t time = cpu_tsc() + cpu_ms * 100;
+	
+	while(cpu_tsc() < time) {
+		if(msg->status != ICC_STATUS_SENT) {
+			return msg->id;
 		}
 	}
+	printf("BUG: ICC timeout: %d\n", msg->id);
+	
+	return 0;
 }
 
 void icc_register(uint8_t type, void(*event)(ICC_Message*)) {

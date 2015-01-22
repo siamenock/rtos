@@ -18,6 +18,7 @@ Driver port_device_driver = {
 };
 
 bool port_device_probe(PCI_Device* pci, char** name, void** data) {
+	/* TODO: disabled temporary
 	uint8_t type = pci_pcie_type(pci);
 	if(!pci->caps[PCI_CAP_ID_EXP] && 
 			(type != PCI_EXP_TYPE_ROOT_PORT &&
@@ -28,4 +29,6 @@ bool port_device_probe(PCI_Device* pci, char** name, void** data) {
 	pci_enable(pci);
 	
 	return true;
+	*/
+	return false;
 }
