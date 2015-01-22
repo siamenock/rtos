@@ -67,6 +67,8 @@ static void destroy(int id) {
 }
 
 static void set_callback(int id, CharInCallback cb) {
+	port_in8(0x60);	// Empty key buffer
+	
 	callback = cb;
 	event_timer_add(event, NULL, 100000, 100000);
 }
