@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "driver/pci.h"
-#include "driver/device.h"
+#include "device.h"
 
 #define PCI_VENDOR_ID			0x00
 #define PCI_DEVICE_ID			0x02
@@ -305,7 +305,9 @@
 #define PCIE_LINK_STATE_L1      2
 #define PCIE_LINK_STATE_CLKPM   4
 
-typedef struct _PCI_Device {
+typedef struct pci_dev {
+	Device		dev;	// for Linux compabibility
+	
 	char*		name;
 	
 	uint16_t	vendor_id;
