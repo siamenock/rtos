@@ -95,10 +95,9 @@ static err_t manager_recv(void* arg, struct tcp_pcb* pcb, struct pbuf* p, err_t 
 	} else {
 		RPCData* data = (RPCData*)rpc->data;
 		list_add(data->pbufs, p);
-		
+
 		rpc_loop(rpc);
 		tcp_recved(pcb, p->len);
-		
 		if(rpc_is_active(rpc)) {
 			if(list_index_of(actives, rpc, NULL) < 0) {
 				list_add(actives, rpc);
@@ -171,18 +170,22 @@ static void status_get_handler(RPC* rpc, uint32_t vmid, void* context, void(*cal
 static void status_set_handler(RPC* rpc, uint32_t vmid, VMStatus status, void* context, void(*callback)(RPC* rpc, bool result)) {
 	typedef struct {
 		RPC* rpc;
+		struct tcp_pcb*	pcb;
 		void(*callback)(RPC* rpc, bool result);
 	} Data;
 	
 	void status_setted(bool result, void* context) {
 		Data* data = context;
 		
-		data->callback(data->rpc, result);
+		if(list_index_of(clients, data->pcb, NULL) >= 0) {
+			data->callback(data->rpc, result);
+		}
 		free(data);
 	}
 	
 	Data* data = malloc(sizeof(Data));
 	data->rpc = rpc;
+	data->pcb = context;
 	data->callback = callback;
 	
 	vm_status_set(vmid, status, status_setted, data);
@@ -251,7 +254,7 @@ static int pcb_read(RPC* rpc, void* buf, int size) {
 			break;
 		}
 	}
-	
+
 	return idx;
 }
 
@@ -260,12 +263,17 @@ static int pcb_write(RPC* rpc, void* buf, int size) {
 	
 	int len = tcp_sndbuf(data->pcb);
 	len = len > size ? size : len;
-	
+
 	if(tcp_write(data->pcb, buf, len, TCP_WRITE_FLAG_COPY) != ERR_OK) {
 		errno = -1;
 		return -1;
 	}
-	
+
+	if(tcp_output(data->pcb) != ERR_OK) {
+		errno = -2;
+		return -1;
+	}
+
 	return len;
 }
 
@@ -291,7 +299,7 @@ static err_t manager_accept(void* arg, struct tcp_pcb* pcb, err_t err) {
 	rpc_vm_delete_handler(rpc, vm_delete_handler, NULL);
 	rpc_vm_list_handler(rpc, vm_list_handler, NULL);
 	rpc_status_get_handler(rpc, status_get_handler, NULL);
-	rpc_status_set_handler(rpc, status_set_handler, NULL);
+	rpc_status_set_handler(rpc, status_set_handler, pcb);
 	rpc_storage_download_handler(rpc, storage_download_handler, NULL);
 	rpc_storage_upload_handler(rpc, storage_upload_handler, NULL);
 	rpc_stdio_handler(rpc, stdio_handler, NULL);

@@ -317,9 +317,6 @@ typedef struct pci_dev {
 	uint8_t		slot;
 	uint8_t		function;
 	
-	uint32_t	ioaddr;
-	void*		membase;
-	
 	uint8_t		irq;
 	
 	uint8_t		caps[PCI_CAP_ID_MAX + 1];	// PCI capabilities

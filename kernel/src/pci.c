@@ -14,6 +14,9 @@
 
 #define INVALID_VENDOR		0xffff
 
+#define MMIO(bus, slot, function, reg)		(((uint64_t)bus << 20) | ((uint64_t)slot << 15) | ((uint64_t)function << 12) | ((uint64_t)reg))
+#define PORTIO(bus, slot, function, reg)	((1 << 31) | (bus << 16) | (slot << 11) | (function << 8) | (reg & 0xfc))
+
 void* pci_mmio[PCI_MAX_BUS];
 
 int pci_cache_line_size;
@@ -76,27 +79,6 @@ static void pci_analyze() {
 				device->bus = bus;
 				device->slot = slot;
 				device->function = function;
-				
-				// ioaddr, membase
-				for(int reg = PCI_BASE_ADDRESS_0; reg <= PCI_BASE_ADDRESS_5; reg += 4) {
-					uint32_t bar = pci_read32(device, reg);
-					
-					if(bar & PCI_BASE_ADDRESS_SPACE_IO) {
-						if(device->ioaddr == 0)
-							device->ioaddr = bar & PCI_BASE_ADDRESS_IO_MASK;
-					} else {
-						if(device->membase == NULL) {
-							if(bar & PCI_BASE_ADDRESS_MEM_TYPE_64) {
-								reg += 4;
-								uint32_t bar2 = pci_read32(device, reg);
-								device->membase = (void*)(((uint64_t)bar2 << 32) | ((uint64_t)(bar & PCI_BASE_ADDRESS_MEM_MASK)));
-							} else {
-								device->membase = (void*)(uint64_t)(bar & PCI_BASE_ADDRESS_MEM_MASK);
-							}
-						}
-					}
-				}
-				
 				device->irq = pci_read8(device, PCI_INTERRUPT_LINE);
 				
 				// capabilities
@@ -246,14 +228,11 @@ uint8_t pci_read8(PCI_Device* device, uint32_t reg) {
 static uint8_t _pci_read8(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, bool is_pcix) {
 	void* mmio = pci_mmio[bus];
 	if(is_pcix && mmio) {
-		mmio +=	((uint64_t)bus << 20) |
-			((uint64_t)slot << 15) |
-			((uint64_t)function << 12) |
-			((uint64_t)reg << 2);
+		mmio +=	MMIO(bus, slot, function, reg);
 		
 		return *(uint8_t*)mmio;
 	} else {
-		port_out32(PCI_CONFIG_ADDRESS, (1 << 31) | (bus << 16) | (slot << 11) | (function << 8) | (reg & 0xfc));
+		port_out32(PCI_CONFIG_ADDRESS, PORTIO(bus, slot, function, reg));
 		return port_in8(PCI_CONFIG_DATA + (reg & 3));
 	}
 }
@@ -265,14 +244,11 @@ void pci_write8(PCI_Device* device, uint32_t reg, uint8_t data) {
 static void _pci_write8(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, uint8_t data, bool is_pcix) {
 	void* mmio = pci_mmio[bus];
 	if(is_pcix && mmio) {
-		mmio +=	((uint64_t)bus << 20) |
-			((uint64_t)slot << 15) |
-			((uint64_t)function << 12) |
-			((uint64_t)reg << 2);
+		mmio +=	MMIO(bus, slot, function, reg);
 		
 		*(uint8_t*)mmio = data;
 	} else {
-		port_out32(PCI_CONFIG_ADDRESS, (1 << 31) | (bus << 16) | (slot << 11) | (function << 8) | (reg & 0xfc));
+		port_out32(PCI_CONFIG_ADDRESS, PORTIO(bus, slot, function, reg));
 		port_out8(PCI_CONFIG_DATA + (reg & 3), data);
 	}
 }
@@ -284,14 +260,11 @@ uint16_t pci_read16(PCI_Device* device, uint32_t reg) {
 static uint16_t _pci_read16(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, bool is_pcix) {
 	void* mmio = pci_mmio[bus];
 	if(is_pcix && mmio) {
-		mmio +=	((uint64_t)bus << 20) |
-			((uint64_t)slot << 15) |
-			((uint64_t)function << 12) |
-			((uint64_t)reg << 2);
+		mmio +=	MMIO(bus, slot, function, reg);
 		
 		return *(uint16_t*)mmio;
 	} else {
-		port_out32(PCI_CONFIG_ADDRESS, (1 << 31) | (bus << 16) | (slot << 11) | (function << 8) | (reg & 0xfc));
+		port_out32(PCI_CONFIG_ADDRESS, PORTIO(bus, slot, function, reg));
 		return port_in16(PCI_CONFIG_DATA + (reg & 2));
 	}
 }
@@ -303,14 +276,11 @@ void pci_write16(PCI_Device* device, uint32_t reg, uint16_t data) {
 static void _pci_write16(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, uint16_t data, bool is_pcix) {
 	void* mmio = pci_mmio[bus];
 	if(is_pcix && mmio) {
-		mmio +=	((uint64_t)bus << 20) |
-			((uint64_t)slot << 15) |
-			((uint64_t)function << 12) |
-			((uint64_t)reg << 2);
+		mmio +=	MMIO(bus, slot, function, reg);
 		
 		*(uint16_t*)mmio = data;
 	} else {
-		port_out32(PCI_CONFIG_ADDRESS, (1 << 31) | (bus << 16) | (slot << 11) | (function << 8) | (reg & 0xfc));
+		port_out32(PCI_CONFIG_ADDRESS, PORTIO(bus, slot, function, reg));
 		port_out16(PCI_CONFIG_DATA + (reg & 2), data);
 	}
 }
@@ -322,15 +292,11 @@ uint32_t pci_read32(PCI_Device* device, uint32_t reg) {
 static uint32_t _pci_read32(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, bool is_pcix) {
 	void* mmio = pci_mmio[bus];
 	if(is_pcix && mmio) {
-		mmio +=	((uint64_t)bus << 20) |
-			((uint64_t)slot << 15) |
-			((uint64_t)function << 12) |
-			((uint64_t)reg << 2);
+		mmio +=	MMIO(bus, slot, function, reg);
 		
 		return *(uint32_t*)mmio;
 	} else {
-		uint32_t address = (1 << 31) | (bus << 16) | (slot << 11) | (function << 8) | reg;
-		port_out32(PCI_CONFIG_ADDRESS, address);
+		port_out32(PCI_CONFIG_ADDRESS, PORTIO(bus, slot, function, reg));
 		return port_in32(PCI_CONFIG_DATA);
 	}
 }
@@ -342,15 +308,10 @@ void pci_write32(PCI_Device* device, uint32_t reg, uint32_t data) {
 static void _pci_write32(uint8_t bus, uint8_t slot, uint8_t function, uint32_t reg, uint32_t data, bool is_pcix) {
 	void* mmio = pci_mmio[bus];
 	if(is_pcix && mmio) {
-		mmio +=	((uint64_t)bus << 20) |
-			((uint64_t)slot << 15) |
-			((uint64_t)function << 12) |
-			((uint64_t)reg << 2);
-		
+		mmio +=	MMIO(bus, slot, function, reg);
 		*(uint32_t*)mmio = data;
 	} else {
-		uint32_t address = (1 << 31) | (bus << 16) | (slot << 11) | (function << 8) | reg;
-		port_out32(PCI_CONFIG_ADDRESS, address);
+		port_out32(PCI_CONFIG_ADDRESS, PORTIO(bus, slot, function, reg));
 		port_out32(PCI_CONFIG_DATA, data);
 	}
 }
