@@ -1,0 +1,2 @@
+UPPER=`echo $1 | sed 's/\(.*\)/\U\1/'`
+sed s/INIT/$UPPER/ < .init.h > $1.h

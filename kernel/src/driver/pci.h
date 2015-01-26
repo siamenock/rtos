@@ -26,7 +26,7 @@ typedef struct _PCI_ID {
 */
 
 
-typedef struct _PCI_Device PCI_Device;
+typedef struct pci_dev PCI_Device;
 
 typedef bool(*PCI_DEVICE_PROBE)(PCI_Device* pci, char** name, void** data);
 

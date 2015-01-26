@@ -7,7 +7,7 @@
 #include <stdarg.h>
 #include "driver/device.h"
 
-typedef struct _Device {
+typedef struct device {
 	DeviceType	type;
 	void*		driver;	// Extends Driver
 	void*		device;
