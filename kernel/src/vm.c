@@ -238,9 +238,6 @@ static bool vm_destroy(VM* vm, int core) {
 	}
 	
 	if(is_destroy) {
-		if(vm->argv)
-			gfree(vm->argv);
-		
 		if(vm->memory.blocks) {
 			for(int i = 0; i < vm->memory.count; i++) {
 				if(vm->memory.blocks[i]) {
