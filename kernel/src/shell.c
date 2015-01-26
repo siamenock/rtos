@@ -120,6 +120,70 @@ static int cmd_ip(int argc, char** argv, void(*callback)(char* result, int exit_
 	return 0;
 }
 
+static int cmd_port(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	uint16_t old = manager_get_port();
+	if(argc == 1) {
+		printf("%d\n", old);
+		return 0;
+	}
+	
+	if(!is_uint16(argv[1])) {
+		return -1;
+	}
+
+	uint16_t port = parse_uint16(argv[1]);
+	
+	manager_set_port(port);
+
+	printf("Manager's Port changed from %d to %d\n", old, port);
+	
+	return 0;
+}
+
+static int cmd_netmask(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	uint32_t old = manager_get_netmask();
+	if(argc == 1) {
+		printf("%d.%d.%d.%d\n", (old >> 24) & 0xff, (old >> 16) & 0xff, (old >> 8) & 0xff, (old >> 0) & 0xff);
+		return 0;
+	}
+	
+	char* str = argv[1];
+	uint32_t address = (strtol(str, &str, 0) & 0xff) << 24; str++;
+	address |= (strtol(str, &str, 0) & 0xff) << 16; str++;
+	address |= (strtol(str, &str, 0) & 0xff) << 8; str++;
+	address |= strtol(str, NULL, 0) & 0xff;
+	
+	manager_set_netmask(address);
+	
+	printf("Manager's Gateway changed from %d.%d.%d.%d to %d.%d.%d.%d\n", 
+		(old >> 24) & 0xff, (old >> 16) & 0xff, (old >> 8) & 0xff, (old >> 0) & 0xff,
+		(address >> 24) & 0xff, (address >> 16) & 0xff, (address >> 8) & 0xff, (address >> 0) & 0xff);
+	
+	return 0;
+}
+
+static int cmd_gateway(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	uint32_t old = manager_get_gateway();
+	if(argc == 1) {
+		printf("%d.%d.%d.%d\n", (old >> 24) & 0xff, (old >> 16) & 0xff, (old >> 8) & 0xff, (old >> 0) & 0xff);
+		return 0;
+	}
+	
+	char* str = argv[1];
+	uint32_t address = (strtol(str, &str, 0) & 0xff) << 24; str++;
+	address |= (strtol(str, &str, 0) & 0xff) << 16; str++;
+	address |= (strtol(str, &str, 0) & 0xff) << 8; str++;
+	address |= strtol(str, NULL, 0) & 0xff;
+	
+	manager_set_gateway(address);
+	
+	printf("Manager's Gateway changed from %d.%d.%d.%d to %d.%d.%d.%d\n", 
+		(old >> 24) & 0xff, (old >> 16) & 0xff, (old >> 8) & 0xff, (old >> 0) & 0xff,
+		(address >> 24) & 0xff, (address >> 16) & 0xff, (address >> 8) & 0xff, (address >> 0) & 0xff);
+	
+	return 0;
+}
+
 static int cmd_version(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	printf("%d.%d.%d-%s\n", VERSION_MAJOR, VERSION_MINOR, VERSION_MICRO, VERSION_TAG);
 	
@@ -527,6 +591,24 @@ Command commands[] = {
 		.desc = "Get or set IP address of manager.",
 		.args = "[(address)]",
 		.func = cmd_ip 
+	},
+	{ 
+		.name = "port", 
+		.desc = "Get or set Port of manager.",
+		.args = "[(port)]",
+		.func = cmd_port 
+	},
+	{ 
+		.name = "netmask", 
+		.desc = "Get or set Netmask of manager.",
+		.args = "[(netmask)]",
+		.func = cmd_netmask
+	},
+	{ 
+		.name = "gateway", 
+		.desc = "Get or set Gateway of manager.",
+		.args = "[(address)]",
+		.func = cmd_gateway
 	},
 	{ 
 		.name = "lsni", 

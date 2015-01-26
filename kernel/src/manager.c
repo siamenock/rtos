@@ -33,6 +33,9 @@
 #define DEFAULT_MANAGER_PORT	111
 
 NI*	manager_ni;
+static struct netif* manager_netif;
+static struct tcp_pcb* manager_server;
+static uint16_t manager_port;
 
 // LwIP TCP callbacks
 typedef struct {
@@ -366,6 +369,57 @@ static void stdio_callback(uint32_t vmid, int thread_id, int fd, char* buffer, v
 	}
 }
 
+static bool manager_server_open() {
+	uint32_t _ip = (uint32_t)(uint64_t)ni_config_get(manager_ni->ni, "ip");
+	struct ip_addr ip;
+	IP4_ADDR(&ip, (_ip >> 24) & 0xff, (_ip >> 16) & 0xff, (_ip >> 8) & 0xff, (_ip >> 0) & 0xff);
+	
+	manager_server = tcp_new();
+	
+	err_t err = tcp_bind(manager_server, &ip, manager_port);
+	if(err != ERR_OK) {
+		printf("ERROR: Manager cannot bind TCP session: %d\n", err);
+
+		return false;
+	}
+	
+	manager_server = tcp_listen(manager_server);
+	tcp_arg(manager_server, manager_server);
+	
+	printf("Manager started: %d.%d.%d.%d:%d\n", (_ip >> 24) & 0xff, (_ip >> 16) & 0xff, 
+		(_ip >> 8) & 0xff, (_ip >> 0) & 0xff, manager_port);
+	
+	tcp_accept(manager_server, manager_accept);
+	
+	if(clients == NULL)
+		clients = list_create(NULL);
+
+	if(actives == NULL)
+		actives = list_create(NULL);
+
+	return true;
+}
+
+static bool manager_server_close() {
+	ListIterator iter;
+	list_iterator_init(&iter, clients);
+
+	while(list_iterator_has_next(&iter)) {
+		struct tcp_pcb* pcb = list_iterator_next(&iter);
+		RPC* rpc = pcb->callback_arg;
+		manager_close(pcb, rpc, true);
+	}
+
+	if(tcp_close(manager_server) != ERR_OK) {
+		printf("Cannot close manager server: %p", manager_server);
+
+		return false;
+	}
+	manager_server = NULL;
+
+	return true;
+}
+
 void manager_init() {
 	uint64_t attrs[] = { 
 		NI_MAC, ni_mac, // Physical MAC
@@ -384,31 +438,11 @@ void manager_init() {
 	ni_config_put(manager_ni->ni, "gateway", (void*)(uint64_t)DEFAULT_MANAGER_GW);
 	ni_config_put(manager_ni->ni, "netmask", (void*)(uint64_t)DEFAULT_MANAGER_NETMASK);
 	ni_config_put(manager_ni->ni, "default", (void*)(uint64_t)true);
+	manager_port = DEFAULT_MANAGER_PORT;
 	
-	ni_init(manager_ni->ni, manage, NULL);
+	manager_netif = ni_init(manager_ni->ni, manage, NULL);
 	
-	struct ip_addr ip;
-	IP4_ADDR(&ip, (DEFAULT_MANAGER_IP >> 24) & 0xff, (DEFAULT_MANAGER_IP >> 16) & 0xff, 
-		(DEFAULT_MANAGER_IP >> 8) & 0xff, (DEFAULT_MANAGER_IP >> 0) & 0xff);
-	
-	struct tcp_pcb* server = tcp_new();
-	
-	err_t err = tcp_bind(server, &ip, DEFAULT_MANAGER_PORT);
-	if(err != ERR_OK)
-		printf("ERROR: Manager cannot bind TCP session: %d\n", err);
-	
-	server = tcp_listen(server);
-	tcp_arg(server, server);
-	
-	printf("Manager started: %d.%d.%d.%d:%d\n", 
-		(DEFAULT_MANAGER_IP >> 24) & 0xff, (DEFAULT_MANAGER_IP >> 16) & 0xff, 
-		(DEFAULT_MANAGER_IP >> 8) & 0xff, (DEFAULT_MANAGER_IP >> 0) & 0xff,
-		DEFAULT_MANAGER_PORT);
-	
-	tcp_accept(server, manager_accept);
-	
-	clients = list_create(NULL);
-	actives = list_create(NULL);
+	manager_server_open();
 	
 	bool manager_loop(void* context) {
 		ni_poll();
@@ -447,6 +481,24 @@ uint32_t manager_get_ip() {
 
 void manager_set_ip(uint32_t ip) {
 	ni_config_put(manager_ni->ni, "ip", (void*)(uint64_t)ip);
+
+	struct ip_addr ip2;
+	IP4_ADDR(&ip2, (ip >> 24) & 0xff, (ip >> 16) & 0xff, (ip >> 8) & 0xff, (ip >> 0) & 0xff);
+	netif_set_ipaddr(manager_netif, &ip2);
+
+	manager_server_close();
+	manager_server_open();
+}
+
+uint16_t manager_get_port() {
+	return manager_port;
+}
+
+void manager_set_port(uint16_t port) {
+	manager_port = port;
+
+	manager_server_close();
+	manager_server_open();
 }
 
 uint32_t manager_get_gateway() {
@@ -455,6 +507,10 @@ uint32_t manager_get_gateway() {
 
 void manager_set_gateway(uint32_t gw) {
 	ni_config_put(manager_ni->ni, "gateway", (void*)(uint64_t)gw);
+
+	struct ip_addr gw2;
+	IP4_ADDR(&gw2, (gw >> 24) & 0xff, (gw >> 16) & 0xff, (gw >> 8) & 0xff, (gw >> 0) & 0xff);
+	netif_set_gw(manager_netif, &gw2);
 }
 
 uint32_t manager_get_netmask() {
@@ -463,4 +519,8 @@ uint32_t manager_get_netmask() {
 
 void manager_set_netmask(uint32_t nm) {
 	ni_config_put(manager_ni->ni, "netmask", (void*)(uint64_t)nm);
+
+	struct ip_addr nm2;
+	IP4_ADDR(&nm2, (nm >> 24) & 0xff, (nm >> 16) & 0xff, (nm >> 8) & 0xff, (nm >> 0) & 0xff);
+	netif_set_netmask(manager_netif, &nm2);
 }
