@@ -224,40 +224,40 @@ struct pci_device_id {
 #define PCI_VENDOR_ID_GIGABYTE          0x1458
 #define PCI_VENDOR_ID_LINKSYS           0x1737
 
-struct pci_dev {
+struct _pci_dev {
 	PCI_Device*	dev;
 	void*		driver;
 };
 
-inline void pci_set_drvdata(struct pci_dev *dev, void* driver) {
+inline void pci_set_drvdata(struct _pci_dev *dev, void* driver) {
 	dev->driver = driver;
 }
 
-inline void* pci_get_drvdata(struct pci_dev *dev) {
+inline void* pci_get_drvdata(struct _pci_dev *dev) {
 	return dev->driver;
 }
 
-inline int pci_write_config_byte(const struct pci_dev *dev, int where, u8 val) {
+inline int pci_write_config_byte(const struct _pci_dev *dev, int where, u8 val) {
 	pci_write8(dev->dev, where, val);
 	return 0;
 }
 
-inline int pci_write_config_word(const struct pci_dev *dev, int where, u16 val) {
+inline int pci_write_config_word(const struct _pci_dev *dev, int where, u16 val) {
 	pci_write16(dev->dev, where, val);
 	return 0;
 }
 
-inline int pci_read_config_byte(const struct pci_dev *dev, int where, u8* val) {
+inline int pci_read_config_byte(const struct _pci_dev *dev, int where, u8* val) {
 	*val = pci_read8(dev->dev, where);
 	return 0;
 }
 
-inline int pci_read_config_word(const struct pci_dev *dev, int where, u16* val) {
+inline int pci_read_config_word(const struct _pci_dev *dev, int where, u16* val) {
 	*val = pci_read16(dev->dev, where);
 	return 0;
 }
 
-inline int pcie_capability_clear_word(struct pci_dev *dev, int pos, u16 clear) {
+inline int pcie_capability_clear_word(struct _pci_dev *dev, int pos, u16 clear) {
 	u16 val;
 	
 	val = pci_read16(dev->dev, pos);
@@ -267,7 +267,7 @@ inline int pcie_capability_clear_word(struct pci_dev *dev, int pos, u16 clear) {
 	return 0;
 }
 
-inline int pcie_capability_set_word(struct pci_dev *dev, int pos, u16 set) {
+inline int pcie_capability_set_word(struct _pci_dev *dev, int pos, u16 set) {
 	u16 val;
 	
 	val = pci_read16(dev->dev, pos);
@@ -277,7 +277,7 @@ inline int pcie_capability_set_word(struct pci_dev *dev, int pos, u16 set) {
 	return 0;
 }
 
-inline int pcie_capability_clear_and_set_word(struct pci_dev *dev, int pos, u16 clear, u16 set) {
+inline int pcie_capability_clear_and_set_word(struct _pci_dev *dev, int pos, u16 clear, u16 set) {
 	u16 val;
 	
 	val = pci_read16(dev->dev, pos);
@@ -288,14 +288,14 @@ inline int pcie_capability_clear_and_set_word(struct pci_dev *dev, int pos, u16 
 	return 0;
 }
 
-inline void pci_release_regions(struct pci_dev *pdev) {
+inline void pci_release_regions(struct _pci_dev *pdev) {
 	// TODO: Implement it
 }
 
-inline int pci_set_cacheline_size(struct pci_dev *dev) {
+inline int pci_set_cacheline_size(struct _pci_dev *dev) {
 }
 
-inline int pci_set_mwi(struct pci_dev *dev) {
+inline int pci_set_mwi(struct _pci_dev *dev) {
 	// TODO: Check cache line size
 	uint16_t cmd = pci_read16(dev->dev, PCI_COMMAND);
 	if(!(cmd & PCI_COMMAND_INVALIDATE)) {
@@ -306,29 +306,29 @@ inline int pci_set_mwi(struct pci_dev *dev) {
 	return 0;
 }
 
-inline void pci_clear_mwi(struct pci_dev *dev) {
+inline void pci_clear_mwi(struct _pci_dev *dev) {
 }
 
-inline int pci_enable_device(struct pci_dev *dev) {
+inline int pci_enable_device(struct _pci_dev *dev) {
 	pci_enable(dev->dev);
 	return 0;
 }
 
-inline void pci_disable_device(struct pci_dev *dev) {
+inline void pci_disable_device(struct _pci_dev *dev) {
 }
 
-inline int pci_enable_msi(struct pci_dev *dev) {
+inline int pci_enable_msi(struct _pci_dev *dev) {
 	return -1;
 }
 
-inline void pci_disable_msi(struct pci_dev *dev) {
+inline void pci_disable_msi(struct _pci_dev *dev) {
 }
 
-inline void pci_disable_link_state(struct pci_dev *dev, int state) {
+inline void pci_disable_link_state(struct _pci_dev *dev, int state) {
 	// TODO: Implement it
 }
 
-inline dma_addr_t pci_resource_start(struct pci_dev *dev, int region) {
+inline dma_addr_t pci_resource_start(struct _pci_dev *dev, int region) {
 	uint32_t addr = pci_read32(dev->dev, PCI_BASE_ADDRESS_0 + region * 4);
 	if(addr & PCI_BASE_ADDRESS_SPACE_IO)
 		return addr & PCI_BASE_ADDRESS_IO_MASK;
@@ -336,20 +336,20 @@ inline dma_addr_t pci_resource_start(struct pci_dev *dev, int region) {
 		return addr & PCI_BASE_ADDRESS_MEM_MASK;
 }
 
-inline void pci_set_master(struct pci_dev *dev) {
+inline void pci_set_master(struct _pci_dev *dev) {
 	// Already done when enabled
 }
 
-inline int pci_is_pcie(struct pci_dev *dev) {
+inline int pci_is_pcie(struct _pci_dev *dev) {
 	return dev->dev->caps[PCI_CAP_ID_EXP] != 0;
 }
 
 struct pci_driver {
 	char *name;
-	const struct pci_device_id *id_table;   /* must be non-NULL for probe to be called */
-	int  (*probe)  (struct pci_dev *dev, const struct pci_device_id *id);   /* New device inserted */
-	void (*remove) (struct pci_dev *dev);   /* Device removed (NULL if not a hot-plug capable driver) */
-	void (*shutdown)(struct pci_dev *pdev);
+	const struct _pci_device_id *id_table;   /* must be non-NULL for probe to be called */
+	int  (*probe)  (struct _pci_dev *dev, const struct _pci_device_id *id);   /* New device inserted */
+	void (*remove) (struct _pci_dev *dev);   /* Device removed (NULL if not a hot-plug capable driver) */
+	void (*shutdown)(struct _pci_dev *pdev);
 };
 
 #define DMA_BIT_MASK(n) (((n) == 64) ? ~0ULL : ((1ULL<<(n))-1))
@@ -368,7 +368,7 @@ inline void dma_sync_single_for_cpu(PCI_Device *dev, dma_addr_t addr, size_t siz
 inline void dma_sync_single_for_device(PCI_Device *dev, dma_addr_t addr, size_t size, int dir) {
 }
 
-inline int pci_set_dma_mask(struct pci_dev *dev, u64 mask) {
+inline int pci_set_dma_mask(struct _pci_dev *dev, u64 mask) {
 	return 0;
 }
 
