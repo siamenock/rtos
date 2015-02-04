@@ -187,10 +187,17 @@ static void icc_start(ICC_Message* msg) {
 }
 
 static void icc_resume(ICC_Message* msg) {
+	if(msg->result < 0) {
+		ICC_Message* msg2 = icc_alloc(ICC_TYPE_RESUMED);
+		msg2->result = msg->result;
+		icc_send(msg2, msg->core_id);
+
+		icc_free(msg);
+		return;
+	}
+
 	printf("Resuming VM...\n");
 	ICC_Message* msg2 = icc_alloc(ICC_TYPE_RESUMED);
-	if(msg->result < 0)
-		msg2->result = msg->result;
 
 	icc_send(msg2, msg->core_id);
 	icc_free(msg);

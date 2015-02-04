@@ -60,12 +60,14 @@ static void icc(uint64_t vector, uint64_t err) {
 
 	icc_msg->result = 0;
 	if(task_id() != 0) {
-		icc_event(NULL);
-	} else {
-		if(icc_msg->type == ICC_TYPE_STOP) {
+		if(icc_msg->type == ICC_TYPE_RESUME) {
 			icc_msg->result = -1000;
 			icc_event(NULL);
-		} else if(icc_msg->type == ICC_TYPE_RESUME) {
+		} else {
+			icc_event(NULL);
+		}
+	} else {
+		if(icc_msg->type == ICC_TYPE_STOP) {
 			icc_msg->result = -1000;
 			icc_event(NULL);
 		}
