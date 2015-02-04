@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <util/event.h>
+#include <lock.h>
+#include <tlsf.h>
 #include "asm.h"
 #include "apic.h"
 #include "mp.h"
@@ -11,66 +13,117 @@
 
 #include "icc.h"
 
-ICC_Message* icc_msg;
+static uint32_t icc_id;
 
 #define ICC_EVENTS_COUNT	64
 typedef void (*ICC_Handler)(ICC_Message*);
 static ICC_Handler icc_events[ICC_EVENTS_COUNT];
 
-static bool is_event;
-
 static bool icc_event(void* context) {
-	if(is_event) {
-		is_event = false;
-		icc_events[icc_msg->type](icc_msg);
+	uint8_t core_id = mp_core_id();
+	FIFO* icc_queue = shared->icc_queues[core_id].icc_queue;
+
+	if(fifo_empty(icc_queue))
+		return true;
+
+	lock_lock(&shared->icc_queues[core_id].icc_queue_lock);
+	ICC_Message* icc_msg = fifo_pop(icc_queue);
+	lock_unlock(&shared->icc_queues[core_id].icc_queue_lock);
+
+	if(icc_msg == NULL)
+		return true;
+
+	if(icc_msg->type >= ICC_EVENTS_COUNT) {
+		icc_free(icc_msg);
+		return true;
 	}
-	
+
+	if(!icc_events[icc_msg->type]) {
+		icc_free(icc_msg);
+		return true;
+	}
+
+	icc_events[icc_msg->type](icc_msg); //event call
+
 	return true;
 }
 
 static void icc(uint64_t vector, uint64_t err) {
-	icc_msg->status = ICC_STATUS_RECEIVED;
-	
-	if(icc_events[icc_msg->type])
-		is_event = true;
-	else
-		icc_msg->status = ICC_STATUS_DONE;
-	
+	uint8_t core_id = mp_core_id();
+	FIFO* icc_queue = shared->icc_queues[core_id].icc_queue;
+	ICC_Message* icc_msg = fifo_peek(icc_queue, 0);
+
 	apic_eoi();
 
-	if(is_event && task_id() != 0)
+	if(icc_msg == NULL)
+		return;
+
+	icc_msg->result = 0;
+	if(task_id() != 0) {
 		icc_event(NULL);
+	} else {
+		if(icc_msg->type == ICC_TYPE_STOP) {
+			icc_msg->result = -1000;
+			icc_event(NULL);
+		} else if(icc_msg->type == ICC_TYPE_RESUME) {
+			icc_msg->result = -1000;
+			icc_event(NULL);
+		}
+	}
 }
 
 void icc_init() {
+	uint8_t core_count = mp_core_count();
+
+	extern void* gmalloc_pool;
 	if(mp_core_id() == 0) {
-		uint8_t core_count = mp_core_count();
-		
-		shared->icc_messages = gmalloc(sizeof(ICC_Message) * core_count);
-		bzero(shared->icc_messages, sizeof(ICC_Message) * core_count);
+		int icc_max = core_count * core_count;
+		shared->icc_pool = fifo_create(icc_max, gmalloc_pool);
+
+		for(int i = 0; i < icc_max; i++) {
+			ICC_Message* icc_message = malloc_ex(sizeof(ICC_Message), shared->icc_pool->pool);
+			fifo_push(shared->icc_pool, icc_message);
+		}
+
+		shared->icc_queues = malloc_ex(core_count * sizeof(Icc), gmalloc_pool);
+
+		for(int i = 0; i < core_count; i++) {
+			shared->icc_queues[i].icc_queue = fifo_create(core_count, gmalloc_pool);
+			lock_init(&shared->icc_queues[i].icc_queue_lock);
+		}
 	}
-	
-	icc_msg = &shared->icc_messages[mp_core_id()];
 	
 	event_busy_add(icc_event, NULL);
 	
 	apic_register(48, icc);
 }
 
-ICC_Message* icc_sending(uint8_t type, uint16_t core_id) {
-	while(shared->icc_messages[core_id].status != ICC_STATUS_DONE);
+ICC_Message* icc_alloc(uint8_t type) {
+	lock_lock(&shared->icc_lock_alloc);
+	ICC_Message* icc_message = fifo_pop(shared->icc_pool);
+	lock_unlock(&shared->icc_lock_alloc);
 	
-	shared->icc_messages[core_id].id++;
-	shared->icc_messages[core_id].type = type;
-	shared->icc_messages[core_id].core_id = mp_core_id();
-	
-	return &shared->icc_messages[core_id];
+	icc_message->id = icc_id++;
+	icc_message->type = type;
+	icc_message->core_id = mp_core_id();
+	icc_message->result = 0;
+
+	return icc_message;
 }
 
-uint32_t icc_send(ICC_Message* msg) {
-	msg->status = ICC_STATUS_SENT;
-	
-	uint64_t core_id = msg - shared->icc_messages;
+void icc_free(ICC_Message* msg) {
+	lock_lock(&shared->icc_lock_free);
+	fifo_push(shared->icc_pool, msg);
+	lock_unlock(&shared->icc_lock_free);
+}
+
+uint32_t icc_send(ICC_Message* msg, uint8_t core_id) {
+	uint32_t _icc_id = msg->id;
+
+	lock_lock(&shared->icc_queues[core_id].icc_queue_lock);
+	fifo_push(shared->icc_queues[core_id].icc_queue, msg);
+	lock_unlock(&shared->icc_queues[core_id].icc_queue_lock);
+
 	apic_write64(APIC_REG_ICR, ((uint64_t)core_id << 56) |
 				APIC_DSH_NONE | 
 				APIC_TM_EDGE | 
@@ -78,17 +131,12 @@ uint32_t icc_send(ICC_Message* msg) {
 				APIC_DM_PHYSICAL | 
 				APIC_DMODE_FIXED |
 				(msg->type == ICC_TYPE_PAUSE ? 49 : 48));
-	
+
 	uint64_t time = cpu_tsc() + cpu_ms * 100;
-	
-	while(cpu_tsc() < time) {
-		if(msg->status != ICC_STATUS_SENT) {
-			return msg->id;
-		}
-	}
-	printf("BUG: ICC timeout: %d\n", msg->id);
-	
-	return 0;
+
+	while(cpu_tsc() < time);
+
+	return _icc_id;
 }
 
 void icc_register(uint8_t type, void(*event)(ICC_Message*)) {

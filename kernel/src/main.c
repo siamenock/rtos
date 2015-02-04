@@ -126,16 +126,15 @@ static void context_switch() {
 	bool is_paused = errno == 0 && task_is_active(1);
 	if(is_paused) {
 		// ICC_TYPE_PAUSE is not a ICC message but a interrupt in fact, So forcely commit the message
-		icc_msg->status = ICC_STATUS_DONE;
 	}
 	
-	ICC_Message* msg3 = icc_sending(is_paused ? ICC_TYPE_PAUSED : ICC_TYPE_STOPPED, 0);
+	ICC_Message* msg3 = icc_alloc(is_paused ? ICC_TYPE_PAUSED : ICC_TYPE_STOPPED);
 	msg3->result = errno;
 	if(!is_paused) {
 		msg3->data.stopped.return_code = apic_user_return_code();
 	}
 	errno = 0;
-	icc_send(msg3);
+	icc_send(msg3, 0);
 	
 	printf("VM %s...\n", is_paused ? "paused" : "stopped");
 }
@@ -146,13 +145,15 @@ static void icc_start(ICC_Message* msg) {
 	
 	// TODO: Change blocks[0] to blocks
 	uint32_t id = loader_load(vm);
+
 	if(errno != 0) {
-		ICC_Message* msg2 = icc_sending(ICC_TYPE_STARTED, msg->core_id);
-		msg->status = ICC_STATUS_DONE;
-		
+		ICC_Message* msg2 = icc_alloc(ICC_TYPE_STARTED);
+
 		msg2->result = errno;	// errno from loader_load
-		icc_send(msg2);
+		icc_send(msg2, msg->core_id);
+		icc_free(msg);
 		printf("Execution FAILED: %x\n", errno);
+		return;
 	}
 	
 	*(uint32_t*)task_addr(id, SYM_NIS_COUNT) = vm->nic_count;
@@ -163,10 +164,8 @@ static void icc_start(ICC_Message* msg) {
 	}
 	
 	printf("Starting VM...\n");
-	ICC_Message* msg2 = icc_sending(ICC_TYPE_STARTED, msg->core_id);
-	msg->status = ICC_STATUS_DONE;
+	ICC_Message* msg2 = icc_alloc(ICC_TYPE_STARTED);
 	
-	msg2->result = 0;
 	msg2->data.started.stdin = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)*(char**)task_addr(id, SYM_STDIN));
 	msg2->data.started.stdin_head = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)task_addr(id, SYM_STDIN_HEAD));
 	msg2->data.started.stdin_tail = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)task_addr(id, SYM_STDIN_TAIL));
@@ -180,17 +179,21 @@ static void icc_start(ICC_Message* msg) {
 	msg2->data.started.stderr_tail = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)task_addr(id, SYM_STDERR_TAIL));
 	msg2->data.started.stderr_size = *(int*)task_addr(id, SYM_STDERR_SIZE);
 	
-	icc_send(msg2);
+	icc_send(msg2, msg->core_id);
+
+	icc_free(msg);
 	
 	context_switch();
 }
 
 static void icc_resume(ICC_Message* msg) {
 	printf("Resuming VM...\n");
-	ICC_Message* msg2 = icc_sending(ICC_TYPE_RESUMED, msg->core_id);
-	msg->status = ICC_STATUS_DONE;
-	icc_send(msg2);
-	
+	ICC_Message* msg2 = icc_alloc(ICC_TYPE_RESUMED);
+	if(msg->result < 0)
+		msg2->result = msg->result;
+
+	icc_send(msg2, msg->core_id);
+	icc_free(msg);
 	context_switch();
 }
 
@@ -201,8 +204,16 @@ static void icc_pause(uint64_t vector, uint64_t error_code) {
 }
 
 static void icc_stop(ICC_Message* msg) {
-	msg->status = ICC_STATUS_DONE;
-	
+	if(msg->result < 0) { //Not yet core is started.
+		ICC_Message* msg2 = icc_alloc(ICC_TYPE_STOPPED);
+		msg2->result = msg->result;
+		icc_send(msg2, msg->core_id);
+
+		icc_free(msg);
+		return;
+	}
+
+	icc_free(msg);
 	task_destroy(1);
 }
 

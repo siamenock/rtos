@@ -45,10 +45,9 @@ static VM_STDIO_CALLBACK stdio_callback;
 static void icc_started(ICC_Message* msg) {
 	Core* core = &cores[msg->core_id];
 	VM* vm = core->vm;
-	
+
 	if(msg->result == 0) {
 		core->error_code = 0;
-		core->status = VM_STATUS_START;
 		core->stdin = msg->data.started.stdin;
 		core->stdin_head = msg->data.started.stdin_head;
 		core->stdin_tail = msg->data.started.stdin_tail;
@@ -66,7 +65,6 @@ static void icc_started(ICC_Message* msg) {
 		
 		printf("Execution succeed on core[%d].\n", msg->core_id);
 		
-		msg->status = ICC_STATUS_DONE;
 	} else {
 		core->error_code = msg->result;
 		
@@ -74,9 +72,10 @@ static void icc_started(ICC_Message* msg) {
 		
 		printf("Execution FAILED on core[%d]: Error code 0x%x.\n", msg->core_id, msg->result);
 		
-		msg->status = ICC_STATUS_DONE;
 	}
 	
+	icc_free(msg);
+
 	int error_code = 0;
 	for(int i = 0; i < vm->core_size; i++) {
 		core = &cores[vm->cores[i]];
@@ -100,8 +99,8 @@ static void icc_started(ICC_Message* msg) {
 	if(error_code != 0) {
 		for(int i = 0; i < vm->core_size; i++) {
 			if(cores[vm->cores[i]].status == VM_STATUS_START) {
-				ICC_Message* msg = icc_sending(ICC_TYPE_STOP, vm->cores[i]);
-				icc_send(msg);
+				ICC_Message* msg2 = icc_alloc(ICC_TYPE_STOP);
+				icc_send(msg2, vm->cores[i]);
 			}
 		}
 	}
@@ -138,8 +137,7 @@ static void icc_paused(ICC_Message* msg) {
 	
 	printf("Execution paused on core[%d].\n", msg->core_id);
 	
-	msg->status = ICC_STATUS_DONE;
-	
+	icc_free(msg);
 	for(int i = 0; i < vm->core_size; i++) {
 		if(cores[vm->cores[i]].status != VM_STATUS_PAUSE)
 			return;
@@ -160,13 +158,21 @@ static void icc_paused(ICC_Message* msg) {
 }
 
 static void icc_resumed(ICC_Message* msg) {
+	if(msg->result == -1000) {	// VM is not strated yet
+		ICC_Message* msg2 = icc_alloc(ICC_TYPE_RESUME);
+		icc_send(msg2, msg->core_id);
+		icc_free(msg);
+		// resend stop icc
+		return;
+	}
+
 	VM* vm = cores[msg->core_id].vm;
 	
 	cores[msg->core_id].status = VM_STATUS_START;
 	
 	printf("Execution resumed on core[%d].\n", msg->core_id);
 	
-	msg->status = ICC_STATUS_DONE;
+	icc_free(msg);
 	
 	for(int i = 0; i < vm->core_size; i++) {
 		if(cores[vm->cores[i]].status != VM_STATUS_START)
@@ -188,19 +194,29 @@ static void icc_resumed(ICC_Message* msg) {
 }
 
 static void icc_stopped(ICC_Message* msg) {
+	if(msg->result == -1000) {	// VM is not strated yet
+		printf("icc stopped error\n");
+		ICC_Message* msg2 = icc_alloc(ICC_TYPE_STOP);
+		icc_send(msg2, msg->core_id);
+		icc_free(msg);
+		// resend stop icc
+		return;
+	}
+
 	VM* vm = cores[msg->core_id].vm;
 	
-	cores[msg->core_id].status = VM_STATUS_STOP;
+	cores[msg->core_id].status = VM_STATUS_PAUSE;
 	cores[msg->core_id].error_code = msg->result;
 	cores[msg->core_id].return_code = msg->data.stopped.return_code;
 	
 	printf("Execution completed on core[%d].\n", msg->core_id);
 	
-	msg->status = ICC_STATUS_DONE;
-	
+	icc_free(msg);
+
 	for(int i = 0; i < vm->core_size; i++) {
-		if(cores[vm->cores[i]].status != VM_STATUS_STOP)
+		if(cores[vm->cores[i]].status != VM_STATUS_PAUSE) {
 			return;
+		}
 	}
 	
 	vm->status = VM_STATUS_STOP;
@@ -484,6 +500,10 @@ uint32_t vm_create(VMSpec* vm_spec) {
 			break;
 		}
 	}
+	// Lazy clean up
+	for(int i = 0; i < vm->memory.count; i++) {
+		bzero(vm->memory.blocks[i], 0x200000);
+	}
 	
 	// Dump info
 	printf("Manager: VM[%d] created(cores [", vmid);
@@ -656,10 +676,10 @@ void vm_status_set(uint32_t vmid, int status, VM_STATUS_CALLBACK callback, void*
 	
 	for(int i = 0; i < vm->core_size; i++) {
 		cores[vm->cores[i]].error_code = 0;
-		ICC_Message* msg = icc_sending(icc_type, vm->cores[i]);
+		ICC_Message* msg = icc_alloc(icc_type);
 		if(status == VM_STATUS_START)
 			msg->data.start.vm = vm;
-		icc_send(msg);
+		icc_send(msg, vm->cores[i]);
 	}
 }
 
