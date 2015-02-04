@@ -500,11 +500,6 @@ uint32_t vm_create(VMSpec* vm_spec) {
 			break;
 		}
 	}
-	// Lazy clean up
-	for(int i = 0; i < vm->memory.count; i++) {
-		bzero(vm->memory.blocks[i], 0x200000);
-	}
-	
 	// Dump info
 	printf("Manager: VM[%d] created(cores [", vmid);
 	for(int i = 0; i < vm->core_size; i++) {
@@ -667,6 +662,13 @@ void vm_status_set(uint32_t vmid, int status, VM_STATUS_CALLBACK callback, void*
 			break;
 	}
 	
+	// Lazy clean up
+	if(status == VM_STATUS_START) {
+		for(int i = 0; i < vm->memory.count; i++) {
+			bzero(vm->memory.blocks[i], 0x200000);
+		}
+	}
+
 	CallbackInfo* info = malloc(sizeof(CallbackInfo));
 	info->callback = callback;
 	info->context = context;
