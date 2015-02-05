@@ -141,7 +141,6 @@ static uint32_t load(VM* vm, void** malloc_pool, void** gmalloc_pool) {
 			if(thread_id == 0) {
 				for(idx = (vaddr >> 21); idx < ((vaddr >> 21) + size); idx++) {
 					void* paddr = vm->memory.blocks[count++];
-					bzero(paddr, 0x200000);
 					task_mmap(id, idx << 21, (uint64_t)paddr, true, phdr[i].p_flags & PF_W, phdr[i].p_flags & PF_X, phdr[i].p_flags & PF_W ? "Data" : "Code");
 				}
 				
@@ -357,7 +356,6 @@ static bool relocate(VM* vm, void* malloc_pool, void* gmalloc_pool, uint32_t tas
 	
 	int thread_count = vm->core_size;
 	
-	
 	SharedBlock* shared_block = (void*)((uint64_t)gmalloc_pool & ~(0x200000L - 1));
 	
 	if(task_addr(task_id, SYM_MALLOC_POOL)) {
@@ -366,7 +364,7 @@ static bool relocate(VM* vm, void* malloc_pool, void* gmalloc_pool, uint32_t tas
 		void* __stdin = malloc_ex(4096, malloc_pool);
 		if(__stdin) {
 			*(uint64_t*)task_addr(task_id, SYM_STDIN) = (uint64_t)__stdin;
-			*(int*)task_addr(task_id, SYM_STDIN_SIZE) = 4096;
+			*(size_t*)task_addr(task_id, SYM_STDIN_SIZE) = 4096;
 		} else {
 			errno = 0x31;
 			return false;
@@ -375,7 +373,7 @@ static bool relocate(VM* vm, void* malloc_pool, void* gmalloc_pool, uint32_t tas
 		void* __stdout = malloc_ex(4096, malloc_pool);
 		if(__stdout) {
 			*(uint64_t*)task_addr(task_id, SYM_STDOUT) = (uint64_t)__stdout;
-			*(int*)task_addr(task_id, SYM_STDOUT_SIZE) = 4096;
+			*(size_t*)task_addr(task_id, SYM_STDOUT_SIZE) = 4096;
 		} else {
 			errno = 0x31;
 			return false;
@@ -384,7 +382,7 @@ static bool relocate(VM* vm, void* malloc_pool, void* gmalloc_pool, uint32_t tas
 		void* __stderr = malloc_ex(4096, malloc_pool);
 		if(__stderr) {
 			*(uint64_t*)task_addr(task_id, SYM_STDERR) = (uint64_t)__stderr;
-			*(int*)task_addr(task_id, SYM_STDERR_SIZE) = 4096;
+			*(size_t*)task_addr(task_id, SYM_STDERR_SIZE) = 4096;
 		} else {
 			errno = 0x31;
 			return false;
