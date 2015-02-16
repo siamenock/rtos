@@ -1,19 +1,15 @@
 #include <stddef.h>
-#include <tlsf.h>
+#include <_malloc.h>
 #include <util/vector.h>
 
 Vector* vector_create(size_t size, void* pool) {
-	extern void* __malloc_pool;
-	if(pool == NULL)
-		pool = __malloc_pool;
-	
-	Vector* vector = malloc_ex(sizeof(Vector), pool);
+	Vector* vector = __malloc(sizeof(Vector), pool);
 	if(!vector)
 		return NULL;
 	
-	void** array = malloc_ex(size * sizeof(void*), pool);
+	void** array = __malloc(size * sizeof(void*), pool);
 	if(!array) {
-		free_ex(vector, pool);
+		__free(vector, pool);
 		return NULL;
 	}
 	vector_init(vector, array, size);
@@ -23,8 +19,8 @@ Vector* vector_create(size_t size, void* pool) {
 }
 
 void vector_destroy(Vector* vector) {
-	free_ex(vector->array, vector->pool);
-	free_ex(vector, vector->pool);
+	__free(vector->array, vector->pool);
+	__free(vector, vector->pool);
 }
 
 void vector_init(Vector* vector, void** array, size_t size) {

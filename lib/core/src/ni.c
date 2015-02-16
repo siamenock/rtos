@@ -2,7 +2,7 @@
 #include <lock.h>
 #include <util/map.h>
 #include <net/ni.h>
-#include <tlsf.h>
+#include <_malloc.h>
 
 int __nis_count;
 NetworkInterface* __nis[NIS_SIZE];
@@ -21,7 +21,7 @@ NetworkInterface* ni_get(int i) {
 }
 
 Packet* ni_alloc(NetworkInterface* ni, uint16_t size) {
-	Packet* packet = malloc_ex(sizeof(Packet) + size + ALIGN - 1, ni->pool);
+	Packet* packet = __malloc(sizeof(Packet) + size + ALIGN - 1, ni->pool);
 	if(packet) {
 		bzero(packet, sizeof(Packet));
 		packet->ni = ni;
@@ -34,7 +34,7 @@ Packet* ni_alloc(NetworkInterface* ni, uint16_t size) {
 }
 
 inline void ni_free(Packet* packet) {
-	free_ex(packet, packet->ni->pool);
+	__free(packet, packet->ni->pool);
 }
 
 inline bool ni_has_input(NetworkInterface* ni) {
@@ -128,15 +128,15 @@ inline bool ni_tryoutput(NetworkInterface* ni, Packet* packet) {
 }
 
 size_t ni_pool_used(NetworkInterface* ni) {
-	return get_used_size(ni->pool);
+	return __get_used_size(ni->pool);
 }
 
 size_t ni_pool_free(NetworkInterface* ni) {
-	return get_total_size(ni->pool) - get_used_size(ni->pool);
+	return __get_total_size(ni->pool) - __get_used_size(ni->pool);
 }
 
 size_t ni_pool_total(NetworkInterface* ni) {
-	return get_total_size(ni->pool);
+	return __get_total_size(ni->pool);
 }
 
 #define CONFIG_INIT					\
@@ -152,7 +152,7 @@ void ni_config_put(NetworkInterface* ni, char* key, void* data) {
 		map_update(ni->config, key, data);
 	} else {
 		int len = strlen(key) + 1;
-		char* key2 = malloc_ex(len, ni->pool);
+		char* key2 = __malloc(len, ni->pool);
 		memcpy(key2, key, len);
 		
 		map_put(ni->config, key2, data);
@@ -171,7 +171,7 @@ void* ni_config_remove(NetworkInterface* ni, char* key) {
 	if(map_contains(ni->config, key)) {
 		char* key2 = map_get_key(ni->config, key);
 		void* data = map_remove(ni->config, key);
-		free_ex(key2, ni->pool);
+		__free(key2, ni->pool);
 		
 		return data;
 	} else {

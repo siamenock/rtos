@@ -1,5 +1,5 @@
 #include <_string.h>
-#include <tlsf.h>
+#include <_malloc.h>
 #include <util/map.h>
 
 // TODO: Change accessing list using index to using iterator.
@@ -7,10 +7,6 @@
 #define THRESHOLD(cap)	(((cap) >> 2) + ((cap) >> 4))	// 75%
 
 Map* map_create(size_t initial_capacity, uint64_t(*hash)(void*), bool(*equals)(void*,void*), void* pool) {
-	extern void* __malloc_pool;
-	if(pool == NULL)
-		pool = __malloc_pool;
-	
 	if(!equals)
 		equals = map_uint64_equals;
 	
@@ -21,12 +17,12 @@ Map* map_create(size_t initial_capacity, uint64_t(*hash)(void*), bool(*equals)(v
 	while(capacity < initial_capacity)
 		capacity <<= 1;
 	
-	Map* map = malloc_ex(sizeof(Map), pool);
+	Map* map = __malloc(sizeof(Map), pool);
 	if(!map)
 		return NULL;
-	map->table = malloc_ex(sizeof(MapEntry) * capacity, pool);
+	map->table = __malloc(sizeof(MapEntry) * capacity, pool);
 	if(!map->table) {
-		free_ex(map, pool);
+		__free(map, pool);
 		return NULL;
 	}
 	bzero(map->table, sizeof(MapEntry) * capacity);
@@ -50,18 +46,18 @@ static void destroy(Map* map) {
 		list_iterator_init(&iter, list);
 		while(list_iterator_has_next(&iter)) {
 			MapEntry* entry = list_iterator_next(&iter);
-			free_ex(entry, map->pool);
+			__free(entry, map->pool);
 		}
 		
 		list_destroy(list);
 	}
 	
-	free_ex(map->table, map->pool);
+	__free(map->table, map->pool);
 }
 
 void map_destroy(Map* map) {
 	destroy(map);
-	free_ex(map, map->pool);
+	__free(map, map->pool);
 }
 
 bool map_is_empty(Map* map) {
@@ -73,7 +69,7 @@ bool map_put(Map* map, void* key, void* data) {
 		// Create new map
 		Map map2;
 		size_t capacity = map->capacity * 2;
-		map2.table = malloc_ex(sizeof(List*) * capacity, map->pool);
+		map2.table = __malloc(sizeof(List*) * capacity, map->pool);
 		if(!map2.table)
 			return false;
 		bzero(map2.table, sizeof(List*) * capacity);
@@ -116,7 +112,7 @@ bool map_put(Map* map, void* key, void* data) {
 		}
 	}
 	
-	MapEntry* entry = malloc_ex(sizeof(MapEntry), map->pool);
+	MapEntry* entry = __malloc(sizeof(MapEntry), map->pool);
 	if(!entry)
 		return false;
 	
@@ -124,7 +120,7 @@ bool map_put(Map* map, void* key, void* data) {
 	entry->data = data;
 	
 	if(!list_add(map->table[index], entry)) {
-		free_ex(entry, map->pool);
+		__free(entry, map->pool);
 		return false;
 	}
 	map->size++;
@@ -210,7 +206,7 @@ void* map_remove(Map* map, void* key) {
 		if(map->equals(entry->key, key)) {
 			void* data = entry->data;
 			list_remove(map->table[index], i);
-			free_ex(entry, map->pool);
+			__free(entry, map->pool);
 			
 			if(list_is_empty(map->table[index])) {
 				list_destroy(map->table[index]);
@@ -269,7 +265,7 @@ MapEntry* map_iterator_remove(MapIterator* iter) {
 	MapEntry* entry = list_remove(iter->map->table[iter->index], iter->list_index - 1);
 	iter->entry.key = entry->key;
 	iter->entry.data = entry->data;
-	free_ex(entry, iter->map->pool);
+	__free(entry, iter->map->pool);
 	
 	if(list_is_empty(iter->map->table[iter->index])) {
 		list_destroy(iter->map->table[iter->index]);
