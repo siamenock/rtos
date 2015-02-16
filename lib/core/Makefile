@@ -10,7 +10,7 @@ OBJS = ether.o crc.o checksum.o ni.o status.o  md5.o md5_asm.o \
 	fifo.o vector.o list.o map.o ring.o errno.o thread.o \
 	asm.o gmalloc.o lock.o shared.o json.o arp.o icmp.o \
 	packet.o ip.o udp.o tcp.o tftp.o event.o cmd.o \
-	malloc.o types.o _string.o rpc.o readline.o
+	malloc.o types.o _string.o _malloc.o rpc.o readline.o
 
 CFLAGS = -I include -I ../TLSF/src -I ../jsmn -O2 -Wall -Werror -m64 -nostdlib -ffreestanding -fno-stack-protector -std=gnu99 -mcmodel=kernel
 

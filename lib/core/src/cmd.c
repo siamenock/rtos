@@ -26,7 +26,9 @@ int cmd_help(int argc, char** argv, void(*callback)(char* result, int exit_statu
 		} else
 			printf("%s\n", commands[i].desc);
         }
-	callback("true", 0);
+	if(callback != NULL)
+		callback("true", 0);
+
         return 0;
 }
 

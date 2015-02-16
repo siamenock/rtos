@@ -1,13 +1,9 @@
 #include <stddef.h>
-#include <tlsf.h>
+#include <_malloc.h>
 #include <util/list.h>
 
 List* list_create(void* pool) {
-	extern void* __malloc_pool;
-	if(pool == NULL)
-		pool = __malloc_pool;
-	
-	List* list = malloc_ex(sizeof(List), pool);
+	List* list = __malloc(sizeof(List), pool);
 	if(!list)
 		return NULL;
 	
@@ -26,10 +22,10 @@ void list_destroy(List* list) {
 	while(list_iterator_has_next(&iter)) {
 		ListNode* node = iter.node;
 		list_iterator_next(&iter);
-		free_ex(node, list->pool);
+		__free(node, list->pool);
 	}
 	
-	free_ex(list, list->pool);
+	__free(list, list->pool);
 }
 
 bool list_is_empty(List* list) {
@@ -55,7 +51,7 @@ static void _add(List* list, ListNode* prev, ListNode* node) {
 }
 
 bool list_add(List* list, void* data) {
-	ListNode* node = malloc_ex(sizeof(ListNode), list->pool);
+	ListNode* node = __malloc(sizeof(ListNode), list->pool);
 	if(!node)
 		return false;
 	
@@ -69,7 +65,7 @@ bool list_add(List* list, void* data) {
 }
 
 bool list_add_at(List* list, int index, void* data) {
-	ListNode* node2 = malloc_ex(sizeof(ListNode), list->pool);
+	ListNode* node2 = __malloc(sizeof(ListNode), list->pool);
 	if(!node2)
 		return false;
 	
@@ -174,7 +170,7 @@ static void* _remove(List* list, ListNode* node) {
 		node->next->prev = node->prev;
 	
 	void* data = node->data;
-	free_ex(node, list->pool);
+	__free(node, list->pool);
 	
 	return data;
 }

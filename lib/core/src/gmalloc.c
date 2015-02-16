@@ -1,22 +1,22 @@
 #include <stdint.h>
 #include <thread.h>
-#include <tlsf.h>
+#include <_malloc.h>
 #include <gmalloc.h>
 
 void* __gmalloc_pool;
 
 void *gmalloc(size_t size) {
-	return malloc_ex(size, __gmalloc_pool);
+	return __malloc(size, __gmalloc_pool);
 }
 
 void gfree(void *ptr) {
-	free_ex(ptr, __gmalloc_pool);
+	__free(ptr, __gmalloc_pool);
 }
 
 void *gcalloc(size_t nmemb, size_t size) {
-	return calloc_ex(nmemb, size, __gmalloc_pool);
+	return __calloc(nmemb, size, __gmalloc_pool);
 }
 
 void *grealloc(void *ptr, size_t size) {
-	return realloc_ex(ptr, size, __gmalloc_pool);
+	return __realloc(ptr, size, __gmalloc_pool);
 }

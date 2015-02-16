@@ -1,19 +1,15 @@
 #include <stddef.h>
-#include <tlsf.h>
+#include <_malloc.h>
 #include <util/fifo.h>
 
 FIFO* fifo_create(size_t size, void* pool) {
-	extern void* __malloc_pool;
-	if(pool == NULL)
-		pool = __malloc_pool;
-	
-	FIFO* fifo = malloc_ex(sizeof(FIFO), pool);
+	FIFO* fifo = __malloc(sizeof(FIFO), pool);
 	if(!fifo)
 		return NULL;
 	
-	void* array = malloc_ex(size * sizeof(void*), pool);
+	void* array = __malloc(size * sizeof(void*), pool);
 	if(!array) {
-		free_ex(fifo, pool);
+		__free(fifo, pool);
 		return NULL;
 	}
 	
@@ -24,12 +20,12 @@ FIFO* fifo_create(size_t size, void* pool) {
 }
 
 void fifo_destroy(FIFO* fifo) {
-	free_ex(fifo->array, fifo->pool);
-	free_ex(fifo, fifo->pool);
+	__free(fifo->array, fifo->pool);
+	__free(fifo, fifo->pool);
 }
 
 bool fifo_resize(FIFO* fifo, size_t size, void(*popped)(void*)) {
-	void* array = malloc_ex(size * sizeof(void*), fifo->pool);
+	void* array = __malloc(size * sizeof(void*), fifo->pool);
 	if(!array)
 		return false;
 	
