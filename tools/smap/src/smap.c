@@ -6,7 +6,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <malloc.h>
-#include "../../kernel/src/symbols.h"
+#include "../../../kernel/src/symbols.h"
 #include <elf.h>
 
 int main(int argc, char* argv[]) {

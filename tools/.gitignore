@@ -1,7 +1,3 @@
-rewrite
-pnkc
-smap
-console
 src/rpc_manager.h
 src/rpc_manager.c
 src/rpc_manager_xdr.c

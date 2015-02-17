@@ -8,7 +8,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <elf.h>
-#include "../../kernel/src/pnkc.h"
+#include "../../../kernel/src/pnkc.h"
 
 int main(int argc, char* argv[]) {
 	if(argc < 3) {
