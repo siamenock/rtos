@@ -1,6 +1,6 @@
 .PHONY: all run deploy clean cleanall system.img mount umount
 
-QEMU=qemu-system-x86_64 $(shell tools/qemu-params) -m 512 -hda system.img -M pc -smp 16 -d cpu_reset -net nic,model=rtl8139 -net tap,script=tools/qemu-ifup -net nic,model=rtl8139 -net tap,script=tools/qemu-ifup
+QEMU=qemu-system-x86_64 $(shell tools/qemu-params) -m 256 -hda system.img -M pc -smp 8 -d cpu_reset -net nic,model=rtl8139 -net tap,script=tools/qemu-ifup -net nic,model=rtl8139 -net tap,script=tools/qemu-ifup
 
 all: system.img
 
