@@ -6,8 +6,13 @@
 static void send(Node* this, Packet* packet) {
 	printf("NE send to %s\n", ((NEPort*)this)->ti->name);
 
-	if(((NEPort*)this)->ti)
-		write(((NEPort*)this)->ti->fd, packet->buffer + packet->start , packet->end - packet->start); 
+	if(((NEPort*)this)->ti) {
+		int len = packet->end - packet->start;
+		int seek = 0;
+		while(seek += write(((NEPort*)this)->ti->fd, packet->buffer + packet->start + seek, len - seek))
+			if(len == seek)
+				break;
+	}
 	
 	//free(packet);
 }

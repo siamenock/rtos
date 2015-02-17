@@ -70,6 +70,7 @@ static int cmd_vm_status(int argc, char** argv, void(*callback)(char* result, in
 
 static int cmd_vm_create(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	VMSpec* vmspec = malloc(sizeof(VMSpec));
+	VM* _vm = NULL;
 	if(!vmspec)
 		return -1;
 
@@ -159,7 +160,7 @@ static int cmd_vm_create(int argc, char** argv, void(*callback)(char* result, in
 		}
 	}
 
-	VM* _vm = malloc(sizeof(VM));
+	_vm = malloc(sizeof(VM));
 	if(_vm == NULL) {
 		goto error;
 	}
@@ -608,7 +609,12 @@ int main(int _argc, char** _argv) {
 					Packet* packet = ni_process_output();
 
 					if(packet != NULL) {
-						write(fd_temp, packet->buffer + packet->start, packet->end - packet->start);
+						int seek = 0;
+						int len = packet->end - packet->start;
+						while((seek += write(fd_temp, packet->buffer + packet->start + seek, len - seek))) {
+							if(len == seek)
+								break;
+						}
 						ni_free(packet);
 					}
 				}

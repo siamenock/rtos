@@ -99,7 +99,8 @@ TunInterface* tun_create(const char* dev, int flags) {
 			return -1;
 		}
 
-		ti->mac = endian48(*(uint64_t*)ifr.ifr_hwaddr.sa_data);
+		uint64_t* mac = (uint64_t*)ifr.ifr_hwaddr.sa_data;
+		ti->mac = endian48(*mac);
 
 		close(fd); 
 
