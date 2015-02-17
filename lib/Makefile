@@ -1,6 +1,6 @@
 .PHONY: all clean cleanall core newlib
 
-all: libtlsf.a libjsmn.a libcore.a libcore_linux.a libc.a libm.a libz.a libssl.a liblwip.a libxdr.a libpacketngin.a
+all: libtlsf.a libjsmn.a libcore.a libcore_linux.a libc.a libm.a libz.a libssl.a liblwip.a libxdr.a libpacketngin.a libumpn.a
 
 libtlsf.a: 
 	make -C TLSF/src
@@ -58,6 +58,13 @@ libpacketngin.a: libc.a libm.a libtlsf.a libcore.a
 	mkdir -p ../sdk/include
 	cp -rL core/include/* ../sdk/include/
 	cp libpacketngin.a ../sdk/lib/
+
+libumpn.a: libtlsf.a libcore.a
+	mkdir -p obj
+	cd obj; ar x ../libtlsf.a
+	cd obj; ar x ../libcore_linux.a
+	cd obj; ar rcs ../$@ *.o
+	rm -r obj
 
 zlib/libz.a:
 	cd zlib; ./configure --static
