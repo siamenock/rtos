@@ -20,7 +20,7 @@ obj/loader.bin: obj/main.o obj/page.o obj/mode_switch.o obj/bfs.o
 
 loader.bin: obj/entry.bin obj/loader.bin
 	cat $^ > $@
-	../util/truncate $@
+	../tools/truncate $@
 
 clean:
 	rm -rf obj

@@ -8,6 +8,7 @@ SYSTEM_IMG_SIZE := 1023		# 512 bytes * 1023 blocks = 512KB - 512B (for boot load
 
 system.img: 
 	make -C lib
+	mkdir -p bin
 	make -C tools
 	make -C boot
 	make -C loader
@@ -78,6 +79,7 @@ clean:
 	rm -f system.img root.img kernel.smap kernel.bin kernel.dis packetngin_sdk-*.tgz
 
 cleanall: clean
+	rm -rf bin
 	make -C boot clean
 	make -C loader clean
 	make -C kernel clean
