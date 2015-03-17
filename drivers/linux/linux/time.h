@@ -1,6 +1,11 @@
 #ifndef __LINUX_TIME_H__
 #define __LINUX_TIME_H__
 
+#include <linux/types.h> 
+
+# define __isleap(year)	\
+  ((year) % 4 == 0 && ((year) % 100 != 0 || (year) % 400 == 0))
+
 struct tm {
 	/*
 	 * the number of seconds after the minute, normally in the range

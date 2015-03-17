@@ -7,7 +7,10 @@ struct file_operations;
 
 struct cdev {
 	struct module*		owner;
-	struct file_operations*	ops;
+	const struct file_operations*	ops; 
+	
+	dev_t dev; 
+	unsigned int count; 
 };
 
 void cdev_init(struct cdev *, const struct file_operations *);

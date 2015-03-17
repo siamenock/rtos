@@ -3,10 +3,6 @@
 
 #include <linux/types.h>
 
-typedef unsigned long kernel_ulong_t;
-
-#define PCI_ANY_ID (~0)
-
 struct pci_device_id {
 	uint32_t	vendor;
 	uint32_t	device;

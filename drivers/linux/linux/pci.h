@@ -2,51 +2,29 @@
 #define __LINUX_PCI_H__
 
 #include <packetngin/pci.h>
-#include <linux/mod_devicetable.h>
 #include <linux/types.h>
-#include <linux/init.h>
-#include <linux/ioport.h>
-#include <linux/errno.h>
-#include <linux/io.h>
-#include <linux/dma-direction.h>
-#include <linux/time.h>
 
-#define PCI_DEVICE(_vendor, _device)	\
-	.vendor = (_vendor),	\
-	.device = (_device),	\
-	.subvendor = PCI_ANY_ID,\
-	.subdevice = PCI_ANY_ID
+#define PCI_DMA_BIDIRECTIONAL	0
+#define PCI_DMA_TODEVICE		1
+#define PCI_DMA_FROMDEVICE		2
+#define PCI_DMA_NONE			3
 
-void* pci_alloc_consistent(struct pci_dev *hwdev, size_t size, dma_addr_t *dma_handle);
-void pci_free_consistent(struct pci_dev *hwdev, size_t size, void *vaddr, dma_addr_t dma_handle);
+#define PCI_DEVICE(_vendor_id, _device_id, _name, _data) {	  \
+	.vendor_id = _vendor_id, .device_id = _device_id,		\
+	.subvendor_id = PCI_ID_ANY, .subdevice_id = PCI_ID_ANY, \
+	.name = _name, .data = (void*)_data }
 
-int pci_enable_device(struct pci_dev *dev);
-void pci_disable_device(struct pci_dev *dev);
-
-void pci_set_master(struct pci_dev *dev);
-void pci_clear_master(struct pci_dev *dev);
+#define PCI_DEVICE2(_vendor_id, _device_id, _subvendor_id, _subdevice_id, _name, _data) {\
+	.vendor_id = _vendor_id, .device_id = _device_id,								\
+	.subvendor_id = _subvendor_id, .subdevice_id = _subdevice_id,					\
+	.name = _name, .data = (void*)_data }
 
 #define pci_enable_msi(pdev)    pci_enable_msi_exact(pdev, 1)
 
-int pci_enable_msi_range(struct pci_dev *dev, int minvec, int maxvec);
-void pci_disable_msi(struct pci_dev *dev);
-
-inline int pci_enable_msi_exact(struct pci_dev *dev, int nvec) {
-	int rc = pci_enable_msi_range(dev, nvec, nvec);
-	if (rc < 0)
-		return rc;
-	return 0;
-}
-
-dma_addr_t pci_resource_start(struct pci_dev *dev, int region);
-dma_addr_t pci_resource_end(struct pci_dev *dev, int region);
-dma_addr_t pci_resource_flags(struct pci_dev *dev, int region);
 #define pci_resource_len(dev,bar) \
 	((pci_resource_start((dev), (bar)) == 0 && pci_resource_end((dev), (bar)) == pci_resource_start((dev), (bar))) ? \
 	0 : (pci_resource_end((dev), (bar)) - pci_resource_start((dev), (bar)) + 1))
 
-void *pci_get_drvdata(struct pci_dev *pdev);
-void pci_set_drvdata(struct pci_dev *pdev, void *data);
 
 typedef unsigned int pci_channel_state_t;
 
@@ -60,6 +38,7 @@ enum pci_channel_state {
 };
 
 typedef unsigned int pci_ers_result_t;
+
 enum pci_ers_result {
 	/* no result/none/not supported in device driver */
 	PCI_ERS_RESULT_NONE = (pci_ers_result_t) 1,
@@ -98,17 +77,41 @@ struct pci_driver {
 	const struct pci_error_handlers *err_handler;
 };
 
+void* pci_alloc_consistent(struct pci_dev *hwdev, size_t size, dma_addr_t *dma_handle);
+void pci_free_consistent(struct pci_dev *hwdev, size_t size, void *vaddr, dma_addr_t dma_handle);
+int pci_enable_device(struct pci_dev *dev);
+void pci_disable_device(struct pci_dev *dev);
+void pci_set_master(struct pci_dev *dev);
+void pci_clear_master(struct pci_dev *dev);
+int pci_enable_msi_range(struct pci_dev *dev, int minvec, int maxvec);
+void pci_disable_msi(struct pci_dev *dev);
+int pci_enable_msi_exact(struct pci_dev *dev, int nvec);
+void pci_disable_link_state(struct pci_dev *dev, int state);
+
+dma_addr_t pci_resource_start(struct pci_dev *dev, int region);
+dma_addr_t pci_resource_end(struct pci_dev *dev, int region);
+dma_addr_t pci_resource_flags(struct pci_dev *dev, int region);
+
+void *pci_get_drvdata(struct pci_dev *pdev);
+void pci_set_drvdata(struct pci_dev *pdev, void *data);
+
+int pci_write_config_byte(struct pci_dev *dev, int where, u8 val);
+int pci_write_config_word(struct pci_dev *dev, int where, u16 val);
+int pci_read_config_byte(struct pci_dev *dev, int where, u8* val);
+int pci_read_config_word(struct pci_dev *dev, int where, u16* val);
+int pcie_capability_clear_word(struct pci_dev *dev, int pos, u16 clear);
+int pcie_capability_set_word(struct pci_dev *dev, int pos, u16 set);
+int pcie_capability_clear_and_set_word(struct pci_dev *dev, int pos, u16 clear, u16 set);
+void pci_release_regions(struct pci_dev *pdev);
+int pci_set_cacheline_size(struct pci_dev *dev);
+int pci_set_mwi(struct pci_dev *dev);
+void pci_clear_mwi(struct pci_dev *dev);
+int pci_is_pcie(struct pci_dev *dev);
+
 int pci_register_driver(struct pci_driver *);
 void pci_unregister_driver(struct pci_driver *dev);
-
-#define PCI_DMA_BIDIRECTIONAL	0
-#define PCI_DMA_TODEVICE	1
-#define PCI_DMA_FROMDEVICE	2
-#define PCI_DMA_NONE		3
-
 dma_addr_t pci_map_single(struct pci_dev *hwdev, void *ptr, size_t size, int direction);
 void pci_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr, size_t size, int direction);
-
 int pci_dma_mapping_error(struct pci_dev *pdev, dma_addr_t dma_addr);
 
 #endif /* __LINUX_PCI_H__ */

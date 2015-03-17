@@ -306,7 +306,7 @@
 #define PCIE_LINK_STATE_CLKPM   4
 
 typedef struct pci_dev {
-	Device		dev;	// for Linux compabibility
+	Device		dev;	// for Linux compabibility  
 	
 	char*		name;
 	
@@ -323,6 +323,8 @@ typedef struct pci_dev {
 	uint16_t	capse[PCI_EXT_CAP_ID_MAX + 1];	// PCIe capabilities
 	
 	void*		priv;
+
+	void* 		driver;
 } PCI_Device;
 
 typedef struct {
@@ -333,10 +335,9 @@ typedef struct {
 } __attribute__((packed)) PCIeExtendedCapability;
 
 #define PCI_MAX_DEVICES		32
-#define PCI_MAX_BUS		256
+#define PCI_MAX_BUS			256
 #define PCI_MAX_SLOT		32
 #define PCI_MAX_FUNCTION	8
-
 
 extern PCI_Device pci_devices[PCI_MAX_DEVICES];
 extern int pci_devices_count;

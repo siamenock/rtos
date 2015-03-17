@@ -11,11 +11,11 @@ OBJS = obj/entry.o \
 	obj/acpi.o \
 	obj/loader.o obj/shared.o obj/ni.o obj/icc.o \
 	obj/string.o obj/module.o obj/symbols.o obj/rootfs.o \
-	obj/driver/linux.o obj/driver/dummy.o \
+	obj/driver/dummy.o \
 	obj/driver/vga.o obj/driver/keyboard.o obj/driver/stdin.o obj/driver/stdout.o obj/driver/bfs.o \
 	obj/driver/port.o \
 	obj/vm.o obj/manager.o
-
+#obj/driver/linux.o 
 LIBS = ../lib/libtlsf.a ../lib/libcore.a ../lib/liblwip.a
 
 all: kernel.elf

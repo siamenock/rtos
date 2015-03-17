@@ -77,6 +77,8 @@ deploy: system.img
 
 clean:
 	rm -f system.img root.img kernel.smap kernel.bin kernel.dis packetngin_sdk-*.tgz
+	make -C kernel clean 
+	make -C drivers clean
 
 cleanall: clean
 	rm -rf bin
