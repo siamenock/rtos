@@ -1,6 +1,6 @@
 .PHONY: all run deploy clean cleanall system.img mount umount
 
-QEMU=qemu-system-x86_64 $(shell util/qemu-params) -m 256 -hda system.img -M pc -smp 8 -d cpu_reset -net nic,model=rtl8139 -net tap,script=util/qemu-ifup -net nic,model=rtl8139 -net tap,script=util/qemu-ifup
+QEMU=qemu-system-x86_64 $(shell tools/qemu-params) -m 256 -hda system.img -M pc -smp 8 -d cpu_reset -net nic,model=rtl8139 -net tap,script=tools/qemu-ifup -net nic,model=rtl8139 -net tap,script=tools/qemu-ifup
 
 all: system.img
 
@@ -8,18 +8,19 @@ SYSTEM_IMG_SIZE := 1023		# 512 bytes * 1023 blocks = 512KB - 512B (for boot load
 
 system.img: 
 	make -C lib
-	make -C util
+	mkdir -p bin
+	make -C tools
 	make -C boot
 	make -C loader
 	make -C kernel
 	make -C drivers
-	util/smap kernel/kernel.elf kernel.smap
-	util/pnkc kernel/kernel.elf kernel.bin
+	bin/smap kernel/kernel.elf kernel.smap
+	bin/pnkc kernel/kernel.elf kernel.bin
 	# Make root.img
 	dd if=/dev/zero of=root.img count=$(SYSTEM_IMG_SIZE)
 	mkdir -p mnt
 	sudo losetup /dev/loop0 root.img
-	sudo util/mkfs.bfs /dev/loop0
+	sudo tools/mkfs.bfs /dev/loop0
 	sudo mount /dev/loop0 mnt
 	sudo cp kernel.bin kernel.smap drivers/*.ko firmware/* mnt
 	sync
@@ -27,7 +28,7 @@ system.img:
 	sudo losetup -d /dev/loop0
 	rmdir mnt
 	cat boot/boot.bin loader/loader.bin root.img > $@
-	util/rewrite $@
+	bin/rewrite $@
 
 mount:
 	mkdir mnt
@@ -71,15 +72,19 @@ stop:
 	killall -9 qemu-system-x86_64
 
 deploy: system.img
-	util/chk-sdb
+	tools/chk-sdb
 	sudo dd if=system.img of=/dev/sdb && sync
 
 clean:
 	rm -f system.img root.img kernel.smap kernel.bin kernel.dis packetngin_sdk-*.tgz
+	make -C kernel clean 
+	make -C drivers clean
 
 cleanall: clean
+	rm -rf bin
 	make -C boot clean
 	make -C loader clean
 	make -C kernel clean
 	make -C drivers clean
 	make -C lib cleanall
+	make -C tools clean

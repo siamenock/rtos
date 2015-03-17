@@ -41,9 +41,8 @@
 #define VGA_BUFFER_PAGES	12
 
 //static uint64_t idle_time;
-
-static Device* nics[8];
-static int nics_count;
+extern int nics_count;
+extern Device* nics[];
 
 static bool idle0_event(void* data) {
 	/*
@@ -60,21 +59,22 @@ static bool idle0_event(void* data) {
 	*/
 	
 	// Poll NICs
-	extern int ni_port;
+	extern int nic_index;
 	int poll_count = 0;
 	for(int i = 0; i < nics_count; i++) {
 		Device* dev = nics[i];
 		NIC* nic = dev->driver;
 		
-		ni_port = i;
+		nic_index = i;
+
 		poll_count += nic->poll(dev->id);
 	}
-	
+				
 	// idle
-	/*
-	for(int i = 0; i < 100; i++)
+/*	
+	for(int i = 0; i < 1000; i++)
 		asm volatile("nop");
-	*/
+*/	
 	
 	//idle_time += cpu_tsc() - time;
 	return true;
@@ -126,16 +126,15 @@ static void context_switch() {
 	bool is_paused = errno == 0 && task_is_active(1);
 	if(is_paused) {
 		// ICC_TYPE_PAUSE is not a ICC message but a interrupt in fact, So forcely commit the message
-		icc_msg->status = ICC_STATUS_DONE;
 	}
 	
-	ICC_Message* msg3 = icc_sending(is_paused ? ICC_TYPE_PAUSED : ICC_TYPE_STOPPED, 0);
+	ICC_Message* msg3 = icc_alloc(is_paused ? ICC_TYPE_PAUSED : ICC_TYPE_STOPPED);
 	msg3->result = errno;
 	if(!is_paused) {
 		msg3->data.stopped.return_code = apic_user_return_code();
 	}
 	errno = 0;
-	icc_send(msg3);
+	icc_send(msg3, 0);
 	
 	printf("VM %s...\n", is_paused ? "paused" : "stopped");
 }
@@ -146,13 +145,15 @@ static void icc_start(ICC_Message* msg) {
 	
 	// TODO: Change blocks[0] to blocks
 	uint32_t id = loader_load(vm);
+
 	if(errno != 0) {
-		ICC_Message* msg2 = icc_sending(ICC_TYPE_STARTED, msg->core_id);
-		msg->status = ICC_STATUS_DONE;
-		
+		ICC_Message* msg2 = icc_alloc(ICC_TYPE_STARTED);
+
 		msg2->result = errno;	// errno from loader_load
-		icc_send(msg2);
+		icc_send(msg2, msg->core_id);
+		icc_free(msg);
 		printf("Execution FAILED: %x\n", errno);
+		return;
 	}
 	
 	*(uint32_t*)task_addr(id, SYM_NIS_COUNT) = vm->nic_count;
@@ -163,10 +164,8 @@ static void icc_start(ICC_Message* msg) {
 	}
 	
 	printf("Starting VM...\n");
-	ICC_Message* msg2 = icc_sending(ICC_TYPE_STARTED, msg->core_id);
-	msg->status = ICC_STATUS_DONE;
+	ICC_Message* msg2 = icc_alloc(ICC_TYPE_STARTED);
 	
-	msg2->result = 0;
 	msg2->data.started.stdin = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)*(char**)task_addr(id, SYM_STDIN));
 	msg2->data.started.stdin_head = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)task_addr(id, SYM_STDIN_HEAD));
 	msg2->data.started.stdin_tail = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)task_addr(id, SYM_STDIN_TAIL));
@@ -180,17 +179,28 @@ static void icc_start(ICC_Message* msg) {
 	msg2->data.started.stderr_tail = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)task_addr(id, SYM_STDERR_TAIL));
 	msg2->data.started.stderr_size = *(int*)task_addr(id, SYM_STDERR_SIZE);
 	
-	icc_send(msg2);
+	icc_send(msg2, msg->core_id);
+
+	icc_free(msg);
 	
 	context_switch();
 }
 
 static void icc_resume(ICC_Message* msg) {
+	if(msg->result < 0) {
+		ICC_Message* msg2 = icc_alloc(ICC_TYPE_RESUMED);
+		msg2->result = msg->result;
+		icc_send(msg2, msg->core_id);
+
+		icc_free(msg);
+		return;
+	}
+
 	printf("Resuming VM...\n");
-	ICC_Message* msg2 = icc_sending(ICC_TYPE_RESUMED, msg->core_id);
-	msg->status = ICC_STATUS_DONE;
-	icc_send(msg2);
-	
+	ICC_Message* msg2 = icc_alloc(ICC_TYPE_RESUMED);
+
+	icc_send(msg2, msg->core_id);
+	icc_free(msg);
 	context_switch();
 }
 
@@ -201,8 +211,16 @@ static void icc_pause(uint64_t vector, uint64_t error_code) {
 }
 
 static void icc_stop(ICC_Message* msg) {
-	msg->status = ICC_STATUS_DONE;
-	
+	if(msg->result < 0) { //Not yet core is started.
+		ICC_Message* msg2 = icc_alloc(ICC_TYPE_STOPPED);
+		msg2->result = msg->result;
+		icc_send(msg2, msg->core_id);
+
+		icc_free(msg);
+		return;
+	}
+
+	icc_free(msg);
 	task_destroy(1);
 }
 
@@ -327,27 +345,37 @@ void main(void) {
 		
 		printf("Cleaning up memory...\n");
 		gmalloc_extend();
-		
-		printf("Initializing device drivers...");
+	
+		printf("Initializing device drivers...\n");
 		int count = device_module_init();
-		
+
 		nics_count = device_count(DEVICE_TYPE_NIC);
 		printf("Finding NICs: %d\n", nics_count);
+
+		extern int** ni_port;
+		int port_index = 0;
 		for(int i = 0; i < count; i++) {
 			nics[i] = device_get(DEVICE_TYPE_NIC, i);
-			NICStatus status;
-			((NIC*)nics[i]->driver)->get_status(nics[i]->id, &status);
-			printf("\tNIC[%d]: %02x:%02x:%02x:%02x:%02x:%02x %c\n", i,
-				(status.mac >> 40) & 0xff, 
-				(status.mac >> 32) & 0xff, 
-				(status.mac >> 24) & 0xff, 
-				(status.mac >> 16) & 0xff, 
-				(status.mac >> 8) & 0xff, 
-				(status.mac >> 0) & 0xff,
-				ni_mac == 0 ? '*' : ' ');
-			
-			if(ni_mac == 0)
-				ni_mac = status.mac;
+			NICInfo info;
+			((NIC*)nics[i]->driver)->get_info(nics[i]->id, &info);
+
+			ni_port[i] = gmalloc(sizeof(int) * info.port_count);
+			for(int j = 0; j < info.port_count; j++) {
+				printf("\tPORT[%d]: NIC[%d]: LOCAL_PORT[%d]: %02x:%02x:%02x:%02x:%02x:%02x %c\n", port_index, i, j,
+					(info.mac[j] >> 40) & 0xff,
+					(info.mac[j] >> 32) & 0xff,
+					(info.mac[j] >> 24) & 0xff,
+					(info.mac[j] >> 16) & 0xff,
+					(info.mac[j] >> 8) & 0xff,
+					(info.mac[j] >> 0) & 0xff,
+					ni_mac == 0 ? '*' : ' ');
+
+				if(ni_mac == 0)
+					ni_mac = info.mac[j];
+
+				ni_port[i][j] = port_index;
+				port_index++;
+			}
 		}
 		
 		printf("Initializing VM manager...\n");
@@ -360,7 +388,7 @@ void main(void) {
 		shell_init();
 		
 		event_busy_add(idle0_event, NULL);
-		
+
 		dummy_init();	// There is no meaning
 	} else {
 		// Application Processor
