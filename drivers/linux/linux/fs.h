@@ -1,7 +1,10 @@
 #ifndef __LINUX_FS_H__
 #define __LINUX_FS_H__
 
-#include <linux/module.h>
+#include <linux/types.h>
+
+#define CHRDEV_MAJOR_HASH_SIZE 	255
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof(*(x)))
 
 struct file {
 	void*		private_data;
@@ -24,6 +27,7 @@ struct file_operations {
 
 int alloc_chrdev_region(dev_t *, unsigned, unsigned, const char *);
 void unregister_chrdev_region(dev_t, unsigned);
+size_t strlcpy(char* dest, const char* src, size_t size);
 
 #endif /* __LINUX_FS_H__ */
 

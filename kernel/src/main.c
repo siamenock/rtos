@@ -41,9 +41,8 @@
 #define VGA_BUFFER_PAGES	12
 
 //static uint64_t idle_time;
-
-static Device* nics[8];
-static int nics_count;
+extern int nics_count;
+extern Device* nics[];
 
 static bool idle0_event(void* data) {
 	/*
@@ -60,21 +59,22 @@ static bool idle0_event(void* data) {
 	*/
 	
 	// Poll NICs
-	extern int ni_port;
+	extern int nic_index;
 	int poll_count = 0;
 	for(int i = 0; i < nics_count; i++) {
 		Device* dev = nics[i];
 		NIC* nic = dev->driver;
 		
-		ni_port = i;
+		nic_index = i;
+
 		poll_count += nic->poll(dev->id);
 	}
-	
+				
 	// idle
-	/*
-	for(int i = 0; i < 100; i++)
+/*	
+	for(int i = 0; i < 1000; i++)
 		asm volatile("nop");
-	*/
+*/	
 	
 	//idle_time += cpu_tsc() - time;
 	return true;
@@ -345,27 +345,37 @@ void main(void) {
 		
 		printf("Cleaning up memory...\n");
 		gmalloc_extend();
-		
-		printf("Initializing device drivers...");
+	
+		printf("Initializing device drivers...\n");
 		int count = device_module_init();
-		
+
 		nics_count = device_count(DEVICE_TYPE_NIC);
 		printf("Finding NICs: %d\n", nics_count);
+
+		extern int** ni_port;
+		int port_index = 0;
 		for(int i = 0; i < count; i++) {
 			nics[i] = device_get(DEVICE_TYPE_NIC, i);
-			NICStatus status;
-			((NIC*)nics[i]->driver)->get_status(nics[i]->id, &status);
-			printf("\tNIC[%d]: %02x:%02x:%02x:%02x:%02x:%02x %c\n", i,
-				(status.mac >> 40) & 0xff, 
-				(status.mac >> 32) & 0xff, 
-				(status.mac >> 24) & 0xff, 
-				(status.mac >> 16) & 0xff, 
-				(status.mac >> 8) & 0xff, 
-				(status.mac >> 0) & 0xff,
-				ni_mac == 0 ? '*' : ' ');
-			
-			if(ni_mac == 0)
-				ni_mac = status.mac;
+			NICInfo info;
+			((NIC*)nics[i]->driver)->get_info(nics[i]->id, &info);
+
+			ni_port[i] = gmalloc(sizeof(int) * info.port_count);
+			for(int j = 0; j < info.port_count; j++) {
+				printf("\tPORT[%d]: NIC[%d]: LOCAL_PORT[%d]: %02x:%02x:%02x:%02x:%02x:%02x %c\n", port_index, i, j,
+					(info.mac[j] >> 40) & 0xff,
+					(info.mac[j] >> 32) & 0xff,
+					(info.mac[j] >> 24) & 0xff,
+					(info.mac[j] >> 16) & 0xff,
+					(info.mac[j] >> 8) & 0xff,
+					(info.mac[j] >> 0) & 0xff,
+					ni_mac == 0 ? '*' : ' ');
+
+				if(ni_mac == 0)
+					ni_mac = info.mac[j];
+
+				ni_port[i][j] = port_index;
+				port_index++;
+			}
 		}
 		
 		printf("Initializing VM manager...\n");
@@ -378,7 +388,7 @@ void main(void) {
 		shell_init();
 		
 		event_busy_add(idle0_event, NULL);
-		
+
 		dummy_init();	// There is no meaning
 	} else {
 		// Application Processor
