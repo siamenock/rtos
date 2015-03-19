@@ -12,7 +12,7 @@ typedef struct {
 	NetworkInterface*	ni;
 	List*		pools;
 	void*		pool;
-	int		port;
+	int			port;
 	
 	// Information
 	uint64_t	mac;
@@ -57,8 +57,8 @@ bool ni_contains(uint64_t mac);
  * 6: no resource to allocate
  */
 uint32_t ni_update(NI* ni, uint64_t* attrs, uint32_t size);
-void ni_process_input(uint8_t* buf1, uint32_t size1, uint8_t* buf2, uint32_t size2);
-Packet* ni_process_output();
+void ni_process_input(uint8_t local_port, uint8_t* buf1, uint32_t size1, uint8_t* buf2, uint32_t size2);
+Packet* ni_process_output(uint8_t local_port);
 void ni_statistics(uint64_t time);
 
 #endif /* __NI_H__ */

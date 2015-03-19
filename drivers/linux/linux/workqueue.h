@@ -1,7 +1,26 @@
 #ifndef __LINUX_WORKQUEUE_H__
 #define __LINUX_WORKQUEUE_H__
 
-#include <linux/types.h>
+#include <stdbool.h> 
+
+#define NR_CPUS		1 //CONFIG_NR_CPUS  // Maximum supported processors
+#define work_data_bits(work) ((unsigned long *)(&(work)->data)) //
+#define create_workqueue(name) alloc_workqueue("%s", WQ_MEM_RECLAIM, 1, (name))
+
+#define DECLARE_WORK(n, f)                                              \
+	struct work_struct n = { 0, f }
+
+#define INIT_WORK(_work, _func) 		\
+	do {					\
+		(_work)->data = 0;		\
+		(_work)->func = (_func);	\
+	} while(0);
+
+enum {
+	WORK_STRUCT_PENDING_BIT	= 0,	/* work item is pending execution */
+	/* not bound to any CPU, prefer the local CPU */
+	WORK_CPU_UNBOUND	= NR_CPUS,
+}; 
 
 enum {
 	WQ_FREEZABLE	= 1 << 2,
@@ -18,21 +37,11 @@ struct work_struct {
 	work_func_t	func;
 };
 
-bool queue_work(struct workqueue_struct *wq, struct work_struct *work);
-
 struct workqueue_struct* alloc_workqueue(const char *fmt, unsigned int flags, int max_active, const char *lock_name);
-
-#define create_workqueue(name) alloc_workqueue("%s", WQ_MEM_RECLAIM, 1, (name))
-
-#define DECLARE_WORK(n, f)                                              \
-	struct work_struct n = { 0, f }
-
-#define INIT_WORK(_work, _func) 		\
-	do {					\
-		(_work)->data = 0;		\
-		(_work)->func = (_func);	\
-	} while(0);
-		
+bool queue_work(struct workqueue_struct *wq, struct work_struct *work);
+bool schedule_work(struct work_struct *work);
+void cancel_work_sync(struct work_struct *work);
+void synchronize_sched();
 
 #endif /* __LINUX_WORKQUEUE_H__ */
 

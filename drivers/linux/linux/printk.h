@@ -1,7 +1,7 @@
 #ifndef __LINUX_PRINTK_H__
 #define __LINUX_PRINTK_H__
 
-#include <linux/string.h>
+#include <linux/types.h>
 
 int printf(const char *format, ...);
 
