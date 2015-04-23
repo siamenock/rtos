@@ -67,6 +67,7 @@
          typeof(x) _max1 = (x);                  \
          typeof(y) _max2 = (y);                  \
          (void) (&_max1 == &_max2);              \
+<<<<<<< HEAD
 	 _max1 > _max2 ? _max1 : _max2; })
 
 #define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))

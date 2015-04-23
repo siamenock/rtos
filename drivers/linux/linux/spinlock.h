@@ -7,7 +7,6 @@
 #define DEFINE_SPINLOCK(x)	spinlock_t x = 0;
 
 #define spin_lock_init(_lock) 
-
 #define raw_spin_lock_irqsave(lock, flags)	\
 do {						\
 	typecheck(unsigned long, flags);	\

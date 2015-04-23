@@ -131,7 +131,7 @@ struct net_device {
 	netdev_features_t		hw_features;
 	netdev_features_t		vlan_features;
 
-//	PCI_Device*			dev;
+	//	PCI_Device*			dev;
 	void* 				dev;
 
 	char				name[16]; 
