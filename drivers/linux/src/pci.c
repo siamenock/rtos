@@ -41,7 +41,6 @@ void pci_free_consistent(struct pci_dev *hwdev, size_t size, void *vaddr, dma_ad
 		gfree(ptr);
 }
 
->>>>>>> d1a747a6c4b3d179f061c4afe19ec2682973a86d
 bool pci_enable(PCI_Device* device) {
 	bool changed = false;
 	

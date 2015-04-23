@@ -335,7 +335,7 @@ typedef struct {
 } __attribute__((packed)) PCIeExtendedCapability;
 
 #define PCI_MAX_DEVICES		32
-#define PCI_MAX_BUS			256
+#define PCI_MAX_BUS		256
 #define PCI_MAX_SLOT		32
 #define PCI_MAX_FUNCTION	8
 

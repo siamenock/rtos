@@ -2,7 +2,7 @@
 
 CFLAGS = -I../lib/core/include -I../kernel/src/driver -O2 -Wall -Werror -m64 -ffreestanding -std=gnu99 -mcmodel=kernel -I./linux
 
-MODULES = virtio.ko r8169.ko #rtl8139.ko #rtl8139.ko nf10.ko
+MODULES = virtio.ko r8169.ko rtl8139.ko #nf10.ko
 
 all: $(MODULES) 
 
@@ -12,7 +12,7 @@ all: $(MODULES)
 %.o: src/%.c 
 	gcc $(CFLAGS) -c -o $@ $<
 
-virtio.ko:
+virtio.ko: linux.ko
 	make -C virtio
 	cp virtio/virtio.ko .
 

@@ -12,18 +12,9 @@
 #define PCI_DMA_FROMDEVICE	2
 #define PCI_DMA_NONE		3
 
-#define PCI_DEVICE(vend,dev) \
-	.vendor_id = (vend), .device_id = (dev), \
-.subvendor_id = PCI_ANY_ID, .subdevice_id = PCI_ANY_ID
-
-#define PCI_DEVICE_SUB(_vendor_id, _device_id, _name, _data) {	  \
+#define PCI_DEVICE_SUB(_vendor_id, _device_id, _name, _data) {		\
 	.vendor_id = _vendor_id, .device_id = _device_id,		\
-	.subvendor_id = PCI_ID_ANY, .subdevice_id = PCI_ID_ANY, \
-	.name = _name, .data = (void*)_data }
-
-#define PCI_DEVICE2(_vendor_id, _device_id, _subvendor_id, _subdevice_id, _name, _data) {\
-	.vendor_id = _vendor_id, .device_id = _device_id,								\
-	.subvendor_id = _subvendor_id, .subdevice_id = _subdevice_id,					\
+	.subvendor_id = PCI_ID_ANY, .subdevice_id = PCI_ID_ANY, 	\
 	.name = _name, .data = (void*)_data }
 
 #define pci_enable_msi(pdev)    pci_enable_msi_exact(pdev, 1)
@@ -31,7 +22,6 @@
 #define pci_resource_len(dev,bar) \
 	((pci_resource_start((dev), (bar)) == 0 && pci_resource_end((dev), (bar)) == pci_resource_start((dev), (bar))) ? \
 	 0 : (pci_resource_end((dev), (bar)) - pci_resource_start((dev), (bar)) + 1))
-
 
 typedef unsigned int pci_channel_state_t;
 
