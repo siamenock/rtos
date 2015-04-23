@@ -3,6 +3,7 @@
 
 #include <linux/types.h>
 #include <linux/device.h>
+#include <linux/err.h>
 
 #define DMA_BIT_MASK(n) (((n) == 64) ? ~0ull : ((1ull << (n)) - 1))
 #define DMA_MASK_NONE   0x0ULL

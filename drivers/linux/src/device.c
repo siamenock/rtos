@@ -10,6 +10,6 @@ void class_unregister(struct class *class) {}
 struct device *device_create(struct class *cls, 
 	struct device *parent, dev_t devt, void *drvdata, 
 	const char *fmt, ...) {
-	return NULL;
+    return NULL;
 }
 void device_destroy(struct class *cls, dev_t devt) {}	

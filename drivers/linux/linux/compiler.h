@@ -2,6 +2,8 @@
 #define __LINUX_COMPILER_H__
 
 #define __iomem
+#define __percpu
+#define __rcu
 
 #define ACCESS_ONCE(x) (*(volatile typeof(x) *)&(x)) // include/linux/compiler.h
 #define likely(x)       __builtin_expect((x),1)

@@ -41,6 +41,8 @@ void pci_free_consistent(struct pci_dev *hwdev, size_t size, void *vaddr, dma_ad
 		gfree(ptr);
 }
 
+int printf(const char *format, ...);
+
 bool pci_enable(PCI_Device* device) {
 	bool changed = false;
 	
@@ -48,6 +50,9 @@ bool pci_enable(PCI_Device* device) {
 	uint16_t command = pci_read16(device, PCI_COMMAND);
 	if((command & enable) != enable) {
 		command |= enable;
+		if(command & PCI_COMMAND_INTX_DISABLE) {
+			printf("Interrupt Disabled\n");
+		}
 		pci_write16(device, PCI_COMMAND, command);
 		changed = true;
 	}
@@ -57,13 +62,13 @@ bool pci_enable(PCI_Device* device) {
 		pci_write8(device, PCI_LATENCY_TIMER, 32);
 		changed = true;
 	}
-	
+
 	return changed;
 }
 
 int pci_enable_device(struct pci_dev *dev) {
 	pci_enable(dev);
-	return 0;
+	return 0;	
 }
 void pci_disable_device(struct pci_dev *dev) {}
 
@@ -75,7 +80,7 @@ void pci_clear_master(struct pci_dev *dev) {}
 
 int pci_enable_msi_range(struct pci_dev *dev, int minvec, int maxvec) {
 	// PacketNgin doesn't have msi
-	return 0;
+	return -1;
 }
 void pci_disable_msi(struct pci_dev *dev) {
 	// PacketNgin doesn't have msi
@@ -94,6 +99,7 @@ int pci_enable_msi_exact(struct pci_dev *dev, int nvec) {
 
 dma_addr_t pci_resource_start(struct pci_dev *dev, int region) {
 	uint32_t addr = pci_read32(dev, PCI_BASE_ADDRESS_0 + region * 4);
+//	printf("mask %d, io %p mem %p, ori : %p\n", addr & PCI_BASE_ADDRESS_SPACE_IO, addr & PCI_BASE_ADDRESS_IO_MASK, addr & PCI_BASE_ADDRESS_MEM_MASK, addr);
 	if(addr & PCI_BASE_ADDRESS_SPACE_IO)
 		return addr & PCI_BASE_ADDRESS_IO_MASK;
 	else
@@ -219,3 +225,117 @@ void pci_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr, size_t size, i
 int pci_dma_mapping_error(struct pci_dev *pdev, dma_addr_t dma_addr) { 
 	return 0; 
 }
+
+volatile void __iomem *pci_iomap(struct pci_dev *dev, int bar, unsigned long maxlen)
+{
+	resource_size_t start = pci_resource_start(dev, bar);
+
+	return (void*)start;
+//	resource_size_t len = pci_resource_len(dev, bar);
+//	unsigned long flags = pci_resource_flags(dev, bar);
+//
+//	if (!len || !start)
+//		return NULL;
+//	if (maxlen && len > maxlen)
+//		len = maxlen;
+//	if (flags & IORESOURCE_IO)
+//		return __pci_ioport_map(dev, start, len);
+//	if (flags & IORESOURCE_MEM) {
+//		if (flags & IORESOURCE_CACHEABLE)
+//			return ioremap(start, len);
+//		return ioremap_nocache(start, len);
+//	}
+//	/* What? */
+//	return NULL;
+}
+
+void pci_iounmap(struct pci_dev *dev, volatile void __iomem * addr)
+{}
+
+//void pci_msi_off(struct pci_dev *dev)
+//{
+//	int pos;
+//	u16 control;
+//
+//	/*
+//	 * This looks like it could go in msi.c, but we need it even when
+//	 * CONFIG_PCI_MSI=n.  For the same reason, we can't use
+//	 * dev->msi_cap or dev->msix_cap here.
+//	 */
+//	pos = pci_find_capability(dev, PCI_CAP_ID_MSI);
+//	if (pos) {
+//		pci_read_config_word(dev, pos + PCI_MSI_FLAGS, &control);
+//		control &= ~PCI_MSI_FLAGS_ENABLE;
+//		pci_write_config_word(dev, pos + PCI_MSI_FLAGS, control);
+//	}
+//	pos = pci_find_capability(dev, PCI_CAP_ID_MSIX);
+//	if (pos) {
+//		pci_read_config_word(dev, pos + PCI_MSIX_FLAGS, &control);
+//		control &= ~PCI_MSIX_FLAGS_ENABLE;
+//		pci_write_config_word(dev, pos + PCI_MSIX_FLAGS, control);
+//	}
+//}
+//
+//int pci_find_capability(struct pci_dev *dev, int cap)
+//{
+//	int pos;
+//
+//	pos = __pci_bus_find_cap_start(dev->bus, dev->devfn, dev->hdr_type);
+//	if (pos)
+//		pos = __pci_find_next_cap(dev->bus, dev->devfn, pos, cap);
+//
+//	return pos;
+//}
+//
+//static int __pci_bus_find_cap_start(struct pci_bus *bus,
+//				    unsigned int devfn, u8 hdr_type)
+//{
+//	u16 status;
+//
+//	pci_bus_read_config_word(bus, devfn, PCI_STATUS, &status);
+//	if (!(status & PCI_STATUS_CAP_LIST))
+//		return 0;
+//
+//	switch (hdr_type) {
+//	case PCI_HEADER_TYPE_NORMAL:
+//	case PCI_HEADER_TYPE_BRIDGE:
+//		return PCI_CAPABILITY_LIST;
+//	case PCI_HEADER_TYPE_CARDBUS:
+//		return PCI_CB_CAPABILITY_LIST;
+//	default:
+//		return 0;
+//	}
+//
+//	return 0;
+//}
+//
+//#define PCI_FIND_CAP_TTL	48
+//
+//static int __pci_find_next_cap_ttl(struct pci_bus *bus, unsigned int devfn,
+//				   u8 pos, int cap, int *ttl)
+//{
+//	u8 id;
+//
+//	while ((*ttl)--) {
+//		pci_bus_read_config_byte(bus, devfn, pos, &pos);
+//		if (pos < 0x40)
+//			break;
+//		pos &= ~3;
+//		pci_bus_read_config_byte(bus, devfn, pos + PCI_CAP_LIST_ID,
+//					 &id);
+//		if (id == 0xff)
+//			break;
+//		if (id == cap)
+//			return pos;
+//		pos += PCI_CAP_LIST_NEXT;
+//	}
+//	return 0;
+//}
+//
+//static int __pci_find_next_cap(struct pci_bus *bus, unsigned int devfn,
+//			       u8 pos, int cap)
+//{
+//	int ttl = PCI_FIND_CAP_TTL;
+//
+//	return __pci_find_next_cap_ttl(bus, devfn, pos, cap, &ttl);
+//}

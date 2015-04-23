@@ -1,6 +1,9 @@
 #ifndef __LINUX_KERNEL_H__
 #define __LINUX_KERNEL_H__
 
+#include <linux/spinlock.h>
+#include <asm/byteorder.h>
+
 #define USHRT_MAX       ((u16)(~0U))
 #define SHRT_MAX        ((s16)(USHRT_MAX>>1))
 #define SHRT_MIN        ((s16)(-SHRT_MAX - 1))
@@ -29,17 +32,19 @@
 #define S64_MAX         ((s64)(U64_MAX>>1))
 #define S64_MIN         ((s64)(-S64_MAX - 1))
 
-#define ALIGN(x, a)						__ALIGN_KERNEL((x), (a))
+#define ALIGN(x, a)			__ALIGN_KERNEL((x), (a))
 #define __ALIGN_KERNEL(x, a)            __ALIGN_KERNEL_MASK(x, (typeof(x))(a) - 1)
-#define __ALIGN_MASK(x, mask)			__ALIGN_KERNEL_MASK((x), (mask))
+#define __ALIGN_MASK(x, mask)		__ALIGN_KERNEL_MASK((x), (mask))
 #define __ALIGN_KERNEL_MASK(x, mask)    (((x) + (mask)) & ~(mask))
-#define PTR_ALIGN(p, a)					((typeof(p))ALIGN((unsigned long)(p), (a)))
-#define IS_ALIGNED(x, a)				(((x) & ((typeof(x))(a) - 1)) == 0)
+#define PTR_ALIGN(p, a)			((typeof(p))ALIGN((unsigned long)(p), (a)))
+#define IS_ALIGNED(x, a)		(((x) & ((typeof(x))(a) - 1)) == 0)
 
-#define cpu_to_le32(v)	(v)
-#define cpu_to_le64(v)	(v)
-#define le32_to_cpu(v)	(v)
-#define le64_to_cpu(v)	(v)
+//#define cpu_to_le17(v)	(v)
+//#define cpu_to_le32(v)	(v)
+//#define cpu_to_le64(v)	(v)
+//#define le16_to_cpu(v) 	(v)
+//#define le32_to_cpu(v)	(v)
+//#define le64_to_cpu(v)	(v)
 
 #undef offsetof
 #ifdef __compiler_offsetof
@@ -62,8 +67,14 @@
          typeof(x) _max1 = (x);                  \
          typeof(y) _max2 = (y);                  \
          (void) (&_max1 == &_max2);              \
+	 _max1 > _max2 ? _max1 : _max2; })
 
 #define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))
+
+#define dev_err(dev, format, ...) //fprintf(stderr, format, ##__VA_ARGS__)
+#define dev_warn(dev, format, ...) //fprintf(stderr, format, ##__VA_ARGS__)
+
+#define uninitialized_var(x)	x = x
 
 #endif /* __LINUX_KERNEL_H__ */
 
