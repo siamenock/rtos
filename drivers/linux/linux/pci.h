@@ -2,29 +2,26 @@
 #define __LINUX_PCI_H__
 
 #include <packetngin/pci.h>
+#include <linux/compiler.h>
 #include <linux/types.h>
+#include <linux/mod_devicetable.h>
+#include <linux/io.h>
 
 #define PCI_DMA_BIDIRECTIONAL	0
-#define PCI_DMA_TODEVICE		1
-#define PCI_DMA_FROMDEVICE		2
-#define PCI_DMA_NONE			3
+#define PCI_DMA_TODEVICE	1
+#define PCI_DMA_FROMDEVICE	2
+#define PCI_DMA_NONE		3
 
-#define PCI_DEVICE(_vendor_id, _device_id, _name, _data) {	  \
+#define PCI_DEVICE_SUB(_vendor_id, _device_id, _name, _data) {		\
 	.vendor_id = _vendor_id, .device_id = _device_id,		\
-	.subvendor_id = PCI_ID_ANY, .subdevice_id = PCI_ID_ANY, \
-	.name = _name, .data = (void*)_data }
-
-#define PCI_DEVICE2(_vendor_id, _device_id, _subvendor_id, _subdevice_id, _name, _data) {\
-	.vendor_id = _vendor_id, .device_id = _device_id,								\
-	.subvendor_id = _subvendor_id, .subdevice_id = _subdevice_id,					\
+	.subvendor_id = PCI_ID_ANY, .subdevice_id = PCI_ID_ANY, 	\
 	.name = _name, .data = (void*)_data }
 
 #define pci_enable_msi(pdev)    pci_enable_msi_exact(pdev, 1)
 
 #define pci_resource_len(dev,bar) \
 	((pci_resource_start((dev), (bar)) == 0 && pci_resource_end((dev), (bar)) == pci_resource_start((dev), (bar))) ? \
-	0 : (pci_resource_end((dev), (bar)) - pci_resource_start((dev), (bar)) + 1))
-
+	 0 : (pci_resource_end((dev), (bar)) - pci_resource_start((dev), (bar)) + 1))
 
 typedef unsigned int pci_channel_state_t;
 
@@ -72,9 +69,14 @@ struct pci_error_handlers {
 struct pci_driver {
 	const char* name;
 	const struct pci_device_id *id_table;
-	int  (*probe)  (struct pci_dev *dev, const struct pci_device_id *id);
+	int	(*probe)  (struct pci_dev *dev, const struct pci_device_id *id);
 	void (*remove) (struct pci_dev *dev);
 	const struct pci_error_handlers *err_handler;
+};
+
+struct msix_entry {
+	u32	vector;
+	u16	entry;
 };
 
 void* pci_alloc_consistent(struct pci_dev *hwdev, size_t size, dma_addr_t *dma_handle);
@@ -114,5 +116,7 @@ dma_addr_t pci_map_single(struct pci_dev *hwdev, void *ptr, size_t size, int dir
 void pci_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr, size_t size, int direction);
 int pci_dma_mapping_error(struct pci_dev *pdev, dma_addr_t dma_addr);
 
+volatile void __iomem *pci_iomap(struct pci_dev *dev, int bar, unsigned long maxlen);
+void pci_iounmap(struct pci_dev *dev, volatile void __iomem * addr);
 #endif /* __LINUX_PCI_H__ */
 
