@@ -4,31 +4,32 @@ CFLAGS = -I. -I../../kernel/src -I../../lib/core/include -O2 -Wall -Werror -m64 
 
 OBJS = obj/cdev.o 		\
 	obj/atomic.o  		\
-	obj/delay.o			\
+	obj/delay.o		\
 	obj/device.o		\
-	obj/slab.o			\
+	obj/slab.o		\
 	obj/dma-mapping.o	\
 	obj/etherdevice.o	\
-	obj/fs.o 			\
+	obj/fs.o 		\
 	obj/interrupt.o 	\
-	obj/io.o 			\
+	obj/io.o 		\
 	obj/ioport.o 		\
 	obj/jiffies.o		\
 	obj/netdevice.o		\
 	obj/skbuff.o		\
 	obj/spinlock.o		\
 	obj/string.o		\
-	obj/time.o			\
+	obj/time.o		\
 	obj/workqueue.o		\
-	obj/pci.o			\
+	obj/pci.o		\
 	obj/uaccess.o    	\
-	obj/err.o			\
+	obj/err.o		\
 	obj/bitops.o		\
-	obj/mutex.o			\
-	obj/pci_dma_compat.o\
-	obj/net.o			\
+	obj/mutex.o		\
+	obj/pci_dma_compat.o	\
+	obj/net.o		\
 	obj/firmware.o 		\
-	obj/timer.o
+	obj/timer.o		\
+	obj/printk.o
 
 obj/%.o: src/%.c 
 	mkdir -p obj

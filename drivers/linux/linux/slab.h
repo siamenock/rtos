@@ -2,6 +2,7 @@
 #define __LINUX_SLAB_H__
 
 #include <linux/types.h>
+#include <linux/workqueue.h>
 
 void* kmalloc(size_t size, gfp_t flags);
 void kfree(const void*);

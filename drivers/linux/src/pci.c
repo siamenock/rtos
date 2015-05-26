@@ -75,7 +75,7 @@ void pci_clear_master(struct pci_dev *dev) {}
 
 int pci_enable_msi_range(struct pci_dev *dev, int minvec, int maxvec) {
 	// PacketNgin doesn't have msi
-	return 0;
+	return -1;
 }
 void pci_disable_msi(struct pci_dev *dev) {
 	// PacketNgin doesn't have msi

@@ -37,6 +37,15 @@ struct work_struct {
 	work_func_t	func;
 };
 
+struct delayed_work {
+	struct work_struct work;
+//	struct timer_list timer;
+
+	/* target workqueue and CPU ->timer uses to queue ->work */
+	struct workqueue_struct *wq;
+	int cpu;
+};
+
 struct workqueue_struct* alloc_workqueue(const char *fmt, unsigned int flags, int max_active, const char *lock_name);
 bool queue_work(struct workqueue_struct *wq, struct work_struct *work);
 bool schedule_work(struct work_struct *work);

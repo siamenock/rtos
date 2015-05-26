@@ -2,7 +2,8 @@
 #define __DRIVER_PCI_H__
 
 #include <stdbool.h>
-/*
+#include <stdint.h>
+
 #define PCI_ID_ANY	~(0)
 
 typedef struct _PCI_ID {
@@ -23,8 +24,6 @@ typedef struct _PCI_ID {
 	.vendor_id = _vendor_id, .device_id = _device_id, 				\
 	.subvendor_id = _subvendor_id, .subdevice_id = _subdevice_id,			\
 	.name = _name, .data = (void*)_data }
-*/
-
 
 typedef struct pci_dev PCI_Device;
 
