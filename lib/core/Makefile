@@ -1,4 +1,4 @@
-.PHONY: all kernel clean
+.PHONY: all kernel clean doc
 
 DIR = obj obj_linux
 
@@ -57,6 +57,9 @@ obj_linux/%.o: src/%.asm
 
 libcore_linux.a: $(addprefix $(LINUX_DIR), $(OBJS))
 	ar rcs $@ $^
+
+doc:
+	doxygen Doxyfile
 
 clean: 
 	rm -rf obj

@@ -1,0 +1,53 @@
+/** \mainpage PacketNgin Core Library
+
+PacketNgin Core Library is a firmware for a PacketNgin Network Applications (Net Apps) and 
+useful utilities to manipulate virtualized resources such as global and local memory,
+threads(or CPU Core), network interface controller, storage, ...
+
+\section sec_cpu CPU and Threads
+PacketNgin O/S allocates one or more CPU cores to a Net App. Net App manages CPU Cores as threads. 
+So one thread maps to one CPU core exactly. The first thread receives thread id as 0, 
+and other threads receives thread id 1 to n sequencially.
+
+Threads can communicate with other threads with global memory area. Every threads in a Net App share 
+global memory area. Natually there is concurrency issues when using global memory area.
+
+One thread allocate local memory area which is exclusively allocated to one thread only.
+It's convenient to consider local memory area as thread local memory. No other thread but associated
+thread can access it's own local memory area.
+
+@see gmalloc
+@see gfree
+@see thread_id
+
+\section sec_global_mem Global memory area and Shared memory area
+Global memory area is sharable memory area between threads in a Net App. Any threads
+in a Net App can read or write global memory area. Shared memory area is a specially
+allocated area from global memory area to share the pointer (address of memory) between threads.
+PacketNgin O/S does not allocate global memory area with predefined addresses. So a thread
+has no knowedge of global memory address to communicates with other threads.
+User can allocate global memory address and register the pointer as a shared memory area.
+When one thread register a chunk of global memory area as a shared memory, 
+other threads can communicates via shared memory.
+
+@see shared_set
+@see shared_get
+
+\section sec_local_mem Local memory area
+Local memory area is explicitly allocated memory area to a thread. So other thread cannot
+read or write local memory area. There is noway to access other thread's local memory area.
+So it's reasonable to consider local memory area as thread local memory.
+
+@see malloc
+@see free
+
+\section sec_nic Network Interface Controller
+
+\section sec_util Utility functions
+
+\section sec_net Network functions
+
+\section sec_authors Contact point
+PacketNgin (packetngin at gurum dot cc)
+
+*/
