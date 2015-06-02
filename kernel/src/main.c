@@ -81,9 +81,15 @@ static bool idle0_event(void* data) {
 }
 
 static bool idle_event(void* data) {
-	for(int i = 0; i < 100; i++)
-		asm volatile("nop");
-	
+	static uint8_t trigger;
+
+	if(CPU_IS_MONITOR_MWAIT & CPU_IS_MWAIT_INTERRUPT) {
+		monitor(&trigger);
+		mwait(1, 0x21);
+	} else {
+		hlt();
+	}
+
 	return true;
 }
 
@@ -383,7 +389,7 @@ void main(void) {
 		
 		printf("Initializing RPC manager...\n");
 		manager_init();
-		
+
 		printf("Initializing shell...\n");
 		shell_init();
 		
@@ -412,12 +418,12 @@ void main(void) {
 		
 		event_idle_add(idle_event, NULL);
 	}
-	
+
 	mp_sync();
 	
 	if(core_id == 0)
 		exec("init.psh");
-	
+
 	while(1)
 		event_loop();
 }

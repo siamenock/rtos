@@ -23,5 +23,9 @@ void refresh_cr3();
 void* read_rbp();
 void* read_rsp();
 void read_xmms0(void* v);
+void mwait(uint32_t ecx, uint32_t eax);
+void monitor(void* addr);
+uint64_t read_msr(uint32_t addr);
+uint64_t write_msr(uint32_t addr, uint64_t val);
 
 #endif /* __ASM_H__ */

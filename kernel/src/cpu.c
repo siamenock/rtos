@@ -3,6 +3,7 @@
 #include "port.h"
 #include "shared.h"
 #include "cpu.h"
+#include "asm.h"
 
 uint64_t cpu_ms;
 uint64_t cpu_us;
@@ -11,6 +12,8 @@ clock_t cpu_clock;
 
 uint64_t cpu_frequency;
 char cpu_brand[4 * 4 * 3 + 1];
+
+uint32_t cpu_infos[CPU_INFOS_SIZE][4];
 
 void cpu_init() {
 	uint32_t* p = (uint32_t*)cpu_brand;
@@ -22,6 +25,13 @@ void cpu_init() {
 			: "a"(eax++));
 	}
 	
+	// Get CPUID Information
+	for(int i = 0; i < CPU_INFOS_SIZE; i++) {
+		asm volatile("cpuid"
+			: "=a"(cpu_infos[i][0]), "=b"(cpu_infos[i][1]), "=c"(cpu_infos[i][2]), "=d"(cpu_infos[i][3])
+			: "a"(i));
+	}
+
 	// TODO: Measure more accurated value
 	void measure() {
 		#define PIT_CONTROL     0x43
@@ -101,10 +111,22 @@ void cpu_init() {
 	cpu_clock = cpu_frequency / CLOCKS_PER_SEC;
 }
 
+static void turbo() {
+	write_msr(0x00000199, 0xff00);
+	printf("Turbo Boost Enabled\n");
+}
+
 void cpu_info() {
 	printf("\tBrand: %s\n", cpu_brand);
 	printf("\tFrequency: %ld\n", cpu_frequency);
-	
+
+	if(CPU_IS_TURBO_BOOST) {
+		printf("Support Intel Turbo Boost Technology\n");
+		turbo();
+	} else {
+		printf("Not Support Intel Turbo Boost Technology\n");
+	}
+
 	if(cpu_frequency == 0) {
 		printf("\tCannot parse CPU frequency...\n");
 		while(1)
