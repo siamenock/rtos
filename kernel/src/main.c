@@ -80,15 +80,17 @@ static bool idle0_event(void* data) {
 	return true;
 }
 
-static bool idle_event(void* data) {
+static bool idle_monitor_event(void* data) {
 	static uint8_t trigger;
 
-	if(CPU_IS_MONITOR_MWAIT & CPU_IS_MWAIT_INTERRUPT) {
-		monitor(&trigger);
-		mwait(1, 0x21);
-	} else {
-		hlt();
-	}
+	monitor(&trigger);
+	mwait(1, 0x21);
+
+	return true;
+}
+
+static bool idle_hlt_event(void* data) {
+	hlt();
 
 	return true;
 }
@@ -416,7 +418,10 @@ void main(void) {
 		icc_register(ICC_TYPE_STOP, icc_stop);
 		apic_register(49, icc_pause);
 		
-		event_idle_add(idle_event, NULL);
+		if(CPU_IS_MONITOR_MWAIT & CPU_IS_MWAIT_INTERRUPT)
+			event_idle_add(idle_monitor_event, NULL);
+		else
+			event_idle_add(idle_hlt_event, NULL);
 	}
 
 	mp_sync();

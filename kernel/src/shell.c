@@ -192,8 +192,8 @@ static int cmd_version(int argc, char** argv, void(*callback)(char* result, int 
 }
 
 static int cmd_turbo(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
-	if(argc != 1) {
-		return 0;
+	if(argc > 2) {
+		return CMD_STATUS_WRONG_NUMBER;
 	}
 
 	if(!CPU_IS_TURBO_BOOST) {
@@ -204,14 +204,33 @@ static int cmd_turbo(int argc, char** argv, void(*callback)(char* result, int ex
 
 	uint64_t perf_ctrl = read_msr(0x00000199);
 
-	if(perf_ctrl & 0x100000000) {
-		write_msr(0x00000199, 0xff00);
-		printf("Turbo Boost Enabled\n");
-		printf("perf status: %lx\n", read_msr(0x00000198));
+	if(argc == 1) {
+		if(perf_ctrl & 0x100000000)
+			printf("Turbo Boost Disable\n");
+		else
+			printf("Turbo Boost Enable\n");
+
+		return 0;
+	}
+
+	if(!strcmp(argv[1], "off")) {
+		if(perf_ctrl & 0x100000000) {
+			printf("Turbo Boost Already Disabled\n");
+		} else {
+			write_msr(0x00000199, 0x10000ff00);
+			printf("Turbo Boost Disabled\n");
+			printf("perf status: %lx\n", read_msr(0x00000198));
+		}
+	} else if(!strcmp(argv[1], "on")) {
+		if(perf_ctrl & 0x100000000) {
+			write_msr(0x00000199, 0xff00);
+			printf("Turbo Boost Enabled\n");
+			printf("perf status: %lx\n", read_msr(0x00000198));
+		} else {
+			printf("Turbo Boost Already Enabled\n");
+		}
 	} else {
-		write_msr(0x00000199, 0x10000ff00);
-		printf("Turbo Boost Disabled\n");
-		printf("perf status: %lx\n", read_msr(0x00000198));
+		return -1;
 	}
 
 	return 0;
@@ -593,7 +612,7 @@ Command commands[] = {
 	},
 	{
 		.name = "turbo",
-		.desc = "Intel Turbo Boost Enable/Disable",
+		.desc = "Turbo Boost Enable/Disable",
 		.func = cmd_turbo
 	},
 	{ 
