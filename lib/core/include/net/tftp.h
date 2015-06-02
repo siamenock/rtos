@@ -7,7 +7,7 @@
 #define TFTP_PORT	"net.tftpd.port"
 #define TFTP_CALLBACK	"net.tftpd.callback"
 
-typedef struct {
+typedef struct _TFTPCallback {
 	int(*create)(char* filename, int mode);	// 1: read, 2: write
 	int (*write)(int fd, void* buf, uint32_t offset, int size);
 	int (*read)(int fd, void* buf, uint32_t offset, int size);

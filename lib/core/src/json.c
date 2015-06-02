@@ -290,9 +290,9 @@ void json_free(JSONType* json){
 	}
 }
 
-JSONAttr* json_get(JSONObject* obj, char* attr) {
+JSONAttr* json_get(JSONObject* obj, char* name) {
 	for(int i = 0; i < obj->size; i++) {
-		if(strcmp(obj->attrs[i].name, attr) == 0)
+		if(strcmp(obj->attrs[i].name, name) == 0)
 			return &obj->attrs[i];
 	}
 	

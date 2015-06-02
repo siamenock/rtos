@@ -3,21 +3,34 @@
 
 #include <stdint.h>
 
+/**
+ * @file
+ * Packet structure
+ */
+
 typedef struct _NetworkInterface NetworkInterface;
 
+/**
+ * A Packet.
+ */
 typedef struct _Packet {
-	NetworkInterface*	ni;
+	NetworkInterface*	ni;		///< Associated NI which allocated the Packet
 	
-	uint32_t		status;
-	uint64_t		time;
+	uint32_t		status;		///< Packet status (deprecated)
+	uint64_t		time;		///< Packet in time in CPU clock
 	
-	uint16_t		start;
-	uint16_t		end;
-	uint16_t		size;
+	uint16_t		start;		///< Packet payload starting index of payload buffer
+	uint16_t		end;		///< Packet payload ending index of payload buffer
+	uint16_t		size;		///< Packet buffer size
 	
-	uint8_t			buffer[0];
+	uint8_t			buffer[0];	///< Packet buffer which contains packet payload itself
 } Packet;
 
+/**
+ * Dump packet payload to standard output
+ * Don't dare use this function in production, but use it for debugging only.
+ * @param packet packet reference
+ */
 void packet_dump(Packet* packet);
 
 #endif /* __NET_PACKET__ */

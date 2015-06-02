@@ -7,19 +7,6 @@
 #define UDP_PORTS	".pn.udp.ports"
 #define UDP_NEXT_PORT	".pn.udp.next_port"
 
-void udp_pack(Packet* packet, uint16_t udp_body_len) {
-	Ether* ether = (Ether*)(packet->buffer + packet->start);
-	IP* ip = (IP*)ether->payload;
-	UDP* udp = (UDP*)ip->body;
-	
-	uint16_t udp_len = UDP_LEN + udp_body_len;
-	udp->length = endian16(udp_len);
-	udp->checksum = 0;	// TODO: Calc checksum
-	packet->end = ((void*)udp + udp_len) - (void*)packet->buffer;
-	
-	ip_pack(packet, udp_len);
-}
-
 uint16_t udp_port_alloc(NetworkInterface* ni) {
 	Map* ports = ni_config_get(ni, UDP_PORTS);
 	if(!ports) {
@@ -48,4 +35,16 @@ void udp_port_free(NetworkInterface* ni, uint16_t port) {
 		return;
 	
 	map_remove(ports, (void*)(uint64_t)port);
+}
+
+void udp_pack(Packet* packet, uint16_t udp_body_len) {
+	Ether* ether = (Ether*)(packet->buffer + packet->start);
+	IP* ip = (IP*)ether->payload;
+	UDP* udp = (UDP*)ip->body;
+	
+	uint16_t udp_len = UDP_LEN + udp_body_len;
+	udp->length = endian16(udp_len);
+	udp->checksum = 0;	// TODO: Calc checksum
+	
+	ip_pack(packet, udp_len);
 }

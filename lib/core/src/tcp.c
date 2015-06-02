@@ -58,7 +58,5 @@ void tcp_pack(Packet* packet, uint16_t tcp_body_len) {
 		sum = (sum & 0xffff) + (sum >> 16);
 	tcp->checksum = endian16(~sum);
 	
-	packet->end = ((void*)tcp + tcp_len) - (void*)packet->buffer;
-	
 	ip_pack(packet, tcp_len);
 }

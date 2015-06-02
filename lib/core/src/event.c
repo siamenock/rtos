@@ -88,6 +88,18 @@ int event_loop() {
 		}
 	}
 	
+	// Trigger events
+	while(list_size(triggers) > 0) {
+		Trigger* trigger = list_remove_first(triggers);
+		fire(trigger->event_id, trigger->event, trigger->last, trigger->last_context);
+		free(trigger);
+		
+		count++;
+	}
+	
+	if(count > 0)
+		return count;
+	
 	// Timer events
 	clock_t time = clock();
 	while(next_timer <= time) {
@@ -112,15 +124,9 @@ int event_loop() {
 		
 		count++;
 	}
-	
-	// Trigger events
-	while(list_size(triggers) > 0) {
-		Trigger* trigger = list_remove_first(triggers);
-		fire(trigger->event_id, trigger->event, trigger->last, trigger->last_context);
-		free(trigger);
-		
-		count++;
-	}
+
+	if(count > 0)
+		return count;
 	
 	// Idle events
 	if(list_size(idle_events) > 0) {

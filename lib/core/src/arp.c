@@ -122,7 +122,10 @@ bool arp_request(NetworkInterface* ni, uint32_t ip) {
 	 
 	packet->end = packet->start + sizeof(Ether) + sizeof(ARP);
 	
-	ni_output(ni, packet);
+	if(!ni_output(ni, packet)) {
+		ni_free(packet);
+		return false;
+	}
 	
 	return true;
 }
@@ -153,7 +156,10 @@ bool arp_announce(NetworkInterface* ni, uint32_t ip) {
 	 
 	packet->end = packet->start + sizeof(Ether) + sizeof(ARP);
 	
-	ni_output(ni, packet);
+	if(!ni_output(ni, packet)) {
+		ni_free(packet);
+		return false;
+	}
 	
 	return true;
 }

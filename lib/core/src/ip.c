@@ -11,4 +11,6 @@ void ip_pack(Packet* packet, uint16_t ip_body_len) {
 	ip->checksum = 0;
 	
 	ip->checksum = endian16(checksum(ip, ip->ihl * 4));
+	
+	packet->end = packet->start + ip->ihl + ip_body_len;
 }
