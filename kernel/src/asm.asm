@@ -12,6 +12,8 @@ global read_cr3, write_cr3
 global refresh_cr3
 global read_rsp, read_rbp
 global read_xmms0
+global mwait, monitor
+global read_msr, write_msr
 
 lgdt:
 	lgdt	[rdi]
@@ -105,4 +107,32 @@ read_rbp:
 
 read_xmms0:
 	movaps	[rdi], xmm0
+	ret
+
+read_msr:
+	mov	ecx, edi
+	rdmsr
+	shl	rdx, 32
+	or	rax, rdx
+	ret
+
+write_msr:
+	mov	ecx, edi
+	mov	eax, esi
+	shr	rsi, 32
+	mov	edx, esi
+	wrmsr
+	ret
+
+monitor:
+	mov	rax, rdi
+	mov	ecx, 0
+	mov	edx, 0
+	monitor	rax, ecx, edx
+	ret
+
+mwait:
+	mov	ecx, edi
+	mov	eax, esi
+	mwait	eax, ecx
 	ret

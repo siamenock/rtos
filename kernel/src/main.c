@@ -80,10 +80,18 @@ static bool idle0_event(void* data) {
 	return true;
 }
 
-static bool idle_event(void* data) {
-	for(int i = 0; i < 100; i++)
-		asm volatile("nop");
-	
+static bool idle_monitor_event(void* data) {
+	static uint8_t trigger;
+
+	monitor(&trigger);
+	mwait(1, 0x21);
+
+	return true;
+}
+
+static bool idle_hlt_event(void* data) {
+	hlt();
+
 	return true;
 }
 
@@ -383,7 +391,7 @@ void main(void) {
 		
 		printf("Initializing RPC manager...\n");
 		manager_init();
-		
+
 		printf("Initializing shell...\n");
 		shell_init();
 		
@@ -410,14 +418,17 @@ void main(void) {
 		icc_register(ICC_TYPE_STOP, icc_stop);
 		apic_register(49, icc_pause);
 		
-		event_idle_add(idle_event, NULL);
+		if(CPU_IS_MONITOR_MWAIT & CPU_IS_MWAIT_INTERRUPT)
+			event_idle_add(idle_monitor_event, NULL);
+		else
+			event_idle_add(idle_hlt_event, NULL);
 	}
-	
+
 	mp_sync();
 	
 	if(core_id == 0)
 		exec("init.psh");
-	
+
 	while(1)
 		event_loop();
 }
