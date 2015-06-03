@@ -1,14 +1,14 @@
-/** \mainpage PacketNgin Core Library
+# PacketNgin Core Library Documentation {#core}
 
-\section sec_overview Overview
+# Overview {#overview}
 PacketNgin Core Library is a firmware for a PacketNgin Network Applications (Net Apps) and 
 useful utilities to manipulate virtualized resources such as global and local memory,
 threads(or CPU Core), network interface controller, storage, ...
 
 
-\section sec_concept Basic Concept
+# Basic Concept {#basic}
 
-\subsection sec_vm Virtual Machine
+## Virtual Machine {#vm}
 PacketNgin O/S allocates Real-Time Virtual Machine(RTVM or just VM) to user. PacketNgin VM
 consists of vCPU, vMemory, vStorage and vNIC just like other hypervisors such as Xen or KVM.
 But PacketNgin VM supports real-time facility to execute real-time Net Apps such as
@@ -26,7 +26,7 @@ Tile NP from Tilera provides firmware binaries to user to program the Net Apps.
 PacketNgin Core Library supports basic APIs to manage CPU, Memory and NIC of PacketNgin VM.
 
 
-\subsection sec_cpu CPU and Threads
+## CPU and Threads {#cpu}
 PacketNgin O/S allocates one or more CPU cores to a Net App. Net App manages CPU Cores as threads. 
 So one thread maps to one CPU core exactly. The first thread receives thread id as 0, 
 and other threads receives thread id 1 to n sequencially.
@@ -43,7 +43,7 @@ thread can access it's own local memory area.
 @see lock.h
 
 
-\subsection sec_global_mem Global memory area and Shared memory area
+## Global memory area and Shared memory area {#gmalloc}
 Global memory area is sharable memory area between threads in a Net App. Any threads
 in a Net App can read or write global memory area. Shared memory area is a specially
 allocated area from global memory area to share the pointer (address of memory) between threads.
@@ -57,7 +57,7 @@ other threads can communicates via shared memory.
 @see shared.h
 
 
-\subsection sec_local_mem Local memory area
+## Local memory area {#malloc}
 Local memory area is explicitly allocated memory area to a thread. So other thread cannot
 read or write local memory area. There is noway to access other thread's local memory area.
 So it's reasonable to consider local memory area as thread local memory.
@@ -65,7 +65,7 @@ So it's reasonable to consider local memory area as thread local memory.
 @see malloc.h
 
 
-\subsection sec_nic Network Interface Controller
+## Network Interface Controller {#nic}
 PacketNgin O/S allocates number of vNIC(virtualized Network Interface Controller)s to a 
 PacketNgin VM. Every vNIC has its own MAC address which is randomly generated or allocated 
 from centralized management system. PacketNgin O/S also allocates some quantity of bandwidth
@@ -92,7 +92,7 @@ to Net Apps without passing through PacketNgin O/S's network protocol stack.
 @see net/md5.h
 
 
-\subsection sec_util Utility functions
+## Utility functions {#util}
 Core library support basic utilities such as read line from buffer, data structure, 
 command parsing and event processing engine to build a Net App.
 
@@ -106,7 +106,7 @@ command parsing and event processing engine to build a Net App.
 @see util/event.h
 
 
-\section sec_authors Contact point
+# Contact point {#contact}
 
 <table border="0">
 	<tr>
@@ -122,5 +122,3 @@ command parsing and event processing engine to build a Net App.
 		<td> packetngin at gurum dot cc </td>
 	</tr>
 </table>
-
-*/

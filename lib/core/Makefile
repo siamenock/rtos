@@ -59,7 +59,7 @@ libcore_linux.a: $(addprefix $(LINUX_DIR), $(OBJS))
 	ar rcs $@ $^
 
 doc:
-	doxygen Doxyfile
+	doxygen doxyfiles/Doxyfile
 
 clean: 
 	rm -rf obj
