@@ -14,6 +14,7 @@ uint64_t cpu_frequency;
 char cpu_brand[4 * 4 * 3 + 1];
 
 uint32_t cpu_infos[CPU_INFOS_SIZE][4];
+uint32_t cpu_extended_infos[CPU_EXTENDED_INFOS_SIZE][4];
 
 void cpu_init() {
 	uint32_t* p = (uint32_t*)cpu_brand;
@@ -31,7 +32,12 @@ void cpu_init() {
 			: "=a"(cpu_infos[i][0]), "=b"(cpu_infos[i][1]), "=c"(cpu_infos[i][2]), "=d"(cpu_infos[i][3])
 			: "a"(i));
 	}
-
+	// Get CPUID Extended Information
+	for(int i = 0; i < CPU_EXTENDED_INFOS_SIZE; i++) {
+		asm volatile("cpuid"
+			: "=a"(cpu_extended_infos[i][0]), "=b"(cpu_extended_infos[i][1]), "=c"(cpu_extended_infos[i][2]), "=d"(cpu_extended_infos[i][3])
+			: "a"(0x80000000 + i));
+	}
 	// TODO: Measure more accurated value
 	void measure() {
 		#define PIT_CONTROL     0x43
@@ -113,7 +119,14 @@ void cpu_init() {
 
 static void turbo() {
 	write_msr(0x00000199, 0xff00);
-	printf("Turbo Boost Enabled\n");
+	printf("\tTurbo Boost Enabled\n");
+}
+
+static void tsc_info() {
+	if(CPU_IS_INVARIANT_TSC)
+		printf("\tInvariant TSC available\n");
+	else
+		printf("\tInvariant TSC not available\n");
 }
 
 void cpu_info() {
@@ -121,10 +134,10 @@ void cpu_info() {
 	printf("\tFrequency: %ld\n", cpu_frequency);
 
 	if(CPU_IS_TURBO_BOOST) {
-		printf("Support Intel Turbo Boost Technology\n");
+		printf("\tSupport Turbo Boost Technology\n");
 		turbo();
 	} else {
-		printf("Not Support Intel Turbo Boost Technology\n");
+		printf("\tNot Support Turbo Boost Technology\n");
 	}
 
 	if(cpu_frequency == 0) {
@@ -132,6 +145,8 @@ void cpu_info() {
 		while(1)
 			asm("hlt");
 	}
+
+	tsc_info();
 }
 
 inline uint64_t cpu_tsc() {

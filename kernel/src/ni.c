@@ -680,6 +680,7 @@ Packet* ni_process_output(uint8_t local_port) {
 		uint64_t dmac = endian48(ether->dmac);
 
 		if(ni->output_accept && list_index_of(ni->output_accept, (void*)dmac, NULL) < 0) {
+			/*Debuging */
 			ni_free(packet);
 			// Packet eliminated
 			continue;

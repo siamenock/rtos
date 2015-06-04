@@ -196,8 +196,11 @@ static int cmd_turbo(int argc, char** argv, void(*callback)(char* result, int ex
 		return CMD_STATUS_WRONG_NUMBER;
 	}
 
+	uint64_t perf_status = read_msr(0x00000198);
+	perf_status = ((perf_status & 0xff00) >> 8);
 	if(!CPU_IS_TURBO_BOOST) {
-		printf("Not Support Intel Turbo Boost Technology\n");
+		printf("Not Support Turbo Boost\n");
+		printf("\tPerfomance status : %d.%d Ghz\n", perf_status / 10, perf_status % 10);
 
 		return 0;
 	}
@@ -205,10 +208,13 @@ static int cmd_turbo(int argc, char** argv, void(*callback)(char* result, int ex
 	uint64_t perf_ctrl = read_msr(0x00000199);
 
 	if(argc == 1) {
-		if(perf_ctrl & 0x100000000)
-			printf("Turbo Boost Disable\n");
-		else
-			printf("Turbo Boost Enable\n");
+		if(perf_ctrl & 0x100000000) {
+			printf("Turbo Boost Disabled\n");
+			printf("\tPerfomance status : %d.%d Ghz\n", perf_status / 10, perf_status % 10);
+		} else {
+			printf("Turbo Boost Enabled\n");
+			printf("\tPerfomance status : %d.%d Ghz\n", perf_status / 10, perf_status % 10);
+		}
 
 		return 0;
 	}
@@ -216,18 +222,24 @@ static int cmd_turbo(int argc, char** argv, void(*callback)(char* result, int ex
 	if(!strcmp(argv[1], "off")) {
 		if(perf_ctrl & 0x100000000) {
 			printf("Turbo Boost Already Disabled\n");
+			printf("\tPerfomance status : %d.%d Ghz\n",  perf_status / 10, perf_status % 10);
 		} else {
 			write_msr(0x00000199, 0x10000ff00);
 			printf("Turbo Boost Disabled\n");
-			printf("perf status: %lx\n", read_msr(0x00000198));
+			perf_status = read_msr(0x00000198);
+			perf_status = ((perf_status & 0xff00) >> 8);
+			printf("\tPerfomance status : %d.%d Ghz\n", perf_status / 10, perf_status % 10);
 		}
 	} else if(!strcmp(argv[1], "on")) {
 		if(perf_ctrl & 0x100000000) {
 			write_msr(0x00000199, 0xff00);
 			printf("Turbo Boost Enabled\n");
-			printf("perf status: %lx\n", read_msr(0x00000198));
+			perf_status = read_msr(0x00000198);
+			perf_status = ((perf_status & 0xff00) >> 8);
+			printf("\tPerfomance status : %d.%d Ghz\n", perf_status / 10, perf_status % 10);
 		} else {
 			printf("Turbo Boost Already Enabled\n");
+			printf("\tPerfomance status : %d.%d Ghz\n", perf_status / 10, perf_status % 10);
 		}
 	} else {
 		return -1;
