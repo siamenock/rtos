@@ -1,3 +1,88 @@
+#ifdef __SSE_4_1__
+#include <stdint.h>
+#include <xmmintrin.h>
+#include <smmintrin.h>
+
+int memcmp(void *dst, void *src, size_t len) {
+	uint8_t* a = dst;
+	uint8_t* b = src;
+
+	if(!len)
+		return 0;
+
+	int aligned_a = 0, aligned_b = 0;
+	int i = 0;
+
+	aligned_a = ((unsigned long)a & (sizeof(__m128i) - 1));
+	aligned_b = ((unsigned long)b & (sizeof(__m128i) - 1));
+
+	/* Not aligned */
+	if(aligned_a != aligned_b) {
+		while(len) {
+			if (a[i] != b[i])
+				return b[i] - a[i];
+
+			i++;
+			len--;
+		}
+
+		return 0;
+	}
+
+	/* aligned */
+	if(aligned_a) {
+		while(len && ((unsigned long) &a[i] & (sizeof(__m128i) - 1))) {
+			if(a[i] != b[i]) {
+				return b[i] - a[i];
+			}
+
+			i++;
+			len--;
+		}
+	}
+
+	while(len >= 16) {
+		__m128i x = _mm_loadu_si128((__m128i*)&(a[i])); //16byte
+		__m128i y = _mm_loadu_si128((__m128i*)&(b[i])); //16byte
+
+		__m128i cmp = _mm_cmpeq_epi8(x, y);
+
+		uint16_t result = (uint16_t)_mm_movemask_epi8(cmp);
+		if(result != 0xffffU) {
+			result = ~result;
+
+			while(!(result & 0x1)) {
+				result = result >> 1;
+				i++;
+			}
+
+			return b[i] - a[i];
+		}
+
+		i += 16;
+		len -= 16;
+	}
+
+	while(len >= 4) {
+		if(*(long*)(&a[i]) != *(long*)(&b[i])) {
+			break;
+		}
+
+		i += 4;
+		len -= 4;
+	}
+
+	while(len) {
+		if (a[i] != b[i])
+			return b[i] - a[i];
+
+		i++;
+		len--;
+	}
+
+	return 0;
+}
+#else
 /*
 FUNCTION
 	<<memcmp>>---compare two memory areas
@@ -110,4 +195,4 @@ _DEFUN (memcmp, (m1, m2, n),
   return 0;
 #endif /* not PREFER_SIZE_OVER_SPEED */
 }
-
+#endif /* __SSE_4_1__ */

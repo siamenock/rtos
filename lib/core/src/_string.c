@@ -1,7 +1,105 @@
 #include <_string.h>
 #include <stdint.h>
 #include <malloc.h>
+#include <stdio.h>
 
+#ifdef __SSE_4_1__
+#include <xmmintrin.h>
+#include <smmintrin.h>
+#endif
+
+#ifdef __SSE_4_1__
+void* __memset(void *dst, int value, size_t len) {
+	uint8_t* a = dst;
+
+	int aligned_a = 0;
+	int i = 0;
+
+	aligned_a = ((unsigned long)a & (sizeof(__m128i)-1));
+
+	/* aligned */
+	if(aligned_a) {
+		while(len && ((unsigned long) &a[i] & (sizeof(__m128i)-1))) {
+			a[i] = (char)value;
+
+			i++;
+			len--;
+		}
+	}
+
+	if(len >= 4) {
+		uint32_t buf_32 = value;
+		buf_32 |= (buf_32 << 8);
+		buf_32 |= (buf_32 << 16);
+
+		if(len >= 16) {
+			__m128i r1 = _mm_set_epi32(buf_32, buf_32, buf_32, buf_32);
+
+			while(len >= 128) {
+				_mm_store_si128((__m128i*)&a[i], r1);
+				_mm_store_si128((__m128i*)&a[i + 16], r1);
+				_mm_store_si128((__m128i*)&a[i + 32], r1);
+				_mm_store_si128((__m128i*)&a[i + 48], r1);
+				_mm_store_si128((__m128i*)&a[i + 64], r1);
+				_mm_store_si128((__m128i*)&a[i + 80], r1);
+				_mm_store_si128((__m128i*)&a[i + 96], r1);
+				_mm_store_si128((__m128i*)&a[i + 112], r1);
+
+				i += 128;
+				len -= 128;
+			}
+
+			if(len >= 64) {
+				_mm_store_si128((__m128i*)&a[i], r1);
+				_mm_store_si128((__m128i*)&a[i + 16], r1);
+				_mm_store_si128((__m128i*)&a[i + 32], r1);
+				_mm_store_si128((__m128i*)&a[i + 48], r1);
+
+				i += 64;
+				len -= 64;
+			}
+
+			if(len >= 32) {
+				_mm_store_si128((__m128i*)&a[i], r1);
+				_mm_store_si128((__m128i*)&a[i + 16], r1);
+
+				i += 32;
+				len -= 32;
+			}
+
+			if(len >= 16) {
+				_mm_store_si128((__m128i*)&a[i], r1);
+
+				i += 16;
+				len -= 16;
+			}
+
+			if(len >= 8) {
+				*(uint64_t*)(&a[i]) = buf_32;
+
+				i += 8;
+				len -= 8;
+			}
+		}
+
+		while(len >= 4) {
+			*(uint32_t*)(&a[i]) = buf_32;
+
+			i += 4;
+			len -= 4;
+		}
+	}
+
+	while(len) {
+		a[i] = (char)value;
+
+		i++;
+		len--;
+	}
+
+	return dst;
+}
+#else
 void *__memset(void *s, int c, size_t n) {
 	uint64_t c8;
 	int8_t *p = (void*)&c8;
@@ -22,7 +120,112 @@ void *__memset(void *s, int c, size_t n) {
 	
 	return s;
 }
+#endif
 
+#ifdef __SSE_4_1__
+void* __memcpy(void *dst, const void *src, size_t len) {
+	uint8_t* a = (uint8_t*)dst;
+	uint8_t* b = (uint8_t*)src;
+
+	int aligned_a = 0, aligned_b = 0;
+	int i = 0;
+
+	aligned_a = ((unsigned long)a & (sizeof(__m128i)-1));
+	aligned_b = ((unsigned long)b & (sizeof(__m128i)-1));
+
+	/* Not aligned */
+	if(aligned_a != aligned_b) {
+		while(len) {
+			a[i] = b[i];
+
+			i++;
+			len--;
+		}
+
+		return dst;
+	}
+
+	/* aligned */
+	if(aligned_a) {
+		while(len && ((unsigned long) &a[i] & (sizeof(__m128i)-1))) {
+			a[i] = b[i];
+
+			i++;
+			len--;
+		}
+	}
+
+	while(len >= 128) {
+		__m128i r1 = _mm_loadu_si128((__m128i*)&(b[i])); //16byte
+		__m128i r2 = _mm_loadu_si128((__m128i*)&(b[i + 16])); //16byte
+		__m128i r3 = _mm_loadu_si128((__m128i*)&(b[i + 32])); //16byte
+		__m128i r4 = _mm_loadu_si128((__m128i*)&(b[i + 48])); //16byte
+		__m128i r5 = _mm_loadu_si128((__m128i*)&(b[i + 64])); //16byte
+		__m128i r6 = _mm_loadu_si128((__m128i*)&(b[i + 80])); //16byte
+		__m128i r7 = _mm_loadu_si128((__m128i*)&(b[i + 96])); //16byte
+		__m128i r8 = _mm_loadu_si128((__m128i*)&(b[i + 112])); //16byte
+		_mm_store_si128((__m128i*)&a[i], r1);
+		_mm_store_si128((__m128i*)&a[i + 16], r2);
+		_mm_store_si128((__m128i*)&a[i + 32], r3);
+		_mm_store_si128((__m128i*)&a[i + 48], r4);
+		_mm_store_si128((__m128i*)&a[i + 64], r5);
+		_mm_store_si128((__m128i*)&a[i + 80], r6);
+		_mm_store_si128((__m128i*)&a[i + 96], r7);
+		_mm_store_si128((__m128i*)&a[i + 112], r8);
+
+		i += 128;
+		len -= 128;
+	}
+
+	if(len >= 64) {
+		__m128i r1 = _mm_loadu_si128((__m128i*)&(b[i])); //16byte
+		__m128i r2 = _mm_loadu_si128((__m128i*)&(b[i + 16])); //16byte
+		__m128i r3 = _mm_loadu_si128((__m128i*)&(b[i + 32])); //16byte
+		__m128i r4 = _mm_loadu_si128((__m128i*)&(b[i + 48])); //16byte
+		_mm_store_si128((__m128i*)&a[i], r1);
+		_mm_store_si128((__m128i*)&a[i + 16], r2);
+		_mm_store_si128((__m128i*)&a[i + 32], r3);
+		_mm_store_si128((__m128i*)&a[i + 48], r4);
+
+		i += 64;
+		len -= 64;
+	}
+
+	if(len >= 32) {
+		__m128i r1 = _mm_loadu_si128((__m128i*)&(b[i])); //16byte
+		__m128i r2 = _mm_loadu_si128((__m128i*)&(b[i + 16])); //16byte
+		_mm_store_si128((__m128i*)&a[i], r1);
+		_mm_store_si128((__m128i*)&a[i + 16], r2);
+
+		i += 32;
+		len -= 32;
+	}
+
+	if(len >= 16) {
+		__m128i r1 = _mm_loadu_si128((__m128i*)&(b[i])); //16byte
+		_mm_store_si128((__m128i*)&a[i], r1);
+
+		i += 16;
+		len -= 16;
+	}
+
+	while(len >= 4) {
+		*(long*)(&a[i]) = *(long*)(&b[i]);
+
+		i += 4;
+		len -= 4;
+	}
+
+	while(len) {
+		a[i] = b[i];
+
+		i++;
+		len--;
+	}
+
+	return dst;
+}
+#else
 void * __attribute__ (( noinline )) __memcpy ( void *dest, const void *src,
 					       size_t len ) {
 	void *edi = dest;
@@ -45,7 +248,190 @@ void * __attribute__ (( noinline )) __memcpy ( void *dest, const void *src,
 			       : "memory" );
 	return dest;
 }
+#endif
 
+#ifdef __SSE_4_1__
+void* __memmove(void *dst, const void *src, size_t len) {
+	uint8_t* a = (uint8_t*)dst;
+	uint8_t* b = (uint8_t*)src;
+
+	int aligned_a = 0, aligned_b = 0;
+	int i = 0;
+
+	if(src < dst && dst < src + len) {
+		/* Destructive overlap...have to copy backwards */
+		i = len;
+		aligned_a = ((unsigned long)&a[i] & (sizeof(__m128i)-1));
+		aligned_b = ((unsigned long)&b[i] & (sizeof(__m128i)-1));
+
+		/* Not aligned */
+		if(aligned_a != aligned_b) {
+			while(i) {
+				i--;
+				a[i] = b[i];
+			}
+
+			return dst;
+		}
+
+		/* align */
+		if(aligned_a) {
+			while(i && ((unsigned long) &a[i] & (sizeof(__m128i)-1))) {
+				i--;
+				a[i] = b[i];
+			}
+		}
+
+		  while(i >= 128) {
+			i -= 128;
+			__m128i r1 = _mm_loadu_si128((__m128i*)&(b[i])); //16byte
+			__m128i r2 = _mm_loadu_si128((__m128i*)&(b[i + 16])); //16byte
+			__m128i r3 = _mm_loadu_si128((__m128i*)&(b[i + 32])); //16byte
+			__m128i r4 = _mm_loadu_si128((__m128i*)&(b[i + 48])); //16byte
+			__m128i r5 = _mm_loadu_si128((__m128i*)&(b[i + 64])); //16byte
+			__m128i r6 = _mm_loadu_si128((__m128i*)&(b[i + 80])); //16byte
+			__m128i r7 = _mm_loadu_si128((__m128i*)&(b[i + 96])); //16byte
+			__m128i r8 = _mm_loadu_si128((__m128i*)&(b[i + 112])); //16byte
+			_mm_store_si128((__m128i*)&a[i], r1);
+			_mm_store_si128((__m128i*)&a[i + 16], r2);
+			_mm_store_si128((__m128i*)&a[i + 32], r3);
+			_mm_store_si128((__m128i*)&a[i + 48], r4);
+			_mm_store_si128((__m128i*)&a[i + 64], r5);
+			_mm_store_si128((__m128i*)&a[i + 80], r6);
+			_mm_store_si128((__m128i*)&a[i + 96], r7);
+			_mm_store_si128((__m128i*)&a[i + 112], r8);
+		}
+
+		if(i >= 64) {
+			i -= 64;
+			__m128i r1 = _mm_loadu_si128((__m128i*)&(b[i])); //16byte
+			__m128i r2 = _mm_loadu_si128((__m128i*)&(b[i + 16])); //16byte
+			__m128i r3 = _mm_loadu_si128((__m128i*)&(b[i + 32])); //16byte
+			__m128i r4 = _mm_loadu_si128((__m128i*)&(b[i + 48])); //16byte
+			_mm_store_si128((__m128i*)&a[i], r1);
+			_mm_store_si128((__m128i*)&a[i + 16], r2);
+			_mm_store_si128((__m128i*)&a[i + 32], r3);
+			_mm_store_si128((__m128i*)&a[i + 48], r4);
+
+		}
+
+		if(i >= 32) {
+			i -= 32;
+			__m128i r1 = _mm_loadu_si128((__m128i*)&(b[i])); //16byte
+			__m128i r2 = _mm_loadu_si128((__m128i*)&(b[i + 16])); //16byte
+			_mm_store_si128((__m128i*)&a[i], r1);
+			_mm_store_si128((__m128i*)&a[i + 16], r2);
+
+		}
+
+		if(i >= 16) {
+			i -= 16;
+			__m128i r1 = _mm_loadu_si128((__m128i*)&(b[i])); //16byte
+			_mm_store_si128((__m128i*)&a[i], r1);
+		}
+
+		while(i) {
+			--i;
+			a[i] = b[i];
+		}
+	} else {
+		aligned_a = ((unsigned long)a & (sizeof(__m128i) - 1));
+		aligned_b = ((unsigned long)b & (sizeof(__m128i) - 1));
+
+		/* Not aligned */
+		if(aligned_a != aligned_b) {
+			while(len) {
+				a[i] = b[i];
+
+				i++;
+				len--;
+			}
+
+			return dst;
+		}
+
+		/* aligned */
+		if(aligned_a) {
+			while(len && ((unsigned long) &a[i] & (sizeof(__m128i)-1))) {
+				a[i] = b[i];
+
+				i++;
+				len--;
+			}
+		}
+
+		  while(len >= 128) {
+			__m128i r1 = _mm_loadu_si128((__m128i*)&(b[i])); //16byte
+			__m128i r2 = _mm_loadu_si128((__m128i*)&(b[i + 16])); //16byte
+			__m128i r3 = _mm_loadu_si128((__m128i*)&(b[i + 32])); //16byte
+			__m128i r4 = _mm_loadu_si128((__m128i*)&(b[i + 48])); //16byte
+			__m128i r5 = _mm_loadu_si128((__m128i*)&(b[i + 64])); //16byte
+			__m128i r6 = _mm_loadu_si128((__m128i*)&(b[i + 80])); //16byte
+			__m128i r7 = _mm_loadu_si128((__m128i*)&(b[i + 96])); //16byte
+			__m128i r8 = _mm_loadu_si128((__m128i*)&(b[i + 112])); //16byte
+			_mm_store_si128((__m128i*)&a[i], r1);
+			_mm_store_si128((__m128i*)&a[i + 16], r2);
+			_mm_store_si128((__m128i*)&a[i + 32], r3);
+			_mm_store_si128((__m128i*)&a[i + 48], r4);
+			_mm_store_si128((__m128i*)&a[i + 64], r5);
+			_mm_store_si128((__m128i*)&a[i + 80], r6);
+			_mm_store_si128((__m128i*)&a[i + 96], r7);
+			_mm_store_si128((__m128i*)&a[i + 112], r8);
+
+			i += 128;
+			len -= 128;
+		}
+
+		if(len >= 64) {
+			__m128i r1 = _mm_loadu_si128((__m128i*)&(b[i])); //16byte
+			__m128i r2 = _mm_loadu_si128((__m128i*)&(b[i + 16])); //16byte
+			__m128i r3 = _mm_loadu_si128((__m128i*)&(b[i + 32])); //16byte
+			__m128i r4 = _mm_loadu_si128((__m128i*)&(b[i + 48])); //16byte
+			_mm_store_si128((__m128i*)&a[i], r1);
+			_mm_store_si128((__m128i*)&a[i + 16], r2);
+			_mm_store_si128((__m128i*)&a[i + 32], r3);
+			_mm_store_si128((__m128i*)&a[i + 48], r4);
+
+			i += 64;
+			len -= 64;
+		}
+
+		if(len >= 32) {
+			__m128i r1 = _mm_loadu_si128((__m128i*)&(b[i])); //16byte
+			__m128i r2 = _mm_loadu_si128((__m128i*)&(b[i + 16])); //16byte
+			_mm_store_si128((__m128i*)&a[i], r1);
+			_mm_store_si128((__m128i*)&a[i + 16], r2);
+
+			i += 32;
+			len -= 32;
+		}
+
+		if(len >= 16) {
+			__m128i r1 = _mm_loadu_si128((__m128i*)&(b[i])); //16byte
+			_mm_store_si128((__m128i*)&a[i], r1);
+
+			i += 16;
+			len -= 16;
+		}
+
+		while(len >= 4) {
+			*(long*)(&a[i]) = *(long*)(&b[i]);
+
+			i += 4;
+			len -= 4;
+		}
+
+		while(len) {
+			a[i] = b[i];
+
+			i++;
+			len--;
+		}
+	}
+
+	return dst;
+}
+#else
 /**
  * Copy memory area backwards
  *
@@ -74,8 +460,7 @@ void * __attribute__ (( noinline )) __memcpy_reverse ( void *dest,
 			       : "memory" );
 	return dest;
 }
-
-void * __memmove ( void *dest, const void *src, size_t len ) {
+void * __memmove( void *dest, const void *src, size_t len ) {
 
 	if ( dest <= src ) {
 		return __memcpy ( dest, src, len );
@@ -83,33 +468,128 @@ void * __memmove ( void *dest, const void *src, size_t len ) {
 		return __memcpy_reverse ( dest, src, len );
 	}
 }
+#endif
 
+#ifdef __SSE_4_1__
+int __memcmp(const void *dst, const void *src, size_t len) {
+	uint8_t* a = (uint8_t*)dst;
+	uint8_t* b = (uint8_t*)src;
+
+	if(!len)
+		return 0;
+
+	int aligned_a = 0, aligned_b = 0;
+	int i = 0;
+
+	aligned_a = ((unsigned long)a & (sizeof(__m128i)-1));
+	aligned_b = ((unsigned long)b & (sizeof(__m128i)-1));
+
+	while(len) {
+		if (a[i] != b[i])
+			return b[i] - a[i];
+
+		i++;
+		len--;
+	}
+
+	return 0;
+	/* Not aligned */
+	if(aligned_a != aligned_b) {
+		while(len) {
+			if (a[i] != b[i])
+				return b[i] - a[i];
+
+			i++;
+			len--;
+		}
+
+		return 0;
+	}
+
+	/* aligned */
+	if(aligned_a) {
+		while(len && (((unsigned long) &a[i]) & (sizeof(__m128i)-1))) {
+			if(a[i] != b[i]) {
+				return b[i] - a[i];
+			}
+
+			i++;
+			len--;
+		}
+	}
+
+	while(len >= 16) {
+		__m128i x = _mm_loadu_si128((__m128i*)&(a[i])); //16byte
+		__m128i y = _mm_loadu_si128((__m128i*)&(b[i])); //16byte
+
+		__m128i cmp = _mm_cmpeq_epi8(x, y);
+
+		uint16_t result = (uint16_t)_mm_movemask_epi8(cmp);
+		if(result != 0xffffU) {
+			result = ~result;
+
+			while(!(result & 0x1)) {
+				result = result >> 1;
+				i++;
+			}
+
+			return b[i] - a[i];
+		}
+
+		i += 16;
+		len -= 16;
+	}
+
+	while(len >= 4) {
+		if(*(long*)(&a[i]) != *(long*)(&b[i])) {
+			break;
+		}
+
+		i += 4;
+		len -= 4;
+	}
+
+	while(len) {
+		if(a[i] != b[i])
+			return b[i] - a[i];
+
+		i++;
+		len--;
+	}
+
+	return 0;
+}
+#else
 int __memcmp(const void* v1, const void* v2, size_t size) {
 	const uint64_t* d = v1;
 	const uint64_t* s = v2;
 	
-	int count = size / 8;
-	while(count--) {
-		if(*d != *s)
-			return *s - *d;
+	//unsigned int count = size / 8;
+	while(size > 8) {
+		if(*d != *s) {
+			break;
+		}
 		
 		s++;
 		d++;
+		size -= 8;
 	}
 	
 	const uint8_t* d2 = (uint8_t*)d;
 	const uint8_t* s2 = (uint8_t*)s;
-	count = size % 8;
-	while(count--) {
+	//count = size % 8;
+	while(size) {
 		if(*d2 != *s2)
 			return *s2 - *d2;
 		
 		s2++;
 		d2++;
+		size--;
 	}
 	
 	return 0;
 }
+#endif
 
 void __bzero(void* dest, size_t size) {
 	uint64_t* d = dest;

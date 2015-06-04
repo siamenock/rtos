@@ -1,3 +1,189 @@
+#ifdef __SSE_4_1__
+#include <stdint.h>
+#include <xmmintrin.h>
+#include <smmintrin.h>
+
+void* memmove(void *dst, void *src, size_t len) {
+	uint8_t* a = (uint8_t*)dst;
+	uint8_t* b = (uint8_t*)src;
+
+	int aligned_a = 0, aligned_b = 0;
+	int i = 0;
+
+	if(src < dst && dst < src + len) {
+		/* Destructive overlap...have to copy backwards */
+		i = len;
+		aligned_a = ((unsigned long)&a[i] & (sizeof(__m128i)-1));
+		aligned_b = ((unsigned long)&b[i] & (sizeof(__m128i)-1));
+
+		/* Not aligned */
+		if(aligned_a != aligned_b) {
+			while(i) {
+				i--;
+				a[i] = b[i];
+			}
+
+			return dst;
+		}
+
+		/* align */
+		if(aligned_a) {
+			while(i && ((unsigned long) &a[i] & (sizeof(__m128i)-1))) {
+				i--;
+				a[i] = b[i];
+			}
+		}
+
+		  while(i >= 128) {
+			i -= 128;
+			__m128i r1 = _mm_loadu_si128((__m128i*)&(b[i])); //16byte
+			__m128i r2 = _mm_loadu_si128((__m128i*)&(b[i + 16])); //16byte
+			__m128i r3 = _mm_loadu_si128((__m128i*)&(b[i + 32])); //16byte
+			__m128i r4 = _mm_loadu_si128((__m128i*)&(b[i + 48])); //16byte
+			__m128i r5 = _mm_loadu_si128((__m128i*)&(b[i + 64])); //16byte
+			__m128i r6 = _mm_loadu_si128((__m128i*)&(b[i + 80])); //16byte
+			__m128i r7 = _mm_loadu_si128((__m128i*)&(b[i + 96])); //16byte
+			__m128i r8 = _mm_loadu_si128((__m128i*)&(b[i + 112])); //16byte
+			_mm_store_si128((__m128i*)&a[i], r1);
+			_mm_store_si128((__m128i*)&a[i + 16], r2);
+			_mm_store_si128((__m128i*)&a[i + 32], r3);
+			_mm_store_si128((__m128i*)&a[i + 48], r4);
+			_mm_store_si128((__m128i*)&a[i + 64], r5);
+			_mm_store_si128((__m128i*)&a[i + 80], r6);
+			_mm_store_si128((__m128i*)&a[i + 96], r7);
+			_mm_store_si128((__m128i*)&a[i + 112], r8);
+		}
+
+		if(i >= 64) {
+			i -= 64;
+			__m128i r1 = _mm_loadu_si128((__m128i*)&(b[i])); //16byte
+			__m128i r2 = _mm_loadu_si128((__m128i*)&(b[i + 16])); //16byte
+			__m128i r3 = _mm_loadu_si128((__m128i*)&(b[i + 32])); //16byte
+			__m128i r4 = _mm_loadu_si128((__m128i*)&(b[i + 48])); //16byte
+			_mm_store_si128((__m128i*)&a[i], r1);
+			_mm_store_si128((__m128i*)&a[i + 16], r2);
+			_mm_store_si128((__m128i*)&a[i + 32], r3);
+			_mm_store_si128((__m128i*)&a[i + 48], r4);
+
+		}
+
+		if(i >= 32) {
+			i -= 32;
+			__m128i r1 = _mm_loadu_si128((__m128i*)&(b[i])); //16byte
+			__m128i r2 = _mm_loadu_si128((__m128i*)&(b[i + 16])); //16byte
+			_mm_store_si128((__m128i*)&a[i], r1);
+			_mm_store_si128((__m128i*)&a[i + 16], r2);
+
+		}
+
+		if(i >= 16) {
+			i -= 16;
+			__m128i r1 = _mm_loadu_si128((__m128i*)&(b[i])); //16byte
+			_mm_store_si128((__m128i*)&a[i], r1);
+		}
+
+		while(i) {
+			--i;
+			a[i] = b[i];
+		}
+	} else {
+		aligned_a = ( (unsigned long)a & (sizeof(__m128i)-1) );
+		aligned_b = ( (unsigned long)b & (sizeof(__m128i)-1) );
+
+		/* Not aligned */
+		if(aligned_a != aligned_b) {
+			while(len) {
+				a[i] = b[i];
+
+				i++;
+				len--;
+			}
+
+			return dst;
+		}
+
+		/* aligned */
+		if(aligned_a) {
+			while(len && ((unsigned long) &a[i] & ( sizeof(__m128i)-1))) {
+				a[i] = b[i];
+
+				i++;
+				len--;
+			}
+		}
+
+		  while(len >= 128) {
+			__m128i r1 = _mm_loadu_si128((__m128i*)&(b[i])); //16byte
+			__m128i r2 = _mm_loadu_si128((__m128i*)&(b[i + 16])); //16byte
+			__m128i r3 = _mm_loadu_si128((__m128i*)&(b[i + 32])); //16byte
+			__m128i r4 = _mm_loadu_si128((__m128i*)&(b[i + 48])); //16byte
+			__m128i r5 = _mm_loadu_si128((__m128i*)&(b[i + 64])); //16byte
+			__m128i r6 = _mm_loadu_si128((__m128i*)&(b[i + 80])); //16byte
+			__m128i r7 = _mm_loadu_si128((__m128i*)&(b[i + 96])); //16byte
+			__m128i r8 = _mm_loadu_si128((__m128i*)&(b[i + 112])); //16byte
+			_mm_store_si128((__m128i*)&a[i], r1);
+			_mm_store_si128((__m128i*)&a[i + 16], r2);
+			_mm_store_si128((__m128i*)&a[i + 32], r3);
+			_mm_store_si128((__m128i*)&a[i + 48], r4);
+			_mm_store_si128((__m128i*)&a[i + 64], r5);
+			_mm_store_si128((__m128i*)&a[i + 80], r6);
+			_mm_store_si128((__m128i*)&a[i + 96], r7);
+			_mm_store_si128((__m128i*)&a[i + 112], r8);
+
+			i += 128;
+			len -= 128;
+		}
+
+		if(len >= 64) {
+			__m128i r1 = _mm_loadu_si128((__m128i*)&(b[i])); //16byte
+			__m128i r2 = _mm_loadu_si128((__m128i*)&(b[i + 16])); //16byte
+			__m128i r3 = _mm_loadu_si128((__m128i*)&(b[i + 32])); //16byte
+			__m128i r4 = _mm_loadu_si128((__m128i*)&(b[i + 48])); //16byte
+			_mm_store_si128((__m128i*)&a[i], r1);
+			_mm_store_si128((__m128i*)&a[i + 16], r2);
+			_mm_store_si128((__m128i*)&a[i + 32], r3);
+			_mm_store_si128((__m128i*)&a[i + 48], r4);
+
+			i += 64;
+			len -= 64;
+		}
+
+		if(len >= 32) {
+			__m128i r1 = _mm_loadu_si128((__m128i*)&(b[i])); //16byte
+			__m128i r2 = _mm_loadu_si128((__m128i*)&(b[i + 16])); //16byte
+			_mm_store_si128((__m128i*)&a[i], r1);
+			_mm_store_si128((__m128i*)&a[i + 16], r2);
+
+			i += 32;
+			len -= 32;
+		}
+
+		if(len >= 16) {
+			__m128i r1 = _mm_loadu_si128((__m128i*)&(b[i])); //16byte
+			_mm_store_si128((__m128i*)&a[i], r1);
+
+			i += 16;
+			len -= 16;
+		}
+
+		while(len >= 4) {
+			*(long*)(&a[i]) = *(long*)(&b[i]);
+
+			i += 4;
+			len -= 4;
+		}
+
+		while(len) {
+			a[i] = b[i];
+
+			i++;
+			len--;
+		}
+	}
+
+	return dst;
+}
+#else
 /*
 FUNCTION
 	<<memmove>>---move possibly overlapping memory
@@ -140,3 +326,4 @@ _DEFUN (memmove, (dst_void, src_void, length),
   return dst_void;
 #endif /* not PREFER_SIZE_OVER_SPEED */
 }
+#endif /* __SSE_4_1__ */

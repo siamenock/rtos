@@ -30,7 +30,7 @@ core: libjsmn.a libtlsf.a
 	cp core/libcore_linux.a .
 
 newlib/Makefile: 
-	cd newlib; CFLAGS=-fno-stack-protector ./configure --target=x86_64-pc-packetngin --disable-multilib
+	cd newlib; CFLAGS="-fno-stack-protector -D__SSE_4_1__ -msse4.1" ./configure --target=x86_64-pc-packetngin --disable-multilib
 
 PACKETNGIN_BASE = $(shell pwd)
 

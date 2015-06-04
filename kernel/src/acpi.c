@@ -152,7 +152,7 @@ typedef struct {
 	
 static RSDP* find_RSDP() {
 	bool is_RSDP(uint8_t* p) {
-		if(memcmp(p, "RSD PTR", 8) == 0) {
+		if(memcmp(p, "RSD PTR", 7) == 0) {
 			uint8_t checksum = 0;
 			for(int i = 0; i < sizeof(RSDP); i++)
 				checksum += p[i];
