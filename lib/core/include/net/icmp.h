@@ -27,7 +27,7 @@ typedef struct _ICMP {
 /**
  * Process ICMPv4 packet
  *
- * @param ICMPv4 packet
+ * @param packet ICMPv4 packet
  * @return true if the packet is processed, in the case the packet must not be reused
  */
 bool icmp_process(Packet* packet);

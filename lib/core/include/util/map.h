@@ -35,7 +35,7 @@ typedef struct _Map {
 /**
  * Create a HashMap.
  *
- * @param initiali_capacity respected maximum number of elements
+ * @param initial_capacity respected maximum number of elements
  * @param hash key hashing function, if hash is NULL map_uint64_hash will be used
  * @param equals key comparing function, if equals is NULL map_uint64_equals will be used
  * @param pool memory pool to use, if NULL local memory area will be used

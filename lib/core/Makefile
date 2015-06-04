@@ -14,7 +14,7 @@ OBJS = ether.o crc.o checksum.o ni.o status.o  md5.o md5_asm.o \
 
 CFLAGS = -I include -I ../TLSF/src -I ../jsmn -O2 -Wall -Werror -m64 -nostdlib -ffreestanding -fno-stack-protector -std=gnu99 -mcmodel=kernel
 
-all: packetngin linux
+all: packetngin linux doc
 
 packetngin: libcore.a
 
@@ -62,6 +62,7 @@ doc:
 	doxygen doxyfiles/Doxyfile
 
 clean: 
+	rm -rf doc
 	rm -rf obj
 	rm -f libcore.a
 	rm -rf obj_linux
