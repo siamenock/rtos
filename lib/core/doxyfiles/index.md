@@ -1,9 +1,12 @@
-# PacketNgin Core Library Documentation {#core}
+# PacketNgin SDK Documentation {#core}
 
 # Overview {#overview}
-PacketNgin Core Library is a firmware for a PacketNgin Network Applications (Net Apps) and 
-useful utilities to manipulate virtualized resources such as global and local memory,
-threads(or CPU Core), network interface controller, storage, ...
+PacketNgin SDK (Software Development Kit) provides basic binary libraries to a 
+PacketNgin Network Applications (or Net Apps) and various tools to test and emulate Net Apps.
+Most important library for a Net App is PacketNgin Core Library (or just libcore)
+which is a firmware for Net Apps and also provides useful utilities to manipulate 
+virtualized resources such as global and local memory, threads(or CPU Core), 
+network interface controller, storage, ...
 
 
 # Basic Concept {#basic}
@@ -104,6 +107,18 @@ command parsing and event processing engine to build a Net App.
 @see util/map.h
 @see util/cmd.h
 @see util/event.h
+
+
+# Other libraries {#libs}
+PacketNgin SDK supports various useful libraries. Here is the list of the libraries,
+ported to PacketNgin RTOS.
+
+  * Newlib - Standard C library
+  * OpenSSL - A cryptography library
+  * LwIP - Light weight IP protocol stack
+  * zlib - A compression library
+
+We need more hands to port more libraries to PacketNgin RTOS.
 
 
 # Contact point {#contact}
