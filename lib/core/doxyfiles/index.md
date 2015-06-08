@@ -46,7 +46,7 @@ thread can access it's own local memory area.
 @see lock.h
 
 
-## Global memory area and Shared memory area {#gmalloc}
+## Global and shared memory area {#gmalloc}
 Global memory area is sharable memory area between threads in a Net App. Any threads
 in a Net App can read or write global memory area. Shared memory area is a specially
 allocated area from global memory area to share the pointer (address of memory) between threads.
@@ -113,12 +113,55 @@ command parsing and event processing engine to build a Net App.
 PacketNgin SDK supports various useful libraries. Here is the list of the libraries,
 ported to PacketNgin RTOS.
 
-  * Newlib - Standard C library
-  * OpenSSL - A cryptography library
-  * LwIP - Light weight IP protocol stack
-  * zlib - A compression library
+  * Newlib - Standard C library (https://sourceware.org/newlib/)
+  * OpenSSL - A cryptography library (https://www.openssl.org/)
+  * LwIP - Light weight IP protocol stack (http://savannah.nongnu.org/projects/lwip/)
+  * zlib - A compression library (http://www.zlib.net/)
 
 We need more hands to port more libraries to PacketNgin RTOS.
+
+
+# Tools {#tools}
+PacketNgin SDK provides various tools to compile, test Net Apps and 
+to emulate virtualized network in a PC.
+
+## Compile and Link
+libpacketngin is a combined library of libcore for firmware, newlib for standard C,
+and TLSF for real-time memory allocation. User can use GCC for compile and link with
+special options.
+
+  * -m64 for PacketNgin RTOS is running on x86_64 only
+  * -ffreestanding for Net App doesnot use GCC's default C library but Newlib
+  * -fno-stack-protector for PacketNgin RTOS protects heap and stack memory using 
+    virtual memory not stack pointer
+
+## Test
+Net App can be tested using QEMU or VirtualBox in developer's PC. Just launch 
+PacketNgin RTOS on QEMU or VirtualBox then upload Net App binary image to the O/S
+and execute it using PacketNgin Console. Which can be used to manipulate 
+PacketNgin RTOS from remote.
+
+User can also use PacketNgin Network Emulator to make a virtualized network 
+on a PC and test Net Apps. Network emulation is fundamental tool to develop Net Apps.
+For most of Net Apps does not act as a end-point host but middle-box node.
+So user need to launch various end-point hosts using virtualization technology,
+such as VirtualBox or Xen and need to emulate network itself on a PC.
+
+
+# Supported Platforms {#platform}
+PacketNgin RTOS is not newbie in O/S world so it does not support various H/W platforms. 
+Here is the list of platforms which the O/S supports.
+
+## CPUs
+  * Intel Core i5
+  * Intel Core i7
+  * QEMU
+  * VirtualBox
+
+## Network Devices
+  * RealTek 8111 (not fully supported yet)
+  * NetFPGA 1G-CML
+  * Virt I/O
 
 
 # Contact point {#contact}
