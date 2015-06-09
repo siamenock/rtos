@@ -370,11 +370,13 @@ void vm_init() {
 	// Core 0 is occupied by RPC manager
 	cores[0].status = VM_STATUS_START;
 	
+	/*
 	for(int i = 1; i < MP_MAX_CORE_COUNT; i++) {
 		if(!mp_apics[i])
 			cores[i].status = VM_STATUS_INVALID;	// Disable the core
 	}
-	
+	*/
+
 	event_idle_add(vm_loop, NULL);
 }
 

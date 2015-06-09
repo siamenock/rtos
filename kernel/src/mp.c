@@ -19,14 +19,19 @@ static MP_FloatingPointerStructure* fps;
 static MP_ConfigurationTableHeader* cth;
 
 static uint8_t core_id = 0xff;
+static uint8_t apic_id = 0xff;
+static uint8_t apic_unit = 1;
 static uint8_t core_count = 0;
 static uint8_t thread_count = 1;
 static uint8_t last_apic_id = 0;
+static bool is_extended_topology = false;
 static uint8_t bus_isa_id = (uint8_t)-1;
 static uint8_t bus_pci_id = (uint8_t)-1;
 
 extern uint64_t _ioapic_address;
 extern uint64_t _apic_address;
+
+static uint8_t mp_apic_id_to_core_id(uint8_t apic_id);
 
 static void cpuid(uint32_t* a, uint32_t* b, uint32_t* c, uint32_t* d) {
 	asm volatile("cpuid"
@@ -35,19 +40,45 @@ static void cpuid(uint32_t* a, uint32_t* b, uint32_t* c, uint32_t* d) {
 }
 
 void mp_init0() {
-	// Get CPU ID
-	uint32_t a, b, c, d;
-	a = 0x01;
-	cpuid(&a, &b, &c, &d);
-	core_id = (b >> 24) & 0xff;
-	
-	// Get thread count (Intel CPU)
-	// TODO: AMD CPU
-	if(strstr(cpu_brand, "Intel") != NULL) {
-		a = 0x0b;
-		c = 0;
+	bool check_extended_topology() {
+		uint32_t a, b, c, d;
+		a = 0x0;
 		cpuid(&a, &b, &c, &d);
+
+		if(a >= 11) {
+			a = 0x0b;
+			c = 0x0;
+			cpuid(&a, &b, &c, &d);
+
+			if(b)
+				return true;
+			else
+				return false;
+		} else
+			return false;
+	}
+
+	uint32_t a, b, c, d;
+
+	if(check_extended_topology()) {
+		//Suppport extended topology
+		a = 0x0b;
+		c = 0x0;
+		cpuid(&a, &b, &c, &d);
+		apic_id = d;
+		core_id = d;
 		thread_count = b & 0xffff;
+		if(thread_count == 1) {
+			core_id = (core_id >> (a & 0xff));
+			apic_unit = 1 << (a & 0xff);
+		}
+	} else {
+		//Not Suppport extended topology
+		// TODO: AMD CPU
+		a = 0x01;
+		cpuid(&a, &b, &c, &d);
+		core_id = (b >> 24) & 0xff;
+		apic_id = (b >> 24) & 0xff;
 	}
 }
 
@@ -235,8 +266,9 @@ void mp_init() {
 			}
 		}
 		
-		if(mp_wait(j, 3000000)) {
-			printf("%d ", j);
+		if(mp_wait(mp_apic_id_to_core_id(j), 3000000)) {
+			//TODO print core_id
+			printf("%d ", mp_apic_id_to_core_id(j));
 		} else {
 			printf("%d!(The core is not working) ", j);
 			mp_apics[j] = false;
@@ -276,9 +308,10 @@ void mp_sync() {
 	uint32_t map = 1 << core_id;
 	
 	uint32_t full = 0;
-	for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
-		if(mp_apics[i])
-			full |= 1 << i;
+	//for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
+	for(int i = 0; i < mp_core_count(); i++) {
+		//if(mp_apics[i])
+		full |= 1 << i;
 	}
 	
 	lock_lock(&shared->mp_sync_lock);
@@ -299,6 +332,18 @@ inline uint8_t mp_core_count() {
 
 inline uint8_t mp_core_id() {
 	return core_id;
+}
+
+inline uint8_t mp_apic_id() {
+	return apic_id;
+}
+
+static inline uint8_t mp_apic_id_to_core_id(uint8_t apic_id) {
+	return apic_id / apic_unit;
+}
+
+inline uint8_t mp_core_id_to_apic_id(uint8_t core_id) {
+	return core_id * apic_unit;
 }
 
 inline uint8_t mp_bus_isa_id() {
