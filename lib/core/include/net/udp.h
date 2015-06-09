@@ -43,7 +43,7 @@ void udp_port_free(NetworkInterface* ni, uint16_t port);
  * Set UDP length, checksum, and do IP packing.
  *
  * @param packet UDP packet to pack
- * @param udp_body_length UDP body length in bytes
+ * @param udp_body_len UDP body length in bytes
  */
 void udp_pack(Packet* packet, uint16_t udp_body_len);
 

@@ -96,6 +96,7 @@ char* read_string(void* buf, uint32_t* idx);
  * Change endianness and write unsigned 8 bits integer to buffer.
  *
  * @param buf buffer to write to
+ * @param value integer value
  * @param[in,out] idx the index to write to, the index will be changed after written
  */
 void write_u8(void* buf, uint8_t value, uint32_t* idx);
@@ -104,6 +105,7 @@ void write_u8(void* buf, uint8_t value, uint32_t* idx);
  * Change endianness and write unsigned 16 bits integer to buffer.
  *
  * @param buf buffer to write to
+ * @param value integer value
  * @param[in,out] idx the index to write to, the index will be changed after written
  */
 void write_u16(void* buf, uint16_t value, uint32_t* idx);
@@ -112,6 +114,7 @@ void write_u16(void* buf, uint16_t value, uint32_t* idx);
  * Change endianness and write unsigned 32 bits integer to buffer.
  *
  * @param buf buffer to write to
+ * @param value integer value
  * @param[in,out] idx the index to write to, the index will be changed after written
  */
 void write_u32(void* buf, uint32_t value, uint32_t* idx);
@@ -120,6 +123,7 @@ void write_u32(void* buf, uint32_t value, uint32_t* idx);
  * Change endianness and write unsigned 48 bits integer to buffer.
  *
  * @param buf buffer to write to
+ * @param value integer value
  * @param[in,out] idx the index to write to, the index will be changed after written
  */
 void write_u48(void* buf, uint64_t value, uint32_t* idx);
@@ -128,6 +132,7 @@ void write_u48(void* buf, uint64_t value, uint32_t* idx);
  * Change endianness and write unsigned 64 bits integer to buffer.
  *
  * @param buf buffer to write to
+ * @param value integer value
  * @param[in,out] idx the index to write to, the index will be changed after written
  */
 void write_u64(void* buf, uint64_t value, uint32_t* idx);

@@ -67,7 +67,7 @@ void tcp_port_free(NetworkInterface* ni, uint16_t port);
  * Set TCP checksum, and do IP packing.
  *
  * @param packet TCP packet to pack
- * @param tcp_body_length TCP body length in bytes
+ * @param tcp_body_len TCP body length in bytes
  */
 void tcp_pack(Packet* packet, uint16_t tcp_body_len);
 

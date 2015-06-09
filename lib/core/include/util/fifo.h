@@ -84,7 +84,8 @@ void* fifo_pop(FIFO* fifo);
  * Peek an element from the FIFO.
  *
  * @param fifo FIFO
- * @return peeked element or NULL if there is no element in the FIFO
+ * @param index peeking index, zero means the first one
+ * @return peeked element or NULL if there is no element in the FIFO or out of bounds
  */
 void* fifo_peek(FIFO* fifo, size_t index);
 
