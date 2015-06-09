@@ -24,7 +24,6 @@ static uint8_t apic_unit = 1;
 static uint8_t core_count = 0;
 static uint8_t thread_count = 1;
 static uint8_t last_apic_id = 0;
-static bool is_extended_topology = false;
 static uint8_t bus_isa_id = (uint8_t)-1;
 static uint8_t bus_pci_id = (uint8_t)-1;
 
