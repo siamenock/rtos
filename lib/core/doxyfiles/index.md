@@ -149,14 +149,13 @@ such as VirtualBox or Xen and need to emulate network itself on a PC.
 
 
 # Supported Platforms {#platform}
-PacketNgin RTOS is not newbie in O/S world so it does not support various H/W platforms. 
-Here is the list of platforms which the O/S supports.
+PacketNgin RTOS is newbie in O/S world so it does not support various H/W devices. 
+Here is the list of devices which the O/S supports.
 
 ## CPUs
   * Intel Core i5
   * Intel Core i7
-  * QEMU
-  * VirtualBox
+  * QEMU and VirtualBox with x86_64 CPU virtualization
 
 ## Network Devices
   * RealTek 8111 (not fully supported yet)

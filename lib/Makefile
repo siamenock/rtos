@@ -67,11 +67,13 @@ libumpn.a: libtlsf.a libcore.a
 	rm -r obj
 
 zlib/libz.a:
-	cd zlib; ./configure --static
+	cd zlib; CFLAGS=-fno-stack-protector ./configure --static --64
 	make -C zlib
 
 libz.a: zlib/libz.a
 	cp zlib/libz.a .
+	cp libz.a ../sdk/lib/
+	cp -rL zlib/*.h ../sdk/include/
 
 openssl/libssl.a: 
 	cd openssl; ./Configure packetngin-x86_64 no-threads no-shared no-dso
