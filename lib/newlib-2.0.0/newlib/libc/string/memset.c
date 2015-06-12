@@ -1,3 +1,99 @@
+#ifdef __SSE_4_1__
+#include <stdint.h>
+#include <xmmintrin.h>
+#include <smmintrin.h>
+
+void* memset(void *dst, int value, size_t len) {
+	uint8_t* a = dst;
+
+	int aligned_a = 0;
+	int i = 0;
+
+	aligned_a = ((unsigned long)a & (sizeof(__m128i)-1));
+
+	/* aligned */
+	if(aligned_a) {
+		while(len && ((unsigned long) &a[i] & (sizeof(__m128i)-1))) {
+			a[i] = (char)value;
+
+			i++;
+			len--;
+		}
+	}
+
+	if(len >= 4) {
+		uint32_t buf_32 = value;
+		buf_32 |= (buf_32 << 8);
+		buf_32 |= (buf_32 << 16);
+
+		if(len >= 16) {
+			__m128i r1 = _mm_set_epi32(buf_32, buf_32, buf_32, buf_32);
+
+			while(len >= 128) {
+				_mm_store_si128((__m128i*)&a[i], r1);
+				_mm_store_si128((__m128i*)&a[i + 16], r1);
+				_mm_store_si128((__m128i*)&a[i + 32], r1);
+				_mm_store_si128((__m128i*)&a[i + 48], r1);
+				_mm_store_si128((__m128i*)&a[i + 64], r1);
+				_mm_store_si128((__m128i*)&a[i + 80], r1);
+				_mm_store_si128((__m128i*)&a[i + 96], r1);
+				_mm_store_si128((__m128i*)&a[i + 112], r1);
+
+				i += 128;
+				len -= 128;
+			}
+
+			if(len >= 64) {
+				_mm_store_si128((__m128i*)&a[i], r1);
+				_mm_store_si128((__m128i*)&a[i + 16], r1);
+				_mm_store_si128((__m128i*)&a[i + 32], r1);
+				_mm_store_si128((__m128i*)&a[i + 48], r1);
+
+				i += 64;
+				len -= 64;
+			}
+
+			if(len >= 32) {
+				_mm_store_si128((__m128i*)&a[i], r1);
+				_mm_store_si128((__m128i*)&a[i + 16], r1);
+
+				i += 32;
+				len -= 32;
+			}
+
+			if(len >= 16) {
+				_mm_store_si128((__m128i*)&a[i], r1);
+
+				i += 16;
+				len -= 16;
+			}
+
+			if(len >= 8) {
+				*(uint64_t*)(&a[i]) = buf_32;
+
+				i += 8;
+				len -= 8;
+			}
+		}
+
+		while(len >= 4) {
+			*(uint32_t*)(&a[i]) = buf_32;
+
+			i += 4;
+			len -= 4;
+		}
+	}
+
+	while(len) {
+		a[i] = (char)value;
+
+		i++;
+		len--;
+	}
+
+	return dst;
+}
+#else
 /*
 FUNCTION
 	<<memset>>---set an area of memory
@@ -100,3 +196,4 @@ _DEFUN (memset, (m, c, n),
 
   return m;
 }
+#endif /*__SSE_4_1__*/

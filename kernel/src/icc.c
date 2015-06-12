@@ -126,7 +126,7 @@ uint32_t icc_send(ICC_Message* msg, uint8_t core_id) {
 	fifo_push(shared->icc_queues[core_id].icc_queue, msg);
 	lock_unlock(&shared->icc_queues[core_id].icc_queue_lock);
 
-	apic_write64(APIC_REG_ICR, ((uint64_t)core_id << 56) |
+	apic_write64(APIC_REG_ICR, ((uint64_t)mp_core_id_to_apic_id(core_id) << 56) |
 				APIC_DSH_NONE | 
 				APIC_TM_EDGE | 
 				APIC_LV_DEASSERT | 

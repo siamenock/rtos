@@ -1,3 +1,110 @@
+#ifdef __SSE_4_1__
+#include <stdint.h>
+#include <xmmintrin.h>
+#include <smmintrin.h>
+void* mempcpy(void *dst, void *src, size_t len) {
+	uint8_t* a = (uint8_t*)dst;
+	uint8_t* b = (uint8_t*)src;
+
+	int aligned_a = 0, aligned_b = 0;
+	int i = 0;
+
+	aligned_a = ((unsigned long)a & (sizeof(__m128i)-1));
+	aligned_b = ((unsigned long)b & (sizeof(__m128i)-1));
+
+	/* Not aligned */
+	if(aligned_a != aligned_b) {
+		while(len) {
+			a[i] = b[i];
+
+			i++;
+			len--;
+		}
+
+		return dst + i;
+	}
+
+	/* aligned */
+	if(aligned_a) {
+		while(len && ((unsigned long) &a[i] & (sizeof(__m128i)-1))) {
+			a[i] = b[i];
+
+			i++;
+			len--;
+		}
+	}
+
+	while(len >= 128) {
+		__m128i r1 = _mm_loadu_si128((__m128i*)&(b[i])); //16byte
+		__m128i r2 = _mm_loadu_si128((__m128i*)&(b[i + 16])); //16byte
+		__m128i r3 = _mm_loadu_si128((__m128i*)&(b[i + 32])); //16byte
+		__m128i r4 = _mm_loadu_si128((__m128i*)&(b[i + 48])); //16byte
+		__m128i r5 = _mm_loadu_si128((__m128i*)&(b[i + 64])); //16byte
+		__m128i r6 = _mm_loadu_si128((__m128i*)&(b[i + 80])); //16byte
+		__m128i r7 = _mm_loadu_si128((__m128i*)&(b[i + 96])); //16byte
+		__m128i r8 = _mm_loadu_si128((__m128i*)&(b[i + 112])); //16byte
+		_mm_store_si128((__m128i*)&a[i], r1);
+		_mm_store_si128((__m128i*)&a[i + 16], r2);
+		_mm_store_si128((__m128i*)&a[i + 32], r3);
+		_mm_store_si128((__m128i*)&a[i + 48], r4);
+		_mm_store_si128((__m128i*)&a[i + 64], r5);
+		_mm_store_si128((__m128i*)&a[i + 80], r6);
+		_mm_store_si128((__m128i*)&a[i + 96], r7);
+		_mm_store_si128((__m128i*)&a[i + 112], r8);
+
+		i += 128;
+		len -= 128;
+	}
+
+	if(len >= 64) {
+		__m128i r1 = _mm_loadu_si128((__m128i*)&(b[i])); //16byte
+		__m128i r2 = _mm_loadu_si128((__m128i*)&(b[i + 16])); //16byte
+		__m128i r3 = _mm_loadu_si128((__m128i*)&(b[i + 32])); //16byte
+		__m128i r4 = _mm_loadu_si128((__m128i*)&(b[i + 48])); //16byte
+		_mm_store_si128((__m128i*)&a[i], r1);
+		_mm_store_si128((__m128i*)&a[i + 16], r2);
+		_mm_store_si128((__m128i*)&a[i + 32], r3);
+		_mm_store_si128((__m128i*)&a[i + 48], r4);
+
+		i += 64;
+		len -= 64;
+	}
+
+	if(len >= 32) {
+		__m128i r1 = _mm_loadu_si128((__m128i*)&(b[i])); //16byte
+		__m128i r2 = _mm_loadu_si128((__m128i*)&(b[i + 16])); //16byte
+		_mm_store_si128((__m128i*)&a[i], r1);
+		_mm_store_si128((__m128i*)&a[i + 16], r2);
+
+		i += 32;
+		len -= 32;
+	}
+
+	if(len >= 16) {
+		__m128i r1 = _mm_loadu_si128((__m128i*)&(b[i])); //16byte
+		_mm_store_si128((__m128i*)&a[i], r1);
+
+		i += 16;
+		len -= 16;
+	}
+
+	while(len >= 4) {
+		*(long*)(&a[i]) = *(long*)(&b[i]);
+
+		i += 4;
+		len -= 4;
+	}
+
+	while(len) {
+		a[i] = b[i];
+
+		i++;
+		len--;
+	}
+
+	return dst + i;
+}
+#else
 /*
 FUNCTION
         <<mempcpy>>---copy memory regions and return end pointer
@@ -105,3 +212,4 @@ _DEFUN (mempcpy, (dst0, src0, len0),
   return dst;
 #endif /* not PREFER_SIZE_OVER_SPEED */
 }
+#endif /* __SSE_4_1__*/

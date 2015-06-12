@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include "page.h"
 #include "pnkc.h"
 #include "bfs.h"
@@ -21,7 +22,7 @@ static int copy_kernel_half(PNKC* pnkc, uint8_t core_id);
 static void dump(int x, int y, void* addr);
 
 void main(void) {
-	uint8_t core_id = get_core_id();
+	uint8_t core_id = get_core_id();;
 	
 	// BSP routine
 	if(core_id == 0) {
@@ -83,12 +84,47 @@ void main(void) {
 }
 
 uint8_t get_core_id() {
+	void cpuid(uint32_t* a, uint32_t* b, uint32_t* c, uint32_t* d) {
+		asm volatile("cpuid"
+			: "=a"(*a), "=b"(*b), "=c"(*c), "=d"(*d)
+			: "a"(*a), "b"(*b), "c"(*c), "d"(*d));
+	}
+
+	bool check_extended_topology() {
+		uint32_t a, b, c, d;
+		a = 0x0;
+		cpuid(&a, &b, &c, &d);
+
+		if(a >= 11) {
+			a = 0x0b;
+			c = 0x0;
+			cpuid(&a, &b, &c, &d);
+
+			if(b)
+				return true;
+			else
+				return false;
+		} else
+			return false;
+	}
+
 	uint32_t a, b, c, d;
-	asm("cpuid" 
-		: "=a"(a), "=b"(b), "=c"(c), "=d"(d) 
-		: "a"(1));
-	
-	return (b >> 24) & 0xff;
+	if(check_extended_topology()) {
+		a = 0x0b;
+		c = 0x0;
+		cpuid(&a, &b, &c, &d);
+
+		if((b & 0xffff) == 1) {
+			return ((d & 0xff) >> (a & 0xf));
+		} else {
+			return d & 0xff;
+		}
+	} else {
+		a = 0x01;
+		cpuid(&a, &b, &c, &d);
+
+		return (b >> 24) & 0xff;
+	}
 }
 
 void print(int x, int y, const char* str, char attr) {
