@@ -53,6 +53,14 @@ void apic_activate() {
 	
 	port_out8(PIC_MASTER_PORT2, 0xff);
 	port_out8(PIC_SLAVE_PORT2, 0xff);
+
+	// Dummy interrupt handler
+	void dummy_timer_handler(uint64_t vector, uint64_t error_code) {
+		// Do nothing
+		apic_eoi();
+	}
+	
+	apic_register(32, dummy_timer_handler);
 	
 	printf("\tActivate local APICs...\n");
 	void _apic_activate();
