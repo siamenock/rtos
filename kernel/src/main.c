@@ -27,9 +27,12 @@
 #include "module.h"
 #include "symbols.h"
 #include "device.h"
+#include "driver/usb/usb.h"
+#include "driver/pata.h"
+#include "driver/fs.h"
+#include "driver/bfs.h"
 #include "driver/dummy.h"
 #include "driver/nic.h"
-#include "rootfs.h"
 
 #include <net/ether.h>
 #include <net/ip.h>
@@ -238,68 +241,86 @@ static void cmd_callback(char* result, int exit_status) {
 }
 
 static void exec(char* name) {
-	uint32_t len;
-	char* end = rootfs_file(name, &len);
-
-	if(!end) //init.psh is not exist
-		return;
-
-	char* eof = end + len;
-	char* head = end;
+	int fd = open(name, "r");
+	if(fd < 0) {
+		return ;
+	}
 	char line[CMD_SIZE];
+	int eof;
+	if((eof = read(fd, line, CMD_SIZE)) <= 0) {
+		printf("Read error\n");
+		close(fd);
+		return ;
+	}
+
+	char* ptr = line;
+	char* head = ptr;
 
 	bool exec_line(void) {
-		int line_len = end - head;
-		if(line_len < CMD_SIZE) {
-			memcpy(line, head, line_len);
-			line[line_len] = '\0';
-			printf("%s\n", line);
-			int ret = cmd_exec(line, cmd_callback);
-			if(ret != 0)
-				return false;
-		} else {
-			printf("Command line is too long %d > %d\n", line_len, CMD_SIZE);
+		int line_len = ptr - head;
+		head[line_len] = '\0';
+		int ret = cmd_exec(head,cmd_callback);
+
+		if(ret != 0) {
+			printf("Exec error\n");
 			return false;
 		}
+
 		return true;
 	}
 
-	for(; end < eof; end++) {
-		if(*end == '\n' || *end == '\0') {
-			if(!exec_line())
-				return;
-			head = end + 1;
+	for(int i = 0; i < eof; i++, ptr++) {
+		if(*ptr == '\n' || *ptr == '\0') {
+			if(!exec_line()) {
+				close(fd);
+				return ;
+			}
+
+			head = ptr + 1;
 		}
 	}
-	if(head < end)
-		exec_line();
+
+	close(fd);
 }
 
 void main(void) {
 	cpu_init();
 	mp_init0();
-	
+
 	uint8_t core_id = mp_core_id();
 	if(core_id == 0) {
-		// Bootstrap processor
 		stdio_init();
-		
+
+		// Bootstrap processor
 		printf("Initializing shared area...\n");
 		shared_init();
-		
+
 		printf("Initializing malloc...\n");
 		malloc_init();
-		
+
 		printf("Initializing gmalloc...\n");
 		gmalloc_init();
 		stdio_init2(gmalloc(4000 * VGA_BUFFER_PAGES), 4000 * VGA_BUFFER_PAGES);
-		
+
+		printf("Initializing USB controller driver...\n");
+		usb_initialize();
+
+		printf("Initializing disk drivers...\n");
+		disk_init0();
+		disk_register(&pata_driver);
+		disk_register(&usb_msc_driver);
+		disk_init();
+
+		printf("Initializing file system...\n");
+		bfs_init();
+		fs_init();
+
 		printf("Analyzing CPU information...\n");
 		cpu_info();
-		
+	
 		printf("Analyzing multi-processors...\n");
 		mp_analyze();
-		
+
 		printf("Initialize GDT...\n");
 		gdt_init();
 		gdt_load();
@@ -317,13 +338,13 @@ void main(void) {
 		
 		printf("Initializing PCI...\n");
 		pci_init();
-		
+
 		printf("Initializing APICs...\n");
 		apic_activate();
 		
 		printf("Initailizing multi-processing...\n");
 		mp_init();
-		
+	
 		printf("Initailizing local APIC...\n");
 		apic_init();
 		
@@ -339,21 +360,21 @@ void main(void) {
 		
 		printf("Initializing inter-core communications...\n");
 		icc_init();
-		
+	
 		printf("Initializing kernel symbols...\n");
 		symbols_init();
-		
-		printf("Initializing modules...\n");
-		module_init();
-		
+	
 		printf("Initializing network interface...\n");
 		ni_init0();
-		
+
 		mp_sync();
-		
+	
 		printf("Cleaning up memory...\n");
 		gmalloc_extend();
-	
+
+		printf("Initializing modules...\n");
+		module_init();
+
 		printf("Initializing device drivers...\n");
 		int count = device_module_init();
 
@@ -394,7 +415,7 @@ void main(void) {
 
 		printf("Initializing shell...\n");
 		shell_init();
-		
+
 		event_busy_add(idle0_event, NULL);
 
 		dummy_init();	// There is no meaning
@@ -425,9 +446,9 @@ void main(void) {
 	}
 
 	mp_sync();
-	
+
 	if(core_id == 0)
-		exec("init.psh");
+		exec("/init.psh");
 
 	while(1)
 		event_loop();

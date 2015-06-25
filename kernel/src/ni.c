@@ -14,8 +14,8 @@
 
 #include "ni.h"
 
-#define DEBUG			0
-#define ALIGN			16
+#define DEBUG		0
+#define ALIGN		16
 #define MAX_NIC_COUNT 	8
 
 Map* nis;

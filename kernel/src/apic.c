@@ -186,25 +186,25 @@ uint64_t apic_user_return_code() {
 }
 
 void apic_dump(uint64_t vector, uint64_t error_code) {
-	Frame* frame = (void*)(0xffffffff805b0000 - sizeof(Frame));
-	
-	printf("\n* Exception: ver=%d.%d.%d-%s core=%d, vector=0x%lx, error=0x%lx\n", VERSION_MAJOR, VERSION_MINOR, VERSION_MICRO, VERSION_TAG, mp_core_id(), vector, error_code);
-	printf("AX=%016lx BX=%016lx CX=%016lx DX=%016lx\n", frame->rax, frame->rbx, frame->rcx, frame->rdx);
-	printf("SI=%016lx DI=%016lx BP=%016lx SP=%016lx\n", frame->rsi, frame->rdi, frame->rbp, frame->rsp);
-	printf("8 =%016lx 9 =%016lx 10=%016lx 11=%016lx\n", frame->r8, frame->r9, frame->r10, frame->r11);
-	printf("12=%016lx 13=%016lx 14=%016lx 15=%016lx\n", frame->r12, frame->r13, frame->r14, frame->r15);
-	printf("IP=%016lx FL=%016lx\n", frame->rip, frame->rflag);
-	printf("ES=%08x CS=%08x DS=%08x FS=%08x GS=%08x SS=%08x\n", frame->es, frame->cs, frame->ds, frame->fs, frame->gs, frame->ss);
-	
-	printf("\n");
-	uint64_t* p = (void*)frame->rsp;
-	for(int i = -20; i < 0; i += 4) {
-		printf("%016lx %016lx %016lx %016lx\n", p[i], p[i + 1], p[i + 2], p[i + 3]);
-	}
-	printf("----------------------------\n");
-	for(int i = 0; i < 40; i += 4) {
-		printf("%016lx %016lx %016lx %016lx\n", p[i], p[i + 1], p[i + 2], p[i + 3]);
-	}
+//	Frame* frame = (void*)(0xffffffff805b0000 - sizeof(Frame));
+//	
+//	printf("\n* Exception: ver=%d.%d.%d-%s core=%d, vector=0x%lx, error=0x%lx\n", VERSION_MAJOR, VERSION_MINOR, VERSION_MICRO, VERSION_TAG, mp_core_id(), vector, error_code);
+//	printf("AX=%016lx BX=%016lx CX=%016lx DX=%016lx\n", frame->rax, frame->rbx, frame->rcx, frame->rdx);
+//	printf("SI=%016lx DI=%016lx BP=%016lx SP=%016lx\n", frame->rsi, frame->rdi, frame->rbp, frame->rsp);
+//	printf("8 =%016lx 9 =%016lx 10=%016lx 11=%016lx\n", frame->r8, frame->r9, frame->r10, frame->r11);
+//	printf("12=%016lx 13=%016lx 14=%016lx 15=%016lx\n", frame->r12, frame->r13, frame->r14, frame->r15);
+//	printf("IP=%016lx FL=%016lx\n", frame->rip, frame->rflag);
+//	printf("ES=%08x CS=%08x DS=%08x FS=%08x GS=%08x SS=%08x\n", frame->es, frame->cs, frame->ds, frame->fs, frame->gs, frame->ss);
+//	
+//	printf("\n");
+//	uint64_t* p = (void*)frame->rsp;
+//	for(int i = -20; i < 0; i += 4) {
+//		printf("%016lx %016lx %016lx %016lx\n", p[i], p[i + 1], p[i + 2], p[i + 3]);
+//	}
+//	printf("----------------------------\n");
+//	for(int i = 0; i < 40; i += 4) {
+//		printf("%016lx %016lx %016lx %016lx\n", p[i], p[i + 1], p[i + 2], p[i + 3]);
+//	}
 }
 
 void isr_exception_handler(uint64_t vector, uint64_t error_code) {

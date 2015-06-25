@@ -104,7 +104,7 @@ static bool is_end() {
 	return s == screen;
 }
 
-static void scroll_up(int lines) {
+void scroll_up(int lines) {
 	if(screen >= head) {
 		if(screen - lines < head) {
 			screen = head;

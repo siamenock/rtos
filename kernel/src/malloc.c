@@ -2,10 +2,11 @@
 #include <tlsf.h>
 #include <malloc.h>
 #include "stdio.h"
-#include "rootfs.h"
 #include "pnkc.h"
 #include "malloc.h"
 #include "asm.h"
+
+#include "mp.h"
 
 #define DEBUG	0
 
@@ -32,8 +33,8 @@ int debug_free_count;
 extern void* __malloc_pool;	// Defined in malloc.c from libcore
 
 void malloc_init() {
-	PNKC* pnkc = rootfs_file("kernel.bin", NULL);
-	
+	PNKC* pnkc = (PNKC*)(0x200200 /* Kernel entry end */ - sizeof(PNKC));
+
 	uint64_t addr1 = pnkc->data_offset + pnkc->data_size;
 	uint64_t addr2 = pnkc->bss_offset + pnkc->bss_size;
 	uint64_t start = PHYSICAL_TO_VIRTUAL(0x400000 + (addr1 > addr2 ? addr1 : addr2));
@@ -41,7 +42,7 @@ void malloc_init() {
 	
 	__malloc_pool = (void*)start;
 	init_memory_pool((uint32_t)(end - start), __malloc_pool, 0);
-	
+
 	#if DEBUG
 	statistics = map_create(512, map_uint64_hash, map_uint64_equals, NULL);
 	tracing = map_create(8192, map_uint64_hash, map_uint64_equals, NULL);

@@ -22,11 +22,11 @@
 #include "device.h"
 #include "port.h"
 #include "acpi.h"
+#include "vm.h"
+#include "asm.h"
 #include "driver/charout.h"
 #include "driver/charin.h"
-#include "vm.h"
-#include "rootfs.h"
-#include "asm.h"
+#include "driver/file.h"
 
 #include "shell.h"
 
@@ -430,6 +430,13 @@ static int cmd_create(int argc, char** argv, void(*callback)(char* result, int e
 						return -1;
 					}
 					nic->mac = parse_uint64(argv[i]);
+				} else if(strcmp(argv[i], "port:") == 0) {
+					i++;
+					if(!is_uint32(argv[i])) {
+						printf("port must be uint32\n");
+						return i;
+					}
+					nic->port = parse_uint32(argv[i]);
 				} else if(strcmp(argv[i], "ibuf:") == 0) {
 					i++;
 					if(!is_uint32(argv[i])) {
@@ -536,19 +543,30 @@ static int cmd_send(int argc, char** argv, void(*callback)(char* result, int exi
 	}
 
 	uint32_t vmid = parse_uint32(argv[1]);
-	uint32_t size = 0;
-	void* file = rootfs_file(argv[2], &size);
-	
-	if(file == NULL) {
-		printf("Cannot open file: %s\n", argv[2]);
+
+	// Attach root directory for full path
+	char file_name[FILE_MAX_NAME_LEN];
+	file_name[0] = '/';
+	strcpy(&file_name[1], argv[2]);
+
+	int fd = open(file_name, "r");
+	if(fd < 0) {
+		printf("Cannot open file: %s\n", file_name);
 		return 1;
 	}
-
-	if(vm_storage_write(vmid, file, 0, size) != size) {
-		callback("false", -1);
-		return -1;
-	}
 	
+	int offset = 0;
+	int len;
+	char buf[4096];
+	while((len = read(fd, buf, 4096)) > 0) {
+		if(vm_storage_write(vmid, buf, offset, len) != len) {
+			callback("false", -1);
+			return -1;
+		}
+
+		offset += len;
+	}
+
 	callback("true", 0);
 	return 0;
 }
@@ -769,12 +787,11 @@ static void cmd_callback(char* result, int exit_status) {
 	printf("%s\n", result);
 }
 
-void shell_callback(int code) {
+void shell_callback() {
 	static char cmd[CMD_SIZE];
 	static int cmd_idx = 0;
 	extern Device* device_stdout;
-	stdio_scancode(code);
-	
+
 	int ch = stdio_getchar();
 	while(ch >= 0) {
 		switch(ch) {

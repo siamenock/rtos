@@ -28,5 +28,6 @@ mode_switch:
 	or	eax, 0xe000000e	; PG=1, CD=1, NW=1, TS=1, EM=1, MP=1
 	xor	eax, 0x60000004	;       CD=1, NW=1,       EM=1
 	mov	cr0, eax	; PG=1, CD=0, NW=0, TS=1, EM=0, MP=1
-	
+
 	jmp	0x08:0x200000	; Jump to kernel64
+

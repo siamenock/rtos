@@ -5,6 +5,7 @@
   * libcurl4-gnutls-dev
   * qemu-kvm
   * bridge-utils
+  * libc6-dev-i386 
 
 * Disable automount-open
 gsettings set org.gnome.desktop.media-handling automount-open false

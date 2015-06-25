@@ -14,9 +14,9 @@ typedef struct {
 } NICStatus;
 
 typedef struct {
-	int		(*init)(void* device, void* data);
+	int	(*init)(void* device, void* data);
 	void	(*destroy)(int id);
-	int		(*poll)(int id);
+	int	(*poll)(int id);
 	void	(*get_status)(int id, NICStatus* status);
 	bool	(*set_status)(int id, NICStatus* status);
 	void	(*get_info)(int id, NICInfo* info);

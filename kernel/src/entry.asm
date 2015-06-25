@@ -21,7 +21,7 @@ start:
 	mov	ss, ax
 	mov	rsp, 0xffffffff805c0000
 	mov	rbp, 0xffffffff805c0000
-	
+
 	call	main
 	
 loop:

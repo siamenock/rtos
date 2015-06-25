@@ -65,3 +65,8 @@ long int strtol(const char *nptr, char **endptr, int base) {
 long long int strtoll(const char *nptr, char **endptr, int base) {
 	return __strtoll(nptr, endptr, base);
 }
+
+char* strcpy(char *dest, const char *src) {
+	return __memcpy(dest, src, strlen(src) + 1);
+}
+

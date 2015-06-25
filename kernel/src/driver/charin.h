@@ -1,7 +1,7 @@
 #ifndef __DRIVER_CHARIN__
 #define __DRIVER_CHARIN__
 
-typedef void(*CharInCallback)(int scancode);
+typedef void(*CharInCallback)();
 
 typedef struct {
 	int	(*init)(void* device, void* data);

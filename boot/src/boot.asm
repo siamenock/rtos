@@ -5,7 +5,7 @@ section .text
 
 jmp		0x07c0:start
 
-TOTAL:	dw	0x00	; total blocks (loader + kernel)
+TOTAL:	dw	0x00	; number of loader blocks
 
 start:
 	; Init stack: 0x0000 ~ 0xffff
@@ -13,7 +13,7 @@ start:
 	mov	ss, ax
 	mov	sp, 0xfffe
 	mov	bp, 0xfffe
-	
+
 	; Save drive
 	mov	ax, 0x07c0
 	mov	ds, ax
@@ -87,7 +87,7 @@ read:
 	
 	mov	ah, 0x02		; BIOS Read sector
 	mov	al, 0x01		; sector count
-	mov	dl, byte[DRIVE]
+	mov	dl, byte [DRIVE]
 	mov	ch, byte [TRACK]	; track
 	mov	cl, byte [SECTOR]	; sector
 	mov	dh, byte [HEAD]		; head

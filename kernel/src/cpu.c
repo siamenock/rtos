@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <string.h>
 #include "port.h"
-#include "shared.h"
 #include "cpu.h"
 #include "asm.h"
 
@@ -118,8 +117,11 @@ void cpu_init() {
 }
 
 static void turbo() {
+#ifdef _KERNEL_
+	// Loader does not have write_msr 
 	write_msr(0x00000199, 0xff00);
 	printf("\tTurbo Boost Enabled\n");
+#endif
 }
 
 static void tsc_info() {
@@ -130,8 +132,10 @@ static void tsc_info() {
 }
 
 void cpu_info() {
+#ifdef _KERNEL_
 	printf("\tBrand: %s\n", cpu_brand);
 	printf("\tFrequency: %ld\n", cpu_frequency);
+#endif
 
 	if(CPU_IS_TURBO_BOOST) {
 		printf("\tSupport Turbo Boost Technology\n");
@@ -142,6 +146,7 @@ void cpu_info() {
 
 	if(cpu_frequency == 0) {
 		printf("\tCannot parse CPU frequency...\n");
+
 		while(1)
 			asm("hlt");
 	}

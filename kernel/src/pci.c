@@ -140,7 +140,7 @@ done:
 
 void pci_init() {
 	pci_devices_count = pci_count();
-	
+
 	pci_analyze();
 		/*
 	for(int i = 0; i < pci_devices_count; i++) {

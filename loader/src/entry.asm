@@ -51,10 +51,9 @@ protectedmode:
 	mov	ss, ax
 	mov	esp, 0xfffe
 	mov	ebp, 0xfffe
-	
+
 	; Jump to C loader
 	jmp	dword 0x18:0x10200
-
 
 align 8, db 0
 

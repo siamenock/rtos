@@ -609,7 +609,7 @@ void stdio_scancode(int code) {
 			else if(ch >= 0x60 && ch < 0x80)
 				ch -= 0x60;
 		}
-		
+	
 		PUT();
 	}
 	
@@ -624,6 +624,9 @@ int stdio_getchar() {
 		return -1;
 }
 
+int stdio_putchar(const char ch) {
+	return ring_write(__stdin, __stdin_head, &__stdin_tail, __stdin_size, &ch, 1);
+}
 /*
 void _print(const char* str, int row, int col) {
 	char* v = (char*)0xb8000 + (row * 160) + col * 2;
@@ -983,7 +986,7 @@ int putchar(int c) {
 	return write1(&ch, 1);
 }
 
-ssize_t write(int fd, const void* buf, size_t count) {
+ssize_t write0(int fd, const void* buf, size_t count) {
 	if(fd == 1)
 		return write1(buf, count);
 	

@@ -2,7 +2,7 @@
 
 CFLAGS = -I../lib/core/include -I../kernel/src/driver -O2 -Wall -Werror -m64 -ffreestanding -std=gnu99 -mcmodel=kernel -I./linux
 
-MODULES = virtio.ko r8169.ko rtl8139.ko #nf10.ko
+MODULES = r8169.ko rtl8139.ko nf10.ko virtio.ko
 
 all: $(MODULES) 
 

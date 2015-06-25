@@ -5,36 +5,31 @@
 #include <util/list.h>
 #include "../port.h"
 #include "../apic.h"
+#include "../stdio.h"
 #include "keyboard.h"
+#include "usb/usb.h"
 
 static CharInCallback callback;
 
-#define KEYBOARD_BUFFER_SIZE	8
-
-static char buffer[8];
-static size_t head;
-static size_t tail;
-
 static bool event(void* data) {
-	int code = 0;
+	if(usb_keyboard) 
+		usb_hid_poll(usb_keyboard);
 
-	while(ring_read(buffer, &head, tail, KEYBOARD_BUFFER_SIZE, (char*)&code, 1)) {
-		if(callback)
-			callback((int)code);
-	}
+	if(callback)
+		callback();
 
 	return true;
 }
 
 static void keyboard_handler(uint64_t vector, uint64_t error_code) {
 	char code = port_in8(0x60);
-	ring_write(buffer, head, &tail, KEYBOARD_BUFFER_SIZE, &code, 1);
+	stdio_scancode((uint8_t)code); 
 	apic_eoi();
 }
 
 static int init(void* device, void* data) {
 	apic_register(32 + 1, keyboard_handler);
-	
+
 	/*
 	int i, j;
 	port_out8(0x64, 0xae);	// Activate keyboard controller

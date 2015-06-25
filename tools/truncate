@@ -1,4 +1,4 @@
 #!/bin/bash
 
-let "SIZE=(($(stat -c%s $1) + 511) / 512) * 512"
+let "SIZE=(($(stat -c%s $1) + 511) / 512 + 1) * 512"
 truncate -s $SIZE $1

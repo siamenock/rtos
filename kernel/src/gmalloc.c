@@ -4,7 +4,6 @@
 #include <util/list.h>
 #include <malloc.h>
 #include "idt.h"
-#include "rootfs.h"
 #include "pnkc.h"
 #include "mp.h"
 #include "gmalloc.h"
@@ -42,25 +41,29 @@ void gmalloc_extend() {
 	} Block;
 	
 	// Make reserved blocks
-	Block reserved[4];
+	Block reserved[3];
 	reserved[0].start = 0x100000;	// Description table
 	reserved[0].end = 0x200000;
-	
-	PNKC* pnkc = rootfs_file("kernel.bin", NULL);
+
+	PNKC* pnkc = (PNKC*)(0x200200 /* Kernel entry end */ - sizeof(PNKC));
+
 	reserved[1].start = 0x200000;	// Kernel global
 	reserved[1].end = 0x200000 + MAX(pnkc->text_offset + pnkc->text_size, pnkc->rodata_offset + pnkc->rodata_size);
 	
 	reserved[2].start = 0x400000;	// Kernel local
 	reserved[2].end = 0x400000 + 0x200000 * mp_core_count();
 	
-	reserved[3].start = (uint64_t)rootfs_addr();	// RootFS
-	reserved[3].end = reserved[3].start + rootfs_size();
+//	// TODO: BFS dependent code. Need to extract common private data for serveral file systems
+//	BFSPriv* priv = (BFSPriv*)driver->priv;
+//	reserved[3].start = priv->reserved_area_addr;
+//	reserved[3].end = reserved[3].start + priv->total_cluster_count * 512; 
+//	// TODO: It's actually sector count. Need to change sector to cluster. 
 	
 	// Get free blocks
 	List* blocks = list_create(NULL);
 	
 	uint64_t total_size = 0;
-	
+
 	printf("\tBIOS e820 System Address Map\n");
 	for(uint32_t i = 0; i < smap_count; i++) {
 		char* type;
@@ -74,6 +77,7 @@ void gmalloc_extend() {
 				Block* block = malloc(sizeof(Block));
 				block->start = smap[i].base;
 				block->end = smap[i].base + smap[i].length;
+
 				list_add(blocks, block);
 				break;
 			case SMAP_TYPE_RESERVED:
@@ -97,7 +101,7 @@ void gmalloc_extend() {
 		
 		printf("\t\t0x%016x - 0x%016x: %s(%d)\n", smap[i].base, end, type, smap[i].extended);
 	}
-	
+
 	// 1MB align
 	total_size = ((total_size + 0x100000 - 1) / 0x100000) * 0x100000;
 	printf("\tTotal memory size: %ld MB\n", total_size / 0x100000);
@@ -138,7 +142,7 @@ void gmalloc_extend() {
 		
 		uint64_t start = (b->start + (0x200000 - 1)) & ~(0x200000 - 1);
 		uint64_t end = b->end & ~(0x200000 - 1);
-		
+	
 		if(start + 0x200000 <= end) {
 			// Head partial
 			if(b->start != start) {
@@ -156,7 +160,7 @@ void gmalloc_extend() {
 				start += 0x200000;
 				_2mb->end = start;
 				b->start = start;
-				
+	
 				list_add(blocks_2mb, _2mb);
 			}
 			
@@ -180,7 +184,7 @@ void gmalloc_extend() {
 		free(b);
 	}
 	list_destroy(blocks_2mb);
-	
+
 	// gmalloc blocks
 	list_iterator_init(&iter, blocks);
 	while(list_iterator_has_next(&iter)) {
@@ -211,12 +215,12 @@ inline void* gmalloc(size_t size) {
 			return ptr;
 
 		// TODO: print to stderr
-		printf("WARN: Not enough global memory!!!");
+		printf("WARN: Not enough global memory!!!\n");
 		
 		void* block = bmalloc();
 		if(!block) {
 			// TODO: print to stderr
-			printf("ERROR: Not enough global memory!!!");
+			printf("ERROR: Not enough block memory!!!\n");
 			while(1) asm("hlt");
 		}
 		

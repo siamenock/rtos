@@ -1,10 +1,15 @@
 .PHONY: all run deploy clean cleanall system.img mount umount
 
-QEMU=qemu-system-x86_64 $(shell tools/qemu-params) -m 256 -hda system.img -M pc -smp 8 -d cpu_reset -net nic,model=rtl8139 -net tap,script=tools/qemu-ifup -net nic,model=rtl8139 -net tap,script=tools/qemu-ifup
+# QEMU can select boot device - USB MSC, HDD
+USB = -drive if=none,id=usbstick,file=./system.img -usb -device usb-ehci,id=ehci -device usb-storage,bus=ehci.0,drive=usbstick
+
+HDD = -hda system.img
+
+QEMU = qemu-system-x86_64 $(shell tools/qemu-params) -m 1024 -M pc -smp 8 -d cpu_reset -net nic,model=rtl8139 -net tap,script=tools/qemu-ifup -net nic,model=rtl8139 -net tap,script=tools/qemu-ifup -no-reboot -no-shutdown $(USB) #$(HDD) 
 
 all: system.img
 
-SYSTEM_IMG_SIZE := 1023		# 512 bytes * 1023 blocks = 512KB - 512B (for boot loader)
+SYSTEM_IMG_SIZE := 4096 	# 512 bytes * 4096 blocks = 2048KB - 512B (for boot loader)
 
 system.img: 
 	make -C lib
@@ -28,7 +33,7 @@ system.img:
 	sudo losetup -d /dev/loop0
 	rmdir mnt
 	cat boot/boot.bin loader/loader.bin root.img > $@
-	bin/rewrite $@
+	bin/rewrite $@ loader/loader.bin
 
 mount:
 	mkdir mnt
@@ -66,10 +71,10 @@ gdb:
 	gdb --eval-command="target remote localhost:1234; set architecture i386:x86-64; file kernel/kernel.elf"
 
 dis: kernel/kernel.elf
-	objdump -d kernel/kernel.elf > kernel.dis && vi kernel.dis
+	objdump -d kernel/kernel.elf > kernel.dis && vim kernel.dis
 
 stop:
-	killall -9 qemu-system-x86_64
+	sudo killall -9 qemu-system-x86_64
 
 deploy: system.img
 	tools/chk-sdb

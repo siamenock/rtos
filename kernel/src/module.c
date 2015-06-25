@@ -5,10 +5,14 @@
 #include <string.h>
 #include <elf.h>
 #include "../../loader/src/page.h"
-#include "rootfs.h"
+#include "driver/file.h"
+#include "driver/fs.h"
+#include "driver/bfs.h"
 #include "pnkc.h"
 #include "symbols.h"
 #include "module.h"
+#include "gmalloc.h"
+#include <openssl/md5.h>
 
 #define MODULE_ALIGNMENT	128
 #define SECTION_ALIGNMENT	128
@@ -20,31 +24,67 @@ int module_count;
 void* modules[MAX_MODULE_COUNT];
 
 void module_init() {
-	#define MAX(a,b) ((a) > (b) ? (a) : (b))
-	
-	PNKC* pnkc = rootfs_file("kernel.bin", NULL);
+#define MAX(a,b) ((a) > (b) ? (a) : (b))
+	PNKC* pnkc = (PNKC*)(0x200200 /* Kernel entry end */ - sizeof(PNKC));
+
 	uint32_t* size = pnkc->text_offset + pnkc->text_size > pnkc->rodata_offset + pnkc->rodata_size ? &pnkc->text_size : &pnkc->rodata_size;
 	void* addr = (void*)PHYSICAL_TO_VIRTUAL(0x200000 + MAX(pnkc->text_offset + pnkc->text_size, pnkc->rodata_offset + pnkc->rodata_size));
-	
+
 	void* org_addr = addr;
-	char name[255];
-	uint32_t file_size;
-	void* mmap;
-	rootfs_rewind();
-	while((mmap = rootfs_next(name, &file_size))) {
-		if(strstr(name, ".ko") + 3 - name == strlen(name)) {
-			printf("\tModule loading: %s\n", name);
-			void* base = module_load(mmap, file_size, &addr);
-			if(base) {
-				modules[module_count++] = base;
+	void* mmap = bmalloc(); // 2MB buffer in memory
+	if(!mmap) 
+		return ;
+
+	// Open root directory
+	File* dir = opendir("/");
+	if(!dir) 
+		return;
+
+	int len;
+	Dirent* dirent;
+	// Memory map pointer
+	uint8_t* ptr = (uint8_t*)mmap;
+
+	while((dirent = readdir(dir))) {
+		if(strstr((const char*)dirent->name, ".ko") + 3 - (char*)dirent->name == strlen((const char*)dirent->name)) {
+			// Attach root directory for full path
+			char file_name[FILE_MAX_NAME_LEN];
+			file_name[0] = '/';
+			strcpy(&file_name[1], dirent->name);
+
+			int fd = open(file_name, "r");
+			if(fd < 0) {
+				printf("\tModule cannot open: %s\n", dirent->name);
+				continue;
 			} else {
-				printf("\t\tFAILED: %s, errno: 0x%x.\n", name, errno);
+				if((len = read(fd, ptr, 0x200000)) != 0) {
+					printf("\tModule loading: %s(%d bytes)\n", dirent->name, len);
+
+					void* base = module_load(ptr, 0, &addr);
+					if(base) {
+						modules[module_count++] = base;
+					} else {
+						printf("\t\tFAILED: %s, errno: 0x%x.\n", dirent->name, errno);
+					}
+
+					ptr += len;
+
+					close(fd);
+				} else {
+					printf("\tModule read error: %s\n", dirent->name);
+					continue;
+				}
 			}
+
 		}
 	}
-	
+
+	closedir(dir);
+
 	// Extend kernel code/rodata area
 	*size += addr - org_addr;
+
+	bfree(mmap);
 }
 
 static bool check_header(Elf64_Ehdr* ehdr) {
@@ -52,37 +92,37 @@ static bool check_header(Elf64_Ehdr* ehdr) {
 		errno = 0x11;	// Illegal ELF64 magic
 		return false;
 	}
-	
+
 	if(ehdr->e_ident[EI_CLASS] != ELFCLASS64) {
 		errno = 0x12;	// Not supported ELF type
 		return false;
 	}
-	
+
 	if(ehdr->e_ident[EI_DATA] != ELFDATA2LSB) {
 		errno = 0x13;	// Not supported ELF data
 		return false;
 	}
-	
+
 	if(ehdr->e_ident[EI_VERSION] != 1) {
 		errno = 0x14;	// Not supported ELF version
 		return false;
 	}
-	
+
 	if(ehdr->e_ident[EI_OSABI] != ELFOSABI_SYSV) {
 		errno = 0x15;	// Not supported ELF O/S ABI
 		return false;
 	}
-	
+
 	if(ehdr->e_ident[EI_ABIVERSION] != 0) {
 		errno = 0x16;	// Not supported ELF ABI version
 		return false;
 	}
-	
+
 	if(ehdr->e_type != ET_REL) {
 		errno = 0x17;	// Illegal ELF type
 		return false;
 	}
-	
+
 	return true;
 }
 
@@ -91,21 +131,21 @@ void* module_load(void* file, size_t size, void **addr) {
 	Elf64_Ehdr* ehdr = (Elf64_Ehdr*)file;
 	if(!check_header(ehdr))
 		return NULL;
-	
+
 	// Find string table
 	Elf64_Shdr* shdr = (Elf64_Shdr*)((void*)ehdr + ehdr->e_shoff);
 	char* shstrtab = (void*)ehdr + shdr[ehdr->e_shstrndx].sh_offset;
 	Elf64_Sym* symtab = NULL;
 	char* strtab = NULL;
-	
+
 	char* shstr(Elf64_Word offset) {
 		return shstrtab + offset;
 	}
-	
+
 	char* str(Elf64_Word offset) {
 		return strtab + offset;
 	}
-	
+
 	// Find symbolic, string table
 	for(uint16_t i = 0; i < ehdr->e_shnum; i++) {
 		char* name = shstr(shdr[i].sh_name);
@@ -115,25 +155,25 @@ void* module_load(void* file, size_t size, void **addr) {
 			strtab = (void*)ehdr + shdr[i].sh_offset;
 		}
 	}
-	
+
 	if(!symtab || !strtab) {
 		errno = 0x42;	// There is no symbolic or string table
 		return NULL;
 	}
-	
+
 	void* load() {
 		// Allocate section area
 		void* base = (void*)ALIGN(*addr, MODULE_ALIGNMENT);
 		memcpy(base, ehdr, sizeof(Elf64_Ehdr));
 		*addr = base + sizeof(Elf64_Ehdr);
-		
+
 		Elf64_Shdr* shdr2 = *addr;
 		memcpy(*addr, shdr, sizeof(Elf64_Shdr) * ehdr->e_shnum);
 		*addr += sizeof(Elf64_Shdr) * ehdr->e_shnum;
-		
+
 		for(uint16_t i = 0; i < ehdr->e_shnum; i++) {
 			char* name = shstr(shdr[i].sh_name);
-			
+
 			if(strstr(name, ".text") == name ||
 					strstr(name, ".data") == name ||
 					strstr(name, ".bss") == name ||
@@ -141,13 +181,13 @@ void* module_load(void* file, size_t size, void **addr) {
 					strstr(name, ".shstrtab") == name ||
 					strstr(name, ".strtab") == name ||
 					strstr(name, ".symtab") == name) {
-				
+
 				Elf64_Addr sec_addr = ALIGN(*addr, shdr[i].sh_addralign > SECTION_ALIGNMENT ? shdr[i].sh_addralign : SECTION_ALIGNMENT);
 				Elf64_Xword sec_size = shdr[i].sh_size;
-				
+
 				shdr[i].sh_addr = shdr2[i].sh_addr = sec_addr;
 				*addr = (void*)sec_addr + sec_size;
-				
+
 				printf("\t\tLoading %s to 0x%p (%d bytes)\n", name, sec_addr, sec_size);
 				if(strstr(name, ".bss") == name) {
 					bzero((void*)sec_addr, sec_size);
@@ -156,28 +196,28 @@ void* module_load(void* file, size_t size, void **addr) {
 				}
 			}
 		}
-		
+
 		return base;
 	}
-	
+
 	// Load sections
 	void* base = load();
 	if(!base)
 		return NULL;
-	
+
 	void* get_section(char* name) {
 		for(uint16_t i = 0; i < ehdr->e_shnum; i++) {
 			if(strcmp(shstr(shdr[i].sh_name), name) == 0)
 				return (void*)shdr[i].sh_addr;
 		}
-		
+
 		return NULL;
 	}
-	
+
 	bool relocate(Elf64_Rela* rela, int rela_size, void* target) {
 		for(int i = 0; i < rela_size; i++) {
 			Elf64_Sym* sym = &symtab[rela[i].r_info >> 32];
-			
+
 			int64_t A = rela[i].r_addend;
 			uint64_t S;
 			if(sym->st_shndx == 0) {
@@ -193,7 +233,7 @@ void* module_load(void* file, size_t size, void **addr) {
 				S = (uint64_t)shdr[sym->st_shndx].sh_addr + sym->st_value;
 			}
 			void* P = target + rela[i].r_offset;
-			
+
 			uint32_t type = rela[i].r_info & 0xffffffff;
 			switch(type) {
 				case R_X86_64_NONE:
@@ -241,10 +281,10 @@ void* module_load(void* file, size_t size, void **addr) {
 					return false;
 			}
 		}
-		
+
 		return true;
 	}
-	
+
 	// Relocate sections
 	for(uint16_t i = 0; i < ehdr->e_shnum; i++) {
 		char* name = shstr(shdr[i].sh_name);
@@ -252,17 +292,17 @@ void* module_load(void* file, size_t size, void **addr) {
 			void* target = get_section(name + 5);
 			if(!target)
 				continue;
-			
+
 			printf("\t\tRelocating %s\n", name + 5);
-			
+
 			Elf64_Rela* rela = (void*)ehdr + shdr[i].sh_offset;
 			int rela_size = shdr[i].sh_size / sizeof(Elf64_Rela);
-			
+
 			if(!relocate(rela, rela_size, target))
 				return NULL;
 		}
 	}
-	
+
 	return base;
 }
 
@@ -280,23 +320,23 @@ void* module_find(void* base, char* name, int type) {
 		default:
 			return NULL;
 	}
-	
+
 	Elf64_Ehdr* ehdr = (Elf64_Ehdr*)base;
 	Elf64_Shdr* shdr = (Elf64_Shdr*)(base + sizeof(Elf64_Ehdr));
 	char* shstrtab = (char*)shdr[ehdr->e_shstrndx].sh_addr;
 	char* strtab = NULL;
-	
+
 	Elf64_Sym* symtab = NULL;
 	int symtab_size = 0;
-	
+
 	char* shstr(Elf64_Word offset) {
 		return shstrtab + offset;
 	}
-	
+
 	char* str(Elf64_Word offset) {
 		return strtab + offset;
 	}
-	
+
 	for(uint16_t i = ehdr->e_shnum - 1; i >= 1; i--) {
 		if(shdr[i].sh_type == SHT_SYMTAB) {
 			symtab = (Elf64_Sym*)shdr[i].sh_addr;
@@ -306,20 +346,20 @@ void* module_find(void* base, char* name, int type) {
 		} else {
 			continue;
 		}
-		
+
 		if(symtab && strtab)
 			break;
 	}
-	
+
 	for(int i = 1; i < symtab_size; i++) {
 		int bind = ELF64_ST_BIND(symtab[i].st_info);
 		int symtype = ELF64_ST_TYPE(symtab[i].st_info);
-		
+
 		if((bind == STB_GLOBAL || bind == STB_WEAK) && (type == 0 || symtype == type) && strcmp(name, str(symtab[i].st_name)) == 0) {
 			return (void*)shdr[symtab[i].st_shndx].sh_addr + symtab[i].st_value;
 		}
 	}
-	
+
 	return NULL;
 }
 
@@ -328,9 +368,9 @@ bool module_iface_init(void* addr, void* iface, ModuleObject* objs, int size) {
 		void* obj = module_find(addr, objs[i].name, objs[i].type);
 		if(objs[i].is_mandatory && !obj)
 			return false;
-		
+
 		*(uint64_t*)(iface+ objs[i].offset) = (uint64_t)obj;
 	}
-	
+
 	return true;
 }
