@@ -1,22 +1,34 @@
 .PHONY: all kernel clean doc
 
-DIR = obj obj_linux
+DIR = obj obj_linux obj_32
 
 OBJ_DIR = obj/
 
+OBJ_32_DIR = obj_32/
+
 LINUX_DIR = obj_linux/
 
-OBJS = ether.o crc.o checksum.o ni.o status.o  md5.o md5_asm.o \
+OBJS = ether.o crc.o checksum.o ni.o status.o  \
 	fifo.o vector.o list.o map.o ring.o errno.o thread.o \
-	asm.o gmalloc.o lock.o shared.o json.o arp.o icmp.o \
-	packet.o ip.o udp.o tcp.o tftp.o event.o cmd.o \
-	malloc.o types.o _string.o _malloc.o rpc.o readline.o
+	asm.o gmalloc.o lock.o shared.o json.o \
+	malloc.o types.o _string.o _malloc.o rpc.o readline.o \
+	arp.o icmp.o \
+	packet.o ip.o udp.o tcp.o tftp.o cmd.o \
+	cache.o	md5.o 
 
-CFLAGS = -I include -I ../TLSF/src -I ../jsmn -O2 -Wall -Werror -m64 -nostdlib -ffreestanding -fno-stack-protector -std=gnu99 -mcmodel=kernel -D__SSE_4_1__ -msse4.1
+OBJS_32 := $(OBJS)	
+
+OBJS += md5_asm.o event.o 
+
+CFLAGS = -I include -I ../TLSF/src -I ../jsmn -O0 -Wall -Werror -nostdlib -ffreestanding -fno-stack-protector -std=gnu99 #-D__SSE_4_1__ -msse4.1
+
+CFLAGS_32 := $(CFLAGS) -m32
+
+CFLAGS += -mcmodel=kernel -m64
 
 all: packetngin linux doc
 
-packetngin: libcore.a
+packetngin: libcore.a libcore_32.a
 
 linux: libcore_linux.a
 
@@ -27,6 +39,10 @@ obj/rpc.o: src/rpc.c
 obj_linux/rpc.o: src/rpc.c
 	mkdir -p $(DIR)
 	gcc $(CFLAGS) -Wno-unused-variable -DLINUX -c -o $@ $<
+
+obj_32/rpc.o: src/rpc.c
+	mkdir -p $(DIR)
+	gcc $(CFLAGS_32) -Wno-unused-variable -DLINUX -c -o $@ $<
 
 obj/%.o: src/%.c
 	mkdir -p $(DIR)
@@ -58,6 +74,21 @@ obj_linux/%.o: src/%.asm
 libcore_linux.a: $(addprefix $(LINUX_DIR), $(OBJS))
 	ar rcs $@ $^
 
+obj_32/%.o: src/%.c
+	mkdir -p $(DIR)
+	gcc $(CFLAGS_32) -c -o $@ $<
+
+obj_32/%.o: src/%.s
+	mkdir -p $(DIR)
+	gcc $(CFLAGS_32) -c -o $@ $<
+
+obj_32/%.o: src/%.asm
+	mkdir -p $(DIR)
+	nasm -f elf64 -o $@ $<
+
+libcore_32.a: $(addprefix $(OBJ_32_DIR), $(OBJS_32))
+	ar rcs $@ $^
+
 doc:
 	doxygen doxyfiles/Doxyfile
 
@@ -65,5 +96,7 @@ clean:
 	rm -rf doc
 	rm -rf obj
 	rm -f libcore.a
+	rm -rf obj_32
+	rm -f libocre_32.a
 	rm -rf obj_linux
 	rm -f libcore_linux.a

@@ -75,13 +75,13 @@ static Session* create(Packet* packet, IP* ip, UDP* udp, TFTPCallback* callback)
 		sessions = map_create(4, map_uint64_hash, map_uint64_equals, NULL);
 	}
 	
-	map_put(sessions, (void*)(uint64_t)session->sport, session);
+	map_put(sessions, (void*)(uintptr_t)session->sport, session);
 	
 	return session;
 }
 
 static void close(Session* session) {
-	map_remove(sessions, (void*)(uint64_t)session->sport);
+	map_remove(sessions, (void*)(uintptr_t)session->sport);
 	delete(session);
 }
 
@@ -142,11 +142,11 @@ bool tftp_process(Packet* packet) {
 		next_gc = time + TFTP_SESSION_GC;
 	} 
 	
-	uint32_t addr = (uint32_t)(uint64_t)ni_config_get(packet->ni, "ip");
+	uint32_t addr = (uint32_t)(uintptr_t)ni_config_get(packet->ni, "ip");
 	if(!addr)
 		return false;
 	
-	uint16_t port = (uint32_t)(uint64_t)ni_config_get(packet->ni, TFTP_PORT);
+	uint16_t port = (uint32_t)(uintptr_t)ni_config_get(packet->ni, TFTP_PORT);
 	if(!port)
 		port = 69;
 	
@@ -184,7 +184,7 @@ bool tftp_process(Packet* packet) {
 				printf("Unsupported opcode: %d\n", opcode);
 				return true;
 		}
-	} else if(sessions && (session = map_get(sessions, (void*)(uint64_t)dport))) {
+	} else if(sessions && (session = map_get(sessions, (void*)(uintptr_t)dport))) {
 		session->time = time + TFTP_SESSION_TTL;
 		
 		uint32_t index = 0;

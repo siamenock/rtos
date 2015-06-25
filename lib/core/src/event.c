@@ -45,7 +45,7 @@ void event_init() {
 static bool is_trigger_stop;
 
 static void fire(uint64_t event_id, void* event, TriggerEventFunc last, void* last_context) {
-	List* list = map_get(trigger_events, (void*)event_id);
+	List* list = map_get(trigger_events, (void*)(uintptr_t)event_id);
 	if(!list)
 		goto done;
 	
@@ -69,7 +69,7 @@ done:
 }
 
 static bool get_first_bigger(void* time, void* node) {
-	return (uint64_t)time < ((TimerNode*)node)->delay;
+	return (uintptr_t)time < ((TimerNode*)node)->delay;
 }
 
 static clock_t next_timer = INT64_MAX;
@@ -106,7 +106,7 @@ int event_loop() {
 		TimerNode* node = list_remove_first(timer_events);
 		if(node->func(node->context)) {
 			node->delay += node->period;
-			int index = list_index_of(timer_events, (void*)(uint64_t)node->delay, get_first_bigger);
+			int index = list_index_of(timer_events, (void*)(uintptr_t)node->delay, get_first_bigger);
 			if(!list_add_at(timer_events, index, node)) {
 				free(node);
 				
@@ -156,12 +156,12 @@ uint64_t event_busy_add(EventFunc func, void* context) {
 		return 0;
 	}
 	
-	return (uint64_t)node;
+	return (uintptr_t)node;
 }
 
 bool event_busy_remove(uint64_t id) {
-	if(list_remove_data(busy_events, (void*)id)) {
-		free((void*)id);
+	if(list_remove_data(busy_events, (void*)(uintptr_t)id)) {
+		free((void*)(uintptr_t)id);
 		return true;
 	} else {
 		return false;
@@ -178,7 +178,7 @@ uint64_t event_timer_add(EventFunc func, void* context, clock_t delay, clock_t p
 	node->delay = time + delay;
 	node->period = period;
 	
-	int index = list_index_of(timer_events, (void*)(uint64_t)node->delay, get_first_bigger);
+	int index = list_index_of(timer_events, (void*)(uintptr_t)node->delay, get_first_bigger);
 	if(!list_add_at(timer_events, index, node)) {
 		free(node);
 		return 0;
@@ -186,17 +186,17 @@ uint64_t event_timer_add(EventFunc func, void* context, clock_t delay, clock_t p
 	
 	next_timer = ((TimerNode*)list_get_first(timer_events))->delay;
 	
-	return (uint64_t)node;
+	return (uintptr_t)node;
 }
 
 bool event_timer_remove(uint64_t id) {
-	if(list_remove_data(timer_events, (void*)id)) {
-		free((void*)id);
+	if(list_remove_data(timer_events, (void*)(uintptr_t)id)) {
+		free((void*)(uintptr_t)id);
 		
 		if(list_size(timer_events) > 0)
 			next_timer = ((TimerNode*)list_get_first(timer_events))->delay;
 		else
-			next_timer = INT64_MAX;
+			next_timer = INT32_MAX;
 		
 		return true;
 	} else {
@@ -212,7 +212,7 @@ uint64_t event_trigger_add(uint64_t event_id, TriggerEventFunc func, void* conte
 	node->func = func;
 	node->context = context;
 	
-	List* list = map_get(trigger_events, (void*)event_id);
+	List* list = map_get(trigger_events, (void*)(uintptr_t)event_id);
 	if(!list) {
 		list = list_create(NULL);
 		if(!list) {
@@ -220,12 +220,12 @@ uint64_t event_trigger_add(uint64_t event_id, TriggerEventFunc func, void* conte
 			return 0;
 		}
 		
-		map_put(trigger_events, (void*)event_id, list);
+		map_put(trigger_events, (void*)(uintptr_t)event_id, list);
 	}
 	
 	list_add(list, node);
 	
-	return (uint64_t)node;
+	return (uintptr_t)node;
 }
 
 bool event_trigger_remove(uint64_t id) {
@@ -233,8 +233,8 @@ bool event_trigger_remove(uint64_t id) {
 	map_iterator_init(&iter, trigger_events);
 	while(map_iterator_has_next(&iter)) {
 		List* list = map_iterator_next(&iter)->data;
-		if(list_remove_data(list, (void*)id)) {
-			free((void*)id);
+		if(list_remove_data(list, (void*)(uintptr_t)id)) {
+			free((void*)(uintptr_t)id);
 			
 			if(list_size(list) == 0) {
 				map_iterator_remove(&iter);
@@ -281,12 +281,12 @@ uint64_t event_idle_add(EventFunc func, void* context) {
 		return 0;
 	}
 	
-	return (uint64_t)node;
+	return (uintptr_t)node;
 }
 
 bool event_idle_remove(uint64_t id) {
-	if(list_remove_data(idle_events, (void*)id)) {
-		free((void*)id);
+	if(list_remove_data(idle_events, (void*)(uintptr_t)id)) {
+		free((void*)(uintptr_t)id);
 		return true;
 	} else {
 		return false;

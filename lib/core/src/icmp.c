@@ -10,7 +10,7 @@ bool icmp_process(Packet* packet) {
 	if(endian16(ether->type) != ETHER_TYPE_IPv4)
 		return false;
 	
-	uint32_t addr = (uint32_t)(uint64_t)ni_config_get(packet->ni, "ip");
+	uint32_t addr = (uint32_t)(uintptr_t)ni_config_get(packet->ni, "ip");
 	if(!addr)
 		return false;
 	

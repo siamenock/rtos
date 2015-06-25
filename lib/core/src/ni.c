@@ -26,7 +26,7 @@ Packet* ni_alloc(NetworkInterface* ni, uint16_t size) {
 		bzero(packet, sizeof(Packet));
 		packet->ni = ni;
 		packet->size = size + ALIGN - 1;
-		packet->start = (((uint64_t)packet->buffer + ALIGN - 1) & ~(ALIGN - 1)) - (uint64_t)packet->buffer;
+		packet->start = (((uintptr_t)packet->buffer + ALIGN - 1) & ~(ALIGN - 1)) - (uintptr_t)packet->buffer;
 		packet->end = packet->start + size;
 	}
 	

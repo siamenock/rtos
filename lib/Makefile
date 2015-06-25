@@ -1,10 +1,14 @@
 .PHONY: all clean cleanall core newlib
 
-all: libtlsf.a libjsmn.a libcore.a libcore_linux.a libc.a libm.a libz.a libssl.a liblwip.a libxdr.a libpacketngin.a libumpn.a
+all: libtlsf.a libtlsf_32.a libjsmn.a libcore.a libcore_32.a libcore_linux.a libc.a libm.a libz.a libssl.a liblwip.a libxdr.a libpacketngin.a libumpn.a
 
 libtlsf.a: 
 	make -C TLSF/src
 	ar rcs $@ TLSF/src/tlsf.o
+
+libtlsf_32.a:
+	make -C TLSF/src
+	ar rcs $@ TLSF/src/tlsf_32.o
 
 jsmn/libjsmn.a:
 	make -C jsmn
@@ -15,11 +19,17 @@ libjsmn.a: jsmn/libjsmn.a
 core/libcore.a:
 	make -C core
 
+core/libcore_32.a:
+	make -C core
+
 core/libcore_linux.a:
 	make -C core
 
 libcore.a: libjsmn.a libtlsf.a core/libcore.a
 	cp core/libcore.a .
+
+libcore_32.a: libtlsf_32.a core/libcore_32.a
+	cp core/libcore_32.a .
 
 libcore_linux.a: core/libcore_linux.a
 	cp core/libcore_linux.a .
@@ -99,7 +109,7 @@ libxdr.a: xdr/linux/libxdr.a
 	cp xdr/linux/libxdr.a .
 
 clean: 
-	rm -f libtlsf.a libjsmn.a libcore.a libcore_linux.a libc.a libm.a libz.a libssl.a libcrypto.a liblwip.a libpacketngin.a
+	rm -f libtlsf.a libtlsf_32.a libjsmn.a libcore.a libcore_32.a libcore_linux.a libc.a libm.a libz.a libssl.a libcrypto.a liblwip.a libpacketngin.a
 
 cleanall: clean
 	-make -C TLSF/src clean

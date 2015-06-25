@@ -211,8 +211,8 @@ typedef struct TLSF_struct {
     /* the TLSF's structure signature */
     u32_t tlsf_signature;
 
-#if TLSF_USE_LOCKS
     u8_t use_lock;
+#if TLSF_USE_LOCKS
     TLSF_MLOCK_T lock;
 #endif
 

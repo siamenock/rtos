@@ -4,9 +4,7 @@
 #ifndef ___STRING_H__
 #define ___STRING_H__
 
-#ifndef size_t
-typedef unsigned long size_t;
-#endif
+#include <stddef.h>
 
 void *__memset(void *s, int c, size_t n);
 void *__memcpy(void *dest, const void *src, size_t n);

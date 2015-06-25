@@ -14,17 +14,17 @@ uint16_t udp_port_alloc(NetworkInterface* ni) {
 		ni_config_put(ni, UDP_PORTS, ports);
 	}
 	
-	uint16_t port = (uint16_t)(uint64_t)ni_config_get(ni, UDP_NEXT_PORT);
+	uint16_t port = (uint16_t)(uintptr_t)ni_config_get(ni, UDP_NEXT_PORT);
 	if(port < 49152)
 		port = 49152;
 	
-	while(map_contains(ports, (void*)(uint64_t)port)) {
+	while(map_contains(ports, (void*)(uintptr_t)port)) {
 		if(++port < 49152)
 			port = 49152;
 	}	
 	
-	map_put(ports, (void*)(uint64_t)port, (void*)(uint64_t)port);
-	ni_config_put(ni, UDP_NEXT_PORT, (void*)(uint64_t)(port + 1));
+	map_put(ports, (void*)(uintptr_t)port, (void*)(uintptr_t)port);
+	ni_config_put(ni, UDP_NEXT_PORT, (void*)(uintptr_t)(port + 1));
 	
 	return port;
 }
@@ -34,7 +34,7 @@ void udp_port_free(NetworkInterface* ni, uint16_t port) {
 	if(!ports)
 		return;
 	
-	map_remove(ports, (void*)(uint64_t)port);
+	map_remove(ports, (void*)(uintptr_t)port);
 }
 
 void udp_pack(Packet* packet, uint16_t udp_body_len) {

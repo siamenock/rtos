@@ -1,9 +1,7 @@
 #ifndef ___MALLOC_H__
 #define ___MALLOC_H__
 
-#ifndef size_t
-typedef unsigned long size_t;
-#endif
+#include <stddef.h>
 
 size_t __get_used_size(void *mem_pool);
 size_t __get_max_size(void* mem_pool);

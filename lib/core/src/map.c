@@ -278,7 +278,7 @@ MapEntry* map_iterator_remove(MapIterator* iter) {
 }
 
 uint64_t map_uint64_hash(void* key) {
-	return (uint64_t)key;
+	return (uintptr_t)key;
 }
 
 bool map_uint64_equals(void* key1, void* key2) {
