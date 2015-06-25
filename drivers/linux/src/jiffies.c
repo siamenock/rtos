@@ -1,6 +1,8 @@
 #include <linux/jiffies.h>
 #include <linux/kernel.h>
 
+uint64_t jiffies = 0;
+
 // include/linux/time64.h
 #define MSEC_PER_SEC	1000L
 #define USEC_PER_MSEC	1000L

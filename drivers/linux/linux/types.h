@@ -1,6 +1,7 @@
 #ifndef __LINUX_TYPES_H__
 #define __LINUX_TYPES_H__
 
+#include <sys/types.h>
 #include <uapi/linux/types.h>
 
 #define __aligned_u64 __u64 __attribute__((aligned(8)))
@@ -37,8 +38,8 @@ typedef u32		uint32_t;
 typedef u16		uint16_t;
 typedef u8		uint8_t;
 
-typedef __u32		__kernel_dev_t;
-typedef __kernel_dev_t	dev_t;
+//typedef __u32		__kernel_dev_t;
+//typedef __kernel_dev_t	dev_t;
 typedef unsigned short	umode_t; 
 
 typedef __kernel_size_t	size_t;
