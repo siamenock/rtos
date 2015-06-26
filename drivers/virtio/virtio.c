@@ -303,8 +303,7 @@ static int virtio_pci_probe(VirtIODevice* vdev) {
 		return -1;
 
 	// Enable device
-	if(pci_enable(vdev->dev))
-		return -2;
+	pci_enable(vdev->dev);
 
 	// Reset device 
 	add_status(&priv->vdev, 0);
