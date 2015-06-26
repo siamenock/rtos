@@ -28,3 +28,5 @@ loop:
 	hlt
 	hlt
 	jmp	loop
+
+times 512 - ($ - $$) db 0x00
