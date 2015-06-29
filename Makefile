@@ -52,6 +52,13 @@ sdk: system.img
 	cp $^ sdk/
 	tar cfz packetngin_sdk-$(shell git tag).$(shell git rev-list HEAD --count).tgz sdk
 
+virtualbox:
+	rm system.vdi -f
+	VBoxManage convertfromraw system.img system.vdi --format VDI --uuid 0174159c-b8df-4b18-9e03-3566a15f43ff
+	VBoxManage startvm PacketNgin
+
+
+
 run: system.img
 	sudo $(QEMU) -monitor stdio
 

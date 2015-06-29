@@ -13,11 +13,12 @@
 #include "virtio_ring.h"
 #include "virtio_net.h"
 
-#define VNET_HDR_LEN	12
-#define MAX_BUF_SIZE	1526 // MTU + VNET_HDR_LEN
-#define PAGE_SIZE	4096
+#define VNET_HDR_LEN		12
+#define MAX_BUF_SIZE		1526 // MTU + VNET_HDR_LEN
+#define MAX_DEVICE_COUNT	8
+#define PAGE_SIZE		4096
 
-#define DEBUG		0
+#define DEBUG			0
 
 typedef struct {
 	/* Common structure */
@@ -33,12 +34,14 @@ typedef struct {
 } VirtIODevice;
 
 typedef struct {
+	int id;
 	VirtIODevice vdev;
 	VirtQueue *rvq, *svq, *cvq;
 } VirtNetPriv;
 
 /* Private structure that virtio network device driver use */
-static VirtNetPriv* priv;
+static VirtNetPriv* priv[MAX_DEVICE_COUNT];
+static int vdev_count = 0;
 
 /* Pseudo header used by add_buf for transmit */
 // TODO: Partial checksum, GSO needs to be implemented. At that time, real virtio header replaces it
@@ -61,7 +64,7 @@ static void kick(VirtQueue* vq) {
 	asm volatile("mfence" ::: "memory"); // mb()
 
 	// We force to notify here in that VRING_USED_F_NO_NOTIFY is simply an optimzation
-	port_out16(priv->vdev.ioaddr + VIRTIO_PCI_QUEUE_NOTIFY, vq->index);
+	port_out16(vq->ioaddr + VIRTIO_PCI_QUEUE_NOTIFY, vq->index);
 }	
 
 /* Add available buffer which host OS can use */
@@ -257,6 +260,7 @@ static int init_vq(VirtIODevice* vdev, uint32_t index, VirtQueue* vqs[]) {
 	vqs[index]->last_used_idx = 0;
 	vqs[index]->num_added = 0;
 	vqs[index]->index = index;
+	vqs[index]->ioaddr = vdev->ioaddr;
 
 	// Assign vring memory space. It must be aligned by page size (4096)
 	if(size > 0x200000 /* 2MB */) {
@@ -299,6 +303,7 @@ static int init_vq(VirtIODevice* vdev, uint32_t index, VirtQueue* vqs[]) {
 static int virtio_pci_probe(VirtIODevice* vdev) {
 	// Read I/O address
 	vdev->ioaddr = pci_read32(vdev->dev, PCI_BASE_ADDRESS_0) & ~3;
+
 	if(!vdev->ioaddr) 
 		return -1;
 
@@ -306,10 +311,10 @@ static int virtio_pci_probe(VirtIODevice* vdev) {
 	pci_enable(vdev->dev);
 
 	// Reset device 
-	add_status(&priv->vdev, 0);
+	add_status(vdev, 0);
 
 	// OS notice device from now
-	add_status(&priv->vdev, VIRTIO_CONFIG_S_ACKNOWLEDGE);
+	add_status(vdev, VIRTIO_CONFIG_S_ACKNOWLEDGE);
 
 	// OS notice driver from now
 	add_status(vdev, VIRTIO_CONFIG_S_DRIVER);
@@ -318,7 +323,8 @@ static int virtio_pci_probe(VirtIODevice* vdev) {
 }
 
 /* Probing function for VirtI/O network device */
-static int virtnet_probe(VirtIODevice* vdev) {
+static int virtnet_probe(VirtNetPriv* priv) {
+	VirtIODevice* vdev = &priv->vdev;
 	// VirtI/O network device has three queues (receive, transmit, control)
 	VirtQueue* vqs[3];
 
@@ -363,7 +369,7 @@ static int virtnet_probe(VirtIODevice* vdev) {
 }
 
 /* Send control command to VirtI/O network device */
-static bool virtnet_send_command(uint8_t class, uint8_t cmd, void* data) {
+static bool virtnet_send_command(int id, uint8_t class, uint8_t cmd, void* data) {
 	VirtIONetCtrlPacket* ctrl = gmalloc(sizeof(VirtIONetCtrlPacket));
 
 	// Controlling RX mode is only available now 
@@ -378,16 +384,16 @@ static bool virtnet_send_command(uint8_t class, uint8_t cmd, void* data) {
 	// TODO: Other classes need to be implemented. e.g VLAN, MAC Filtering...
 	ctrl->cmd_specific_data = *(uint8_t*)data;
 
-	if(add_buf(priv->cvq, ctrl, 4))
+	if(add_buf(priv[id]->cvq, ctrl, 4))
 		return false;
 
 	// Notify otherside of new buffer
-	kick(priv->cvq);
+	kick(priv[id]->cvq);
 
 	// Wait for a sec till host send ACK 
 	cpu_mwait(100);
 
-	VirtIONetCtrlPacket* ctrl_ack = (VirtIONetCtrlPacket*)get_buf(priv->cvq, NULL);
+	VirtIONetCtrlPacket* ctrl_ack = (VirtIONetCtrlPacket*)get_buf(priv[id]->cvq, NULL);
 
 	if(!ctrl_ack) {
 		printf("Send command failed\n");
@@ -406,9 +412,9 @@ static bool virtnet_send_command(uint8_t class, uint8_t cmd, void* data) {
 }
 
 /* Function for packet receive */
-static int virtnet_receive(void* buf, uint32_t len) {
+static int virtnet_receive(int id, void* buf, uint32_t len) {
 	// Instead of calling add_buf, we just notify that buffer index is updated 
-	VirtQueue* vq = priv->rvq;
+	VirtQueue* vq = priv[id]->rvq;
 	vq->num_added++; 
 
 	// If the number of free descriptors goes beyond half of the maximum buffer, kick it
@@ -435,9 +441,9 @@ static int virtnet_receive(void* buf, uint32_t len) {
 }
 
 /* Function for packet send */
-static int virtnet_send(Packet* packet) {
+static int virtnet_send(int id, Packet* packet) {
 	// Check whether free descriptor exists to prevent buffer overflow 
-	VirtQueue* vq = priv->svq;
+	VirtQueue* vq = priv[id]->svq;
 	if(vq->num_free == 0) {
 #if DEBUG
 		printf("No more free descriptor in send queue\n");
@@ -453,15 +459,15 @@ static int virtnet_send(Packet* packet) {
 	kick(vq);
 
 #if DEBUG
-//	printf("Sent : ");
-//	uint8_t* ptr = (uint8_t*)packet->buffer - packet->start;
-//	
-//	for(int i = 0; i < len - VNET_HDR_LEN; i++) {
-//		if(i % 8 == 0)
-//			printf("\n\t");
-//		printf("%02x ", ptr[i]);
-//	}
-//	printf("\n");
+	printf("Sent : ");
+	uint8_t* ptr = (uint8_t*)packet->buffer - packet->start;
+	
+	for(int i = 0; i < len - VNET_HDR_LEN; i++) {
+		if(i % 8 == 0)
+			printf("\n\t");
+		printf("%02x ", ptr[i]);
+	}
+	printf("\n");
 #endif
 
 	return 0;
@@ -469,25 +475,34 @@ static int virtnet_send(Packet* packet) {
 
 int init(void* device, void* data) {
 	int err;
-	priv = gmalloc(sizeof(VirtNetPriv));
-	priv->vdev.dev = (PCI_Device*)device;
+	int id = vdev_count;
+	priv[id] = NULL;
+
+	if(vdev_count >= MAX_DEVICE_COUNT) {
+		printf("virtio_pci_probe failed: Too many devices\n");
+		goto error;
+	}
+
+	priv[id] = gmalloc(sizeof(VirtNetPriv));
+	priv[id]->vdev.dev = (PCI_Device*)device;
+	priv[id]->id = id;
 
 	// VirtI/O deivce PCI probing
-	err = virtio_pci_probe(&priv->vdev);
+	err = virtio_pci_probe(&priv[id]->vdev);
 	if(err) {
 		printf("virtio_pci_probe failed: %d\n", err); 
 		goto error;
 	}
 
 	// Feature synchronizing with host OS
-	err = synchronize_features(&priv->vdev);
+	err = synchronize_features(&priv[id]->vdev);
 	if(err) {
 		printf("synchronize_features failed: %d\n", err);
-	goto error;
+		goto error;
 	}
 
 	// VirtI/O driver probing 
-	err = virtnet_probe(&priv->vdev);
+	err = virtnet_probe(priv[id]);
 	if(err) {
 		printf("virtnet_probe failed: %d\n", err);
 		goto error;
@@ -497,13 +512,18 @@ int init(void* device, void* data) {
 
 	// Set promiscuos mode
 	uint8_t promisc = 1; // 1 means ON for the command
-	if(virtnet_send_command(VIRTIO_NET_CTRL_RX, VIRTIO_NET_CTRL_RX_PROMISC, &promisc)) 
+	if(virtnet_send_command(id, VIRTIO_NET_CTRL_RX, VIRTIO_NET_CTRL_RX_PROMISC, &promisc)) 
 		printf("Promiscuos mode ON\n");
 	else
 		printf("Promiscous mode OFF\n");
 
-	return 0;
+	vdev_count++;
+
+	return id;
 error: 
+	if(priv[id])
+		gfree(priv[id]);
+
 	return -1;
 }
 
@@ -512,38 +532,38 @@ void destroy(int id) {
 	gfree(pseudo_vnet_hdr);
 
 	// Destroy virtqueues
-	bfree(priv->rvq->vring.desc);
-	gfree(priv->rvq);
+	bfree(priv[id]->rvq->vring.desc);
+	gfree(priv[id]->rvq);
 
-	bfree(priv->svq->vring.desc);
-	gfree(priv->svq);
+	bfree(priv[id]->svq->vring.desc);
+	gfree(priv[id]->svq);
 	
-	if(device_has_feature(&priv->vdev, VIRTIO_NET_F_CTRL_VQ) == 3) {
-		bfree(priv->cvq->vring.desc);
-		gfree(priv->rvq);
+	if(device_has_feature(&priv[id]->vdev, VIRTIO_NET_F_CTRL_VQ) == 3) {
+		bfree(priv[id]->cvq->vring.desc);
+		gfree(priv[id]->rvq);
 	}
 
 	// Destroy private structure
-	gfree(priv);
+	gfree(priv[id]);
 }
 
 int poll(int id) {
 	// Free used buffer
 	void* buf;
-	while((buf = get_buf(priv->svq, NULL))) {
+	while((buf = get_buf(priv[id]->svq, NULL))) {
 		ni_free(buf);
 	}
 
 	// TX
 	Packet* packet = ni_process_output(0);
 	if(packet) {
-		virtnet_send(packet);
+		virtnet_send(id, packet);
 	}
 
 	// RX
 	uint32_t len;
-	if((buf = get_buf(priv->rvq, &len))) {
-		virtnet_receive(buf, len);
+	if((buf = get_buf(priv[id]->rvq, &len))) {
+		virtnet_receive(id, buf, len);
 	}
 
 	return 0;
@@ -561,7 +581,7 @@ void get_info(int id, NICInfo* info) {
 	uint64_t mac = 0;
 
 	for (int i = 0; i < ETH_ALEN; i++) {
-		mac |= (uint64_t)priv->vdev.config.mac[i] << (ETH_ALEN - i - 1) * 8;
+		mac |= (uint64_t)priv[id]->vdev.config.mac[i] << (ETH_ALEN - i - 1) * 8;
 	}
 
 	info->mac[0] = mac;
