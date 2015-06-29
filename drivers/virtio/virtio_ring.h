@@ -138,6 +138,9 @@ typedef struct {
 	/* Actual memory layout for this queue */
 	Vring vring;
 
+	/* I/O Address for kick */
+	uint32_t ioaddr;
+
 	/* Size of queue */
 	uint32_t size;
 	/* Number of free buffers */
