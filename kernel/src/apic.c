@@ -54,22 +54,22 @@ void apic_activate() {
 	port_out8(PIC_MASTER_PORT2, 0xff);
 	port_out8(PIC_SLAVE_PORT2, 0xff);
 
-	// Dummy interrupt handler
-	void dummy_timer_handler(uint64_t vector, uint64_t error_code) {
-		// Do nothing
-		apic_eoi();
-	}
-	
-	apic_register(32, dummy_timer_handler);
-	
 	printf("\tActivate local APICs...\n");
+
 	void _apic_activate();
 	_apic_activate();
 }
 
 void apic_init() {
-	apic_write32(APIC_REG_SIVR, apic_read32(APIC_REG_SIVR) | 0x100);
+	// Dummy interrupt handler
+	void dummy_timer_handler(uint64_t vector, uint64_t error_code) {
+		// Do nothing
+		apic_eoi();
+	}
+	apic_register(32, dummy_timer_handler);
 	
+	apic_write32(APIC_REG_SIVR, apic_read32(APIC_REG_SIVR) | 0x100);
+
 	apic_write32(APIC_REG_TPR,  0);
 	
 	apic_write32(APIC_REG_LVT_TR, apic_read32(APIC_REG_LVT_TR) | APIC_IM_DISABLED);
