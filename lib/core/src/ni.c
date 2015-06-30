@@ -108,12 +108,7 @@ bool ni_output_dup(NetworkInterface* ni, Packet* packet) {
 	// Copy packet buffer
 	memcpy(p->buffer + p->start, packet->buffer + packet->start, len);
 	
-	if(!ni_output(ni, p)) {
-		ni_free(p);
-		return false;
-	} else {
-		return true;
-	}
+	return ni_output(ni, p);
 }
 
 inline bool ni_tryoutput(NetworkInterface* ni, Packet* packet) {
