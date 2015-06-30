@@ -18,7 +18,7 @@
 #define MAX_DEVICE_COUNT	8
 #define PAGE_SIZE		4096
 
-#define DEBUG			0
+#define DEBUG			1
 
 typedef struct {
 	/* Common structure */
@@ -273,6 +273,7 @@ static int init_vq(VirtIODevice* vdev, uint32_t index, VirtQueue* vqs[]) {
 		printf("Queue bmalloc failed\n");
 		return -3;
 	}
+	memset(queue, 0x0, 0x200000); 
 
 	// Activate the queue
 	port_out32(vdev->ioaddr + VIRTIO_PCI_QUEUE_PFN, (uint32_t)(uint64_t)queue >> VIRTIO_PCI_QUEUE_ADDR_SHIFT);
@@ -429,7 +430,7 @@ static int virtnet_receive(int id, void* buf, uint32_t len) {
 #if DEBUG
 	printf("Received : ");
 	uint8_t* ptr = (uint8_t*)vp->data;
-	for(int i = 0; i < len - VNET_HDR_LEN; i++) {
+	for(int i = 0; i < len + VNET_HDR_LEN; i++) {
 		if(i % 8 == 0)
 			printf("\n\t");
 		printf("%02x ", ptr[i]);
@@ -460,9 +461,9 @@ static int virtnet_send(int id, Packet* packet) {
 
 #if DEBUG
 	printf("Sent : ");
-	uint8_t* ptr = (uint8_t*)packet->buffer - packet->start;
+	uint8_t* ptr = (uint8_t*)packet->buffer + packet->start;
 	
-	for(int i = 0; i < len - VNET_HDR_LEN; i++) {
+	for(int i = 0; i < len; i++) {
 		if(i % 8 == 0)
 			printf("\n\t");
 		printf("%02x ", ptr[i]);
