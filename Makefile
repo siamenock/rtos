@@ -5,11 +5,13 @@ USB = -drive if=none,id=usbstick,file=./system.img -usb -device usb-ehci,id=ehci
 
 HDD = -hda system.img
 
-QEMU = qemu-system-x86_64 $(shell tools/qemu-params) -m 1024 -M pc -smp 8 -d cpu_reset -net nic,model=rtl8139 -net tap,script=tools/qemu-ifup -net nic,model=rtl8139 -net tap,script=tools/qemu-ifup -no-reboot -no-shutdown $(USB) #$(HDD) 
+NIC = virtio #rtl8139
+
+QEMU = qemu-system-x86_64 $(shell tools/qemu-params) -m 1024 -M pc -smp 8 -d cpu_reset -net nic,model=$(NIC) -net tap,script=tools/qemu-ifup -net nic,model=$(NIC) -net tap,script=tools/qemu-ifup -no-reboot -no-shutdown $(USB) #$(HDD) 
 
 all: system.img
 
-SYSTEM_IMG_SIZE := 4096 	# 512 bytes * 4096 blocks = 2048KB - 512B (for boot loader)
+SYSTEM_IMG_SIZE := 4095 	# 512 bytes * 4096 blocks = 2048KB - 512B (for boot loader)
 
 system.img: 
 	make -C lib
@@ -52,12 +54,12 @@ sdk: system.img
 	cp $^ sdk/
 	tar cfz packetngin_sdk-$(shell git tag).$(shell git rev-list HEAD --count).tgz sdk
 
-virtualbox:
-	rm system.vdi -f
-	VBoxManage convertfromraw system.img system.vdi --format VDI --uuid 0174159c-b8df-4b18-9e03-3566a15f43ff
+virtualbox: system.img 
+	# UUID = 0174159c-b8df-4b18-9e03-3566a15f43ff
+	$(eval UUID = $(shell VBoxManage showhdinfo system.vdi | grep UUID | awk '{print $$2}' | head -n1))
+	rm -f system.vdi
+	VBoxManage convertfromraw system.img system.vdi --format VDI --uuid $(UUID)
 	VBoxManage startvm PacketNgin
-
-
 
 run: system.img
 	sudo $(QEMU) -monitor stdio
@@ -78,7 +80,7 @@ gdb:
 	gdb --eval-command="target remote localhost:1234; set architecture i386:x86-64; file kernel/kernel.elf"
 
 dis: kernel/kernel.elf
-	objdump -d kernel/kernel.elf > kernel.dis && vim kernel.dis
+	objdump -d kernel/kernel.elf > kernel.dis && vi kernel.dis
 
 stop:
 	sudo killall -9 qemu-system-x86_64
