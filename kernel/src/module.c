@@ -12,7 +12,6 @@
 #include "symbols.h"
 #include "module.h"
 #include "gmalloc.h"
-#include <openssl/md5.h>
 
 #define MODULE_ALIGNMENT	128
 #define SECTION_ALIGNMENT	128

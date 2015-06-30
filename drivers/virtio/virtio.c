@@ -18,7 +18,7 @@
 #define MAX_DEVICE_COUNT	8
 #define PAGE_SIZE		4096
 
-#define DEBUG			1
+#define DEBUG			0
 
 typedef struct {
 	/* Common structure */
@@ -233,6 +233,7 @@ static int prepare_recv_buf(VirtQueue* vq, uint32_t num) {
 
 		if(add_buf(vq, buffer[i], MAX_BUF_SIZE))
 			return -2;
+
 	}
 
 	// Notify otherside of new buffer
