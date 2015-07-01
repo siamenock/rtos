@@ -325,10 +325,12 @@ const int32_t **__ctype_toupper_loc(void) {
 	return (void *)&__ctype_toupper_ptable;
 }
 
-/*
+// Ubuntu's libc compatible functions
+
 #undef stdin
 #undef stdout
 #undef stderr
+
 struct _IO_FILE* stdin;
 struct _IO_FILE* stdout;
 struct _IO_FILE* stderr;
@@ -347,9 +349,16 @@ int _IO_putc(int ch, struct _IO_FILE* fp) {
 	
 	return -1;
 }
-*/
 
-// Ubuntu's libc compatible functions
+int __sprintf_chk(int flag, char *str, const char *format, ...) {
+	va_list va;
+	va_start(va, format);
+	int len = vsprintf(str, format, va);
+	va_end(va);
+
+	return len;
+}
+
 int __printf_chk (int flag, const char *fmt, ...) {
 	int ret;
 	va_list ap;

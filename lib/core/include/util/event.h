@@ -101,6 +101,14 @@ void event_trigger_stop();
 uint64_t event_timer_add(EventFunc func, void* context, clock_t delay, clock_t period);
 
 /**
+ * Update timer event
+ *
+ * @param id event ID
+ * @return true if deregistered
+ */
+bool event_timer_update(uint64_t id);
+
+/**
  * Deregister timer event
  *
  * @param id event ID
