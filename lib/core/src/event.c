@@ -189,6 +189,26 @@ uint64_t event_timer_add(EventFunc func, void* context, clock_t delay, clock_t p
 	return (uintptr_t)node;
 }
 
+bool event_timer_update(uint64_t id) {
+	if(list_remove_data(timer_events, (void*)id)) {
+		TimerNode* node = (TimerNode*)id;
+		clock_t time = clock();
+		node->delay = time + node->period;
+		
+		int index = list_index_of(timer_events, (void*)(uint64_t)node->delay, get_first_bigger);
+		if(!list_add_at(timer_events, index, node)) {
+			free(node);
+			return false;
+		}
+
+		next_timer = ((TimerNode*)list_get_first(timer_events))->delay;
+		
+		return true;
+	} else {
+		return false;
+	}
+}
+
 bool event_timer_remove(uint64_t id) {
 	if(list_remove_data(timer_events, (void*)(uintptr_t)id)) {
 		free((void*)(uintptr_t)id);
