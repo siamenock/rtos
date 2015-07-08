@@ -4,7 +4,7 @@
 
 // TODO: Change accessing list using index to using iterator.
 
-#define THRESHOLD(cap)	(((cap) >> 2) + ((cap) >> 4))	// 75%
+#define THRESHOLD(cap)	(((cap) >> 1) + ((cap) >> 2))	// 75%
 
 Map* map_create(size_t initial_capacity, uint64_t(*hash)(void*), bool(*equals)(void*,void*), void* pool) {
 	if(!equals)
@@ -20,12 +20,14 @@ Map* map_create(size_t initial_capacity, uint64_t(*hash)(void*), bool(*equals)(v
 	Map* map = __malloc(sizeof(Map), pool);
 	if(!map)
 		return NULL;
-	map->table = __malloc(sizeof(MapEntry) * capacity, pool);
+
+	map->table = __malloc(sizeof(List*) * capacity, pool);
 	if(!map->table) {
 		__free(map, pool);
 		return NULL;
 	}
-	bzero(map->table, sizeof(MapEntry) * capacity);
+
+	bzero(map->table, sizeof(List*) * capacity);
 	map->capacity = capacity;
 	map->threshold = THRESHOLD(capacity);
 	map->size = 0;
@@ -113,14 +115,24 @@ bool map_put(Map* map, void* key, void* data) {
 	}
 	
 	MapEntry* entry = __malloc(sizeof(MapEntry), map->pool);
-	if(!entry)
+	if(!entry) {
+		if(list_is_empty(map->table[index])) {
+			list_destroy(map->table[index]);
+			map->table[index] = NULL;
+		}
 		return false;
+	}
 	
 	entry->key = key;
 	entry->data = data;
 	
 	if(!list_add(map->table[index], entry)) {
 		__free(entry, map->pool);
+		if(list_is_empty(map->table[index])) {
+			list_destroy(map->table[index]);
+			map->table[index] = NULL;
+		}
+
 		return false;
 	}
 	map->size++;
@@ -262,7 +274,8 @@ MapEntry* map_iterator_next(MapIterator* iter) {
 }
 
 MapEntry* map_iterator_remove(MapIterator* iter) {
-	MapEntry* entry = list_remove(iter->map->table[iter->index], iter->list_index - 1);
+	iter->list_index--;
+	MapEntry* entry = list_remove(iter->map->table[iter->index], iter->list_index);
 	iter->entry.key = entry->key;
 	iter->entry.data = entry->data;
 	__free(entry, iter->map->pool);
@@ -305,6 +318,9 @@ bool map_string_equals(void* key1, void* key2) {
 		if(*c1++ != *c2++)
 			return false;
 	}
+
+	if(*c1 != '\0' || *c2 != '\0')
+		return false;
 	
 	return true;
 }
