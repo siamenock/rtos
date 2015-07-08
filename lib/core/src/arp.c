@@ -28,7 +28,12 @@ bool arp_process(Packet* packet) {
 	Map* arp_table = ni_config_get(packet->ni, ARP_TABLE);
 	if(!arp_table) {
 		arp_table = map_create(32, map_uint64_hash, map_uint64_equals, packet->ni->pool);
-		ni_config_put(packet->ni, ARP_TABLE, arp_table);
+		if(!arp_table)
+			return false;
+		if(!ni_config_put(packet->ni, ARP_TABLE, arp_table)) {
+			map_destroy(arp_table);
+			return false;
+		}
 	}
 	
 	clock_t current = clock();
@@ -37,7 +42,8 @@ bool arp_process(Packet* packet) {
 	uint64_t gc_time = (uintptr_t)ni_config_get(packet->ni, ARP_TABLE_GC);
 	if(gc_time == 0 && !ni_config_contains(packet->ni, ARP_TABLE_GC)) {
 		gc_time = current + GC_INTERVAL;
-		ni_config_put(packet->ni, ARP_TABLE_GC, (void*)(uintptr_t)gc_time);
+		if(!ni_config_put(packet->ni, ARP_TABLE_GC, (void*)(uintptr_t)gc_time))
+			return false;
 	}
 	
 	if(gc_time < current) {
@@ -46,13 +52,14 @@ bool arp_process(Packet* packet) {
 		while(map_iterator_has_next(&iter)) {
 			MapEntry* entry = map_iterator_next(&iter);
 			if(((ARPEntity*)entry->data)->timeout < current) {
-				map_iterator_remove(&iter);
 				__free(entry->data, packet->ni->pool);
+				map_iterator_remove(&iter);
 			}
 		}
 		
 		gc_time = current + GC_INTERVAL;
-		ni_config_put(packet->ni, ARP_TABLE_GC, (void*)(uintptr_t)gc_time);
+		if(!ni_config_put(packet->ni, ARP_TABLE_GC, (void*)(uintptr_t)gc_time))
+			return false;
 	}
 	
 	ARP* arp = (ARP*)ether->payload;
@@ -84,7 +91,11 @@ bool arp_process(Packet* packet) {
 				if(!entity)
 					goto done;
 				
-				map_put(arp_table, (void*)(uintptr_t)sip, entity);
+				if(!map_put(arp_table, (void*)(uintptr_t)sip, entity)) {
+					__free(entity, packet->ni->pool);
+					goto done;
+				}
+
 			}
 			entity->mac = smac;
 			entity->timeout = current + ARP_TIMEOUT;

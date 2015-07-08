@@ -249,7 +249,7 @@ size_t ni_pool_total(NetworkInterface* ni);
  * @param key configuration key
  * @param data configuration data
  */
-void ni_config_put(NetworkInterface* ni, char* key, void* data);
+bool ni_config_put(NetworkInterface* ni, char* key, void* data);
 
 /**
  * Check configuration data is setted with the key.

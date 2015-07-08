@@ -53,11 +53,11 @@ inline Packet* ni_tryinput(NetworkInterface* ni) {
 }
 
 inline Packet* ni_input(NetworkInterface* ni) {
-	lock_lock(&ni->input_lock);
+	lock_lock(&ni->output_lock);
 	
 	Packet* packet = fifo_pop(ni->input_buffer);
 	
-	lock_unlock(&ni->input_lock);
+	lock_unlock(&ni->output_lock);
 	
 	return packet;
 }
@@ -140,7 +140,7 @@ if(ni->config->equals != map_string_equals) {		\
 	ni->config->hash = map_string_hash;		\
 }
 
-void ni_config_put(NetworkInterface* ni, char* key, void* data) {
+bool ni_config_put(NetworkInterface* ni, char* key, void* data) {
 	CONFIG_INIT;
 	
 	if(map_contains(ni->config, key)) {
@@ -148,10 +148,18 @@ void ni_config_put(NetworkInterface* ni, char* key, void* data) {
 	} else {
 		int len = strlen(key) + 1;
 		char* key2 = __malloc(len, ni->pool);
+		if(key2 == NULL)
+			return false;
 		memcpy(key2, key, len);
 		
-		map_put(ni->config, key2, data);
+		if(!map_put(ni->config, key2, data)) {
+			__free(key2, ni->pool);
+			return false;
+		} else
+			return true;
 	}
+
+	return true;
 }
 
 bool ni_config_contains(NetworkInterface* ni, char* key) {
