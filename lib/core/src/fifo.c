@@ -29,7 +29,9 @@ bool fifo_resize(FIFO* fifo, size_t size, void(*popped)(void*)) {
 	if(!array)
 		return false;
 	
+	void* _array = fifo->array;
 	fifo_reinit(fifo, array, size, popped);
+	__free(_array, fifo->pool);
 	
 	return true;
 }
