@@ -1,40 +1,55 @@
 #include <time.h>
+#include <net/interface.h>
 #include <net/ether.h>
 #include <net/ip.h>
 #include <net/udp.h>
 #include <util/map.h>
 
-#define UDP_PORTS	".pn.udp.ports"
-#define UDP_NEXT_PORT	".pn.udp.next_port"
-
-uint16_t udp_port_alloc(NetworkInterface* ni) {
-	Map* ports = ni_config_get(ni, UDP_PORTS);
-	if(!ports) {
-		ports = map_create(64, map_uint64_hash, map_uint64_equals, ni->pool);
-		ni_config_put(ni, UDP_PORTS, ports);
+bool udp_port_alloc0(NetworkInterface* ni, uint32_t addr, uint16_t port) {
+	IPv4Interface* interface = ni_ip_get(ni, addr);
+	if(!interface->udp_ports) {
+		interface->udp_ports = set_create(64, set_uint64_hash, set_uint64_equals, ni->pool);
+		if(!interface->udp_ports)
+			return false;
 	}
-	
-	uint16_t port = (uint16_t)(uintptr_t)ni_config_get(ni, UDP_NEXT_PORT);
+
+	if(set_contains(interface->udp_ports, (void*)(uintptr_t)port))
+		return false;
+
+	return set_put(interface->udp_ports, (void*)(uintptr_t)port);
+}
+
+uint16_t udp_port_alloc(NetworkInterface* ni, uint32_t addr) {
+	IPv4Interface* interface = ni_ip_get(ni, addr);
+	if(!interface->udp_ports) {
+		interface->udp_ports = set_create(64, set_uint64_hash, set_uint64_equals, ni->pool);
+		if(!interface->udp_ports)
+			return 0;
+	}
+
+	uint16_t port = interface->udp_next_port;
 	if(port < 49152)
 		port = 49152;
-	
-	while(map_contains(ports, (void*)(uintptr_t)port)) {
+
+	while(set_contains(interface->udp_ports, (void*)(uintptr_t)port)) {
 		if(++port < 49152)
 			port = 49152;
 	}	
-	
-	map_put(ports, (void*)(uintptr_t)port, (void*)(uintptr_t)port);
-	ni_config_put(ni, UDP_NEXT_PORT, (void*)(uintptr_t)(port + 1));
-	
+
+	if(!set_put(interface->udp_ports, (void*)(uintptr_t)port))
+		return 0;
+
+	interface->udp_next_port = port;
+
 	return port;
 }
 
-void udp_port_free(NetworkInterface* ni, uint16_t port) {
-	Map* ports = ni_config_get(ni, UDP_PORTS);
-	if(!ports)
+void udp_port_free(NetworkInterface* ni, uint32_t addr, uint16_t port) {
+	IPv4Interface* interface = ni_ip_get(ni, addr);
+	if(interface == NULL)
 		return;
 	
-	map_remove(ports, (void*)(uintptr_t)port);
+	set_remove(interface->udp_ports, (void*)(uintptr_t)port);
 }
 
 void udp_pack(Packet* packet, uint16_t udp_body_len) {

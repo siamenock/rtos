@@ -8,8 +8,8 @@ OBJ_32_DIR = obj_32/
 
 LINUX_DIR = obj_linux/
 
-OBJS = ether.o crc.o checksum.o ni.o status.o  \
-	fifo.o vector.o list.o map.o ring.o errno.o thread.o \
+OBJS = ether.o crc.o checksum.o ni.o interface.o status.o  \
+	fifo.o vector.o list.o map.o set.o ring.o errno.o thread.o \
 	asm.o gmalloc.o lock.o shared.o json.o \
 	malloc.o types.o _string.o _malloc.o rpc.o readline.o \
 	arp.o icmp.o \
@@ -20,11 +20,11 @@ OBJS_32 := $(OBJS)
 
 OBJS += md5_asm.o event.o 
 
-CFLAGS = -I include -I ../TLSF/src -I ../jsmn -O0 -Wall -Werror -nostdlib -ffreestanding -fno-stack-protector -std=gnu99 #-D__SSE_4_1__ -msse4.1
+CFLAGS = -I include -I ../TLSF/src -I ../jsmn -O2 -Wall -Werror -nostdlib -ffreestanding -fno-stack-protector -std=gnu99
 
 CFLAGS_32 := $(CFLAGS) -m32
 
-CFLAGS += -mcmodel=kernel -m64
+CFLAGS += -mcmodel=kernel -m64 #-D__SSE_4_1__ -msse4.1
 
 all: packetngin linux doc
 

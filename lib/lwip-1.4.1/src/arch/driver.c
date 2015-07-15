@@ -57,6 +57,7 @@
 #include <lwip/init.h>
 #include <netif/etharp.h>
 #include <net/ni.h>
+#include <net/interface.h>
 #include <lwip/timers.h>
 
 
@@ -304,14 +305,29 @@ static int netif_count;
 struct netif* ni_init(NetworkInterface* ni, NI_DPI preprocessor, NI_DPI postprocessor) {
 	if(netif_count >= NIS_SIZE)
 		return NULL;
-	
-	if(!ni_config_contains(ni, "ip") || !ni_config_contains(ni, "netmask") || !ni_config_contains(ni, "gateway"))
+
+	uint32_t ip;
+	IPv4Interface* interface = NULL;
+
+	Map* interfaces = ni_config_get(ni, NI_ADDR_IPv4);
+	if(!interfaces)
 		return NULL;
-	
-	uint32_t ip = (uint32_t)(uint64_t)ni_config_get(ni, "ip");
-	uint32_t netmask = (uint32_t)(uint64_t)ni_config_get(ni, "netmask");
-	uint32_t gw = (uint32_t)(uint64_t)ni_config_get(ni, "gateway");
-	bool is_default = !!ni_config_get(ni, "default");
+
+	MapIterator iter;
+	map_iterator_init(&iter, interfaces);
+	while(map_iterator_has_next(&iter)) {
+		MapEntry* entry = map_iterator_next(&iter);
+		interface = entry->data;
+		ip = (uint32_t)(uint64_t)entry->key;
+		break;
+	}
+
+	if(!interface)
+		return NULL;
+
+	uint32_t netmask = interface->netmask;
+	uint32_t gw = interface->gateway;
+	bool is_default = interface->_default;
 	
 	if(!is_lwip_inited) {
 		lwip_init();

@@ -51,17 +51,29 @@ typedef struct _TCP_Pseudo {
  * Allocate TCP port number which associated with NI.
  *
  * @param ni NI reference
+ * @param addr
+ * @param port
+ * @return true if port alloc success
+ */
+bool tcp_port_alloc0(NetworkInterface* ni, uint32_t addr, uint16_t port);
+
+/**
+ * Allocate TCP port number which associated with NI.
+ *
+ * @param ni NI reference
+ * @param addr
  * @return port number
  */
-uint16_t tcp_port_alloc(NetworkInterface* ni);
+uint16_t tcp_port_alloc(NetworkInterface* ni, uint32_t addr);
 
 /**
  * Free TCP port number.
  *
  * @param ni NI reference
+ * @param addr
  * @param port port number to free
  */
-void tcp_port_free(NetworkInterface* ni, uint16_t port);
+void tcp_port_free(NetworkInterface* ni, uint32_t addr, uint16_t port);
 
 /**
  * Set TCP checksum, and do IP packing.

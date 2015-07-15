@@ -1,5 +1,8 @@
 #include <time.h>
+#define DONT_MAKE_WRAPPER
 #include <_malloc.h>
+#undef DONT_MAKE_WRAPPER
+#include <net/interface.h>
 #include <net/ether.h>
 #include <net/arp.h>
 #include <util/map.h>
@@ -20,9 +23,11 @@ bool arp_process(Packet* packet) {
 	Ether* ether = (Ether*)(packet->buffer + packet->start);
 	if(endian16(ether->type) != ETHER_TYPE_ARP)
 		return false;
+
+	ARP* arp = (ARP*)ether->payload;
+	uint32_t addr = endian32(arp->tpa);
 	
-	uint32_t addr = (uint32_t)(uintptr_t)ni_config_get(packet->ni, "ip");
-	if(!addr)
+	if(!ni_ip_get(packet->ni, addr))
 		return false;
 	
 	Map* arp_table = ni_config_get(packet->ni, ARP_TABLE);
@@ -62,25 +67,19 @@ bool arp_process(Packet* packet) {
 			return false;
 	}
 	
-	ARP* arp = (ARP*)ether->payload;
 	switch(endian16(arp->operation)) {
 		case 1:	// Request
-			if(endian32(arp->tpa) == addr) {
-				ether->dmac = ether->smac;
-				ether->smac = endian48(packet->ni->mac);
-				arp->operation = endian16(2);
-				arp->tha = arp->sha;
-				arp->tpa = arp->spa;
-				arp->sha = ether->smac;
-				arp->spa = endian32(addr);
-				
-				ni_output(packet->ni, packet);
-				
-				return true;
-			} else {
-				ni_free(packet);
-				return true;
-			}
+			ether->dmac = ether->smac;
+			ether->smac = endian48(packet->ni->mac);
+			arp->operation = endian16(2);
+			arp->tha = arp->sha;
+			arp->tpa = arp->spa;
+			arp->sha = ether->smac;
+			arp->spa = endian32(addr);
+
+			ni_output(packet->ni, packet);
+
+			return true;
 		case 2: // Reply
 			;
 			uint64_t smac = endian48(arp->sha);
@@ -108,73 +107,103 @@ done:
 	return false;
 }
 
-bool arp_request(NetworkInterface* ni, uint32_t ip) {
-	uint32_t addr = (uint32_t)(uintptr_t)ni_config_get(ni, "ip");
-	
-	Packet* packet = ni_alloc(ni, sizeof(Ether) + sizeof(ARP));
-	if(!packet)
-		return false;
-	
-	Ether* ether = (Ether*)(packet->buffer + packet->start);
-	ether->dmac = endian48(0xffffffffffff);
-	ether->smac = endian48(ni->mac);
-	ether->type = endian16(ETHER_TYPE_ARP);
-	
-	ARP* arp = (ARP*)ether->payload;
-	arp->htype = endian16(1);
-	arp->ptype = endian16(0x0800);
-	arp->hlen = endian8(6);
-	arp->plen = endian8(4);
-	arp->operation = endian16(1);
-	arp->sha = endian48(ni->mac);
-	arp->spa = endian32(addr);
-	arp->tha = endian48(0);
-	arp->tpa = endian32(ip);
-	 
-	packet->end = packet->start + sizeof(Ether) + sizeof(ARP);
-	
-	return ni_output(ni, packet);
+bool arp_request(NetworkInterface* ni, uint32_t destination, uint32_t source) {
+	if(source == 0) {
+		Map* interfaces = ni_config_get(ni, NI_ADDR_IPv4);
+		if(!interfaces)
+			return false;
+		
+		bool result = false;
+		
+		MapIterator iter;
+		map_iterator_init(&iter, interfaces);
+		while(map_iterator_has_next(&iter)) {
+			MapEntry* entry = map_iterator_next(&iter);
+			source = (uint32_t)(uintptr_t)(entry->key);
+			result &= arp_request(ni, destination, source);
+		}
+		return result;
+	} else {
+		Packet* packet = ni_alloc(ni, sizeof(Ether) + sizeof(ARP));
+		if(!packet)
+			return false;
+		
+		Ether* ether = (Ether*)(packet->buffer + packet->start);
+		ether->dmac = endian48(0xffffffffffff);
+		ether->smac = endian48(ni->mac);
+		ether->type = endian16(ETHER_TYPE_ARP);
+		
+		ARP* arp = (ARP*)ether->payload;
+		arp->htype = endian16(1);
+		arp->ptype = endian16(0x0800);
+		arp->hlen = endian8(6);
+		arp->plen = endian8(4);
+		arp->operation = endian16(1);
+		arp->sha = endian48(ni->mac);
+		arp->spa = endian32(source);
+		arp->tha = endian48(0);
+		arp->tpa = endian32(destination);
+		 
+		packet->end = packet->start + sizeof(Ether) + sizeof(ARP);
+		
+		return ni_output(ni, packet);
+	}
 }
 
 bool arp_announce(NetworkInterface* ni, uint32_t ip) {
-	if(ip == 0)
-		ip = (uint32_t)(uintptr_t)ni_config_get(ni, "ip");
-	
-	Packet* packet = ni_alloc(ni, sizeof(Ether) + sizeof(ARP));
-	if(!packet)
-		return false;
-	
-	Ether* ether = (Ether*)(packet->buffer + packet->start);
-	ether->dmac = endian48(0xffffffffffff);
-	ether->smac = endian48(ni->mac);
-	ether->type = endian16(ETHER_TYPE_ARP);
-	
-	ARP* arp = (ARP*)ether->payload;
-	arp->htype = endian16(1);
-	arp->ptype = endian16(0x0800);
-	arp->hlen = endian8(6);
-	arp->plen = endian8(4);
-	arp->operation = endian16(2);
-	arp->sha = endian48(ni->mac);
-	arp->spa = endian32(ip);
-	arp->tha = endian48(0);
-	arp->tpa = endian32(ip);
-	 
-	packet->end = packet->start + sizeof(Ether) + sizeof(ARP);
-	
-	return ni_output(ni, packet);
+	if(ip == 0) {
+		Map* interfaces = ni_config_get(ni, NI_ADDR_IPv4);
+		if(!interfaces)
+			return false;
+		
+		bool result = false;
+		
+		MapIterator iter;
+		map_iterator_init(&iter, interfaces);
+		while(map_iterator_has_next(&iter)) {
+			MapEntry* entry = map_iterator_next(&iter);
+			ip = (uint32_t)(uintptr_t)entry->key;
+			result &= arp_announce(ni, ip);
+		}
+
+		return result;
+	} else {
+		Packet* packet = ni_alloc(ni, sizeof(Ether) + sizeof(ARP));
+		if(!packet)
+			return false;
+		
+		Ether* ether = (Ether*)(packet->buffer + packet->start);
+		ether->dmac = endian48(0xffffffffffff);
+		ether->smac = endian48(ni->mac);
+		ether->type = endian16(ETHER_TYPE_ARP);
+		
+		ARP* arp = (ARP*)ether->payload;
+		arp->htype = endian16(1);
+		arp->ptype = endian16(0x0800);
+		arp->hlen = endian8(6);
+		arp->plen = endian8(4);
+		arp->operation = endian16(2);
+		arp->sha = endian48(ni->mac);
+		arp->spa = endian32(ip);
+		arp->tha = endian48(0);
+		arp->tpa = endian32(ip);
+		 
+		packet->end = packet->start + sizeof(Ether) + sizeof(ARP);
+		
+		return ni_output(ni, packet);
+	}
 }
 
-uint64_t arp_get_mac(NetworkInterface* ni, uint32_t ip) {
+uint64_t arp_get_mac(NetworkInterface* ni, uint32_t destination, uint32_t source) {
 	Map* arp_table = ni_config_get(ni, ARP_TABLE);
 	if(!arp_table) {
-		arp_request(ni, ip);
+		arp_request(ni, destination, source);
 		return 0xffffffffffff;
 	}
 	
-	ARPEntity* entity = map_get(arp_table, (void*)(uintptr_t)ip);
+	ARPEntity* entity = map_get(arp_table, (void*)(uintptr_t)destination);
 	if(!entity) {
-		arp_request(ni, ip);
+		arp_request(ni, destination, source);
 		return 0xffffffffffff;
 	}
 	

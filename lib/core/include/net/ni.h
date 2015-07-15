@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <net/interface.h>
 #include <net/packet.h>
 #include <util/fifo.h>
 #include <util/map.h>
@@ -277,5 +278,32 @@ void* ni_config_remove(NetworkInterface* ni, char* key);
  * @return configuration data reviously putted or NULL if not putted
  */
 void* ni_config_get(NetworkInterface* ni, char* key);
+
+/**
+ * Add IP with the interface.
+ *
+ * @param ni NI reference
+ * @param addr
+ * @return true if success
+ */
+bool ni_ip_add(NetworkInterface* ni, uint32_t addr);
+
+/**
+ * Get ipv4 interface.
+ *
+ * @param ni NI reference
+ * @param addr
+ * @return interface of ipv4
+ */
+IPv4Interface* ni_ip_get(NetworkInterface* ni, uint32_t addr);
+
+/**
+ * Remove IP with the interface.
+ *
+ * @param ni NI reference
+ * @param addr
+ * @return interface of ipv4
+ */
+bool ni_ip_remove(NetworkInterface* ni, uint32_t addr);
 
 #endif /* __NET_NETWORK_INTERFACE_H__ */

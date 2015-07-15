@@ -10,12 +10,13 @@ bool icmp_process(Packet* packet) {
 	if(endian16(ether->type) != ETHER_TYPE_IPv4)
 		return false;
 	
-	uint32_t addr = (uint32_t)(uintptr_t)ni_config_get(packet->ni, "ip");
-	if(!addr)
+	IP* ip = (IP*)ether->payload;
+	uint32_t addr = endian32(ip->destination);
+
+	if(!ni_ip_get(packet->ni, addr))
 		return false;
 	
-	IP* ip = (IP*)ether->payload;
-	if(ip->protocol == IP_PROTOCOL_ICMP && endian32(ip->destination) == addr) {
+	if(ip->protocol == IP_PROTOCOL_ICMP) {
 		ICMP* icmp = (ICMP*)ip->body;
 		
 		icmp->type = 0;

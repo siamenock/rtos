@@ -337,7 +337,7 @@ static int cmd_arping(int argc, char** argv, void(*callback)(char* result, int e
 		}
 	}
 	
-	if(arp_request(manager_ni->ni, arping_addr)) {
+	if(arp_request(manager_ni->ni, arping_addr, 0)) {
 		arping_event = event_timer_add(arping_timeout, NULL, 1000000, 1000000);
 	} else {
 		arping_count = 0;
@@ -899,7 +899,7 @@ bool shell_process(Packet* packet) {
 				if(arping_count > 0) {
 					bool arping(void* context) {
 						arping_time = cpu_tsc();
-						if(arp_request(manager_ni->ni, arping_addr)) {
+						if(arp_request(manager_ni->ni, arping_addr, 0)) {
 							arping_event = event_timer_add(arping_timeout, NULL, 1000000, 1000000);
 						} else {
 							arping_count = 0;

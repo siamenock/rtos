@@ -2,6 +2,8 @@
 #include <lock.h>
 #include <util/map.h>
 #include <net/ni.h>
+#include <net/interface.h>
+#include <errno.h>
 #include <_malloc.h>
 
 int __nis_count;
@@ -188,3 +190,50 @@ void* ni_config_get(NetworkInterface* ni, char* key) {
 	return map_get(ni->config, key);
 }
 
+bool ni_ip_add(NetworkInterface* ni, uint32_t addr) {
+	Map* interfaces = ni_config_get(ni, NI_ADDR_IPv4);
+	if(!interfaces) {
+		interfaces = map_create(16, NULL, NULL, ni->pool);
+		ni_config_put(ni, NI_ADDR_IPv4, interfaces);
+	}
+
+	if(!interfaces)
+		return false;
+
+	IPv4Interface* interface = interface_alloc(ni->pool);
+	if(!interface)
+		return false;
+
+	interface->netmask = 0xffffff00;
+	interface->gateway = (addr & interface->netmask) | 0x1;
+	interface->_default = true;
+
+	if(!map_put(interfaces, (void*)(uintptr_t)addr, interface)) {
+		interface_free(interface, ni->pool);
+		return false;
+	}
+
+	return true;
+}
+
+IPv4Interface* ni_ip_get(NetworkInterface* ni, uint32_t addr) {
+	Map* interfaces = ni_config_get(ni, NI_ADDR_IPv4);
+	if(!interfaces)
+		return NULL;
+
+	return map_get(interfaces, (void*)(uintptr_t)addr);
+}
+
+bool ni_ip_remove(NetworkInterface* ni, uint32_t addr) {
+	Map* interfaces = ni_config_get(ni, NI_ADDR_IPv4);
+	if(!interfaces)
+		return false;
+
+	IPv4Interface* interface =  map_remove(interfaces, (void*)(uintptr_t)addr);
+	if(!interface)
+		return false;
+
+	interface_free(interface, ni->pool);
+
+	return true;
+}

@@ -2,6 +2,7 @@
 #include <malloc.h>
 #include <time.h>
 #include <net/ni.h>
+#include <net/interface.h>
 #include <net/ether.h>
 #include <net/ip.h>
 #include <net/udp.h>
@@ -10,7 +11,7 @@
 
 typedef struct {
 	NetworkInterface*	ni;
-	
+	uint16_t	saddr;
 	uint16_t	sport;
 	
 	uint32_t	daddr;
@@ -34,7 +35,7 @@ uint32_t TFTP_SESSION_TTL = (10 * 1000000);	// 10 secs
 static Map* sessions;
 
 static void delete(Session* session) {
-	udp_port_free(session->ni, session->sport);
+	udp_port_free(session->ni, session->saddr, session->sport);
 	free(session->filename);
 	free(session->mode);
 	free(session);
@@ -51,7 +52,8 @@ static Session* create(Packet* packet, IP* ip, UDP* udp, TFTPCallback* callback)
 	Session* session = malloc(sizeof(Session));
 	bzero(session, sizeof(Session));
 	session->ni = packet->ni;
-	session->sport = udp_port_alloc(session->ni);
+	session->saddr = endian32(ip->destination);
+	session->sport = udp_port_alloc(session->ni, session->saddr);
 	session->daddr = endian32(ip->source);
 	session->dport = endian16(udp->source);
 	int len = strlen(filename) + 1;
@@ -142,14 +144,6 @@ bool tftp_process(Packet* packet) {
 		next_gc = time + TFTP_SESSION_GC;
 	} 
 	
-	uint32_t addr = (uint32_t)(uintptr_t)ni_config_get(packet->ni, "ip");
-	if(!addr)
-		return false;
-	
-	uint16_t port = (uint32_t)(uintptr_t)ni_config_get(packet->ni, TFTP_PORT);
-	if(!port)
-		port = 69;
-	
 	TFTPCallback* callback = ni_config_get(packet->ni, TFTP_CALLBACK); 
 	if(!callback)
 		return false;
@@ -160,8 +154,16 @@ bool tftp_process(Packet* packet) {
 		return false;
 	
 	IP* ip = (IP*)ether->payload;
-	if(endian32(ip->destination) != addr || ip->protocol != IP_PROTOCOL_UDP)
+	if(ip->protocol != IP_PROTOCOL_UDP)
 		return false;
+
+	uint32_t addr = endian32(ip->destination);
+	IPv4Interface* interface = ni_ip_get(packet->ni, addr);
+	if(!interface)
+		return false;
+
+	udp_port_alloc0(packet->ni, addr, 69);
+	uint16_t port = 69;
 	
 	UDP* udp = (UDP*)ip->body;
 	Session* session;

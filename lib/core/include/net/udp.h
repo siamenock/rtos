@@ -27,17 +27,29 @@ typedef struct _UDP {
  * Allocate UDP port number which associated with NI.
  *
  * @param ni NI reference
+ * @param addr
+ * @param port
+ * @return true if port alloc success
+ */
+bool udp_port_alloc0(NetworkInterface* ni, uint32_t addr, uint16_t port);
+
+/**
+ * Allocate UDP port number which associated with NI.
+ *
+ * @param ni NI reference
+ * @param addr
  * @return port number
  */
-uint16_t udp_port_alloc(NetworkInterface* ni);
+uint16_t udp_port_alloc(NetworkInterface* ni, uint32_t addr);
 
 /**
  * Free UDP port number.
  *
  * @param ni NI reference
+ * @param addr
  * @param port port number to free
  */
-void udp_port_free(NetworkInterface* ni, uint16_t port);
+void udp_port_free(NetworkInterface* ni, uint32_t addr, uint16_t port);
 
 /**
  * Set UDP length, checksum, and do IP packing.

@@ -1,41 +1,56 @@
 #include <time.h>
+#include <net/interface.h>
 #include <net/ether.h>
 #include <net/ip.h>
 #include <net/tcp.h>
 #include <net/checksum.h>
 #include <util/map.h>
 
-#define TCP_PORTS	".pn.tcp.ports"
-#define TCP_NEXT_PORT	".pn.tcp.next_port"
-
-uint16_t tcp_port_alloc(NetworkInterface* ni) {
-	Map* ports = ni_config_get(ni, TCP_PORTS);
-	if(!ports) {
-		ports = map_create(64, map_uint64_hash, map_uint64_equals, ni->pool);
-		ni_config_put(ni, TCP_PORTS, ports);
+bool tcp_port_alloc0(NetworkInterface* ni, uint32_t addr, uint16_t port) {
+	IPv4Interface* interface = ni_ip_get(ni, addr);
+	if(!interface->tcp_ports) {
+		interface->tcp_ports = set_create(64, set_uint64_hash, set_uint64_equals, ni->pool);
+		if(!interface->tcp_ports)
+			return false;
 	}
-	
-	uint16_t port = (uint16_t)(uintptr_t)ni_config_get(ni, TCP_NEXT_PORT);
+
+	if(set_contains(interface->tcp_ports, (void*)(uintptr_t)port))
+		return false;
+
+	return set_put(interface->tcp_ports, (void*)(uintptr_t)port);
+}
+
+uint16_t tcp_port_alloc(NetworkInterface* ni, uint32_t addr) {
+	IPv4Interface* interface = ni_ip_get(ni, addr);
+	if(!interface->tcp_ports) {
+		interface->tcp_ports = set_create(64, set_uint64_hash, set_uint64_equals, ni->pool);
+		if(!interface->tcp_ports)
+			return 0;
+	}
+
+	uint16_t port = interface->tcp_next_port;
 	if(port < 49152)
 		port = 49152;
 	
-	while(map_contains(ports, (void*)(uintptr_t)port)) {
+	while(set_contains(interface->tcp_ports, (void*)(uintptr_t)port)) {
 		if(++port < 49152)
 			port = 49152;
 	}	
+
+	if(!set_put(interface->tcp_ports, (void*)(uintptr_t)port))
+		return 0;
 	
-	map_put(ports, (void*)(uintptr_t)port, (void*)(uintptr_t)port);
-	ni_config_put(ni, TCP_NEXT_PORT, (void*)(uintptr_t)(port + 1));
+	interface->tcp_next_port = port;
 	
 	return port;
 }
 
-void tcp_port_free(NetworkInterface* ni, uint16_t port) {
-	Map* ports = ni_config_get(ni, TCP_PORTS);
-	if(!ports)
+void tcp_port_free(NetworkInterface* ni, uint32_t addr, uint16_t port) {
+	IPv4Interface* interface = ni_ip_get(ni, addr);
+	if(interface == NULL)
 		return;
 	
-	map_remove(ports, (void*)(uintptr_t)port);
+	set_remove(interface->tcp_ports, (void*)(uintptr_t)port);
 }
 
 void tcp_pack(Packet* packet, uint16_t tcp_body_len) {
