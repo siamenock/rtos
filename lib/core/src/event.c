@@ -69,7 +69,7 @@ done:
 }
 
 static bool get_first_bigger(void* time, void* node) {
-	return (uintptr_t)time < ((TimerNode*)node)->delay;
+	return (clock_t)time < ((TimerNode*)node)->delay;
 }
 
 static clock_t next_timer = INT64_MAX;
@@ -107,11 +107,20 @@ int event_loop() {
 		if(node->func(node->context)) {
 			node->delay += node->period;
 			int index = list_index_of(timer_events, (void*)(uintptr_t)node->delay, get_first_bigger);
-			if(!list_add_at(timer_events, index, node)) {
-				free(node);
-				
-				printf("Timer event lost unexpectedly cause of memory lack!!!\n");
-				while(1) __asm__ __volatile__  ("hlt");
+			if(index == -1) {
+				if(!list_add(timer_events, node)) {
+					free(node);
+
+					printf("Timer event lost unexpectedly cause of memory lack!!!\n");
+					while(1) __asm__ __volatile__  ("hlt");
+				}
+			} else {
+				if(!list_add_at(timer_events, index, node)) {
+					free(node);
+
+					printf("Timer event lost unexpectedly cause of memory lack!!!\n");
+					while(1) __asm__ __volatile__  ("hlt");
+				}
 			}
 		} else {
 			free(node);
@@ -179,9 +188,16 @@ uint64_t event_timer_add(EventFunc func, void* context, clock_t delay, clock_t p
 	node->period = period;
 	
 	int index = list_index_of(timer_events, (void*)(uintptr_t)node->delay, get_first_bigger);
-	if(!list_add_at(timer_events, index, node)) {
-		free(node);
-		return 0;
+	if(index == -1) {
+		if(!list_add(timer_events, node)) {
+			free(node);
+			return 0;
+		}
+	} else {
+		if(!list_add_at(timer_events, index, node)) {
+			free(node);
+			return 0;
+		}
 	}
 	
 	next_timer = ((TimerNode*)list_get_first(timer_events))->delay;
@@ -196,9 +212,16 @@ bool event_timer_update(uint64_t id) {
 		node->delay = time + node->period;
 		
 		int index = list_index_of(timer_events, (void*)(uint64_t)node->delay, get_first_bigger);
-		if(!list_add_at(timer_events, index, node)) {
-			free(node);
-			return false;
+		if(index == -1) {
+			if(!list_add(timer_events, node)) {
+				free(node);
+				return false;
+			}
+		} else {
+			if(!list_add_at(timer_events, index, node)) {
+				free(node);
+				return false;
+			}
 		}
 
 		next_timer = ((TimerNode*)list_get_first(timer_events))->delay;
@@ -216,7 +239,7 @@ bool event_timer_remove(uint64_t id) {
 		if(list_size(timer_events) > 0)
 			next_timer = ((TimerNode*)list_get_first(timer_events))->delay;
 		else
-			next_timer = INT32_MAX;
+			next_timer = INT64_MAX;
 		
 		return true;
 	} else {
