@@ -77,7 +77,7 @@ libumpn.a: libtlsf.a libcore.a
 	rm -r obj
 
 zlib/libz.a:
-	cd zlib; CFLAGS=-fno-stack-protector ./configure --static --64
+	cd zlib; CFLAGS="-fno-stack-protector -O3" ./configure --static --64
 	make -C zlib
 
 libz.a: zlib/libz.a
