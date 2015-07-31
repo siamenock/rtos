@@ -390,6 +390,7 @@ uint32_t vm_create(VMSpec* vm_spec) {
 		argv_len += strlen(vm_spec->argv[i]) + 1;
 	}
 	vm->argv = gmalloc(argv_len);
+	vm->argc = vm_spec->argc;
 	char* args = (void*)vm->argv + sizeof(char*) * vm_spec->argc;
 	for(int i = 0; i < vm_spec->argc; i++) {
 		vm->argv[i] = args;
