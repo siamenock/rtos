@@ -58,8 +58,9 @@
 #include <netif/etharp.h>
 #include <net/ni.h>
 #include <net/interface.h>
+#include <util/list.h>
 #include <lwip/timers.h>
-
+#include <gmalloc.h>
 
 /* Define those to better describe your network interface. */
 #define IFNAME0 'e'
@@ -298,12 +299,31 @@ driver_init(struct netif *netif)
 }
 
 static bool is_lwip_inited;
-static struct netif netifs[NIS_SIZE];
-static struct netif_private privates[NIS_SIZE];
-static int netif_count;
+ //static struct netif* netifs[NIS_SIZE];
+ //static struct netif_private* privates[NIS_SIZE];
+ //static int netif_count;
+static List* netifs = NULL;
+static ListIterator iter;
+//static List* privates;
 
 struct netif* ni_init(NetworkInterface* ni, NI_DPI preprocessor, NI_DPI postprocessor) {
-	if(netif_count >= NIS_SIZE)
+	if(!netifs) {
+		netifs = list_create(NULL);
+		if(!netifs) {
+			printf("Can'nt create netif list\n");
+			return NULL;
+		}
+		list_iterator_init(&iter, netifs);
+	}
+ //	if(!privates) {
+ //		privates = list_create(NULL);
+ //		if(!privates) {
+ //			printf("Can'nt create netif list\n");
+ //			return NULL;
+ //		}
+ //	}
+
+	if(list_size(netifs) >= NIS_SIZE)
 		return NULL;
 
 	uint32_t ip;
@@ -334,8 +354,14 @@ struct netif* ni_init(NetworkInterface* ni, NI_DPI preprocessor, NI_DPI postproc
 		is_lwip_inited = true;
 	}
 	
-	struct netif* netif = &netifs[netif_count];
-	struct netif_private* private = &privates[netif_count++];
+	struct netif* netif = gmalloc(sizeof(struct netif));
+	//netifs[netif_count] = netif;
+	struct netif_private* private =  gmalloc(sizeof(struct netif_private));
+	list_add(netifs, netif);
+	//list_add(privates, private);
+	//privates[netif_count] = private;
+	//netif_count++;
+
 	private->ni = ni;
 	private->preprocessor = preprocessor;
 	private->postprocessor = postprocessor;
@@ -353,32 +379,51 @@ struct netif* ni_init(NetworkInterface* ni, NI_DPI preprocessor, NI_DPI postproc
 	return netif;
 }
 
+bool ni_remove(struct netif* netif) {
+ 	netif_set_down(netif);
+ 	netif_remove(netif);
+	list_remove_data(netifs, netif);
+	gfree(netif->state);
+	gfree(netif);
+
+	return true;
+}
+
 bool ni_poll() {
-	static bool netif_index;
-	
 	bool result = false;
 	
-	if(netif_count <= 0)
+	if(list_size(netifs) == 0)
 		return result;
 	
-	struct netif* netif = &netifs[netif_index];
-	NetworkInterface* ni = ((struct netif_private*)netif->state)->ni;
-	if(!ni_has_input(ni))
-		goto done;
-	
-	Packet* packet = ni_input(ni);
-	NI_DPI preprocessor = ((struct netif_private*)netif->state)->preprocessor;
-	if(preprocessor)
-		packet = preprocessor(packet);
-	
-	if(packet)
-		driver_poll(netif, packet);
-	
-	result = true;
-	
+	if(!list_iterator_has_next(&iter)) {
+		list_iterator_init(&iter, netifs);
+		goto check_has_next;
+	} else
+		goto process_packet;
+
+check_has_next:
+	if(list_iterator_has_next(&iter)) {
+process_packet:
+;
+		struct netif* netif = list_iterator_next(&iter);
+		NetworkInterface* ni = ((struct netif_private*)netif->state)->ni;
+		if(!ni_has_input(ni))
+			goto done;
+		
+		Packet* packet = ni_input(ni);
+		NI_DPI preprocessor = ((struct netif_private*)netif->state)->preprocessor;
+		if(preprocessor)
+			packet = preprocessor(packet);
+		
+		if(packet)
+			driver_poll(netif, packet);
+		
+		result = true;
+	} else {
+		result = false;
+	}
+
 done:
-	netif_index = (netif_index + 1) % netif_count;
-	
 	return result;
 }
 

@@ -19,7 +19,7 @@
 #include "shared.h"
 #include "malloc.h"
 #include "gmalloc.h"
-#include "ni.h"
+#include "vnic.h"
 #include "vm.h"
 #include "manager.h"
 #include "icc.h"
@@ -44,8 +44,7 @@
 #define VGA_BUFFER_PAGES	12
 
 //static uint64_t idle_time;
-extern int nics_count;
-extern Device* nics[];
+extern Device* nic_devices[];
 
 static bool idle0_event(void* data) {
 	/*
@@ -62,17 +61,19 @@ static bool idle0_event(void* data) {
 	*/
 	
 	// Poll NICs
-	extern int nic_index;
+	extern Device* nic_current;
 	int poll_count = 0;
-	for(int i = 0; i < nics_count; i++) {
-		Device* dev = nics[i];
-		NIC* nic = dev->driver;
+	for(int i = 0; i < NIC_MAX_DEVICE_COUNT; i++) {
+		Device* dev = nic_devices[i];
+		if(dev == NULL)
+			break;
 		
-		nic_index = i;
-
-		poll_count += nic->poll(dev->id);
+		nic_current = dev;
+		NICDriver* nic = nic_current->driver;
+		
+		poll_count += nic->poll(nic_current->id);
 	}
-				
+
 	// idle
 /*	
 	for(int i = 0; i < 1000; i++)
@@ -365,7 +366,7 @@ void main(void) {
 		symbols_init();
 	
 		printf("Initializing network interface...\n");
-		ni_init0();
+		vnic_init0();
 
 		mp_sync();
 	
@@ -376,34 +377,53 @@ void main(void) {
 		module_init();
 
 		printf("Initializing device drivers...\n");
-		int count = device_module_init();
+		device_module_init(); //
 
-		nics_count = device_count(DEVICE_TYPE_NIC);
-		printf("Finding NICs: %d\n", nics_count);
+		uint16_t nic_devices_count = device_count(DEVICE_TYPE_NIC);
+		printf("Finding NICs: %d\n", nic_devices_count);
 
-		extern int** ni_port;
-		int port_index = 0;
-		for(int i = 0; i < count; i++) {
-			nics[i] = device_get(DEVICE_TYPE_NIC, i);
+		int ni_dev_index = 0;
+		extern uint64_t manager_mac;
+		for(int i = 0; i < nic_devices_count; i++) {
+			nic_devices[i] = device_get(DEVICE_TYPE_NIC, i);
+			if(!nic_devices[i])
+				continue;
+
+			NICPriv* nic_priv = gmalloc(sizeof(NICPriv));
+			if(!nic_priv)
+				continue;
+
+			nic_priv->nics = map_create(8, NULL, NULL, NULL);
+
+			nic_devices[i]->priv = nic_priv;
+
 			NICInfo info;
-			((NIC*)nics[i]->driver)->get_info(nics[i]->id, &info);
+			((NICDriver*)nic_devices[i]->driver)->get_info(nic_devices[i]->id, &info);
 
-			ni_port[i] = gmalloc(sizeof(int) * info.port_count);
+			nic_priv->port_count = info.port_count;
 			for(int j = 0; j < info.port_count; j++) {
-				printf("\tPORT[%d]: NIC[%d]: LOCAL_PORT[%d]: %02x:%02x:%02x:%02x:%02x:%02x %c\n", port_index, i, j,
+				nic_priv->mac[j] = info.mac[j];
+
+				char name_buf[64];
+				sprintf(name_buf, "eth%d", ni_dev_index);
+				uint16_t port = j << 12;
+
+				Map* vnics = map_create(16, NULL, NULL, NULL);
+				map_put(nic_priv->nics, (void*)(uint64_t)port, vnics);
+
+				printf("\t%s : [%02x:%02x:%02x:%02x:%02x:%02x] [%c]\n", name_buf,
 					(info.mac[j] >> 40) & 0xff,
 					(info.mac[j] >> 32) & 0xff,
 					(info.mac[j] >> 24) & 0xff,
 					(info.mac[j] >> 16) & 0xff,
 					(info.mac[j] >> 8) & 0xff,
 					(info.mac[j] >> 0) & 0xff,
-					ni_mac == 0 ? '*' : ' ');
+					manager_mac == 0 ? '*' : ' ');
 
-				if(ni_mac == 0)
-					ni_mac = info.mac[j];
+				if(!manager_mac)
+					manager_mac = info.mac[j];
 
-				ni_port[i][j] = port_index;
-				port_index++;
+				ni_dev_index++;
 			}
 		}
 		

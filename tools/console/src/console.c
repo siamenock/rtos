@@ -230,13 +230,14 @@ static int cmd_vm_create(int argc, char** argv, void(*callback)(char* result, in
 						return i;
 					}
 					nic->mac = parse_uint64(argv[i]);
-				} else if(strcmp(argv[i], "port:") == 0) {
+				} else if(strcmp(argv[i], "dev:") == 0) {
 					i++;
-					if(!is_uint32(argv[i])) {
-						printf("port must be uint32\n");
-						return i;
-					}
-					nic->port = parse_uint32(argv[i]);
+ //					if(!is_uint32(argv[i])) {
+ //						printf("port must be uint32\n");
+ //						return i;
+ //					}
+ //					nic->port = parse_uint32(argv[i]);
+					nic->dev = argv[i];
 				} else if(strcmp(argv[i], "ibuf:") == 0) {
 					i++;
 					if(!is_uint32(argv[i])) {

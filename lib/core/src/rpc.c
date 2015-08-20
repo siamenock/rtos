@@ -214,7 +214,8 @@ static int write_vm(RPC* rpc, VMSpec* vm) {
 	WRITE(write_uint16(rpc, vm->nic_count));
 	for(int i = 0; i < vm->nic_count; i++) {
 		WRITE(write_uint64(rpc, vm->nics[i].mac));
-		WRITE(write_uint32(rpc, vm->nics[i].port));
+		//WRITE(write_uint32(rpc, vm->nics[i].port));
+		WRITE(write_string(rpc, vm->nics[i].dev));
 		WRITE(write_uint32(rpc, vm->nics[i].input_buffer_size));
 		WRITE(write_uint32(rpc, vm->nics[i].output_buffer_size));
 		WRITE(write_uint64(rpc, vm->nics[i].input_bandwidth));
@@ -266,7 +267,14 @@ static int read_vm(RPC* rpc, VMSpec** vm2) {
 	}
 	for(int i = 0; i < vm->nic_count; i++) {
 		READ2(read_uint64(rpc, &vm->nics[i].mac), failed);
-		READ2(read_uint32(rpc, &vm->nics[i].port), failed);
+		//READ2(read_uint32(rpc, &vm->nics[i].port), failed);
+		char* ch;
+		uint16_t len2;
+		READ2(read_string(rpc, &ch, &len2), failed);
+		vm->nics[i].dev = (char*)malloc(len2 + 1);
+		bzero(vm->nics[i].dev, len2 + 1);
+		memcpy(vm->nics[i].dev, ch, len2);
+
 		READ2(read_uint32(rpc, &vm->nics[i].input_buffer_size), failed);
 		READ2(read_uint32(rpc, &vm->nics[i].output_buffer_size), failed);
 		READ2(read_uint64(rpc, &vm->nics[i].input_bandwidth), failed);
@@ -1166,7 +1174,7 @@ void rpc_vm_dump(VMSpec* vm) {
 	printf("storage_size = %x\n", vm->storage_size);
 	for(int i = 0; i < vm->nic_count; i++) {
 		printf("\tnic[%d].mac = %lx\n", i, vm->nics[i].mac);
-		printf("\tnic[%d].port = %d\n", i, vm->nics[i].port);
+		printf("\tnic[%d].dev = %s\n", i, vm->nics[i].dev);
 		printf("\tnic[%d].input_buffer_size = %d\n", i, vm->nics[i].input_buffer_size);
 		printf("\tnic[%d].output_buffer_size = %d\n", i, vm->nics[i].output_buffer_size);
 		printf("\tnic[%d].input_bandwidth = %lx\n", i, vm->nics[i].input_bandwidth);

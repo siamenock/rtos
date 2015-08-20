@@ -4,7 +4,7 @@
 #include <../gmalloc.h>
 #include <../port.h>
 #include <../cpu.h>
-#include <../ni.h>
+#include <../vnic.h>
 #include <../pci.h>
 #include <nic.h>
 // Virtio driver header
@@ -426,7 +426,7 @@ static int virtnet_receive(int id, void* buf, uint32_t len) {
 	}
 
 	VirtIONetPacket* vp = (VirtIONetPacket*)buf;
-	ni_process_input(0, vp->data, len - VNET_HDR_LEN, NULL, 0);
+	nic_process_input(0, vp->data, len - VNET_HDR_LEN, NULL, 0);
 
 #if DEBUG
 	printf("Received : ");
@@ -557,7 +557,7 @@ int poll(int id) {
 	}
 
 	// TX
-	Packet* packet = ni_process_output(0);
+	Packet* packet = nic_process_output(0);
 	if(packet) {
 		virtnet_send(id, packet);
 	}
@@ -611,7 +611,7 @@ bool pci_device_probe(PCI_Device* pci, char** name, void** data) {
 	return 0;
 }
 
-NIC device_driver = {
+NICDriver device_driver = {
 	.init = init,
 	.destroy = destroy,
 	.poll = poll,

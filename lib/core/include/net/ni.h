@@ -19,7 +19,8 @@
 typedef enum {
 	NI_NONE,		///< End of attributes
 	NI_MAC,			///< MAC address
-	NI_PORT,		///< Physical port mapping
+	//NI_PORT,		///< Physical port mapping
+	NI_DEV,			///< Device of Network Interface
 	NI_POOL_SIZE,		///< NI's total memory size
 	NI_INPUT_BANDWIDTH,	///< Input bandwidth in bps
 	NI_OUTPUT_BANDWIDTH,	///< Output bandwidth in bps
@@ -104,6 +105,11 @@ typedef Packet*(*NI_DPI)(Packet*);
  */
 struct netif;
 struct netif* ni_init(NetworkInterface* ni, NI_DPI preprocessor, NI_DPI postprocessor);
+
+/**
+ * Remove LwIP network protocol stack if needed
+ */
+bool ni_remove(struct netif* netif);
 
 /**
  * Poll NI to receive and send packets.

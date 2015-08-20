@@ -12,7 +12,8 @@
 #include "vm.h"
 
 static uint32_t	last_vmid = 1;
-static Map*	vms;
+//static Map*	vms;
+Map*	vms;
 
 // Core status
 typedef struct {
@@ -277,7 +278,7 @@ static bool vm_destroy(VM* vm, int core) {
 		if(vm->nics) {
 			for(uint16_t i = 0; i < vm->nic_count; i++) {
 				if(vm->nics[i])
-					ni_destroy(vm->nics[i]);
+					vnic_destroy(vm->nics[i]);
 			}
 			
 			gfree(vm->nics);
@@ -450,11 +451,23 @@ uint32_t vm_create(VMSpec* vm_spec) {
 		}
 	}
 	
-	// Allocate NICs
+	// Allocate vmid
+	uint32_t vmid;
+	while(true) {
+		vmid = last_vmid++;
+
+		if(vmid != 0 && !map_contains(vms, (void*)(uint64_t)vmid)) {
+			vm->id = vmid;
+			map_put(vms, (void*)(uint64_t)vmid, vm);
+			break;
+		}
+	}
+
+	// Allocate VNICs
 	NICSpec* nics = vm_spec->nics;
 	vm->nic_count = vm_spec->nic_count;
-	vm->nics = gmalloc(sizeof(NI) * vm->nic_count);
-	bzero(vm->nics, sizeof(NI) * vm->nic_count);
+	vm->nics = gmalloc(sizeof(VNIC) * vm->nic_count);
+	bzero(vm->nics, sizeof(VNIC) * vm->nic_count);
 	
 	for(int i = 0; i < vm->nic_count; i++) {
 		uint64_t mac = nics[i].mac;
@@ -462,16 +475,17 @@ uint32_t vm_create(VMSpec* vm_spec) {
 			do {
 				mac = cpu_tsc() & 0x0fffffffffffL;
 				mac |= 0x02L << 40;	// Locally administrered
-			} while(ni_contains(mac));
-		} else if(ni_contains(mac)) {
+			} while(vnic_contains(nics[i].dev, mac));
+		} else if(vnic_contains(nics[i].dev, mac)) {
 			printf("Manager: The mac address already in use: %012x.\n", mac);
+			map_remove(vms, (void*)(uint64_t)vmid);
 			vm_destroy(vm, -1);
 			return 0;
 		}
 		
 		uint64_t attrs[] = { 
 			NI_MAC, mac,
-			NI_PORT, nics[i].port,
+			NI_DEV,	(uint64_t)nics[i].dev,
 			NI_INPUT_BUFFER_SIZE, nics[i].input_buffer_size,
 			NI_OUTPUT_BUFFER_SIZE, nics[i].output_buffer_size,
 			NI_INPUT_BANDWIDTH, nics[i].input_bandwidth,
@@ -483,23 +497,12 @@ uint32_t vm_create(VMSpec* vm_spec) {
 			NI_NONE
 		};
 		
-		vm->nics[i] = ni_create(attrs);
+		vm->nics[i] = vnic_create(attrs);
 		if(!vm->nics[i]) {
-			printf("Manager: Not enough NIC to allocate: errno=%d.\n", errno);
+			printf("Manager: Not enough VNIC to allocate: errno=%d.\n", errno);
+			map_remove(vms, (void*)(uint64_t)vmid);
 			vm_destroy(vm, -1);
 			return 0;
-		}
-	}
-	
-	// Allocate vmid
-	uint32_t vmid;
-	while(true) {
-		vmid = last_vmid++;
-		
-		if(vmid != 0 && !map_contains(vms, (void*)(uint64_t)vmid)) {
-			vm->id = vmid;
-			map_put(vms, (void*)(uint64_t)vmid, vm);
-			break;
 		}
 	}
 	// Dump info
@@ -509,22 +512,21 @@ uint32_t vm_create(VMSpec* vm_spec) {
 		if(i + 1 < vm->core_size)
 			printf(", ");
 	}
-	printf("], %dMBs memory, %dMBs storage, NICs: %d\n",
+	printf("], %dMBs memory, %dMBs storage, VNICs: %d\n",
 		vm->memory.count * VM_MEMORY_SIZE_ALIGN / 0x100000,
 		vm->storage.count * VM_STORAGE_SIZE_ALIGN / 0x100000, vm->nic_count);
 	
 	for(int i = 0; i < vm->nic_count; i++) {
-		NI* ni = vm->nics[i];
+		VNIC* nic = vm->nics[i];
 		printf("\t");
 		for(int j = 5; j >= 0; j--) {
-			printf("%02x", (ni->mac >> (j * 8)) & 0xff);
+			printf("%02x", (nic->mac >> (j * 8)) & 0xff);
 			if(j - 1 >= 0)
 				printf(":");
 			else
 				printf(" ");
 		}
-		printf("%dMbps/%d, %dMbps/%d, %dMBs\n", ni->input_bandwidth / 1000000, fifo_capacity(ni->ni->input_buffer) + 1, ni->output_bandwidth / 1000000, fifo_capacity(ni->ni->output_buffer) + 1, list_size(ni->pools) * 2);
-	}
+		printf("%dMbps/%d, %dMbps/%d, %dMBs\n", nic->input_bandwidth / 1000000, fifo_capacity(nic->ni->input_buffer) + 1, nic->output_bandwidth / 1000000, fifo_capacity(nic->ni->output_buffer) + 1, list_size(nic->pools) * 2); }
 	
 	printf("\targs(%d): ", vm->argc);
 	for(int i = 0; i < vm->argc; i++) {

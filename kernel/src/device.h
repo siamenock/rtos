@@ -12,6 +12,7 @@ typedef struct device {
 	void*		driver;	// Extends Driver
 	void*		device;
 	int		id;
+	void*		priv;
 } Device;
 
 Device* device_register(DeviceType type, void* driver, void* device, void* data);

@@ -25,7 +25,7 @@ linux.ko:
 
 clean:
 	make -C nf10 clean
-#make -C linux clean
+	make -C linux clean
 	make -C virtio clean
 	rm -rf obj
 	rm -f $(MODULES)

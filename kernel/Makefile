@@ -19,7 +19,7 @@ OBJS = obj/entry.o \
 	obj/isr.o obj/device.o obj/pci.o obj/malloc.o obj/gmalloc.o obj/task.o obj/task_asm.o \
 	obj/mp.o obj/apic.o obj/apic_asm.o obj/ioapic.o obj/rtc.o obj/cpu.o \
 	obj/acpi.o \
-	obj/loader.o obj/shared.o obj/ni.o obj/icc.o \
+	obj/loader.o obj/shared.o obj/vnic.o obj/icc.o \
 	obj/string.o obj/module.o obj/symbols.o \
 	obj/driver/dummy.o \
 	obj/driver/vga.o obj/driver/keyboard.o obj/driver/stdin.o obj/driver/stdout.o obj/driver/bfs.o \

@@ -32,7 +32,7 @@
 #define DEFAULT_MANAGER_NETMASK	0xffffff00	// 255.255.255.0
 #define DEFAULT_MANAGER_PORT	111
 
-NI*	manager_ni;
+uint64_t manager_mac;
 static struct netif* manager_netif;
 static struct tcp_pcb* manager_server;
 static uint32_t manager_ip;
@@ -422,22 +422,29 @@ static bool manager_server_close() {
 
 void manager_init() {
 	uint64_t attrs[] = { 
-		NI_MAC, ni_mac, // Physical MAC
+		NI_MAC, manager_mac, // Physical MAC
+		NI_DEV, (uint64_t)"eth0",
 		NI_POOL_SIZE, 0x400000,
 		NI_INPUT_BANDWIDTH, 1000000000L,
 		NI_OUTPUT_BANDWIDTH, 1000000000L,
 		NI_INPUT_BUFFER_SIZE, 1024,
 		NI_OUTPUT_BUFFER_SIZE, 1024,
+		NI_PADDING_HEAD, 32,
+		NI_PADDING_TAIL, 32,
 		NI_INPUT_ACCEPT_ALL, 1,
 		NI_OUTPUT_ACCEPT_ALL, 1,
 		NI_NONE
 	};
 	
-	manager_ni = ni_create(attrs);
+	manager_ni = vnic_create(attrs);
+	if(!manager_ni) {
+		printf("\tCan'nt create manager\n");
+		return;
+	}
 
 	manager_ip = DEFAULT_MANAGER_IP;
 	if(!ni_ip_add(manager_ni->ni, DEFAULT_MANAGER_IP)) {
-		printf("Can'nt allocate manager ip\n");
+		printf("\tCan'nt allocate manager ip\n");
 		return;
 	}
 
@@ -447,7 +454,7 @@ void manager_init() {
 	interface->_default = true;
 
 	if(!udp_port_alloc0(manager_ni->ni, DEFAULT_MANAGER_IP, manager_port)) {
-		printf("Can'nt allocate manager port\n");
+		printf("\tCan'nt allocate manager port\n");
 		return;
 	}
 	manager_port = DEFAULT_MANAGER_PORT;
@@ -568,4 +575,11 @@ void manager_set_netmask(uint32_t nm) {
 	struct ip_addr nm2;
 	IP4_ADDR(&nm2, (nm >> 24) & 0xff, (nm >> 16) & 0xff, (nm >> 8) & 0xff, (nm >> 0) & 0xff);
 	netif_set_netmask(manager_netif, &nm2);
+}
+
+void manager_set_interface() {
+	manager_server_close();
+	ni_remove(manager_netif);
+	manager_netif = ni_init(manager_ni->ni, manage, NULL);
+	manager_server_open();
 }

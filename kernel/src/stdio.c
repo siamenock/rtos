@@ -646,8 +646,13 @@ int vsprintf(char *str, const char *format, va_list va) {
 	int width2;
 	
 	void print_string(char* str2) {
+		char* str0 = str;
 		while(*str2 != 0) {
 			*str++ = *str2++;
+		}
+
+		while(str - str0 < width) {
+			*str++ = fill;
 		}
 	}
 	
@@ -768,8 +773,10 @@ int vsprintf(char *str, const char *format, va_list va) {
 		
 		for(int i = 0; i < width2; i++) {
 			value = (value - l) * 10;
-			if(value == 0.0)
+			if(value == 0.0) {
+				*str++ = '0';
 				break;
+			}
 			
 			l = (long)value;
 			*str++ = (char)l + '0';

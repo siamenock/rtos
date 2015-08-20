@@ -4,7 +4,7 @@
 #include <sys/types.h>
 #include <control/vmspec.h>
 #include "mp.h"
-#include "ni.h"
+#include "vnic.h"
 
 #define EVENT_VM_STARTED	0x0200000000000001
 #define EVENT_VM_PAUSED		0x0200000000000002
@@ -26,7 +26,7 @@ typedef struct {
 	Block		memory;
 	Block		storage;
 	int		nic_count;
-	NI**		nics;	// gmalloc, ni_create
+	VNIC**		nics;	// gmalloc, ni_create
 	
 	int		argc;
 	char**		argv;	// gmalloc

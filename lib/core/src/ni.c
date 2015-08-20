@@ -23,12 +23,12 @@ NetworkInterface* ni_get(int i) {
 }
 
 Packet* ni_alloc(NetworkInterface* ni, uint16_t size) {
-	Packet* packet = __malloc(sizeof(Packet) + size + ALIGN - 1, ni->pool);
+	Packet* packet = __malloc(sizeof(Packet) + size + 4 /* VLAN padding */ + ALIGN - 1, ni->pool);
 	if(packet) {
 		bzero(packet, sizeof(Packet));
 		packet->ni = ni;
 		packet->size = size + ALIGN - 1;
-		packet->start = (((uintptr_t)packet->buffer + ALIGN - 1) & ~(ALIGN - 1)) - (uintptr_t)packet->buffer;
+		packet->start = (((uintptr_t)packet->buffer + 4 /* VLAN padding */ + ALIGN - 1) & ~(ALIGN - 1)) - (uintptr_t)packet->buffer;
 		packet->end = packet->start + size;
 	}
 	

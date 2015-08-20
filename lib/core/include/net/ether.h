@@ -16,6 +16,7 @@
 #define ETHER_TYPE_IPv6		0x86dd		///< Ether type of IPv6
 #define ETHER_TYPE_LLDP		0x88cc		///< Ether type of LLDP
 #define ETHER_TYPE_8021Q	0x8100		///< Ether type of 802.1q
+#define ETHER_TYPE_8021AD	0x88a8		///< Ether type of 802.1ad
 #define ETHER_TYPE_QINQ1	0x9100		///< Ether type of QinQ
 #define ETHER_TYPE_QINQ2	0x9200		///< Ether type of QinQ
 #define ETHER_TYPE_QINQ3	0x9300		///< Ether type of QinQ

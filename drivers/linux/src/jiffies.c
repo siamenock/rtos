@@ -54,6 +54,10 @@ unsigned long msecs_to_jiffies(const unsigned int m)
 #endif
 }
 
+unsigned int jiffies_to_msecs(const unsigned long j) {
+	return (MSEC_PER_SEC / HZ) * j;
+}
+
 unsigned long usecs_to_jiffies(const unsigned int u)
 {
 	if (u > jiffies_to_usecs(MAX_JIFFY_OFFSET))

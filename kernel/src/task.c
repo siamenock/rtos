@@ -6,7 +6,7 @@
 #include "asm.h"
 #include "malloc.h"
 #include "gmalloc.h"
-#include "ni.h"
+#include "vnic.h"
 #include "../../loader/src/page.h"
 
 #include "task.h"
@@ -194,10 +194,10 @@ void task_resource(uint32_t id, uint8_t type, void* data) {
 		case RESOURCE_NI:
 			;
 			bool is_first = true;
-			NI* ni = (NI*)data;
+			VNIC* vnic = (VNIC*)data;
 			
 			ListIterator iter;
-			list_iterator_init(&iter, ni->pools);
+			list_iterator_init(&iter, vnic->pools);
 			while(list_iterator_has_next(&iter)) {
 				uint64_t vaddr = (uint64_t)list_iterator_next(&iter);
 				
@@ -213,13 +213,13 @@ void task_resource(uint32_t id, uint8_t type, void* data) {
 						PAGE_L4U[idx].us ? 'r' : '-', 
 						PAGE_L4U[idx].rw ? 'w' : '-', 
 						PAGE_L4U[idx].exb ? '-' : 'x',
-						"NIC",
-						(ni->mac >> 40) & 0xff,
-						(ni->mac >> 32) & 0xff,
-						(ni->mac >> 24) & 0xff,
-						(ni->mac >> 16) & 0xff,
-						(ni->mac >> 8) & 0xff,
-						(ni->mac >> 0) & 0xff);
+						"VNIC",
+						(vnic->mac >> 40) & 0xff,
+						(vnic->mac >> 32) & 0xff,
+						(vnic->mac >> 24) & 0xff,
+						(vnic->mac >> 16) & 0xff,
+						(vnic->mac >> 8) & 0xff,
+						(vnic->mac >> 0) & 0xff);
 					
 					is_first = false;
 				} else {
@@ -228,7 +228,7 @@ void task_resource(uint32_t id, uint8_t type, void* data) {
 						PAGE_L4U[idx].us ? 'r' : '-', 
 						PAGE_L4U[idx].rw ? 'w' : '-', 
 						PAGE_L4U[idx].exb ? '-' : 'x',
-						"NIC");
+						"VNIC");
 				}
 			}
 			task_refresh_mmap();
@@ -265,7 +265,7 @@ void task_destroy(uint32_t id) {
 		
 		switch(resource->type) {
 			case RESOURCE_NI:
-				list_iterator_init(&iter, ((NI*)resource->data)->pools);
+				list_iterator_init(&iter, ((VNIC*)resource->data)->pools);
 				while(list_iterator_has_next(&iter)) {
 					uint64_t vaddr = (uint64_t)list_iterator_next(&iter);
 					uint64_t idx = vaddr >> 21;
@@ -279,7 +279,7 @@ void task_destroy(uint32_t id) {
 						PAGE_L4U[idx].us ? 'r' : '-', 
 						PAGE_L4U[idx].rw ? 'w' : '-', 
 						PAGE_L4U[idx].exb ? '-' : 'x',
-						"NIC");
+						"VNIC");
 				}
 				break;
 		}
