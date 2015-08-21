@@ -905,7 +905,7 @@ Packet* nic_process_output(uint8_t local_port) {
 			VNIC* vnic = entry1->data;
 
 			if(vnic->output_closed - vnic->output_wait_grace > time) {
-				printf("output closed: %016lx\n", nic->mac);
+				printf("output closed: %016lx\n", vnic->mac);
 				continue;
 			}
 
