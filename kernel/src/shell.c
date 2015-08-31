@@ -144,10 +144,11 @@ static int cmd_manager(int argc, char** argv, void(*callback)(char* result, int 
 		}
 
 		if(!is_uint16(argv[2])) {
+			printf("port number wrong\n");
 			return -1;
 		}
 
-		uint16_t port = parse_uint16(argv[3]);
+		uint16_t port = parse_uint16(argv[2]);
 
 		manager_set_port(port);
 	} else if(!strcmp("netmask", argv[1])) {
