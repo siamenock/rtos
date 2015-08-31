@@ -99,10 +99,10 @@ bool cache_iterator_has_next(CacheIterator* iter) {
 
 void* cache_iterator_next(CacheIterator* iter) {
 	if(iter->node) {
-		void* data = iter->node->data;
+		void* key = iter->node->data;
 		iter->node = iter->node->next;
-		
-		return data;
+	
+		return map_get(iter->cache->map, key);
 	} else {
 		return NULL;
 	}
