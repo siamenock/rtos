@@ -18,7 +18,7 @@
 
 #include "vnic.h"
 
-#define DEBUG		1
+#define DEBUG		0
 #define ALIGN		16
 
 Device* nic_current;
@@ -239,10 +239,8 @@ VNIC* vnic_create(uint64_t* attrs) {
 	vnic->ni = malloc_ex(sizeof(NetworkInterface), vnic->pool);
 	bzero(vnic->ni, sizeof(NetworkInterface));
 
-	vnic->padding_head = 32;
-	vnic->padding_tail = 32;
-	vnic->min_buffer_size = 128;
-	vnic->max_buffer_size = 2048;
+	vnic->ni->min_buffer_size = vnic->min_buffer_size = 128;
+	vnic->ni->max_buffer_size = vnic->max_buffer_size = 2048;
 	if(!has_key(NI_INPUT_ACCEPT_ALL))
 		vnic->input_accept = list_create(vnic->pool);
 	if(!has_key(NI_OUTPUT_ACCEPT_ALL))

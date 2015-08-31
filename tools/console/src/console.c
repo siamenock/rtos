@@ -186,6 +186,7 @@ static int cmd_vm_create(int argc, char** argv, void(*callback)(char* result, in
 	vm.storage_size = 0x1000000;	// 16MB
 	vm.nic_count = 0;
 	NICSpec nics[VM_MAX_NIC_COUNT];
+	memset(nics, 0, sizeof(NICSpec) * VM_MAX_NIC_COUNT);
 	vm.nics = nics;
 	vm.argc = 0;
 	char* _args[VM_MAX_ARGC];
@@ -232,11 +233,6 @@ static int cmd_vm_create(int argc, char** argv, void(*callback)(char* result, in
 					nic->mac = parse_uint64(argv[i]);
 				} else if(strcmp(argv[i], "dev:") == 0) {
 					i++;
- //					if(!is_uint32(argv[i])) {
- //						printf("port must be uint32\n");
- //						return i;
- //					}
- //					nic->port = parse_uint32(argv[i]);
 					nic->dev = argv[i];
 				} else if(strcmp(argv[i], "ibuf:") == 0) {
 					i++;
@@ -266,6 +262,20 @@ static int cmd_vm_create(int argc, char** argv, void(*callback)(char* result, in
 						return i;
 					}
 					nic->output_bandwidth = parse_uint64(argv[i]);
+				} else if(strcmp(argv[i], "hpad:") == 0) {
+					i++;
+					if(!is_uint8(argv[i])) {
+						printf("hpad must be uint8\n");
+						return i;
+					}
+					nic->padding_head = parse_uint8(argv[i]);
+				} else if(strcmp(argv[i], "tpad:") == 0) {
+					i++;
+					if(!is_uint8(argv[i])) {
+						printf("tpad must be uint8\n");
+						return i;
+					}
+					nic->padding_tail = parse_uint8(argv[i]);
 				} else if(strcmp(argv[i], "pool:") == 0) {
 					i++;
 					if(!is_uint32(argv[i])) {

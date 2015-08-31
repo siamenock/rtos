@@ -491,6 +491,8 @@ uint32_t vm_create(VMSpec* vm_spec) {
 			NI_OUTPUT_BUFFER_SIZE, nics[i].output_buffer_size,
 			NI_INPUT_BANDWIDTH, nics[i].input_bandwidth,
 			NI_OUTPUT_BANDWIDTH, nics[i].output_bandwidth,
+			NI_PADDING_HEAD, nics[i].padding_head ? nics[i].padding_head : 32,
+			NI_PADDING_TAIL, nics[i].padding_tail ? nics[i].padding_tail : 32,
 			NI_POOL_SIZE, nics[i].pool_size,
 			NI_INPUT_ACCEPT_ALL, 1,
 			NI_OUTPUT_ACCEPT_ALL, 1,

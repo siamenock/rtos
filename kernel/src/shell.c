@@ -321,6 +321,8 @@ static int cmd_vnic(int argc, char** argv, void(*callback)(char* result, int exi
 			print_byte_size(vnic->ni->input_bytes);
 			printf("  TX bytes:%lu ", vnic->ni->output_bytes);
 			print_byte_size(vnic->ni->output_bytes);
+			printf("\n");
+			printf("%12sHead Padding:%d Tail Padding:%d", "",vnic->padding_head, vnic->padding_tail);
 			printf("\n\n");
 		}
 
