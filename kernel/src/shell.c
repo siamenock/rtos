@@ -795,6 +795,7 @@ static int cmd_status_set(int argc, char** argv, void(*callback)(char* result, i
 		return CMD_STATUS_WRONG_NUMBER;
 	}
 	if(!is_uint32(argv[1])) {
+		callback("invalid", -1);
 		return -1;
 	}
 	
@@ -808,6 +809,9 @@ static int cmd_status_set(int argc, char** argv, void(*callback)(char* result, i
 		status = VM_STATUS_RESUME;
 	} else if(strcmp(argv[0], "stop") == 0) {
 		status = VM_STATUS_STOP;
+	} else {
+		callback("invalid", -1);
+		return -1;
 	}
 	
 	vm_status_set(vmid, status, status_setted, callback);
