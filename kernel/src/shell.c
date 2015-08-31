@@ -101,6 +101,58 @@ static int cmd_date(int argc, char** argv, void(*callback)(char* result, int exi
 	return 0;
 }
 
+static bool parse_addr(char* argv, uint32_t* address) {
+	char* next = NULL;
+	uint32_t temp;
+	temp = strtol(argv, &next, 0);
+	if(temp > 0xff)
+		return false;
+
+	*address = (temp & 0xff) << 24;
+	if(next == argv)
+		return false;
+	argv = next;
+
+	if(*argv != '.')
+		return false;
+	argv++;
+	temp = strtol(argv, &next, 0);
+	if(temp > 0xff)
+		return false;
+
+	*address |= (temp & 0xff) << 16;
+	if(next == argv)
+		return false;
+	argv = next;
+
+	if(*argv != '.')
+		return false;
+	argv++;
+	temp = strtol(argv, &next, 0);
+	if(temp > 0xff)
+		return false;
+	*address |= (temp & 0xff) << 8;
+	if(next == argv)
+		return false;
+	argv = next;
+
+	if(*argv != '.')
+		return false;
+	argv++;
+	temp = strtol(argv, &next, 0);
+	if(temp > 0xff)
+		return false;
+	*address |= temp & 0xff;
+	if(next == argv)
+		return false;
+	argv = next;
+
+	if(*argv != '\0')
+		return false;
+
+	return true;
+}
+
 static int cmd_manager(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	if(argc == 1) {
 		printf("HWaddr %02x:%02x:%02x:%02x:%02x:%02x\n",
@@ -129,11 +181,11 @@ static int cmd_manager(int argc, char** argv, void(*callback)(char* result, int 
 			return 0;
 		}
 
-		char* str = argv[2];
-		uint32_t address = (strtol(str, &str, 0) & 0xff) << 24; str++;
-		address |= (strtol(str, &str, 0) & 0xff) << 16; str++;
-		address |= (strtol(str, &str, 0) & 0xff) << 8; str++;
-		address |= strtol(str, NULL, 0) & 0xff;
+		uint32_t address;
+		if(!parse_addr(argv[2], &address)) {
+			printf("address wrong\n");
+			return 0;
+		}
 
 		manager_set_ip(address);
 	} else if(!strcmp("port", argv[1])) {
@@ -158,11 +210,11 @@ static int cmd_manager(int argc, char** argv, void(*callback)(char* result, int 
 			return 0;
 		}
 
-		char* str = argv[2];
-		uint32_t address = (strtol(str, &str, 0) & 0xff) << 24; str++;
-		address |= (strtol(str, &str, 0) & 0xff) << 16; str++;
-		address |= (strtol(str, &str, 0) & 0xff) << 8; str++;
-		address |= strtol(str, NULL, 0) & 0xff;
+		uint32_t address;
+		if(!parse_addr(argv[2], &address)) {
+			printf("address wrong\n");
+			return 0;
+		}
 
 		manager_set_netmask(address);
 
@@ -177,11 +229,11 @@ static int cmd_manager(int argc, char** argv, void(*callback)(char* result, int 
 			return 0;
 		}
 
-		char* str = argv[2];
-		uint32_t address = (strtol(str, &str, 0) & 0xff) << 24; str++;
-		address |= (strtol(str, &str, 0) & 0xff) << 16; str++;
-		address |= (strtol(str, &str, 0) & 0xff) << 8; str++;
-		address |= strtol(str, NULL, 0) & 0xff;
+		uint32_t address;
+		if(!parse_addr(argv[2], &address)) {
+			printf("address wrong\n");
+			return 0;
+		}
 
 		manager_set_gateway(address);
 
