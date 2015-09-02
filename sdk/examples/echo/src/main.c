@@ -8,6 +8,7 @@
 #include <net/icmp.h>
 #include <net/checksum.h>
 #include <net/udp.h>
+#include <readline.h>
 
 void ginit(int argc, char** argv) {
 }
@@ -16,7 +17,7 @@ void init(int argc, char** argv) {
 }
 
 //static uint32_t address = 0xc0a8c80a;	// 192.168.200.10
-static uint32_t address = 0xc0a80ac8;	// 192.168.10.200
+static uint32_t address = 0xc0a864c8;	// 192.168.100.200
 
 void process(NetworkInterface* ni) {
 	Packet* packet = ni_input(ni);
@@ -24,7 +25,8 @@ void process(NetworkInterface* ni) {
 		return;
 	
 	Ether* ether = (Ether*)(packet->buffer + packet->start);
-	
+
+
 	if(endian16(ether->type) == ETHER_TYPE_ARP) {
 		// ARP response
 		ARP* arp = (ARP*)ether->payload;
@@ -122,6 +124,10 @@ int main(int argc, char** argv) {
 	
 	uint32_t i = 0;
 	while(1) {
+		char* cmd;
+		if((cmd = readline()))
+			printf("Stdio : %s\n", cmd);
+
 		uint32_t count = ni_count();
 		if(count > 0) {
 			i = (i + 1) % count;

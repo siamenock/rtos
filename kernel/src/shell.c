@@ -16,6 +16,7 @@
 
 #include "stdio.h"
 #include "cpu.h"
+#include "time.h"
 #include "version.h"
 #include "rtc.h"
 #include "vnic.h"

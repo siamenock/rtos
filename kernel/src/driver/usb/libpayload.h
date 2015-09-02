@@ -58,7 +58,7 @@
 #include <time.h>
 #include <stdbool.h>
 #include "../../gmalloc.h" 
-#include "../../cpu.h"
+#include "../../time.h"
 #include "../disk.h"
 
 #define MIN(a,b) ((a) < (b) ? (a) : (b))

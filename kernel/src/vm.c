@@ -5,10 +5,10 @@
 #include <util/event.h>
 #include <util/ring.h>
 #include <net/md5.h>
+#include "time.h"
 #include "icc.h"
 #include "gmalloc.h"
 #include "stdio.h"
-#include "cpu.h"
 #include "vm.h"
 
 static uint32_t	last_vmid = 1;

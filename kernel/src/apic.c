@@ -5,6 +5,7 @@
 #include "port.h"
 #include "asm.h"
 #include "apic.h"
+#include "time.h"
 
 uint64_t _apic_address;
 
@@ -139,7 +140,6 @@ inline void apic_write64(int reg, uint64_t v) {
 }
 
 #define HEX(v)	(((v) & 0x0f) > 9 ? ((v) & 0x0f) - 10 + 'a' : ((v) & 0x0f) + '0')
-#include "cpu.h"
 static char animation[] = { '-', '\\', '|', '/' };
 
 typedef struct {

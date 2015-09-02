@@ -3,7 +3,7 @@
 #include <lock.h>
 #include "asm.h"
 #include "apic.h"
-#include "cpu.h"
+#include "time.h"
 #include "shared.h"
 #include "mp.h"
 

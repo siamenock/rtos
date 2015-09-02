@@ -3,7 +3,7 @@
 // PacketNign kernel header
 #include <../gmalloc.h>
 #include <../port.h>
-#include <../cpu.h>
+#include <../time.h>
 #include <../vnic.h>
 #include <../pci.h>
 #include <nic.h>

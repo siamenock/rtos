@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
+#include "time.h"
 #include "cpu.h"
 #include "mp.h"
 #include "port.h"

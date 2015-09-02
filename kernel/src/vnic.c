@@ -8,6 +8,7 @@
 #include <net/ip.h>
 #include <util/map.h>
 #include <util/event.h>
+#include "time.h"
 #include "gmalloc.h"
 #include "mp.h"
 #include "cpu.h"
@@ -18,7 +19,7 @@
 
 #include "vnic.h"
 
-#define DEBUG		1
+#define DEBUG		0
 #define ALIGN		16
 
 Device* nic_current;

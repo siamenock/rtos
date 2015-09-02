@@ -1,5 +1,5 @@
 #include <linux/delay.h>
-#include <cpu.h>
+#include <time.h>
 
 void udelay(unsigned int d) {
 	cpu_uwait(d);

@@ -4,6 +4,7 @@
 #include "pnkc.h"
 #include "port.h"
 #include "tlsf.h"
+#include "time.h"
 #include "driver/fs.h"
 #include "driver/bfs.h"
 #include "driver/pata.h"
@@ -63,7 +64,7 @@ void main(void) {
 		}
 
 		print(0, 6, "Measuring CPU clock", NORMAL);
-		cpu_init();
+		time_init();
 		print(50, 6, "Pass", PASS);
 
 		#ifdef DEBUG

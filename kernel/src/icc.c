@@ -3,13 +3,13 @@
 #include <util/event.h>
 #include <lock.h>
 #include <tlsf.h>
+#include "time.h"
 #include "asm.h"
 #include "apic.h"
 #include "mp.h"
 #include "shared.h"
 #include "gmalloc.h"
 #include "task.h"
-#include "cpu.h"
 
 #include "icc.h"
 

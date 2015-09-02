@@ -3,7 +3,7 @@
 #include "pata.h"
 #include "disk.h"
 #include "../port.h"
-#include "../cpu.h"
+#include "../time.h"
 
 typedef struct {
 	uint16_t 	configuration;

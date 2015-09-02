@@ -4,9 +4,9 @@
 #include <util/list.h>
 #include <elf.h>
 #include <errno.h>
+#include "time.h"
 #include "task.h"
 #include "mp.h"
-#include "cpu.h"
 
 #include "loader.h"
 
