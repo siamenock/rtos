@@ -74,7 +74,9 @@ void* cache_remove(Cache* cache, void* key) {
 	if(!data) 
 		return NULL;
 
-	list_remove_data(cache->list, data);
+	list_remove_data(cache->list, key);
+	if(cache->uncache)
+		cache->uncache(data);
 	
 	return data;
 }
