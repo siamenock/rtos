@@ -102,6 +102,58 @@ static int cmd_date(int argc, char** argv, void(*callback)(char* result, int exi
 	return 0;
 }
 
+static bool parse_addr(char* argv, uint32_t* address) {
+	char* next = NULL;
+	uint32_t temp;
+	temp = strtol(argv, &next, 0);
+	if(temp > 0xff)
+		return false;
+
+	*address = (temp & 0xff) << 24;
+	if(next == argv)
+		return false;
+	argv = next;
+
+	if(*argv != '.')
+		return false;
+	argv++;
+	temp = strtol(argv, &next, 0);
+	if(temp > 0xff)
+		return false;
+
+	*address |= (temp & 0xff) << 16;
+	if(next == argv)
+		return false;
+	argv = next;
+
+	if(*argv != '.')
+		return false;
+	argv++;
+	temp = strtol(argv, &next, 0);
+	if(temp > 0xff)
+		return false;
+	*address |= (temp & 0xff) << 8;
+	if(next == argv)
+		return false;
+	argv = next;
+
+	if(*argv != '.')
+		return false;
+	argv++;
+	temp = strtol(argv, &next, 0);
+	if(temp > 0xff)
+		return false;
+	*address |= temp & 0xff;
+	if(next == argv)
+		return false;
+	argv = next;
+
+	if(*argv != '\0')
+		return false;
+
+	return true;
+}
+
 static int cmd_manager(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	if(argc == 1) {
 		printf("HWaddr %02x:%02x:%02x:%02x:%02x:%02x\n",
@@ -123,6 +175,11 @@ static int cmd_manager(int argc, char** argv, void(*callback)(char* result, int 
 		return 0;
 	}
 
+	if(!manager_ni) {
+		printf("Can'nt found manager\n");
+		return -1;
+	}
+
 	if(!strcmp("ip", argv[1])) {
 		uint32_t old = manager_get_ip();
 		if(argc == 2) {
@@ -130,11 +187,11 @@ static int cmd_manager(int argc, char** argv, void(*callback)(char* result, int 
 			return 0;
 		}
 
-		char* str = argv[2];
-		uint32_t address = (strtol(str, &str, 0) & 0xff) << 24; str++;
-		address |= (strtol(str, &str, 0) & 0xff) << 16; str++;
-		address |= (strtol(str, &str, 0) & 0xff) << 8; str++;
-		address |= strtol(str, NULL, 0) & 0xff;
+		uint32_t address;
+		if(!parse_addr(argv[2], &address)) {
+			printf("address wrong\n");
+			return 0;
+		}
 
 		manager_set_ip(address);
 	} else if(!strcmp("port", argv[1])) {
@@ -145,10 +202,11 @@ static int cmd_manager(int argc, char** argv, void(*callback)(char* result, int 
 		}
 
 		if(!is_uint16(argv[2])) {
+			printf("port number wrong\n");
 			return -1;
 		}
 
-		uint16_t port = parse_uint16(argv[3]);
+		uint16_t port = parse_uint16(argv[2]);
 
 		manager_set_port(port);
 	} else if(!strcmp("netmask", argv[1])) {
@@ -158,11 +216,11 @@ static int cmd_manager(int argc, char** argv, void(*callback)(char* result, int 
 			return 0;
 		}
 
-		char* str = argv[2];
-		uint32_t address = (strtol(str, &str, 0) & 0xff) << 24; str++;
-		address |= (strtol(str, &str, 0) & 0xff) << 16; str++;
-		address |= (strtol(str, &str, 0) & 0xff) << 8; str++;
-		address |= strtol(str, NULL, 0) & 0xff;
+		uint32_t address;
+		if(!parse_addr(argv[2], &address)) {
+			printf("address wrong\n");
+			return 0;
+		}
 
 		manager_set_netmask(address);
 
@@ -177,18 +235,28 @@ static int cmd_manager(int argc, char** argv, void(*callback)(char* result, int 
 			return 0;
 		}
 
-		char* str = argv[2];
-		uint32_t address = (strtol(str, &str, 0) & 0xff) << 24; str++;
-		address |= (strtol(str, &str, 0) & 0xff) << 16; str++;
-		address |= (strtol(str, &str, 0) & 0xff) << 8; str++;
-		address |= strtol(str, NULL, 0) & 0xff;
+		uint32_t address;
+		if(!parse_addr(argv[2], &address)) {
+			printf("address wrong\n");
+			return 0;
+		}
 
 		manager_set_gateway(address);
 
 		printf("Manager's Gateway changed from %d.%d.%d.%d to %d.%d.%d.%d\n",
 			(old >> 24) & 0xff, (old >> 16) & 0xff, (old >> 8) & 0xff, (old >> 0) & 0xff,
 			(address >> 24) & 0xff, (address >> 16) & 0xff, (address >> 8) & 0xff, (address >> 0) & 0xff);
-	} else if(!strncmp("nic", argv[1], 3)) {
+	} else if(!strcmp("nic", argv[1])) {
+		if(argc == 2) {
+			printf("Network Interface name required\n");
+			return false;
+		}
+
+		if(argc != 3) {
+			printf("Wrong Parameter\n");
+			return false;
+		}
+
 		uint16_t port = 0;
 		Device* dev = nic_parse_index(argv[2], &port);
 		if(!dev)
@@ -257,6 +325,19 @@ static int cmd_nic(int argc, char** argv, void(*callback)(char* result, int exit
 }
 
 static int cmd_vnic(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	extern Device* nic_devices[];
+	uint16_t get_ni_index(Device* device) {
+		uint16_t ni_index = 0;
+		for(int i = 0; nic_devices[i] != NULL; i++) {
+			if(device == nic_devices[i])
+				return ni_index;
+			else
+				ni_index += ((NICPriv*)(nic_devices[i]->priv))->port_count;
+		}
+
+		return 0;
+	}
+
 	void print_byte_size(uint64_t byte_size) {
 		uint64_t size = 1;
 		for(int i = 0; i < 5; i++) {
@@ -286,9 +367,6 @@ static int cmd_vnic(int argc, char** argv, void(*callback)(char* result, int exi
 		}
 	}
 
-	extern Device* nic_devices[];
-
-	uint16_t ni_index = 0;
 	if(argc == 1 || (argc == 2 && !strcmp(argv[1], "list"))) {
 		void print_vnic(VNIC* vnic, uint16_t vmid, uint16_t nic_index) {
 			char name_buf[32];
@@ -309,9 +387,9 @@ static int cmd_vnic(int argc, char** argv, void(*callback)(char* result, int exi
 			uint16_t port_num = vnic->port >> 12;
 			uint16_t vlan_id = vnic->port & 0xfff;
 			if(!vlan_id) {
-				sprintf(name_buf, "eth%d", ni_index + port_num);
+				sprintf(name_buf, "eth%d", get_ni_index(vnic->device) + port_num);
 			} else {
-				sprintf(name_buf, "eth%d.%d\t", ni_index + port_num, vlan_id);
+				sprintf(name_buf, "eth%d.%d\t", get_ni_index(vnic->device) + port_num, vlan_id);
 			}
 			printf("Parent %s\n", name_buf);
 			printf("%12sRX packets:%d dropped:%d\n", "", vnic->ni->input_packets, vnic->ni->input_drop_packets);
@@ -322,6 +400,8 @@ static int cmd_vnic(int argc, char** argv, void(*callback)(char* result, int exi
 			print_byte_size(vnic->ni->input_bytes);
 			printf("  TX bytes:%lu ", vnic->ni->output_bytes);
 			print_byte_size(vnic->ni->output_bytes);
+			printf("\n");
+			printf("%12sHead Padding:%d Tail Padding:%d", "",vnic->padding_head, vnic->padding_tail);
 			printf("\n\n");
 		}
 
@@ -532,11 +612,10 @@ static int cmd_arping(int argc, char** argv, void(*callback)(char* result, int e
 		return CMD_STATUS_WRONG_NUMBER;
 	}
 	
-	char* str = argv[1];
-	arping_addr = (strtol(str, &str, 0) & 0xff) << 24; str++;
-	arping_addr |= (strtol(str, &str, 0) & 0xff) << 16; str++;
-	arping_addr |= (strtol(str, &str, 0) & 0xff) << 8; str++;
-	arping_addr |= strtol(str, NULL, 0) & 0xff;
+	if(!parse_addr(argv[1], &arping_addr)) {
+		printf("Address Wrong\n");
+		return -1;
+	}
 	
 	arping_time = time_ns();
 	
@@ -577,6 +656,7 @@ static int cmd_md5(int argc, char** argv, void(*callback)(char* result, int exit
 
 	if(!ret) {
 		sprintf(cmd_result, "(nil)");
+		printf("Can'nt md5 checksum\n");
 	} else {
 		char* p = (char*)cmd_result;
 		for(int i = 0; i < 16; i++, p += 2) {
@@ -794,6 +874,7 @@ static int cmd_status_set(int argc, char** argv, void(*callback)(char* result, i
 		return CMD_STATUS_WRONG_NUMBER;
 	}
 	if(!is_uint32(argv[1])) {
+		callback("invalid", -1);
 		return -1;
 	}
 	
@@ -807,6 +888,9 @@ static int cmd_status_set(int argc, char** argv, void(*callback)(char* result, i
 		status = VM_STATUS_RESUME;
 	} else if(strcmp(argv[0], "stop") == 0) {
 		status = VM_STATUS_STOP;
+	} else {
+		callback("invalid", -1);
+		return -1;
 	}
 	
 	vm_status_set(vmid, status, status_setted, callback);
@@ -824,20 +908,44 @@ static int cmd_status_get(int argc, char** argv, void(*callback)(char* result, i
 	}
 
 	uint32_t vmid = parse_uint32(argv[1]);
-	switch(vm_status_get(vmid)) {
-		case VM_STATUS_START:
-			callback("start", 0);
-			break;
-		case VM_STATUS_PAUSE:
-			callback("pause", 0);
-			break;
-		case VM_STATUS_STOP:
-			callback("stop", 0);
-			break;
-		default:
-			callback("invalid", -1);
-			break;
+	extern Map* vms;
+	VM* vm = map_get(vms, (void*)(uint64_t)vmid);
+	if(!vm) {
+		printf("Can'nt found VM\n");
+		return -1;
 	}
+
+	void print_vm_status(int status) {
+		switch(status) {
+			case VM_STATUS_START:
+				printf("start");
+				//callback("start", 0);
+				break;
+			case VM_STATUS_PAUSE:
+				printf("pause");
+				//callback("pause", 0);
+				break;
+			case VM_STATUS_STOP:
+				printf("stop");
+				//callback("stop", 0);
+				break;
+			default:
+				printf("invalid");
+				//callback("invalid", -1);
+				break;
+		}
+	}
+
+	printf("VM ID: %d\n", vmid);
+	printf("Status: ");
+	print_vm_status(vm->status);
+	printf("\n");
+	printf("Core size: %d\n", vm->core_size);
+	printf("Core: ");
+	for(int i = 0; i < vm->core_size; i++) {
+		printf("[%d] ", vm->cores[i]);
+	}
+	printf("\n");
 
 	return 0;
 }
@@ -856,6 +964,7 @@ Command commands[] = {
 	{
 		.name = "turbo",
 		.desc = "Turbo Boost Enable/Disable",
+		.args = "[on/off]",
 		.func = cmd_turbo
 	},
 	{ 
@@ -872,7 +981,7 @@ Command commands[] = {
 	{
 		.name = "sleep",
 		.desc = "Sleep n seconds",
-		.args = "[time: uint32]",
+		.args = "[n: uint32]",
 		.func = cmd_sleep
 	},
 	{ 

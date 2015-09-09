@@ -6,6 +6,7 @@
 #include <util/ring.h>
 #include <net/md5.h>
 #include <timer.h>
+#include "apic.h"
 #include "icc.h"
 #include "gmalloc.h"
 #include "stdio.h"
@@ -163,7 +164,6 @@ static void icc_resumed(ICC_Message* msg) {
 		ICC_Message* msg2 = icc_alloc(ICC_TYPE_RESUME);
 		icc_send(msg2, msg->core_id);
 		icc_free(msg);
-		// resend stop icc
 		return;
 	}
 
@@ -491,6 +491,8 @@ uint32_t vm_create(VMSpec* vm_spec) {
 			NI_OUTPUT_BUFFER_SIZE, nics[i].output_buffer_size,
 			NI_INPUT_BANDWIDTH, nics[i].input_bandwidth,
 			NI_OUTPUT_BANDWIDTH, nics[i].output_bandwidth,
+			NI_PADDING_HEAD, nics[i].padding_head ? nics[i].padding_head : 32,
+			NI_PADDING_TAIL, nics[i].padding_tail ? nics[i].padding_tail : 32,
 			NI_POOL_SIZE, nics[i].pool_size,
 			NI_INPUT_ACCEPT_ALL, 1,
 			NI_OUTPUT_ACCEPT_ALL, 1,
@@ -682,11 +684,21 @@ void vm_status_set(uint32_t vmid, int status, VM_STATUS_CALLBACK callback, void*
 	event_trigger_add(event_type, status_changed, info);
 	
 	for(int i = 0; i < vm->core_size; i++) {
-		cores[vm->cores[i]].error_code = 0;
-		ICC_Message* msg = icc_alloc(icc_type);
-		if(status == VM_STATUS_START)
-			msg->data.start.vm = vm;
-		icc_send(msg, vm->cores[i]);
+		if(status == VM_STATUS_PAUSE) {
+			apic_write64(APIC_REG_ICR, ((uint64_t)mp_core_id_to_apic_id(vm->cores[i]) << 56) |
+						APIC_DSH_NONE |
+						APIC_TM_EDGE |
+						APIC_LV_DEASSERT |
+						APIC_DM_PHYSICAL |
+						APIC_DMODE_FIXED |
+						49);
+		} else {
+			cores[vm->cores[i]].error_code = 0;
+			ICC_Message* msg = icc_alloc(icc_type);
+			if(status == VM_STATUS_START)
+				msg->data.start.vm = vm;
+			icc_send(msg, vm->cores[i]);
+		}
 	}
 }
 
@@ -748,6 +760,10 @@ bool vm_storage_md5(uint32_t vmid, uint32_t size, uint32_t digest[4]) {
 	if(!vm)
 		return false;
 	
+	int block_count = size / VM_MEMORY_SIZE_ALIGN;
+	if(vm->storage.count < block_count)
+		return false;
+
 	md5_blocks(vm->storage.blocks, vm->storage.count, VM_STORAGE_SIZE_ALIGN, size, digest);
 	
 	return true;

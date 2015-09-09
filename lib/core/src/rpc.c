@@ -60,7 +60,12 @@ MAKE_WRITE(int32)
 #define write_bool(RPC, DATA)	write_uint8((RPC), (uint8_t)(DATA))
 
 static int write_string(RPC* rpc, const char* v) {
-	uint16_t len0 = strlen(v);
+	uint16_t len0;
+	if(!v)
+		len0 = 0;
+	else
+		len0 = strlen(v);
+
 	uint16_t len = sizeof(uint16_t) + len0;
 	if(rpc->wbuf_index + len > RPC_BUFFER_SIZE)
 		return 0;
@@ -220,6 +225,8 @@ static int write_vm(RPC* rpc, VMSpec* vm) {
 		WRITE(write_uint32(rpc, vm->nics[i].output_buffer_size));
 		WRITE(write_uint64(rpc, vm->nics[i].input_bandwidth));
 		WRITE(write_uint64(rpc, vm->nics[i].output_bandwidth));
+		WRITE(write_uint8(rpc, vm->nics[i].padding_head));
+		WRITE(write_uint8(rpc, vm->nics[i].padding_tail));
 		WRITE(write_uint32(rpc, vm->nics[i].pool_size));
 	}
 	
@@ -279,6 +286,8 @@ static int read_vm(RPC* rpc, VMSpec** vm2) {
 		READ2(read_uint32(rpc, &vm->nics[i].output_buffer_size), failed);
 		READ2(read_uint64(rpc, &vm->nics[i].input_bandwidth), failed);
 		READ2(read_uint64(rpc, &vm->nics[i].output_bandwidth), failed);
+		READ2(read_uint8(rpc, &vm->nics[i].padding_head), failed);
+		READ2(read_uint8(rpc, &vm->nics[i].padding_tail), failed);
 		READ2(read_uint32(rpc, &vm->nics[i].pool_size), failed);
 	}
 	

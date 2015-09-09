@@ -55,11 +55,11 @@ inline Packet* ni_tryinput(NetworkInterface* ni) {
 }
 
 inline Packet* ni_input(NetworkInterface* ni) {
-	lock_lock(&ni->output_lock);
+	lock_lock(&ni->input_lock);
 	
 	Packet* packet = fifo_pop(ni->input_buffer);
 	
-	lock_unlock(&ni->output_lock);
+	lock_unlock(&ni->input_lock);
 	
 	return packet;
 }
