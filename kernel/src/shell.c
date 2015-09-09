@@ -174,6 +174,11 @@ static int cmd_manager(int argc, char** argv, void(*callback)(char* result, int 
 		return 0;
 	}
 
+	if(!manager_ni) {
+		printf("Can'nt found manager\n");
+		return -1;
+	}
+
 	if(!strcmp("ip", argv[1])) {
 		uint32_t old = manager_get_ip();
 		if(argc == 2) {
@@ -651,6 +656,7 @@ static int cmd_md5(int argc, char** argv, void(*callback)(char* result, int exit
 
 	if(!ret) {
 		sprintf(cmd_result, "(nil)");
+		printf("Can'nt md5 checksum\n");
 	} else {
 		char* p = (char*)cmd_result;
 		for(int i = 0; i < 16; i++, p += 2) {
@@ -958,6 +964,7 @@ Command commands[] = {
 	{
 		.name = "turbo",
 		.desc = "Turbo Boost Enable/Disable",
+		.args = "[on/off]",
 		.func = cmd_turbo
 	},
 	{ 
@@ -974,7 +981,7 @@ Command commands[] = {
 	{
 		.name = "sleep",
 		.desc = "Sleep n seconds",
-		.args = "[time: uint32]",
+		.args = "[n: uint32]",
 		.func = cmd_sleep
 	},
 	{ 
