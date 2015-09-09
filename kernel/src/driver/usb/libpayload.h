@@ -53,12 +53,11 @@
 #include "arch/io.h"
 #include "arch/virtual.h"
 #include "pci.h"
+#include "timer.h"
 
 #include <stddef.h>
-#include <time.h>
 #include <stdbool.h>
 #include "../../gmalloc.h" 
-#include "../../time.h"
 #include "../disk.h"
 
 #define MIN(a,b) ((a) < (b) ? (a) : (b))

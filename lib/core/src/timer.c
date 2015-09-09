@@ -5,10 +5,9 @@
 uint64_t cpu_ms;
 uint64_t cpu_us;
 uint64_t cpu_ns;
-clock_t cpu_clock;
-uint64_t cpu_frequency;
+uint64_t TIMER_FREQUENCY_PER_SEC;
 
-uint64_t cpu_tsc() {
+uint64_t timer_frequency() {
 	uint64_t time;
 	uint32_t* p = (uint32_t*)&time;
 	asm volatile("rdtsc" : "=a"(p[0]), "=d"(p[1]));
@@ -42,14 +41,14 @@ void time_init() {
 		uint16_t freq = PIT_FREQUENCY * 10 / 1000;	// 10 ms
 		port_out8(PIT_COUNTER0, freq & 0xff);
 
-		uint64_t base = cpu_tsc();
+		uint64_t base = timer_frequency();
 		port_out8(PIT_COUNTER0, freq >> 8);
 
 		uint16_t count = freq;
 		while(!(count == 0 || count > freq)) {
 			count = read_counter();
 		}
-		cpu_frequency = (cpu_tsc() - base) * 100;
+		TIMER_FREQUENCY_PER_SEC = (timer_frequency() - base) * 100;
 	}
 
 	char cpu_brand[4 * 4 * 3 + 1];
@@ -90,72 +89,67 @@ void time_init() {
 			frequency /= 10;
 			dot--;
 		}
-
-		cpu_frequency = frequency * number;
+		TIMER_FREQUENCY_PER_SEC = frequency * number;
 	} else {
 		measure();
 	}
 
-	cpu_ms = cpu_frequency / 1000;
+	cpu_ms = TIMER_FREQUENCY_PER_SEC / 1000;
 	cpu_us = cpu_ms / 1000;
 	cpu_ns = cpu_us / 1000;
-
-	cpu_clock = cpu_frequency / CLOCKS_PER_SEC;
 }
 
-void cpu_swait(uint32_t s) {
-	uint64_t time = cpu_tsc();
-	time += cpu_frequency * s;
-	while(cpu_tsc() < time)
+void time_swait(uint32_t s) {
+	uint64_t time = timer_frequency();
+	time += TIMER_FREQUENCY_PER_SEC * s;
+	while(timer_frequency() < time)
 		asm volatile("nop");
 }
 
-void cpu_mwait(uint32_t ms) {
-	uint64_t time = cpu_tsc();
+void time_mwait(uint32_t ms) {
+	uint64_t time = timer_frequency();
 	time += cpu_ms * ms;
-	while(cpu_tsc() < time)
+	while(timer_frequency() < time)
 		asm volatile("nop");
 }
 
-void cpu_uwait(uint32_t us) {
-	uint64_t time = cpu_tsc();
+void time_uwait(uint32_t us) {
+	uint64_t time = timer_frequency();
 	time += cpu_us * us;
-	while(cpu_tsc() < time)
+	while(timer_frequency() < time)
 		asm volatile("nop");
 }
 
-void cpu_nwait(uint32_t ns) {
-	uint64_t time = cpu_tsc();
+void time_nwait(uint32_t ns) {
+	uint64_t time = timer_frequency();
 	time += cpu_ns * ns;
-	while(cpu_tsc() < time)
+	while(timer_frequency() < time)
 		asm volatile("nop");
 }
 
-#include <stdio.h>
-
-inline time_t time_ns() {
+uint64_t time_ns() {
 #ifdef LINUX
 	struct timespec ts;
 	if(clock_gettime(CLOCK_MONOTONIC, &ts) != 0)
-		return (clock_t)-1;
+		return (uint64_t)-1;
 
-	return (time_t)(ts.tv_nsec + ts.tv_sec * 1000000000);
+	return (uint64_t)(ts.tv_nsec + ts.tv_sec * 1000000000);
 
-#else /*LINUX*/
+#else /* LINUX */
 	/* (Current CPU Time Stamp Counter / CPU frequency per nano-seconds) */
-	return (time_t)(cpu_tsc() / cpu_ns); 
+	return (uint64_t)(timer_frequency() / cpu_ns); 
 #endif
 }
 
-time_t time_us() {
+uint64_t time_us() {
 	return time_ns() / 1000;
 }
 
-time_t time_ms() {
+uint64_t time_ms() {
 	return time_ns() / 1000000;
 }
 
-time_t time_s() {
+uint64_t time_s() {
 	return time_ns() / 1000000000;
 }
 

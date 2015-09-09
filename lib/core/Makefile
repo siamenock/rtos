@@ -9,12 +9,12 @@ OBJ_32_DIR = obj_32/
 LINUX_DIR = obj_linux/
 
 OBJS = ether.o crc.o checksum.o ni.o interface.o status.o  \
-	fifo.o vector.o list.o map.o set.o ring.o errno.o thread.o \
+	timer.o fifo.o vector.o list.o map.o set.o ring.o errno.o thread.o \
 	asm.o gmalloc.o lock.o shared.o json.o \
 	malloc.o types.o _string.o _malloc.o rpc.o readline.o \
 	arp.o icmp.o \
 	packet.o ip.o udp.o tcp.o tftp.o cmd.o \
-	cache.o	md5.o _time.o 
+	cache.o	md5.o 
 
 OBJS_32 := $(OBJS)	
 
@@ -97,6 +97,6 @@ clean:
 	rm -rf obj
 	rm -f libcore.a
 	rm -rf obj_32
-	rm -f libocre_32.a
+	rm -f libcore_32.a
 	rm -rf obj_linux
 	rm -f libcore_linux.a

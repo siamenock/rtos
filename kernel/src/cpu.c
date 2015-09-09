@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <string.h>
-#include "time.h"
+#include <timer.h>
 #include "port.h"
 #include "cpu.h"
 #include "asm.h"
@@ -52,7 +52,7 @@ static void tsc_info() {
 void cpu_info() {
 #ifdef _KERNEL_
 	printf("\tBrand: %s\n", cpu_brand);
-	printf("\tFrequency: %ld\n", cpu_frequency);
+	printf("\tFrequency: %ld\n", timer_frequency());
 #endif
 
 	if(CPU_IS_TURBO_BOOST) {
@@ -62,7 +62,7 @@ void cpu_info() {
 		printf("\tNot Support Turbo Boost Technology\n");
 	}
 
-	if(cpu_frequency == 0) {
+	if(timer_frequency() == 0) {
 		printf("\tCannot parse CPU frequency...\n");
 
 		while(1)

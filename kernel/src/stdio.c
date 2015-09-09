@@ -983,11 +983,6 @@ void exit(int status) {
 	while(1) asm("hlt");
 }
 
-clock_t clock() {
-	/* (Current CPU Time Stamp Counter / CPU frequency per tick clocks) */
-	return (clock_t)(cpu_tsc() / cpu_clock);
-}
-
 int putchar(int c) {
 	char ch = c;
 	return write1(&ch, 1);

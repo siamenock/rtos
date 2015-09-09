@@ -1,9 +1,9 @@
 #include <malloc.h>
 #include <string.h>
+#include <timer.h>
 #include "pata.h"
 #include "disk.h"
 #include "../port.h"
-#include "../time.h"
 
 typedef struct {
 	uint16_t 	configuration;
@@ -53,9 +53,9 @@ static uint8_t read_hdd_status(bool primary) {
 }
 
 static bool wait_for_hdd(bool primary, int flag) {
-	uint64_t time = cpu_tsc();
+	uint64_t time = time_ms();
 
-	while((cpu_tsc() - time) <= WAITTIME * cpu_ms) {
+	while((time_ms() - time) <= WAITTIME) {
 		uint8_t status = read_hdd_status(primary);
 
 		switch(flag) {
@@ -78,7 +78,7 @@ static bool wait_for_hdd(bool primary, int flag) {
 				return false;
 		}
 
-		cpu_mwait(1);
+		time_mwait(1);
 	}
 	
 	return false;

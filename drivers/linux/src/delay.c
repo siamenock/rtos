@@ -1,15 +1,15 @@
 #include <linux/delay.h>
-#include <time.h>
+#include <timer.h>
 
 void udelay(unsigned int d) {
-	cpu_uwait(d);
+	time_uwait(d);
 }
 
 void mdelay(unsigned int d) {
-	cpu_mwait(d);
+	time_mwait(d);
 }
 
 void msleep(unsigned int d) {
-	cpu_mwait(d);
+	time_mwait(d);
 }	
 

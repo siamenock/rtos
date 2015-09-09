@@ -1,11 +1,11 @@
 #include <stdio.h>
 #include <stddef.h>
+#include <timer.h>
 #include "version.h"
 #include "mp.h"
 #include "port.h"
 #include "asm.h"
 #include "apic.h"
-#include "time.h"
 
 uint64_t _apic_address;
 
@@ -344,7 +344,7 @@ void isr_interrupt_handler(uint64_t vector) {
 			*v++ = 0x40;
 			*v++ = ' ';
 			*v++ = 0x40;
-			*v++ = animation[(cpu_tsc() >> 16) % 4];
+			*v++ = animation[(timer_frequency() >> 16) % 4];
 			*v++ = 0x40;
 			
 			for(int i = 0; i < 1000000; i++)

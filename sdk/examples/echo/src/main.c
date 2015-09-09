@@ -8,7 +8,6 @@
 #include <net/icmp.h>
 #include <net/checksum.h>
 #include <net/udp.h>
-#include <readline.h>
 
 void ginit(int argc, char** argv) {
 }
@@ -124,10 +123,6 @@ int main(int argc, char** argv) {
 	
 	uint32_t i = 0;
 	while(1) {
-		char* cmd;
-		if((cmd = readline()))
-			printf("Stdio : %s\n", cmd);
-
 		uint32_t count = ni_count();
 		if(count > 0) {
 			i = (i + 1) % count;

@@ -4,7 +4,7 @@
 #include <util/list.h>
 #include <elf.h>
 #include <errno.h>
-#include "time.h"
+#include <timer.h>
 #include "task.h"
 #include "mp.h"
 
@@ -408,7 +408,7 @@ static bool relocate(VM* vm, void* malloc_pool, void* gmalloc_pool, uint32_t tas
 	}
 	
 	if(task_addr(task_id, SYM_CPU_FREQUENCY)) {
-		*(uint64_t*)task_addr(task_id, SYM_CPU_FREQUENCY) = cpu_frequency;
+		*(uint64_t*)task_addr(task_id, SYM_CPU_FREQUENCY) = TIMER_FREQUENCY_PER_SEC;
 	}
 	
 	return true;

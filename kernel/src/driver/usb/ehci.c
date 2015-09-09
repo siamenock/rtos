@@ -134,12 +134,12 @@ static void ehci_reset (hci_t *controller)
 	short count = 0;
 	ehci_stop(controller);
 	/* wait 10 ms just to be shure */
-	cpu_mwait(10);
+	time_mwait(10);
 	if (EHCI_INST(controller)->operation->usbsts & HC_OP_HC_HALTED) {
 		EHCI_INST(controller)->operation->usbcmd = HC_OP_HC_RESET;
 		/* wait 100 ms */
 		for (count = 0; count < 10; count++) {
-			cpu_mwait(10);
+			time_mwait(10);
 			if (!(EHCI_INST(controller)->operation->usbcmd & HC_OP_HC_RESET)) {
 				return;
 			}
@@ -166,7 +166,7 @@ static int ehci_set_periodic_schedule(ehci_t *ehcic, int enable)
 	int timeout = 100000; /* time out after 100ms */
 	while (((ehcic->operation->usbsts & HC_OP_PERIODIC_SCHED_STAT) != enable)
 			&& timeout--) 
-		cpu_uwait(1);
+		time_uwait(1);
 
 	if (timeout < 0) {
 		usb_debug("ehci periodic schedule status change timed out.\n");
@@ -303,7 +303,7 @@ static int wait_for_tds(qtd_t *head)
 		int timeout = 60000; /* time out after 60000 * 50us == 3s */
 		while ((cur->token & QTD_ACTIVE) && !(cur->token & QTD_HALTED)
 				&& timeout--)
-			cpu_uwait(50);
+			time_uwait(50);
 		if (timeout < 0) {
 			usb_debug("Error: ehci: queue transfer "
 				"processing timed out.\n");
@@ -350,7 +350,7 @@ static int ehci_set_async_schedule(ehci_t *ehcic, int enable)
 	int timeout = 100; /* time out after 100ms */ //
 	while (((ehcic->operation->usbsts & HC_OP_ASYNC_SCHED_STAT) != enable)
 			&& timeout--)
-		cpu_mwait(1);
+		time_mwait(1);
 	if (timeout < 0) {
 		usb_debug("ehci async schedule status change timed out.\n");
 		return 1;
@@ -749,7 +749,7 @@ static void ehci_destroy_intr_queue(endpoint_t *const ep, void *const queue)
 	}
 
 	/* wait 1ms for frame to end */
-	cpu_mwait(1);
+	time_mwait(1);
 
 	while (intrq->head) {
 		/* disable qTD and destroy list */
