@@ -1,6 +1,6 @@
 .PHONY: all clean
 
-all: rewrite/rewrite pnkc/pnkc smap/smap console/console umpn/packetngin
+all: rewrite/rewrite pnkc/pnkc smap/smap console/console 
 
 rewrite/rewrite:
 	make -C rewrite

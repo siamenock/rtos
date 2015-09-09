@@ -83,6 +83,7 @@ zlib/libz.a:
 libz.a: zlib/libz.a
 	cp zlib/libz.a .
 	cp libz.a ../sdk/lib/
+	mkdir -p ../sdk/include
 	cp -rL zlib/*.h ../sdk/include/
 
 openssl/libssl.a: 
