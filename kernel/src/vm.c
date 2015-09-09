@@ -760,6 +760,10 @@ bool vm_storage_md5(uint32_t vmid, uint32_t size, uint32_t digest[4]) {
 	if(!vm)
 		return false;
 	
+	int block_count = size / VM_MEMORY_SIZE_ALIGN;
+	if(vm->storage.count < block_count)
+		return false;
+
 	md5_blocks(vm->storage.blocks, vm->storage.count, VM_STORAGE_SIZE_ALIGN, size, digest);
 	
 	return true;
