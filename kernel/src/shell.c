@@ -611,11 +611,10 @@ static int cmd_arping(int argc, char** argv, void(*callback)(char* result, int e
 		return CMD_STATUS_WRONG_NUMBER;
 	}
 	
-	char* str = argv[1];
-	arping_addr = (strtol(str, &str, 0) & 0xff) << 24; str++;
-	arping_addr |= (strtol(str, &str, 0) & 0xff) << 16; str++;
-	arping_addr |= (strtol(str, &str, 0) & 0xff) << 8; str++;
-	arping_addr |= strtol(str, NULL, 0) & 0xff;
+	if(!parse_addr(argv[1], &arping_addr)) {
+		printf("Address Wrong\n");
+		return -1;
+	}
 	
 	arping_time = cpu_tsc();
 	

@@ -113,7 +113,7 @@ bool arp_request(NetworkInterface* ni, uint32_t destination, uint32_t source) {
 		if(!interfaces)
 			return false;
 		
-		bool result = false;
+		bool result = true;
 		
 		MapIterator iter;
 		map_iterator_init(&iter, interfaces);
