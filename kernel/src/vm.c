@@ -70,7 +70,7 @@ static void icc_started(ICC_Message* msg) {
 	} else {
 		core->error_code = msg->result;
 		
-		core->status = VM_STATUS_STOP;
+		core->status = VM_STATUS_PAUSE;
 		
 		printf("Execution FAILED on core[%d]: Error code 0x%x.\n", msg->core_id, msg->result);
 		
