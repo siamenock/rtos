@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <lock.h>
+#include <timer.h>
 #include "asm.h"
 #include "apic.h"
-#include "cpu.h"
 #include "shared.h"
 #include "mp.h"
 
@@ -222,7 +222,7 @@ void mp_init() {
 				APIC_DM_PHYSICAL | 
 				APIC_DMODE_INIT);
 	
-	cpu_uwait(200);
+	time_uwait(200);
 	
 	if(apic_read32(APIC_REG_ICR) & APIC_DS_PENDING) {
 		printf("\tCannot send core init IPI(1/2).\n");
@@ -235,7 +235,7 @@ void mp_init() {
 				APIC_DM_PHYSICAL | 
 				APIC_DMODE_INIT);
 	
-	cpu_uwait(100);
+	time_uwait(100);
 	
 	if(apic_read32(APIC_REG_ICR) & APIC_DS_PENDING) {
 		printf("\tCannot send core init IPI(2/2).\n");
@@ -257,7 +257,7 @@ void mp_init() {
 						APIC_DMODE_STARTUP |
 						0x10);	// Startup address: 0x10 = 0x10000 / 4KB
 			
-			cpu_uwait(200);
+			time_uwait(200);
 			
 			if(apic_read32(APIC_REG_ICR) & APIC_DS_PENDING) {
 				printf("\tCannot send core startup IPI(%d/2).\n", i);
@@ -281,12 +281,12 @@ void mp_wait_init() {
 }
 
 bool mp_wait(uint8_t core_id, uint32_t us) {
-	uint64_t time = cpu_tsc();
-	time += cpu_us * us;
+	uint64_t time = time_us(); 
+	time += us;
 	
 	uint32_t map = 1 << core_id;
 	
-	while(cpu_tsc() < time) {
+	while(time_us() < time) {
 		if(shared->mp_wait_map & map) {
 			return true;
 		}

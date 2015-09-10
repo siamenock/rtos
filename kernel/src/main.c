@@ -4,11 +4,13 @@
 #include <errno.h>
 #include <string.h>
 #include <util/event.h>
+#include <time.h>
 #include "asm.h"
 #include "gdt.h"
 #include "idt.h"
 #include "pci.h"
 #include "stdio.h"
+#include "time.h"
 #include "shell.h"
 #include "mp.h"
 #include "acpi.h"
@@ -286,6 +288,7 @@ static void exec(char* name) {
 
 void main(void) {
 	cpu_init();
+	time_init();
 	mp_init0();
 
 	uint8_t core_id = mp_core_id();

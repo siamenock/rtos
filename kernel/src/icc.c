@@ -3,13 +3,13 @@
 #include <util/event.h>
 #include <lock.h>
 #include <tlsf.h>
+#include <timer.h>
 #include "asm.h"
 #include "apic.h"
 #include "mp.h"
 #include "shared.h"
 #include "gmalloc.h"
 #include "task.h"
-#include "cpu.h"
 
 #include "icc.h"
 
@@ -134,9 +134,10 @@ uint32_t icc_send(ICC_Message* msg, uint8_t core_id) {
 				APIC_DMODE_FIXED |
 				(msg->type == ICC_TYPE_PAUSE ? 49 : 48));
 
-	uint64_t time = cpu_tsc() + cpu_ms * 100;
-
-	while(cpu_tsc() < time);
+//	uint64_t time = timer_frequency() + cpu_ms * 100;
+//
+//	while(timer_frequency() < time);
+	time_mwait(100);
 
 	return _icc_id;
 }

@@ -43,7 +43,7 @@ void* cache_get(Cache* cache, void* key) {
 	if(!data) 
 		return NULL;
 	
-	// Update cahce ordering
+	// Update cache ordering
 	list_remove_data(cache->list, key);
 	list_add(cache->list, key);
 	
@@ -69,6 +69,18 @@ bool cache_set(Cache* cache, void* key, void* data) {
 	return true;
 }
 
+void* cache_remove(Cache* cache, void* key) {
+	void* data = map_remove(cache->map, key);
+	if(!data) 
+		return NULL;
+
+	list_remove_data(cache->list, key);
+	if(cache->uncache)
+		cache->uncache(data);
+	
+	return data;
+}
+
 void cache_clear(Cache* cache) {
 	while(list_size(cache->list) > 0) {
 		void* key = list_remove_first(cache->list);
@@ -77,6 +89,27 @@ void cache_clear(Cache* cache) {
 			cache->uncache(data);
 	}
 }
+
+void cache_iterator_init(CacheIterator* iter, Cache* cache) {
+	iter->cache = cache;
+	iter->node = cache->list->head;
+}
+
+bool cache_iterator_has_next(CacheIterator* iter) {
+	return iter->node != NULL;
+}
+
+void* cache_iterator_next(CacheIterator* iter) {
+	if(iter->node) {
+		void* key = iter->node->data;
+		iter->node = iter->node->next;
+	
+		return map_get(iter->cache->map, key);
+	} else {
+		return NULL;
+	}
+}
+
 #if 0
 #include <stdio.h>
 

@@ -16,6 +16,7 @@
 
 #include "stdio.h"
 #include "cpu.h"
+#include "timer.h"
 #include "version.h"
 #include "rtc.h"
 #include "vnic.h"
@@ -59,7 +60,7 @@ static int cmd_sleep(int argc, char** argv, void(*callback)(char* result, int ex
 	if(argc >= 2 && is_uint32(argv[1])) {
 		time = parse_uint32(argv[1]);
 	}
-	cpu_mwait(time);
+	time_mwait(time);
 	
 	return 0;
 }
@@ -593,7 +594,7 @@ static bool arping_timeout(void* context) {
 	if(arping_count <= 0)
 		return false;
 	
-	arping_time = cpu_tsc();
+	arping_time = time_ns();
 	
 	printf("Reply timeout\n");
 	arping_count--;
@@ -616,7 +617,7 @@ static int cmd_arping(int argc, char** argv, void(*callback)(char* result, int e
 		return -1;
 	}
 	
-	arping_time = cpu_tsc();
+	arping_time = time_ns();
 	
 	arping_count = 1;
 	if(argc >= 4) {
@@ -1189,9 +1190,9 @@ bool shell_process(Packet* packet) {
 			uint32_t sip = endian32(arp->spa);
 			
 			if(arping_addr == sip) {
-				uint64_t time = cpu_tsc();
-				uint32_t ms = (time - arping_time) / cpu_ms;
-				uint32_t ns = (time - arping_time) / cpu_ns - ms * 1000;
+				uint32_t time = time_ns() - arping_time;
+				uint32_t ms = time / 1000;
+				uint32_t ns = time - ms * 1000; 
 				
 				printf("Reply from %d.%d.%d.%d [%02x:%02x:%02x:%02x:%02x:%02x] %d.%dms\n",
 					(sip >> 24) & 0xff,
@@ -1211,7 +1212,7 @@ bool shell_process(Packet* packet) {
 				
 				if(arping_count > 0) {
 					bool arping(void* context) {
-						arping_time = cpu_tsc();
+						arping_time = time_ns();
 						if(arp_request(manager_ni->ni, arping_addr, 0)) {
 							arping_event = event_timer_add(arping_timeout, NULL, 1000000, 1000000);
 						} else {

@@ -20,7 +20,6 @@
 #include <control/rpc.h>
 #include "malloc.h"
 #include "mp.h"
-#include "cpu.h"
 #include "shell.h"
 #include "vm.h"
 #include "stdio.h"

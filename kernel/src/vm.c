@@ -5,11 +5,11 @@
 #include <util/event.h>
 #include <util/ring.h>
 #include <net/md5.h>
+#include <timer.h>
 #include "apic.h"
 #include "icc.h"
 #include "gmalloc.h"
 #include "stdio.h"
-#include "cpu.h"
 #include "vm.h"
 
 static uint32_t	last_vmid = 1;
@@ -474,7 +474,7 @@ uint32_t vm_create(VMSpec* vm_spec) {
 		uint64_t mac = nics[i].mac;
 		if(mac == 0) {
 			do {
-				mac = cpu_tsc() & 0x0fffffffffffL;
+				mac = timer_frequency() & 0x0fffffffffffL;
 				mac |= 0x02L << 40;	// Locally administrered
 			} while(vnic_contains(nics[i].dev, mac));
 		} else if(vnic_contains(nics[i].dev, mac)) {

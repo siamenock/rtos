@@ -2,6 +2,7 @@
 #include <util/list.h>
 #include <util/map.h>
 #include <util/event.h>
+#include <timer.h>
 
 typedef struct {
 	EventFunc	func;
@@ -101,7 +102,7 @@ int event_loop() {
 		return count;
 	
 	// Timer events
-	clock_t time = clock();
+	uint64_t time = time_us();
 	while(next_timer <= time) {
 		TimerNode* node = list_remove_first(timer_events);
 		if(node->func(node->context)) {
@@ -183,7 +184,8 @@ uint64_t event_timer_add(EventFunc func, void* context, clock_t delay, clock_t p
 		return 0;
 	node->func = func;
 	node->context = context;
-	clock_t time = clock();
+	uint64_t time = time_us();
+
 	node->delay = time + delay;
 	node->period = period;
 	
@@ -208,7 +210,7 @@ uint64_t event_timer_add(EventFunc func, void* context, clock_t delay, clock_t p
 bool event_timer_update(uint64_t id) {
 	if(list_remove_data(timer_events, (void*)id)) {
 		TimerNode* node = (TimerNode*)id;
-		clock_t time = clock();
+		uint64_t time = time_us();
 		node->delay = time + node->period;
 		
 		int index = list_index_of(timer_events, (void*)(uint64_t)node->delay, get_first_bigger);

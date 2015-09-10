@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
+#include <timer.h>
 #include "cpu.h"
 #include "mp.h"
 #include "port.h"
@@ -256,7 +257,7 @@ static void acpi_enable() {
 		if(port_in16(fadt->pm1a_control_block) == 1)
 			break;
 		
-		cpu_mwait(10);
+		time_mwait(10);
 	}
 	
 	if(fadt->pm1b_control_block) {
@@ -264,7 +265,7 @@ static void acpi_enable() {
 			if(port_in16(fadt->pm1a_control_block) == 1)
 				break;
 			
-			cpu_mwait(10);
+			time_mwait(10);
 		}
 	}
 }

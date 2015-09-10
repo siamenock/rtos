@@ -2,9 +2,9 @@
 #include <stddef.h>
 #include <string.h>
 #include <stdlib.h>
-#include <time.h>
 #include <byteswap.h>
 #include <util/ring.h>
+#include "time.h"
 #include "device.h"
 #include "port.h"
 #include "mp.h"
@@ -12,7 +12,6 @@
 #include "driver/keyboard.h"
 #include "driver/stdin.h"
 #include "driver/stdout.h"
-#include "cpu.h"
 #include "stdio.h"
 
 struct _IO_FILE* stdin;
@@ -62,28 +61,28 @@ void stdio_init2(void* buf, size_t size) {
 }
 
 void stdio_dump(int coreno, int fd, char* buffer, volatile size_t* head, volatile size_t* tail, size_t size) {
-	#define HEX(v)	(((v) & 0x0f) > 9 ? ((v) & 0x0f) - 10 + 'a' : ((v) & 0x0f) + '0')
-	
+#define HEX(v)	(((v) & 0x0f) > 9 ? ((v) & 0x0f) - 10 + 'a' : ((v) & 0x0f) + '0')
+
 	if(*head == *tail)
 		return;
-	
+
 	char header[10] = "Core 01> ";
 	header[5] = HEX(coreno >> 4);
 	header[6] = HEX(coreno >> 0);
 	header[7] = '>';
-	
+
 	int header_len = strlen(header);
 	int body_len = 80 - header_len;
-	
+
 	char* strchrn(const char* s, const char* e, int c) {
 		char* ch = (char*)s;
-		
+
 		while(*ch != c && *ch != '\0' && ch < e)
 			ch++;
-		
+
 		return ch < e && *ch == c ? ch: NULL;
 	}
-	
+
 	char* dump_lines(char* h, char* e) {
 		char* t = strchrn(h, e, '\n');
 		while(t) {
@@ -91,30 +90,30 @@ void stdio_dump(int coreno, int fd, char* buffer, volatile size_t* head, volatil
 			while(t - h > body_len) {
 				write1(header, header_len);
 				write1(h, body_len);
-				
+
 				h += body_len;
 			}
-			
+
 			write1(header, header_len);
 			write1(h, t - h);
-			
+
 			if(t >= e)
 				return NULL;
-			
+
 			h = t;
 			t = strchrn(h, e, '\n');
 		}
-		
+
 		while(e - h > body_len) {
 			write1(header, header_len);
 			write1(h, body_len);
-			
+
 			h += body_len;
 		}
-		
+
 		return h < e ? h : NULL;
 	}
-	
+
 	char* h = buffer + *head;
 	char* e = buffer + *tail;
 	if(*head > *tail) {
@@ -123,11 +122,11 @@ void stdio_dump(int coreno, int fd, char* buffer, volatile size_t* head, volatil
 			int len1 = buffer + size - h;
 			write1(header, header_len);
 			write1(h, len1);
-			
+
 			int len2 = body_len - len1;
 			if(len2 > *tail)
 				len2 = *tail;
-			
+
 			char* t = strchrn(h, buffer + len2, '\n');
 			if(t) {
 				t++;
@@ -142,14 +141,14 @@ void stdio_dump(int coreno, int fd, char* buffer, volatile size_t* head, volatil
 			h = buffer;
 		}
 	}
-	
+
 	h = dump_lines(h, e);
 	if(h) {
 		write1(header, header_len);
 		write1(h, e - h);
 		write1("\n", 1);
 	}
-	
+
 	*head = *tail;
 }
 
@@ -170,7 +169,7 @@ static const char mapping[][2] = {
 	{ '-', '_' },
 	{ '=', '+' },
 	{ '\b', '\b' },	// Back space
-	
+
 	{ '\t', '\t' },	// Tap
 	{ 'q', 'Q' },	// Scan code: 0x10
 	{ 'w', 'W' },
@@ -185,7 +184,7 @@ static const char mapping[][2] = {
 	{ '[', '{' },
 	{ ']', '}' },
 	{ '\n', '\n' },	// Carriage Return
-	
+
 	{ 0, 0 },	// Left ctrl
 	{ 'a', 'A' },
 	{ 's', 'S' },
@@ -199,7 +198,7 @@ static const char mapping[][2] = {
 	{ ';', ':' },
 	{ '\'', '"' },
 	{ '`', '~' },
-	
+
 	{ 0, 0 },	// Left shift
 	{ '\\', '|' },
 	{ 'z', 'Z' },
@@ -214,7 +213,7 @@ static const char mapping[][2] = {
 	{ '/', '?' },
 	{ 0, 0 },	// Right shift
 	{ '*', '*' },
-	
+
 	{ 0, 0 },	// Left alt
 	{ ' ', ' ' },
 	{ 0, 0 },	// Caps lock
@@ -228,7 +227,7 @@ static const char mapping[][2] = {
 	{ 0, 0 },	// F8
 	{ 0, 0 },	// F9
 	{ 0, 0 },	// F10
-	
+
 	{ 0, 0 },	// Num lock
 	{ 0, 0 },	// Scroll lock
 	{ 0, '7' },	// Home
@@ -264,32 +263,32 @@ static int extention;
 #if 0
 static int print_string2(const char* str, int len) {
 	char buf[64];
-	
+
 	int i, s;
 	while(len > 0) {
 		s = len < 64 ? len : 64;
 		for(i = 0; i < s; i++) {
 			buf[i] = *str++;
 		}
-		
+
 		write1((void*)buf, s);
-		
+
 		len -= s;
 	}
-	
+
 	return len;
 }
 
 static int print_char(char ch) {
 	write1((void*)&ch, 1);
-	
+
 	return 1;
 }
 
 static int print_string(char* str) {
 	int i;
 	for(i = 0; str[i] != 0; i++);
-	
+
 	write1((void*)str, i);
 
 	return i;
@@ -297,11 +296,11 @@ static int print_string(char* str) {
 
 static int print_integer(int value, int base, char a, int width, char fill) {
 	char buf[64];
-	
+
 	int sign = value < 0;
 	if(sign)
 		value *= -1;
-	
+
 	int i = 63;
 	while(value != 0) {
 		int mod = value % base;
@@ -311,7 +310,7 @@ static int print_integer(int value, int base, char a, int width, char fill) {
 			buf[i--] = '0' + mod;
 		value /= base;
 	}
-	
+
 	if(sign) {
 		buf[i] = '-';
 	} else if(i == 63) {
@@ -319,11 +318,11 @@ static int print_integer(int value, int base, char a, int width, char fill) {
 	} else {
 		i++;
 	}
-	
+
 	while(64 - i < width) {
 		buf[--i] = fill;
 	}
-	
+
 	write1((void*)(buf + i), 64 - i);
 
 	return 64 - i;
@@ -331,11 +330,11 @@ static int print_integer(int value, int base, char a, int width, char fill) {
 
 static int print_unsigned_integer(unsigned int value, int base, char a, int width, char fill) {
 	char buf[64];
-	
+
 	int sign = value < 0;
 	if(sign)
 		value *= -1;
-	
+
 	int i = 63;
 	while(value != 0) {
 		int mod = value % base;
@@ -345,7 +344,7 @@ static int print_unsigned_integer(unsigned int value, int base, char a, int widt
 			buf[i--] = '0' + mod;
 		value /= base;
 	}
-	
+
 	if(sign) {
 		buf[i] = '-';
 	} else if(i == 63) {
@@ -353,14 +352,14 @@ static int print_unsigned_integer(unsigned int value, int base, char a, int widt
 	} else {
 		i++;
 	}
-	
+
 	while(64 - i < width) {
 		buf[--i] = fill;
 	}
-	
+
 	if(width > 0 && 64 - i > width)
 		i = 64 - width;
-	
+
 	write1((void*)(buf + i), 64 - i);
 
 	return 64 - i;
@@ -368,11 +367,11 @@ static int print_unsigned_integer(unsigned int value, int base, char a, int widt
 
 static int print_long(long value, int base, char a, int width, char fill) {
 	char buf[64];
-	
+
 	int sign = value < 0;
 	if(sign)
 		value *= -1;
-	
+
 	int i = 63;
 	while(value != 0) {
 		int mod = value % base;
@@ -382,7 +381,7 @@ static int print_long(long value, int base, char a, int width, char fill) {
 			buf[i--] = '0' + mod;
 		value /= base;
 	}
-	
+
 	if(sign) {
 		buf[i] = '-';
 	} else if(i == 63) {
@@ -390,11 +389,11 @@ static int print_long(long value, int base, char a, int width, char fill) {
 	} else {
 		i++;
 	}
-	
+
 	while(64 - i < width) {
 		buf[--i] = fill;
 	}
-	
+
 	write1((void*)(buf + i), 64 - i);
 
 	return 64 - i;
@@ -402,11 +401,11 @@ static int print_long(long value, int base, char a, int width, char fill) {
 
 static int print_unsigned_long(unsigned long value, int base, char a, int width, char fill) {
 	char buf[64];
-	
+
 	int sign = value < 0;
 	if(sign)
 		value *= -1;
-	
+
 	int i = 63;
 	while(value != 0) {
 		int mod = value % base;
@@ -416,7 +415,7 @@ static int print_unsigned_long(unsigned long value, int base, char a, int width,
 			buf[i--] = '0' + mod;
 		value /= base;
 	}
-	
+
 	if(sign) {
 		buf[i] = '-';
 	} else if(i == 63) {
@@ -424,45 +423,45 @@ static int print_unsigned_long(unsigned long value, int base, char a, int width,
 	} else {
 		i++;
 	}
-	
+
 	while(64 - i < width) {
 		buf[--i] = fill;
 	}
-	
+
 	if(width > 0 && 64 - i > width)
 		i = 64 - width;
-	
+
 	write1((void*)(buf + i), 64 - i);
-	
+
 	return 64 - i;
 }
 
 static int print_double(double v) {
 	char buf[64];
-	
+
 	long l = (long)v;
 	print_long(l, 10, 0, 0, ' ');
-	
+
 	int i = 0;
 	buf[i] = '.';
-	
+
 	for(i = 1 ; i < 8; i++) {
 		v = (v - l) * 10;
 		if(v == 0.0)
 			break;
-		
+
 		l = (long)v;
 		buf[i] = (char)l + '0';
 	}
-	
+
 	while(i >= 1 && buf[i] == '0')
 		i--;
-	
+
 	if(i == 1)
 		buf[i++] = '0';
-	
+
 	write1((void*)(buf), i);
-	
+
 	return i;
 }
 #endif
@@ -474,15 +473,15 @@ int _IO_putc(int ch, struct _IO_FILE* fp) {
 	} else if(fp == stderr) {
 		write2((void*)&c, 1);
 	}
-	
+
 	return -1;
 }
 
 static void led() {
 	port_out8(0x60, 
-		(((uint8_t)capslock) << 2) |
-		(((uint8_t)numlock) << 1) |
-		(((uint8_t)scrolllock) << 0));
+			(((uint8_t)capslock) << 2) |
+			(((uint8_t)numlock) << 1) |
+			(((uint8_t)scrolllock) << 0));
 }
 
 void stdio_scancode(int code) {
@@ -533,10 +532,10 @@ void stdio_scancode(int code) {
 				return;
 		}
 	}
-	
+
 	// Parse char scancode
-	#define PUT()		ring_write(__stdin, __stdin_head, &__stdin_tail, __stdin_size, &ch, 1)
-	
+#define PUT()		ring_write(__stdin, __stdin_head, &__stdin_tail, __stdin_size, &ch, 1)
+
 	bool is_cap = false;
 	char ch;
 	if(extention > 0) {
@@ -578,20 +577,20 @@ void stdio_scancode(int code) {
 				PUT();
 				break;
 		}
-		
+
 		extention--;
 	} else if(code <= 0x60) {
 		ch = mapping[code][0];
 		if(code <= 0x58 && ch == 0)
 			return;
-		
+
 		if(ch >= 'a' && ch <= 'z') {
 			if(shift > 0)
 				is_cap = !is_cap;
-			
+
 			if(capslock)
 				is_cap = !is_cap;
-			
+
 			if(is_cap)
 				ch = mapping[code][1];
 		} else {
@@ -602,17 +601,17 @@ void stdio_scancode(int code) {
 				ch = mapping[code][1];
 			}
 		}
-		
+
 		if(ctrl > 0) {
 			if(ch >= 0x40 && ch < 0x60)
 				ch -= 0x40;
 			else if(ch >= 0x60 && ch < 0x80)
 				ch -= 0x60;
 		}
-	
+
 		PUT();
 	}
-	
+
 	// TODO: make numlock mapping table
 }
 
@@ -640,11 +639,11 @@ void _print(const char* str, int row, int col) {
 
 int vsprintf(char *str, const char *format, va_list va) {
 	char* str0 = str;
-	
+
 	char fill;
 	int width;
 	int width2;
-	
+
 	void print_string(char* str2) {
 		char* str0 = str;
 		while(*str2 != 0) {
@@ -655,13 +654,13 @@ int vsprintf(char *str, const char *format, va_list va) {
 			*str++ = fill;
 		}
 	}
-	
+
 	void print_integer(int value, char a, int base) {
 		if(value < 0) {
 			*str++ = '-';
 			value = -value;
 		}
-		
+
 		char* str0 = str;
 		do {
 			int mod = value % base;
@@ -669,14 +668,14 @@ int vsprintf(char *str, const char *format, va_list va) {
 				*str++ = a + mod - 10;
 			else
 				*str++ = '0' + mod;
-			
+
 			value /= base;
 		} while(value != 0);
-		
+
 		while(str - str0 < width) {
 			*str++ = fill;
 		}
-		
+
 		int half = (str - str0) / 2;
 		for(int i = 0; i < half; i++) {
 			char tmp = str0[i];
@@ -684,13 +683,13 @@ int vsprintf(char *str, const char *format, va_list va) {
 			str[-i - 1] = tmp;
 		}
 	}
-	
+
 	void print_long(long value, char a, int base) {
 		if(value < 0) {
 			*str++ = '-';
 			value = -value;
 		}
-		
+
 		char* str0 = str;
 		do {
 			int mod = value % base;
@@ -698,14 +697,14 @@ int vsprintf(char *str, const char *format, va_list va) {
 				*str++ = a + mod - 10;
 			else
 				*str++ = '0' + mod;
-			
+
 			value /= base;
 		} while(value != 0);
-		
+
 		while(str - str0 < width) {
 			*str++ = fill;
 		}
-		
+
 		int half = (str - str0) / 2;
 		for(int i = 0; i < half; i++) {
 			char tmp = str0[i];
@@ -713,7 +712,7 @@ int vsprintf(char *str, const char *format, va_list va) {
 			str[-i - 1] = tmp;
 		}
 	}
-	
+
 	void print_unsigned_integer(unsigned int value, char a, int base) {
 		char* str0 = str;
 		do {
@@ -722,14 +721,14 @@ int vsprintf(char *str, const char *format, va_list va) {
 				*str++ = a + mod - 10;
 			else
 				*str++ = '0' + mod;
-			
+
 			value /= base;
 		} while(value != 0);
-		
+
 		while(str - str0 < width) {
 			*str++ = fill;
 		}
-		
+
 		int half = (str - str0) / 2;
 		for(int i = 0; i < half; i++) {
 			char tmp = str0[i];
@@ -737,7 +736,7 @@ int vsprintf(char *str, const char *format, va_list va) {
 			str[-i - 1] = tmp;
 		}
 	}
-	
+
 	void print_unsigned_long(unsigned long value, char a, int base) {
 		char* str0 = str;
 		do {
@@ -746,14 +745,14 @@ int vsprintf(char *str, const char *format, va_list va) {
 				*str++ = a + mod - 10;
 			else
 				*str++ = '0' + mod;
-			
+
 			value /= base;
 		} while(value != 0);
-		
+
 		while(str - str0 < width) {
 			*str++ = fill;
 		}
-		
+
 		int half = (str - str0) / 2;
 		for(int i = 0; i < half; i++) {
 			char tmp = str0[i];
@@ -761,28 +760,28 @@ int vsprintf(char *str, const char *format, va_list va) {
 			str[-i - 1] = tmp;
 		}
 	}
-	
+
 	void print_double(double value) {
 		long l = (long)value;
 		print_long(l, 0, 10);
-		
+
 		*str++ = '.';
-		
+
 		if(width2 == 0)
 			width2 = 6;
-		
+
 		for(int i = 0; i < width2; i++) {
 			value = (value - l) * 10;
 			if(value == 0.0) {
 				*str++ = '0';
 				break;
 			}
-			
+
 			l = (long)value;
 			*str++ = (char)l + '0';
 		}
 	}
-	
+
 	while(1) {
 		switch(*format) {
 			case '%':
@@ -794,7 +793,7 @@ int vsprintf(char *str, const char *format, va_list va) {
 					if(*format == '0') {
 						fill = '0';
 					}
-					
+
 					while(*format >= '0' && *format <= '9') {
 						width = width * 10 + *format++ - '0';
 					}
@@ -810,15 +809,15 @@ int vsprintf(char *str, const char *format, va_list va) {
 							break;
 					}
 				}
-				
+
 				if(*format == '.') {
 					format++;
-					
+
 					while(*format >= '0' && *format <= '9') {
 						width2 = width2 * 10 + *format++ - '0';
 					}
 				}
-				
+
 				switch(*format) {
 					case '%':
 						*str++ = *format++;
@@ -903,7 +902,7 @@ int vsprintf(char *str, const char *format, va_list va) {
 						// Unknown format
 						goto done;
 				}
-				
+
 				break;
 			case 0:
 				*str++ = *format++;
@@ -913,7 +912,7 @@ int vsprintf(char *str, const char *format, va_list va) {
 		}
 	}
 done:
-	
+
 	return str - str0;
 }
 
@@ -922,7 +921,7 @@ int sprintf(char *str, const char *format, ...) {
 	va_start(va, format);
 	int len = vsprintf(str, format, va);
 	va_end(va);
-	
+
 	return len;
 }
 
@@ -931,61 +930,57 @@ int __sprintf_chk(int flag, char *str, const char *format, ...) {
 	va_start(va, format);
 	int len = vsprintf(str, format, va);
 	va_end(va);
-	
+
 	return len;
 }
 
 int printf(const char* format, ...) {
 	char buf[4096];
-	
+
 	va_list va;
 	va_start(va, format);
 	int len = vsprintf(buf, format, va);
 	va_end(va);
-	
+
 	return write1(buf, len);
 }
 
 int __printf_chk(int flag, const char *format, ...) {
 	char buf[4096];
-	
+
 	va_list va;
 	va_start(va, format);
 	int len = vsprintf(buf, format, va);
 	va_end(va);
-	
+
 	return write1(buf, len);
 }
 
 int fprintf(FILE* stream, const char* format, ...) {
 	char buf[4096];
-	
+
 	va_list va;
 	va_start(va, format);
 	int len = vsprintf(buf, format, va);
 	va_end(va);
-	
+
 	return write1(buf, len);
 }
 
 int __fprintf_chk(FILE* stream, int flag, const char* format, ...) {
 	char buf[4096];
-	
+
 	va_list va;
 	va_start(va, format);
 	int len = vsprintf(buf, format, va);
 	va_end(va);
-	
+
 	return write1(buf, len);
 }
 
 void exit(int status) {
 	printf("Exit is called: %d\n", status);
 	while(1) asm("hlt");
-}
-
-clock_t clock() {
-       return (clock_t)(cpu_tsc() / cpu_clock);
 }
 
 int putchar(int c) {
@@ -996,7 +991,7 @@ int putchar(int c) {
 ssize_t write0(int fd, const void* buf, size_t count) {
 	if(fd == 1)
 		return write1(buf, count);
-	
+
 	return -1;
 }
 
