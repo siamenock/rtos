@@ -18,7 +18,7 @@ OBJS =	obj/arch/sys_arch.o obj/arch/driver.o	\
 	obj/netif/ppp/fsm.o obj/netif/ppp/pap.o obj/netif/ppp/chpms.o obj/netif/ppp/magic.o	\
 	obj/netif/ppp/ipcp.o
 
-CFLAGS = -I src/include -I src/include/ipv4 -O2 -Wall -Werror -m64 -nostdlib -ffreestanding -std=gnu99 -mcmodel=kernel
+CFLAGS = -I ../core/include -I src/include -I src/include/ipv4 -O2 -Wall -Werror -m64 -nostdlib -ffreestanding -std=gnu99 -mcmodel=kernel
 
 all: $(DIR) $(TARGET)
 
