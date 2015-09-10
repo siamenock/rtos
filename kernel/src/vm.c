@@ -714,15 +714,18 @@ ssize_t vm_storage_read(uint32_t vmid, void** buf, size_t offset, size_t size) {
 	VM* vm = map_get(vms, (void*)(uint64_t)vmid);
 	if(!vm)
 		return -1;
-	
-	// TODO: Calc block index, fragmented block
-	if(offset < vm->storage.count * VM_STORAGE_SIZE_ALIGN)
-		*buf = vm->storage.blocks[0] + offset;
-	else
+
+	if(offset > vm->storage.count * VM_STORAGE_SIZE_ALIGN) {
 		*buf = NULL;
+		return 0;
+	}
+
+	int index = offset / VM_STORAGE_SIZE_ALIGN;
+	offset %= VM_STORAGE_SIZE_ALIGN;
+	*buf = vm->storage.blocks[index] + offset;
 	
-	if(offset + size > vm->storage.count * VM_STORAGE_SIZE_ALIGN)
-		return vm->storage.count * VM_STORAGE_SIZE_ALIGN - offset;
+	if(offset + size > VM_STORAGE_SIZE_ALIGN)
+		return VM_STORAGE_SIZE_ALIGN - offset;
 	else
 		return size;
 }
@@ -731,12 +734,36 @@ ssize_t vm_storage_write(uint32_t vmid, void* buf, size_t offset, size_t size) {
 	VM* vm = map_get(vms, (void*)(uint64_t)vmid);
 	if(!vm)
 		return -1;
+
+	if(!size)
+		return 0;
 	
-	// TODO: Calc block index, fragmented block
 	if((uint64_t)offset + size > (uint64_t)vm->storage.count * VM_STORAGE_SIZE_ALIGN)
 		return -1;
 	
-	memcpy(vm->storage.blocks[0] + offset, buf, size);
+	int index = offset / VM_STORAGE_SIZE_ALIGN;
+	if(index >= vm->storage.count)
+		return -1;
+
+	size_t _size = size;
+	offset %= VM_STORAGE_SIZE_ALIGN;
+	for(; index < vm->storage.count; index++) {
+		if(offset + _size > VM_STORAGE_SIZE_ALIGN) {
+			size_t write_size = VM_STORAGE_SIZE_ALIGN - offset;
+			memcpy(vm->storage.blocks[index] + offset, buf, write_size);
+			_size -= write_size;
+		} else {
+			memcpy(vm->storage.blocks[index] + offset, buf, _size);
+			_size = 0;
+		}
+
+		if(_size == 0)
+			break;
+		offset = 0;
+	}
+
+	if(_size != 0)
+		return -1;
 	
 	return size;
 }
