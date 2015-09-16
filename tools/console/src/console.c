@@ -587,16 +587,26 @@ static int cmd_download(int argc, char** argv, void(*callback)(char* result, int
 }
 
 static int cmd_md5(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
-	/*
-	void callback_md5(uint64_t vmid, uint32_t _md5[4]) {
+	bool callback_storage_md5(bool result, uint32_t _md5[], void* context) {
+		void(*callback)(char* result, int exit_status) = context;
+
+		if(!result) {
+			callback("false", -1);
+			return false;
+		}
+
 		uint8_t md5[16];
 		int pos = 0;
 		memcpy(md5, _md5, 16);
 		for(int i = 0; i < 16; i++) {
-			pos += sprintf(cmd_result + pos, "%2x", md5[i]);
+			pos += sprintf(cmd_result + pos, "%02x", md5[i]);
 		}
+
+		callback(cmd_result, 0);
+
+		return false;
 	}
-	*/
+
 	if(rpc == NULL)
 		return ERROR_RPC_DISCONNECTED;
 
@@ -609,15 +619,10 @@ static int cmd_md5(int argc, char** argv, void(*callback)(char* result, int exit
 	if(!is_uint64(argv[2]))
 		return -2;
 
-	/*
 	uint32_t vmid = parse_uint32(argv[1]);
 	uint64_t size = parse_uint64(argv[2]);
-	bool ret = ctrl_storage_md5(vmid, size, callback_md5);
 
-	if(ret == false)
-		return errno;
-	else
-	*/
+	rpc_storage_md5(rpc, vmid, size, callback_storage_md5, callback);
 	sync_status = false;
 
 	return 0;

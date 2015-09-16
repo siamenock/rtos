@@ -30,6 +30,8 @@ typedef enum {
 	RPC_TYPE_STORAGE_DOWNLOAD_RES,
 	RPC_TYPE_STORAGE_UPLOAD_REQ,
 	RPC_TYPE_STORAGE_UPLOAD_RES,	// 20
+	RPC_TYPE_STORAGE_MD5_REQ,
+	RPC_TYPE_STORAGE_MD5_RES,
 	RPC_TYPE_STDIO_REQ,
 	RPC_TYPE_STDIO_RES,
 	RPC_TYPE_END,			// 22
@@ -96,6 +98,10 @@ struct _RPC {
 	void* storage_upload_context;
 	void(*storage_upload_handler)(RPC* rpc, uint32_t id, uint32_t offset, void* buf, int32_t size, void* context, void(*callback)(RPC* rpc, int32_t size));
 	void* storage_upload_handler_context;
+	bool(*storage_md5_callback)(bool result, uint32_t md5[], void* context);
+	void* storage_md5_context;
+	void(*storage_md5_handler)(RPC* rpc, uint32_t id, uint64_t size, void* context, void(*callback)(RPC* rpc, bool result, uint32_t md5[]));
+	void* storage_md5_handler_context;
 	bool(*stdio_callback)(uint16_t written, void* context);
 	void* stdio_context;
 	void(*stdio_handler)(RPC* rpc, uint32_t id, uint8_t thread_id, int fd, char* str, uint16_t size, void* context, void(*callback)(RPC* rpc, uint16_t size));
@@ -126,6 +132,7 @@ int rpc_status_set(RPC* rpc, uint32_t id, VMStatus status, bool(*callback)(bool 
 
 int rpc_storage_download(RPC* rpc, uint32_t id, int32_t(*callback)(uint32_t offset, void* buf, int32_t size, void* context), void* context);
 int rpc_storage_upload(RPC* rpc, uint32_t id, int32_t(*callback)(uint32_t offset, void** buf, int32_t size, void* context), void* context);
+void rpc_storage_md5(RPC* rpc, uint32_t id, uint64_t size, bool(*callback)(bool result, uint32_t md5[], void* context), void* context);
 
 int rpc_stdio(RPC* rpc, uint32_t id, uint8_t thread_id, int fd, const char* str, uint16_t size, bool(*callback)(uint16_t written, void* context), void* context);
 
@@ -141,6 +148,7 @@ void rpc_status_set_handler(RPC* rpc, void(*handler)(RPC* rpc, uint32_t id, VMSt
 
 void rpc_storage_download_handler(RPC* rpc, void(*handler)(RPC* rpc, uint32_t id, uint32_t offset, int32_t size, void* context, void(*callback)(RPC* rpc, void* buf, int32_t size)), void* context);
 void rpc_storage_upload_handler(RPC* rpc, void(*handler)(RPC* rpc, uint32_t id, uint32_t offset, void* buf, int32_t size, void* context, void(*callback)(RPC* rpc, int32_t size)), void* context);
+void rpc_storage_md5_handler(RPC* rpc, void(*handler)(RPC* rpc, uint32_t id, uint64_t size, void* context, void(*callback)(RPC* rpc, bool result, uint32_t md5[])), void* context);
 
 void rpc_stdio_handler(RPC* rpc, void(*handler)(RPC* rpc, uint32_t id, uint8_t thread_id, int fd, char* str, uint16_t size, void* context, void(*callback)(RPC* rpc, uint16_t size)), void* context);
 

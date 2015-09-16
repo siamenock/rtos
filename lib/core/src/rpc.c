@@ -720,6 +720,78 @@ static int status_get_res_handler(RPC* rpc) {
 	RETURN();
 }
 
+// md5 server API
+void rpc_storage_md5_handler(RPC* rpc, void(*handler)(RPC* rpc, uint32_t id, uint64_t size, void* context, void(*callback)(RPC* rpc, bool result, uint32_t md5[])), void* context) {
+	rpc->storage_md5_handler = handler;
+	rpc->storage_md5_handler_context = context;
+}
+
+static int storage_md5_req_handler(RPC* rpc) {
+	INIT();
+	
+	uint32_t id;
+	uint64_t size;
+	READ(read_uint32(rpc, &id));
+	READ(read_uint64(rpc, &size));
+	
+	void callback(RPC* rpc, bool result, uint32_t md5[]) {
+		INIT2();
+		
+		WRITE2(write_uint16(rpc, RPC_TYPE_STORAGE_MD5_RES));
+		WRITE2(write_bool(rpc, result));
+		for(int i = 0; i < 4; i++) {
+			if(md5) {
+				WRITE2(write_uint32(rpc, md5[i]));
+			} else {
+				WRITE2(write_uint32(rpc, 0));
+			}
+		}
+		
+		RETURN2();
+	}
+	
+	if(rpc->status_get_handler) {
+		rpc->storage_md5_handler(rpc, id, size, rpc->storage_md5_context, callback);
+	} else {
+		callback(rpc, false, NULL);
+	}
+	
+	RETURN();
+}
+
+// md5 client API
+void rpc_storage_md5(RPC* rpc, uint32_t id, uint64_t size, bool(*callback)(bool result, uint32_t md5[], void* context), void* context) {
+	INIT();
+	
+	WRITE2(write_uint16(rpc, RPC_TYPE_STORAGE_MD5_REQ));
+	WRITE2(write_uint32(rpc, id));
+	WRITE2(write_uint64(rpc, size));
+	
+	rpc->storage_md5_callback = callback;
+	rpc->storage_md5_context = context;
+	
+	RETURN2();
+}
+
+static int storage_md5_res_handler(RPC* rpc) {
+	INIT();
+
+	bool result;
+	READ(read_bool(rpc, &result));
+
+	uint32_t md5[4];
+	for(int i = 0; i < 4; i++) {
+		READ(read_uint32(rpc, &md5[i]));
+	}
+
+	if(rpc->storage_md5_callback && !rpc->storage_md5_callback(result, md5, rpc->storage_md5_context)) {
+		rpc->storage_md5_callback = NULL;
+		rpc->storage_md5_context = NULL;
+	}
+
+	RETURN();
+}
+
 // status_get server API
 void rpc_status_get_handler(RPC* rpc, void(*handler)(RPC* rpc, uint32_t id, void* context, void(*callback)(RPC* rpc, VMStatus status)), void* context) {
 	rpc->status_get_handler = handler;
@@ -1084,6 +1156,8 @@ static Handler handlers[] = {
 	storage_download_res_handler,
 	storage_upload_req_handler,
 	storage_upload_res_handler,
+	storage_md5_req_handler,
+	storage_md5_res_handler,
 	stdio_req_handler,
 	stdio_res_handler,
 	download,

@@ -238,6 +238,13 @@ static void stdio_handler(RPC* rpc, uint32_t id, uint8_t thread_id, int fd, char
 	callback(rpc, len >= 0 ? len : 0);
 }
 
+static void storage_md5_handler(RPC* rpc, uint32_t id, uint64_t size, void* context, void(*callback)(RPC* rpc, bool result, uint32_t md5[])) {
+	uint32_t md5sum[4];
+	bool ret = vm_storage_md5(id, size, md5sum);
+
+	callback(rpc, ret, md5sum);
+}
+
 // PCB utility
 static int pcb_read(RPC* rpc, void* buf, int size) {
 	RPCData* data = (RPCData*)rpc->data;
@@ -306,6 +313,7 @@ static err_t manager_accept(void* arg, struct tcp_pcb* pcb, err_t err) {
 	rpc_storage_download_handler(rpc, storage_download_handler, NULL);
 	rpc_storage_upload_handler(rpc, storage_upload_handler, NULL);
 	rpc_stdio_handler(rpc, stdio_handler, NULL);
+	rpc_storage_md5_handler(rpc, storage_md5_handler, NULL);
 	
 	RPCData* data = (RPCData*)rpc->data;
 	data->pcb = pcb;
