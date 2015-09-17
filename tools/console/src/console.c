@@ -359,8 +359,7 @@ static int cmd_vm_list(int argc, char** argv, void(*callback)(char* result, int 
 typedef struct {
 	char path[256];
 	int fd;
-	uint32_t file_size;
-	uint32_t size;
+	uint64_t file_size;
 	uint32_t offset;
 	uint64_t current_time;
 	void(*callback)(char* result, int eixt_status);
@@ -399,7 +398,7 @@ static int cmd_upload(int argc, char** argv, void(*callback)(char* result, int e
 		}
 
 		if(offset == 0) {
-			printf("Total Upload Size : %d Byte\n", file_info->file_size);
+			printf("Total Upload Size : %ld Byte\n", file_info->file_size);
 		}
 		
 		if(file_info->offset != offset) {
@@ -500,8 +499,8 @@ static int cmd_download(int argc, char** argv, void(*callback)(char* result, int
 			file_info->offset = offset;
 		}
 
-		size = write(file_info->fd, buf, size > file_info->file_size ? file_info->file_size : size);
-		file_info->file_size -= size;
+		size = write(file_info->fd, buf, size);
+		file_info->offset += size;
 
 		if(size < 0) {
 			printf("Write Error!\n");
@@ -512,10 +511,10 @@ static int cmd_download(int argc, char** argv, void(*callback)(char* result, int
 			return 0;
 		}
 
-		if(size == 0 || file_info->file_size == 0) {
+		if(size == 0) {
 			printf("\nStorage Download Completed\n");
-			uint32_t file_size = lseek(file_info->fd, 0, SEEK_CUR);
-			printf("Total Size : %u Byte\n", file_size);
+			//uint32_t file_size = lseek(file_info->fd, 0, SEEK_CUR);
+			printf("Total Size : %d Byte\n", file_info->offset);
 			close(file_info->fd);
 
 			struct timeval tv;
@@ -528,8 +527,6 @@ static int cmd_download(int argc, char** argv, void(*callback)(char* result, int
 
 			return 0;
 		}
-
-		file_info->offset += size;
 
 		printf(".");
 		fflush(stdout);
@@ -566,13 +563,18 @@ static int cmd_download(int argc, char** argv, void(*callback)(char* result, int
 
 	strcpy(file_info->path, argv[2]);
 	lseek(file_info->fd, 0, SEEK_SET);
+	uint64_t download_size = 0;
 	if(argc == 4) {
 		if(!is_uint32(argv[3]))
 			return -3;
 
-		file_info->file_size = parse_uint32(argv[3]);
-	} else
-		file_info->file_size = 0xffffffff;
+		//file_info->file_size = parse_uint32(argv[3]);
+		download_size = parse_uint32(argv[3]);
+	} else {
+		//file_info->file_size = 0;
+		download_size = 0;
+	}
+
 	file_info->offset = 0;
 	file_info->callback = callback;
 
@@ -580,7 +582,7 @@ static int cmd_download(int argc, char** argv, void(*callback)(char* result, int
 	gettimeofday(&tv, NULL);
 	file_info->current_time = tv.tv_sec * 1000 * 1000 + tv.tv_usec;
 	
-	rpc_storage_download(rpc, vmid, callback_storage_download, file_info);
+	rpc_storage_download(rpc, vmid, download_size, callback_storage_download, file_info);
 	sync_status = false;
 
 	return 0;

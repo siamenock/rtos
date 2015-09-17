@@ -89,8 +89,9 @@ struct _RPC {
 	int32_t(*storage_download_callback)(uint32_t offset, void* buf, int32_t size, void* context);
 	void* storage_download_context;
 	uint32_t storage_download_id;
+	uint64_t storage_download_size;
 	uint32_t storage_download_offset;
-	void(*storage_download_handler)(RPC* rpc, uint32_t id, uint32_t offset, int32_t size, void* context, void(*callback)(RPC* rpc, void* buf, int32_t size));
+	void(*storage_download_handler)(RPC* rpc, uint32_t id, uint64_t download_size, uint32_t offset, int32_t size, void* context, void(*callback)(RPC* rpc, void* buf, int32_t size));
 	void* storage_download_handler_context;
 	uint32_t storage_upload_id;
 	uint32_t storage_upload_offset;
@@ -130,7 +131,7 @@ int rpc_vm_list(RPC* rpc, bool(*callback)(uint32_t* ids, uint16_t count, void* c
 int rpc_status_get(RPC* rpc, uint32_t id, bool(*callback)(VMStatus status, void* context), void* context);
 int rpc_status_set(RPC* rpc, uint32_t id, VMStatus status, bool(*callback)(bool result, void* context), void* context);
 
-int rpc_storage_download(RPC* rpc, uint32_t id, int32_t(*callback)(uint32_t offset, void* buf, int32_t size, void* context), void* context);
+int rpc_storage_download(RPC* rpc, uint32_t id, uint64_t size, int32_t(*callback)(uint32_t offset, void* buf, int32_t size, void* context), void* context);
 int rpc_storage_upload(RPC* rpc, uint32_t id, int32_t(*callback)(uint32_t offset, void** buf, int32_t size, void* context), void* context);
 void rpc_storage_md5(RPC* rpc, uint32_t id, uint64_t size, bool(*callback)(bool result, uint32_t md5[], void* context), void* context);
 
@@ -146,7 +147,7 @@ void rpc_vm_list_handler(RPC* rpc, void(*handler)(RPC* rpc, int size, void* cont
 void rpc_status_get_handler(RPC* rpc, void(*handler)(RPC* rpc, uint32_t id, void* context, void(*callback)(RPC* rpc, VMStatus status)), void* context);
 void rpc_status_set_handler(RPC* rpc, void(*handler)(RPC* rpc, uint32_t id, VMStatus status, void* context, void(*callback)(RPC* rpc, bool result)), void* context);
 
-void rpc_storage_download_handler(RPC* rpc, void(*handler)(RPC* rpc, uint32_t id, uint32_t offset, int32_t size, void* context, void(*callback)(RPC* rpc, void* buf, int32_t size)), void* context);
+void rpc_storage_download_handler(RPC* rpc, void(*handler)(RPC* rpc, uint32_t id, uint64_t download_size, uint32_t offset, int32_t size, void* context, void(*callback)(RPC* rpc, void* buf, int32_t size)), void* context);
 void rpc_storage_upload_handler(RPC* rpc, void(*handler)(RPC* rpc, uint32_t id, uint32_t offset, void* buf, int32_t size, void* context, void(*callback)(RPC* rpc, int32_t size)), void* context);
 void rpc_storage_md5_handler(RPC* rpc, void(*handler)(RPC* rpc, uint32_t id, uint64_t size, void* context, void(*callback)(RPC* rpc, bool result, uint32_t md5[])), void* context);
 

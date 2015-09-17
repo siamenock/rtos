@@ -194,12 +194,16 @@ static void status_set_handler(RPC* rpc, uint32_t vmid, VMStatus status, void* c
 	vm_status_set(vmid, status, status_setted, data);
 }
 
-static void storage_download_handler(RPC* rpc, uint32_t vmid, uint32_t offset, int32_t size, void* context, void(*callback)(RPC* rpc, void* buf, int32_t size)) {
+static void storage_download_handler(RPC* rpc, uint32_t vmid, uint64_t download_size, uint32_t offset, int32_t size, void* context, void(*callback)(RPC* rpc, void* buf, int32_t size)) {
 	if(size < 0) {
 		callback(rpc, NULL, size);
 	} else {
 		void* buf;
-		size = vm_storage_read(vmid, &buf, offset, size);
+		if(download_size)
+			size = vm_storage_read(vmid, &buf, offset, (offset + size > download_size) ? (download_size - offset) : size);
+		else
+			size = vm_storage_read(vmid, &buf, offset, size);
+
 		callback(rpc, buf, size);
 	}
 }

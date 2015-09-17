@@ -884,11 +884,12 @@ static int status_set_req_handler(RPC* rpc) {
 }
 
 // storage_download client API
-int rpc_storage_download(RPC* rpc, uint32_t id, int32_t(*callback)(uint32_t offset, void* buf, int32_t size, void* context), void* context) {
+int rpc_storage_download(RPC* rpc, uint32_t id, uint64_t size, int32_t(*callback)(uint32_t offset, void* buf, int32_t size, void* context), void* context) {
 	INIT();
 	
 	WRITE(write_uint16(rpc, RPC_TYPE_STORAGE_DOWNLOAD_REQ));
 	WRITE(write_uint32(rpc, id));
+	WRITE(write_uint64(rpc, size));
 	
 	rpc->storage_download_callback = callback;
 	rpc->storage_download_context = context;
@@ -919,7 +920,7 @@ static int storage_download_res_handler(RPC* rpc) {
 }
 
 // storage_download server API
-void rpc_storage_download_handler(RPC* rpc, void(*handler)(RPC* rpc, uint32_t id, uint32_t offset, int32_t size, void* context, void(*callback)(RPC* rpc, void* buf, int32_t size)), void* context) {
+void rpc_storage_download_handler(RPC* rpc, void(*handler)(RPC* rpc, uint32_t id, uint64_t download_size, uint32_t offset, int32_t size, void* context, void(*callback)(RPC* rpc, void* buf, int32_t size)), void* context) {
 	rpc->storage_download_handler = handler;
 	rpc->storage_download_handler_context = context;
 }
@@ -928,6 +929,7 @@ static int storage_download_req_handler(RPC* rpc) {
 	INIT();
 	
 	READ(read_uint32(rpc, &rpc->storage_download_id));
+	READ(read_uint64(rpc, &rpc->storage_download_size));
 	
 	rpc->storage_download_offset = 0;
 	
@@ -948,7 +950,7 @@ static int download(RPC* rpc) {
 			rpc->storage_download_offset += size;
 		} else {
 			WRITE2(write_uint16(rpc, RPC_TYPE_STORAGE_DOWNLOAD_RES));
-			WRITE2(write_uint32(rpc, 0));
+			WRITE2(write_uint32(rpc, rpc->storage_download_offset));
 			WRITE2(write_bytes(rpc, NULL, size));
 		
 			rpc->storage_download_id = 0;
@@ -961,7 +963,7 @@ static int download(RPC* rpc) {
 	_size++;	// To avoid rollback
 	
 	if(rpc->storage_download_handler) {
-		rpc->storage_download_handler(rpc, rpc->storage_download_id, rpc->storage_download_offset, 1460, rpc->storage_download_handler_context, callback);
+		rpc->storage_download_handler(rpc, rpc->storage_download_id, rpc->storage_download_size, rpc->storage_download_offset, 1460, rpc->storage_download_handler_context, callback);
 	} else {
 		callback(rpc, NULL, -1);
 	}
