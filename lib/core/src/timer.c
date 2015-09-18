@@ -6,6 +6,7 @@ uint64_t cpu_ms;
 uint64_t cpu_us;
 uint64_t cpu_ns;
 uint64_t TIMER_FREQUENCY_PER_SEC;
+char cpu_brand[4 * 4 * 3 + 1];
 
 uint64_t timer_frequency() {
 	uint64_t time;
@@ -16,6 +17,15 @@ uint64_t timer_frequency() {
 }
 
 void time_init() {
+	uint32_t* p = (uint32_t*)cpu_brand;
+	
+	uint32_t eax = 0x80000002;
+	for(int i = 0; i < 12; i += 4) {
+		asm volatile("cpuid" 
+			: "=a"(p[i + 0]), "=b"(p[i + 1]), "=c"(p[i + 2]), "=d"(p[i + 3]) 
+			: "a"(eax++));
+	}
+	
 	// TODO: Measure more accurated value
 	void measure() {
 #define PIT_CONTROL     0x43
@@ -51,7 +61,6 @@ void time_init() {
 		TIMER_FREQUENCY_PER_SEC = (timer_frequency() - base) * 100;
 	}
 
-	char cpu_brand[4 * 4 * 3 + 1];
 	// Intel(R) Core(TM) i7-3770 CPU @ 3.40GHz
 	if(strstr(cpu_brand, "Intel") != NULL && strstr(cpu_brand, "@ ") != NULL) {
 		int number = 0;
