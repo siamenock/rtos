@@ -25,7 +25,6 @@
 static RPC* rpc;
 static bool sync_status = true;
 static bool is_continue = true;
-int out_fd;
 
 static int cmd_exit(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	is_continue = false;
@@ -70,9 +69,6 @@ static void stdio_handler(RPC* rpc, uint32_t id, uint8_t thread_id, int fd, char
 	}
 
 	size = write(1, str, size);
-	if(out_fd) { 
-		write(out_fd, str, size);
-	}
 	fflush(stdout);
 	
 	callback(rpc, size);
@@ -809,13 +805,13 @@ Command commands[] = {
 	{
 		.name = "upload",
 		.desc = "Upload file",
-		.args = "result: bool, vmid: uint32 path: string",
+		.args = "result: bool, vmid: uint32 path: string size: uint32",
 		.func = cmd_upload
 	},
 	{
 		.name = "download",
 		.desc = "Download file",
-		.args = "result: bool, vmid: uint32 path: string",
+		.args = "result: bool, vmid: uint32 path: string size: uint32",
 		.func = cmd_download
 	},
 	{
@@ -991,7 +987,6 @@ int main(int _argc, char** _argv) {
 
 	struct timeval time;
 	
-	out_fd = open("./out", O_WRONLY | O_CREAT | O_TRUNC, 0644);
 	while(is_continue) {
 		temp_in = in_put;
 		time.tv_sec = 0;
