@@ -26,7 +26,6 @@ void time_init() {
 			: "a"(eax++));
 	}
 	
-	// TODO: Measure more accurated value
 	void measure() {
 #define PIT_CONTROL     0x43
 #define PIT_COUNTER0    0x40
@@ -46,19 +45,23 @@ void time_init() {
 			return (uint16_t)port_in8(PIT_COUNTER0) | ((uint16_t)port_in8(PIT_COUNTER0) << 8);
 		}
 
-		// Wait using PIT controller
-		port_out8(PIT_CONTROL, 0x00 << 6 | 0x03 << 4 | 0x01 << 1 | 0x00 << 0);	// SC=Counter0, RW=0b11, Mode=1, BCD=Binary
-		uint16_t freq = PIT_FREQUENCY * 10 / 1000;	// 10 ms
+		// Make PIT Counter stopped
+		port_out8(PIT_CONTROL, 0x00 << 6 | 0x03 << 4 | 0x00 << 1 | 0x00 << 0);	// SC=Counter0, RW=0b11, Mode=0, BCD=Binary
+
+		uint16_t freq = PIT_FREQUENCY * 50 / 1000;	// 50 ms
 		port_out8(PIT_COUNTER0, freq & 0xff);
 
 		uint64_t base = timer_frequency();
 		port_out8(PIT_COUNTER0, freq >> 8);
 
+		// Wait using PIT controller
+		port_out8(PIT_CONTROL, 0x00 << 6 | 0x03 << 4 | 0x01 << 1 | 0x00 << 0);	// SC=Counter0, RW=0b11, Mode=1, BCD=Binary
+
 		uint16_t count = freq;
 		while(!(count == 0 || count > freq)) {
 			count = read_counter();
 		}
-		TIMER_FREQUENCY_PER_SEC = (timer_frequency() - base) * 100;
+		TIMER_FREQUENCY_PER_SEC = (timer_frequency() - base) * 20;
 	}
 
 	// Intel(R) Core(TM) i7-3770 CPU @ 3.40GHz
