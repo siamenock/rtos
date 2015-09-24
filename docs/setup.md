@@ -6,6 +6,7 @@
   * qemu-kvm
   * bridge-utils
   * libc6-dev-i386 
+  * doxygen 
 
 * Disable automount-open
 gsettings set org.gnome.desktop.media-handling automount-open false

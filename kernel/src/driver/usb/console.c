@@ -31,8 +31,6 @@
 #include "libpayload.h"
 #include "usb.h"
 
-#include "../../cpu.h"
-
 struct console_output_driver *console_out;
 struct console_input_driver *console_in;
 static console_input_type last_getchar_input_type;
@@ -181,7 +179,7 @@ int getchar_timeout(int *ms)
 		if (havekey())
 			return getchar();
 
-		cpu_mwait(100);
+		time_mwait(100);
 		*ms -= 100;
 	}
 

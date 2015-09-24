@@ -206,7 +206,7 @@ inline size_t gmalloc_used() {
 inline void* gmalloc(size_t size) {
 	if(mp_core_id() != 0) {
 		printf("Core %d gmalloc\n", mp_core_id());
-		while(1) asm("hlt");
+		return NULL;
 	}
 	
 	do {
@@ -221,7 +221,7 @@ inline void* gmalloc(size_t size) {
 		if(!block) {
 			// TODO: print to stderr
 			printf("ERROR: Not enough block memory!!!\n");
-			while(1) asm("hlt");
+			return NULL;
 		}
 		
 		add_new_area(block, 0x200000, gmalloc_pool);
@@ -243,7 +243,7 @@ inline void* gcalloc(uint32_t nmemb, size_t size) {
 void* bmalloc() {
 	if(mp_core_id() != 0) {
 		printf("Core %d bmalloc\n", mp_core_id());
-		while(1) asm("hlt");
+		return NULL;
 	}
 	
 	for(int i = 0; i < bmalloc_count; i++) {
@@ -256,7 +256,6 @@ void* bmalloc() {
 	
 	// TODO: print to stderr
 	printf("Not enough block memory!!!");
-	while(1) asm("hlt");
 	
 	return NULL;
 }

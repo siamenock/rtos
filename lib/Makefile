@@ -83,10 +83,11 @@ zlib/libz.a:
 libz.a: zlib/libz.a
 	cp zlib/libz.a .
 	cp libz.a ../sdk/lib/
+	mkdir -p ../sdk/include
 	cp -rL zlib/*.h ../sdk/include/
 
 openssl/libssl.a: 
-	cd openssl; ./Configure packetngin-x86_64 no-threads no-shared no-dso
+	cd openssl; CFLAGS="-fno-stack-protector -O3" ./Configure packetngin-x86_64 no-threads no-shared no-dso
 	PACKETNGIN_BASE=$(PACKETNGIN_BASE) make -C openssl build_libs
 
 libssl.a: openssl/libssl.a

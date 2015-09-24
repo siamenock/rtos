@@ -68,7 +68,7 @@ static void stdio_handler(RPC* rpc, uint32_t id, uint8_t thread_id, int fd, char
 		fflush(stdout);
 	}
 
-	size = write(0, str, size);
+	size = write(1, str, size);
 	fflush(stdout);
 	
 	callback(rpc, size);
@@ -355,7 +355,7 @@ static int cmd_vm_list(int argc, char** argv, void(*callback)(char* result, int 
 typedef struct {
 	char path[256];
 	int fd;
-	uint32_t file_size;
+	uint64_t file_size;
 	uint32_t offset;
 	uint64_t current_time;
 	void(*callback)(char* result, int eixt_status);
@@ -394,7 +394,7 @@ static int cmd_upload(int argc, char** argv, void(*callback)(char* result, int e
 		}
 
 		if(offset == 0) {
-			printf("Total Size : %d Byte\n", file_info->file_size);
+			printf("Total Upload Size : %ld Byte\n", file_info->file_size);
 		}
 		
 		if(file_info->offset != offset) {
@@ -402,7 +402,7 @@ static int cmd_upload(int argc, char** argv, void(*callback)(char* result, int e
 			file_info->offset = offset;
 		}
 		
-		size = read(file_info->fd, ubuf, size);
+		size = read(file_info->fd, ubuf, size > (file_info->file_size - file_info->offset) ? (file_info->file_size - file_info->offset) : size);
 
 		if(size < 0) {
 			printf("\nFile Read Error\n");
@@ -424,7 +424,7 @@ static int cmd_upload(int argc, char** argv, void(*callback)(char* result, int e
 	if(rpc == NULL)
 		return ERROR_RPC_DISCONNECTED;
 
-	if(argc < 3)
+	if(argc < 3 || argc > 4)
 		return CMD_STATUS_WRONG_NUMBER;
 	
 	if(!is_uint32(argv[1]))
@@ -433,15 +433,20 @@ static int cmd_upload(int argc, char** argv, void(*callback)(char* result, int e
 	if(strlen(argv[2]) >= 256)
 		return -2;
 
+	if(argc == 4) {
+		if(!is_uint32(argv[3]))
+			return -3;
+	}
+
 	uint32_t vmid = parse_uint32(argv[1]);
 	
 	FileInfo* file_info = malloc(sizeof(FileInfo));
 	if(file_info == NULL) {
 		return ERROR_MALLOC_NULL;
 	}
+	memset(file_info, 0, sizeof(FileInfo));
 
 	file_info->fd = open(argv[2], O_RDONLY);
-
 	if(file_info->fd < 0) {
 		free(file_info);
 
@@ -452,6 +457,15 @@ static int cmd_upload(int argc, char** argv, void(*callback)(char* result, int e
 	lseek(file_info->fd, 0, SEEK_SET);
 	file_info->offset = 0;
 	file_info->callback = callback;
+
+	if(argc == 4) {
+		uint32_t size = parse_uint32(argv[3]);
+		if(size > file_info->file_size) {
+			printf("File size is smaller than paramter\n");
+			return -3;
+		}
+		file_info->file_size = size;
+	}
 
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
@@ -482,6 +496,7 @@ static int cmd_download(int argc, char** argv, void(*callback)(char* result, int
 		}
 
 		size = write(file_info->fd, buf, size);
+		file_info->offset += size;
 
 		if(size < 0) {
 			printf("Write Error!\n");
@@ -493,8 +508,9 @@ static int cmd_download(int argc, char** argv, void(*callback)(char* result, int
 		}
 
 		if(size == 0) {
-			printf("\nStorage Upload Completed\n");
-			printf("Total Size : %d Byte\n", file_info->file_size);
+			printf("\nStorage Download Completed\n");
+			//uint32_t file_size = lseek(file_info->fd, 0, SEEK_CUR);
+			printf("Total Size : %d Byte\n", file_info->offset);
 			close(file_info->fd);
 
 			struct timeval tv;
@@ -507,8 +523,6 @@ static int cmd_download(int argc, char** argv, void(*callback)(char* result, int
 
 			return 0;
 		}
-
-		file_info->offset += size;
 
 		printf(".");
 		fflush(stdout);
@@ -534,6 +548,7 @@ static int cmd_download(int argc, char** argv, void(*callback)(char* result, int
 	if(file_info == NULL) {
 		return ERROR_MALLOC_NULL;
 	}
+	memset(file_info, 0, sizeof(FileInfo));
 
 	file_info->fd = open(argv[2], O_WRONLY | O_CREAT | O_TRUNC, 0755);
 	
@@ -543,8 +558,19 @@ static int cmd_download(int argc, char** argv, void(*callback)(char* result, int
 	}
 
 	strcpy(file_info->path, argv[2]);
-	file_info->file_size = 0;
 	lseek(file_info->fd, 0, SEEK_SET);
+	uint64_t download_size = 0;
+	if(argc == 4) {
+		if(!is_uint32(argv[3]))
+			return -3;
+
+		//file_info->file_size = parse_uint32(argv[3]);
+		download_size = parse_uint32(argv[3]);
+	} else {
+		//file_info->file_size = 0;
+		download_size = 0;
+	}
+
 	file_info->offset = 0;
 	file_info->callback = callback;
 
@@ -552,23 +578,33 @@ static int cmd_download(int argc, char** argv, void(*callback)(char* result, int
 	gettimeofday(&tv, NULL);
 	file_info->current_time = tv.tv_sec * 1000 * 1000 + tv.tv_usec;
 	
-	rpc_storage_download(rpc, vmid, callback_storage_download, file_info);
+	rpc_storage_download(rpc, vmid, download_size, callback_storage_download, file_info);
 	sync_status = false;
 
 	return 0;
 }
 
 static int cmd_md5(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
-	/*
-	void callback_md5(uint64_t vmid, uint32_t _md5[4]) {
+	bool callback_storage_md5(bool result, uint32_t _md5[], void* context) {
+		void(*callback)(char* result, int exit_status) = context;
+
+		if(!result) {
+			callback("false", -1);
+			return false;
+		}
+
 		uint8_t md5[16];
 		int pos = 0;
 		memcpy(md5, _md5, 16);
 		for(int i = 0; i < 16; i++) {
-			pos += sprintf(cmd_result + pos, "%2x", md5[i]);
+			pos += sprintf(cmd_result + pos, "%02x", md5[i]);
 		}
+
+		callback(cmd_result, 0);
+
+		return false;
 	}
-	*/
+
 	if(rpc == NULL)
 		return ERROR_RPC_DISCONNECTED;
 
@@ -581,15 +617,10 @@ static int cmd_md5(int argc, char** argv, void(*callback)(char* result, int exit
 	if(!is_uint64(argv[2]))
 		return -2;
 
-	/*
 	uint32_t vmid = parse_uint32(argv[1]);
 	uint64_t size = parse_uint64(argv[2]);
-	bool ret = ctrl_storage_md5(vmid, size, callback_md5);
 
-	if(ret == false)
-		return errno;
-	else
-	*/
+	rpc_storage_md5(rpc, vmid, size, callback_storage_md5, callback);
 	sync_status = false;
 
 	return 0;
@@ -774,13 +805,13 @@ Command commands[] = {
 	{
 		.name = "upload",
 		.desc = "Upload file",
-		.args = "result: bool, vmid: uint32 path: string",
+		.args = "result: bool, vmid: uint32 path: string size: uint32",
 		.func = cmd_upload
 	},
 	{
 		.name = "download",
 		.desc = "Download file",
-		.args = "result: bool, vmid: uint32 path: string",
+		.args = "result: bool, vmid: uint32 path: string size: uint32",
 		.func = cmd_download
 	},
 	{

@@ -1,4 +1,4 @@
-#include <time.h>
+#include <timer.h>
 #define DONT_MAKE_WRAPPER
 #include <_malloc.h>
 #undef DONT_MAKE_WRAPPER
@@ -41,7 +41,7 @@ bool arp_process(Packet* packet) {
 		}
 	}
 	
-	clock_t current = clock();
+	uint64_t current = time_us(); 
 	
 	// GC
 	uint64_t gc_time = (uintptr_t)ni_config_get(packet->ni, ARP_TABLE_GC);
@@ -113,7 +113,7 @@ bool arp_request(NetworkInterface* ni, uint32_t destination, uint32_t source) {
 		if(!interfaces)
 			return false;
 		
-		bool result = false;
+		bool result = true;
 		
 		MapIterator iter;
 		map_iterator_init(&iter, interfaces);

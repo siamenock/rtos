@@ -20,7 +20,6 @@
 #include <control/rpc.h>
 #include "malloc.h"
 #include "mp.h"
-#include "cpu.h"
 #include "shell.h"
 #include "vm.h"
 #include "stdio.h"
@@ -195,12 +194,16 @@ static void status_set_handler(RPC* rpc, uint32_t vmid, VMStatus status, void* c
 	vm_status_set(vmid, status, status_setted, data);
 }
 
-static void storage_download_handler(RPC* rpc, uint32_t vmid, uint32_t offset, int32_t size, void* context, void(*callback)(RPC* rpc, void* buf, int32_t size)) {
+static void storage_download_handler(RPC* rpc, uint32_t vmid, uint64_t download_size, uint32_t offset, int32_t size, void* context, void(*callback)(RPC* rpc, void* buf, int32_t size)) {
 	if(size < 0) {
 		callback(rpc, NULL, size);
 	} else {
 		void* buf;
-		size = vm_storage_read(vmid, &buf, offset, size);
+		if(download_size)
+			size = vm_storage_read(vmid, &buf, offset, (offset + size > download_size) ? (download_size - offset) : size);
+		else
+			size = vm_storage_read(vmid, &buf, offset, size);
+
 		callback(rpc, buf, size);
 	}
 }
@@ -237,6 +240,13 @@ static void storage_upload_handler(RPC* rpc, uint32_t vmid, uint32_t offset, voi
 static void stdio_handler(RPC* rpc, uint32_t id, uint8_t thread_id, int fd, char* str, uint16_t size, void* context, void(*callback)(RPC* rpc, uint16_t size)) {
 	ssize_t len = vm_stdio(id, thread_id, fd, str, size);
 	callback(rpc, len >= 0 ? len : 0);
+}
+
+static void storage_md5_handler(RPC* rpc, uint32_t id, uint64_t size, void* context, void(*callback)(RPC* rpc, bool result, uint32_t md5[])) {
+	uint32_t md5sum[4];
+	bool ret = vm_storage_md5(id, size, md5sum);
+
+	callback(rpc, ret, md5sum);
 }
 
 // PCB utility
@@ -307,6 +317,7 @@ static err_t manager_accept(void* arg, struct tcp_pcb* pcb, err_t err) {
 	rpc_storage_download_handler(rpc, storage_download_handler, NULL);
 	rpc_storage_upload_handler(rpc, storage_upload_handler, NULL);
 	rpc_stdio_handler(rpc, stdio_handler, NULL);
+	rpc_storage_md5_handler(rpc, storage_md5_handler, NULL);
 	
 	RPCData* data = (RPCData*)rpc->data;
 	data->pcb = pcb;

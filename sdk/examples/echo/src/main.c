@@ -16,7 +16,7 @@ void init(int argc, char** argv) {
 }
 
 //static uint32_t address = 0xc0a8c80a;	// 192.168.200.10
-static uint32_t address = 0xc0a80ac8;	// 192.168.10.200
+static uint32_t address = 0xc0a864c8;	// 192.168.100.200
 
 void process(NetworkInterface* ni) {
 	Packet* packet = ni_input(ni);
@@ -24,7 +24,8 @@ void process(NetworkInterface* ni) {
 		return;
 	
 	Ether* ether = (Ether*)(packet->buffer + packet->start);
-	
+
+
 	if(endian16(ether->type) == ETHER_TYPE_ARP) {
 		// ARP response
 		ARP* arp = (ARP*)ether->payload;

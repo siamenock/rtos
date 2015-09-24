@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stddef.h>
+#include <timer.h>
 #include "version.h"
 #include "mp.h"
 #include "port.h"
@@ -139,7 +140,6 @@ inline void apic_write64(int reg, uint64_t v) {
 }
 
 #define HEX(v)	(((v) & 0x0f) > 9 ? ((v) & 0x0f) - 10 + 'a' : ((v) & 0x0f) + '0')
-#include "cpu.h"
 static char animation[] = { '-', '\\', '|', '/' };
 
 typedef struct {
@@ -344,7 +344,7 @@ void isr_interrupt_handler(uint64_t vector) {
 			*v++ = 0x40;
 			*v++ = ' ';
 			*v++ = 0x40;
-			*v++ = animation[(cpu_tsc() >> 16) % 4];
+			*v++ = animation[(timer_frequency() >> 16) % 4];
 			*v++ = 0x40;
 			
 			for(int i = 0; i < 1000000; i++)
