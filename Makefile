@@ -16,7 +16,7 @@ SYSTEM_IMG_SIZE := 4095 	# 512 bytes * 4096 blocks = 2048KB - 512B (for boot loa
 system.img: 
 	make -C lib
 	mkdir -p bin
-	#make -C tools
+	make -C tools
 	make -C boot
 	make -C loader
 	make -C kernel
