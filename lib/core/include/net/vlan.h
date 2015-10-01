@@ -24,7 +24,7 @@
 
 #define VLAN_GET_PCP(tci)			(tci & 0xe000) >> 13
 #define VLAN_GET_DEI(tci)			(tci & 0x1000) >> 12
-#define VLAN_GET_VID(tci)			(tci & 0x3ff)
+#define VLAN_GET_VID(tci)			(tci & 0xfff)
 
 /**
  * VLANv4 header
