@@ -1,5 +1,0 @@
-#ip 192.168.200.1
-login packetngin packetngin
-create -core 1 -memory 16MB -storage 2MB -nic 00:00:00:00:00:00 1024 1024 1000Mbps 1000Mbps 2MB -args -ip 192.168.100.2
-send tcp
-start
