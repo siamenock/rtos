@@ -160,6 +160,7 @@ void list_rotate(List* list);
  */
 typedef struct _ListIterator {
 	List* list;			///< LinkedList (internal use only)
+	ListNode* prev;			///< previous node (internal use only)
 	ListNode* node;			///< current node (internal use only)
 } ListIterator;
 

@@ -231,6 +231,7 @@ void list_rotate(List* list) {
 
 void list_iterator_init(ListIterator* iter, List* list) {
 	iter->list = list;
+	iter->prev = NULL;
 	iter->node = list->head;
 }
 
@@ -241,6 +242,7 @@ bool list_iterator_has_next(ListIterator* iter) {
 void* list_iterator_next(ListIterator* iter) {
 	if(iter->node) {
 		void* data = iter->node->data;
+		iter->prev = iter->node;
 		iter->node = iter->node->next;
 		
 		return data;
@@ -250,12 +252,9 @@ void* list_iterator_next(ListIterator* iter) {
 }
 
 void* list_iterator_remove(ListIterator* iter) {
-	if(iter->node == iter->list->head) {
-		iter->node = iter->node->next;
-		return _remove(iter->list, iter->list->head);
-	} else if(iter->node == NULL) {
-		return _remove(iter->list, iter->list->tail);
+	if(iter->prev) {
+		return _remove(iter->list, iter->prev);
 	} else {
-		return _remove(iter->list, iter->node->prev);
+		return NULL;
 	}
 }
