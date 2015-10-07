@@ -13,6 +13,7 @@
 #include <net/checksum.h>
 #include <net/udp.h>
 #include <net/ni.h>
+#include <net/arp.h>
 
 inline uint64_t cpu_tsc() {
 	uint64_t time;

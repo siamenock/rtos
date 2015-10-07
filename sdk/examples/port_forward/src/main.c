@@ -157,11 +157,13 @@ int main(int argc, char** argv) {
 	while(is_continue) {
 		for(int i = 0; i < count; i++) {
 			if(ni_has_input(ni[i])) {
+				printf("in first if\n");
 				Packet* packet = ni_input(ni[i]);
 				if(packet == NULL)
 					continue;
 
 				if(port_map[i] != -1) {
+					printf("packet here!\n");
 					ni_output(ni[port_map[i]], packet);
 					packet = NULL;
 				}

@@ -1,12 +1,13 @@
 #include <string.h>
-#include "pn/status.h"
-#include "pn/types.h"
-#include "pn/ether.h"
-#include "pn/ip.h"
-#include "pn/icmp.h"
-#include "pn/checksum.h"
-#include "pn/udp.h"
-#include "pn/ni.h"
+#include <status.h>
+#include <util/types.h>//#include "pn/types.h"
+#include <net/ether.h>//#include "pn/ether.h"
+#include <net/ip.h>//#include "pn/ip.h"
+#include <net/icmp.h>//#include "pn/icmp.h"
+#include <net/checksum.h>//#include "pn/checksum.h"
+#include <net/udp.h>//#include "pn/udp.h"
+#include <net/ni.h>//#include "pn/ni.h"
+#include <net/arp.h>
 
 typedef struct {
 	char		collection[256];
@@ -193,7 +194,8 @@ int main(int argc, char** argv) {
 	init(argc, argv);
 	
 	uint32_t i = 0;
-	while(_app_status == STATUS_START) {
+//	while(_app_status == APP_STATUS_STARTED) {
+	while(1){
 		uint32_t count = ni_count();
 		if(count > 0) {
 			i = (i + 1) % count;
@@ -204,6 +206,7 @@ int main(int argc, char** argv) {
 			}
 		}
 	}
+//	}
 	
 	destroy();
 	

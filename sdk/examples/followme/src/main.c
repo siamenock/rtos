@@ -1,12 +1,13 @@
-#include "pn/status.h"
-#include "pn/string.h"
-#include "pn/types.h"
-#include "pn/ether.h"
-#include "pn/ip.h"
-#include "pn/icmp.h"
-#include "pn/checksum.h"
-#include "pn/udp.h"
-#include "pn/ni.h"
+#include <status.h>
+#include <_string.h>
+#include <util/types.h>
+#include <net/ether.h>
+#include <net/ip.h>
+#include <net/icmp.h>
+#include <net/checksum.h>
+#include <net/udp.h>
+#include <net/ni.h>
+#include <net/arp.h>
 
 void init(int argc, char** argv) {
 }
@@ -107,8 +108,9 @@ int main(int argc, char** argv) {
 	init(argc, argv);
 	
 	uint32_t i = 0;
-	while(_app_status == STATUS_START) {
-		uint32_t count = ni_count();
+	//while(_app_status == STATUS_START) {
+	while(1){
+	uint32_t count = ni_count();
 		if(count > 0) {
 			i = (i + 1) % count;
 			

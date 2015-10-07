@@ -23,11 +23,7 @@ typedef struct {
 } Keyword;
 
 List* list;
-NetworkInterface* ni0;
-NetworkInterface* ni1;
 void ginit(int argc, char** argv) {
-	ni0 = ni_get(0);
-	ni1 = ni_get(1);
 }
 
 void init(int argc, char** argv) {
@@ -82,11 +78,9 @@ void process(NetworkInterface* ni) {
 		}
 	}
 
-	if(ni == ni0)
-		ni_output(ni1, packet);
+	
 
-	else
-		ni_output(ni0, packet);
+	ni_output(ni, packet);
 
 	packet = NULL;
 }

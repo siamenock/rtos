@@ -1,36 +1,26 @@
 #include <stdio.h>
-#include <malloc.h>
-#include <unistd.h>
-#include <string.h>
-
-#include <gmalloc.h>
-#include <status.h>
 #include <thread.h>
-#include <shared.h>
+#include <net/ni.h>
+#include <net/packet.h>
 #include <net/ether.h>
+#include <net/arp.h>
 #include <net/ip.h>
 #include <net/icmp.h>
 #include <net/checksum.h>
 #include <net/udp.h>
-#include <net/tcp.h>
-#include <net/ni.h>
+#include "tcp.h"
 
 void ginit(int argc, char** argv) {
-	printf("ginit\n");
 }
 
 void init(int argc, char** argv) {
-	printf("init\n");
 }
 
-//static uint32_t address = 0xc0a8c80a;	// 192.168.200.10
+static int count = 0;
 static uint32_t address = 0xc0a8640a;	// 192.168.100.10
-
-static uint64_t gw_mac = 0x64e599445476L;
-static uint32_t gw_ip = 0xc0859b01;
+//static uint32_t address = 0xc0a80ac8;	// 192.168.10.200
 
 void process(NetworkInterface* ni) {
-	
 	Packet* packet = ni_input(ni);
 	if(!packet)
 		return;
@@ -74,45 +64,50 @@ void process(NetworkInterface* ni) {
 			
 			ni_output(ni, packet);
 			packet = NULL;
+		} else if(ip->protocol == IP_PROTOCOL_UDP) {
+			UDP* udp = (UDP*)ip->body;
+			
+			if(endian16(udp->destination) == 7) {
+				uint16_t t = udp->destination;
+				udp->destination = udp->source;
+				udp->source = t;
+				udp->checksum = 0;
+				
+				uint32_t t2 = ip->destination;
+				ip->destination = ip->source;
+				ip->source = t2;
+				ip->ttl = 0x40;
+				ip->checksum = 0;
+				ip->checksum = endian16(checksum(ip, ip->ihl * 4));
+
+				uint64_t t3 = ether->dmac;
+				ether->dmac = ether->smac;
+				ether->smac = t3;
+				
+				ni_output(ni, packet);
+				packet = NULL;
+			}
+			
 		} else if(ip->protocol == IP_PROTOCOL_TCP) {
 			TCP* tcp = (TCP*)ip->body;
-			
-			TCP_Pseudo_Header header;
-			header.source = endian32(address);
-			header.destination = 
-			
-			TCP_Option* option = tcp_option(tcp);
-			while(option) {
-				switch(option->kind) {
-					case TCP_OPTION_EOL:
-						printf("EOL\n");
-						break;
-					case TCP_OPTION_NOP:
-						printf("NOP\n");
-						break;
-					case TCP_OPTION_MSS:
-						printf("MSS: %d\n", endian16(option->data.u16));
-						break;
-					case TCP_OPTION_WSOPT:
-						printf("WSOPT: %d\n", endian8(option->data.u8));
-						break;
-					case TCP_OPTION_SACKP:
-						printf("SACKP: true\n");
-						break;
-					case TCP_OPTION_TSOPT:
-						{
-							printf("TSOPT: ");
-							for(int i = 0; i < option->length - 2; i++)
-								printf("%02x", option->data.payload[i]);
-							printf("\n");
-						}
-						break;
-					default:
-						printf("Unknown option: %d\n", option->kind);
-				}
-				
-				option = tcp_option_next(tcp, option);
-			}
+			printf("count : %d", ++count);
+			printf("origin dest port : %d\n",endian16(tcp->destination));
+			tcp->destination = endian16(13300);
+			printf("origin dest port : %d\n",endian16(tcp->destination));
+			printf("origin IP : %x\n", endian32(ip->destination));
+			uint32_t address = 0xc0a864c8;
+			ip->source = endian32(address);
+			ip->destination = endian32(address);
+			printf("origin IP : %x\n", endian32(ip->destination));
+			ni_output(ni, packet);
+			packet = NULL;
+			/**
+			printf("source=%u, destination=%u, sequence=%u, acknowledgement=%u\n", 
+				endian16(tcp->source), endian16(tcp->destination), endian32(tcp->sequence), endian32(tcp->acknowledgement));
+			printf("offset=%d, ns=%d, cwr=%d, ece=%d, urg=%d, ack=%d, psh=%d, rst=%d, syn=%d, fin=%d\n", 
+				tcp->offset, tcp->ns, tcp->cwr, tcp->ece, tcp->urg, tcp->ack, tcp->psh, tcp->rst, tcp->syn, tcp->fin);
+			printf("window=%d, checksum=%x, urgent=%d\n", endian16(tcp->window), endian16(tcp->checksum), endian16(tcp->urgent));
+			**/
 		}
 	}
 	
@@ -146,6 +141,7 @@ int main(int argc, char** argv) {
 			
 			NetworkInterface* ni = ni_get(i);
 			if(ni_has_input(ni)) {
+				printf("has input\n");
 				process(ni);
 			}
 		}
