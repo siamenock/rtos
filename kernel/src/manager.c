@@ -510,6 +510,9 @@ uint32_t manager_get_ip() {
 }
 
 void manager_set_ip(uint32_t ip) {
+	if(manager_ni == NULL)
+		return;
+
 	IPv4Interface* interface = ni_ip_get(manager_ni->ni, manager_ip);
 	if(!interface)
 		return;
@@ -538,6 +541,9 @@ uint16_t manager_get_port() {
 }
 
 void manager_set_port(uint16_t port) {
+	if(manager_ni == NULL)
+		return;
+
 	if(!udp_port_alloc0(manager_ni->ni, manager_ip, port))
 		return;
 
@@ -549,6 +555,9 @@ void manager_set_port(uint16_t port) {
 }
 
 uint32_t manager_get_gateway() {
+	if(manager_ni == NULL)
+		return 0;
+
 	IPv4Interface* interface = ni_ip_get(manager_ni->ni, manager_ip);
 	if(!interface)
 		return 0;
@@ -557,6 +566,9 @@ uint32_t manager_get_gateway() {
 }
 
 void manager_set_gateway(uint32_t gw) {
+	if(manager_ni == NULL)
+		return;
+
 	IPv4Interface* interface = ni_ip_get(manager_ni->ni, manager_ip);
 	if(!interface)
 		return;
@@ -569,6 +581,9 @@ void manager_set_gateway(uint32_t gw) {
 }
 
 uint32_t manager_get_netmask() {
+	if(manager_ni == NULL)
+		return 0;
+
 	IPv4Interface* interface = ni_ip_get(manager_ni->ni, manager_ip);
 	if(!interface)
 		return 0;
@@ -577,6 +592,9 @@ uint32_t manager_get_netmask() {
 }
 
 void manager_set_netmask(uint32_t nm) {
+	if(manager_ni == NULL)
+		return;
+
 	IPv4Interface* interface = ni_ip_get(manager_ni->ni, manager_ip);
 	if(!interface)
 		return;
@@ -589,6 +607,9 @@ void manager_set_netmask(uint32_t nm) {
 }
 
 void manager_set_interface() {
+	if(manager_ni == NULL)
+		return;
+
 	manager_server_close();
 	ni_remove(manager_netif);
 	manager_netif = ni_init(manager_ni->ni, manage, NULL);

@@ -155,6 +155,11 @@ static bool parse_addr(char* argv, uint32_t* address) {
 }
 
 static int cmd_manager(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	if(manager_ni == NULL) {
+		printf("Can't found manager nic\n");
+		return -1;
+	}
+
 	if(argc == 1) {
 		printf("HWaddr %02x:%02x:%02x:%02x:%02x:%02x\n",
 			(manager_ni->mac >> 40) & 0xff,
@@ -405,7 +410,8 @@ static int cmd_vnic(int argc, char** argv, void(*callback)(char* result, int exi
 			printf("\n\n");
 		}
 
-		print_vnic(manager_ni, 0, 0);
+		if(manager_ni != NULL)
+			print_vnic(manager_ni, 0, 0);
 
 		extern Map* vms;
 		MapIterator iter;
@@ -608,6 +614,11 @@ static bool arping_timeout(void* context) {
 }
 
 static int cmd_arping(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	if(manager_ni == NULL) {
+		printf("Can't found manager nic\n");
+		return -1;
+	}
+
 	if(argc < 2) {
 		return CMD_STATUS_WRONG_NUMBER;
 	}
