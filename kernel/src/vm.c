@@ -209,6 +209,9 @@ static void icc_stopped(ICC_Message* msg) {
 	cores[msg->core_id].status = VM_STATUS_PAUSE;
 	cores[msg->core_id].error_code = msg->result;
 	cores[msg->core_id].return_code = msg->data.stopped.return_code;
+	cores[msg->core_id].stdin = NULL;
+	cores[msg->core_id].stdout = NULL;
+	cores[msg->core_id].stderr = NULL;
 	
 	printf("Execution completed on core[%d].\n", msg->core_id);
 	
@@ -822,11 +825,19 @@ ssize_t vm_stdio(uint32_t vmid, int thread_id, int fd, const char* str, size_t s
 	
 	switch(fd) {
 		case 0:
-			return ring_write(core->stdin, *core->stdin_head, core->stdin_tail, core->stdin_size, str, size);
+			if(core->stdin)
+				return ring_write(core->stdin, *core->stdin_head, core->stdin_tail, core->stdin_size, str, size);
+			else
+				return -1;
 		case 1:
-			return ring_write(core->stdout, *core->stdout_head, core->stdout_tail, core->stdout_size, str, size);
+			if(core->stdout)
+				return ring_write(core->stdout, *core->stdout_head, core->stdout_tail, core->stdout_size, str, size);
+			else
+				return -1;
 		case 2:
-			return ring_write(core->stderr, *core->stderr_head, core->stderr_tail, core->stderr_size, str, size);
+			if(core->stderr)
+				return ring_write(core->stderr, *core->stderr_head, core->stderr_tail, core->stderr_size, str, size);
+			return -1;
 		default:
 			return -1;
 	}
