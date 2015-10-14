@@ -36,6 +36,8 @@
 #define MAX_VM_COUNT	128
 #define MAX_VNIC_COUNT	32
 
+bool cmd_async;
+
 static int cmd_clear(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	printf("\f");
 
@@ -763,6 +765,20 @@ static int cmd_create(int argc, char** argv, void(*callback)(char* result, int e
 						return -1;
 					}
 					nic->output_bandwidth = parse_uint64(argv[i]);
+				} else if(strcmp(argv[i], "hpad:") == 0) {
+					i++;
+					if(!is_uint16(argv[i])) {
+						printf("iband must be uint16\n");
+						return -1;
+					}
+					nic->padding_head = parse_uint16(argv[i]);
+				} else if(strcmp(argv[i], "tpad:") == 0) {
+					i++;
+					if(!is_uint16(argv[i])) {
+						printf("oband must be uint16\n");
+						return -1;
+					}
+					nic->padding_tail = parse_uint16(argv[i]);
 				} else if(strcmp(argv[i], "pool:") == 0) {
 					i++;
 					if(!is_uint32(argv[i])) {
@@ -837,7 +853,7 @@ static int cmd_vm_list(int argc, char** argv, void(*callback)(char* result, int 
 	return 0;
 }
 
-static int cmd_send(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+static int cmd_upload(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	if(argc < 3) {
 		return CMD_STATUS_WRONG_NUMBER;
 	}
@@ -904,6 +920,7 @@ static int cmd_status_set(int argc, char** argv, void(*callback)(char* result, i
 		return -1;
 	}
 	
+	cmd_async = true;
 	vm_status_set(vmid, status, status_setted, callback);
 	
 	return 0;
@@ -957,6 +974,40 @@ static int cmd_status_get(int argc, char** argv, void(*callback)(char* result, i
 		printf("[%d] ", vm->cores[i]);
 	}
 	printf("\n");
+
+	return 0;
+}
+
+
+static int cmd_stdio(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	if(argc < 3) {
+		printf("Argument is not enough\n");
+		return -1;
+	}
+
+	uint32_t id;
+	uint8_t thread_id;
+
+	if(!is_uint32(argv[1])) {
+		printf("VM ID is wrong\n");
+		return -1;
+	}
+	if(!is_uint8(argv[2])) {
+		printf("Thread ID is wrong\n");
+		return -2;
+	}
+
+	id = parse_uint32(argv[1]);
+	thread_id = parse_uint8(argv[2]);
+
+	for(int i = 3; i < argc; i++) {
+		printf("%s\n", argv[i]);
+		ssize_t len = vm_stdio(id, thread_id, 0, argv[i], strlen(argv[i]) + 1);
+		if(!len) {
+			printf("stdio fail\n");
+			return -i;
+		}
+	}
 
 	return 0;
 }
@@ -1061,10 +1112,10 @@ Command commands[] = {
 		.func = cmd_vm_list
 	},
 	{
-		.name = "send",
-		.desc = "Send file",
+		.name = "upload",
+		.desc = "Upload file",
 		.args = "result: bool, vmid: uint32 path: string",
-		.func = cmd_send
+		.func = cmd_upload
 	},
 	{
 		.name = "md5",
@@ -1103,12 +1154,19 @@ Command commands[] = {
 		.func = cmd_status_get
 	},
 	{
+		.name = "stdin",
+		.desc = "Write stdin to vm",
+		.args = "result: bool, vmid: uint32 thread_id: uint8 msg: string",
+		.func = cmd_stdio
+	},
+	{
 		.name = NULL
 	},
 };
 
 static void cmd_callback(char* result, int exit_status) {
 	cmd_update_var(result, exit_status);
+	cmd_async = false;
 	printf("%s\n", result);
 }
 
@@ -1116,6 +1174,9 @@ void shell_callback() {
 	static char cmd[CMD_SIZE];
 	static int cmd_idx = 0;
 	extern Device* device_stdout;
+
+	if(cmd_async)
+		return;
 
 	int ch = stdio_getchar();
 	while(ch >= 0) {
@@ -1171,6 +1232,8 @@ void shell_callback() {
 					putchar(ch);
 				}
 		}
+		if(cmd_async)
+			break;
 		
 		ch = stdio_getchar();
 	}
@@ -1182,6 +1245,7 @@ void shell_init() {
 	
 	extern Device* device_stdin;
 	((CharIn*)device_stdin->driver)->set_callback(device_stdin->id, shell_callback);
+	cmd_async = false;
 	cmd_init();
 }
 

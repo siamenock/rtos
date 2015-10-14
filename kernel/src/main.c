@@ -5,9 +5,11 @@
 
 // Core
 #include <util/event.h>
-#include <util/cmd.h>
 
 // Kernel
+#include <time.h>
+#include <timer.h>
+
 #include "asm.h"
 #include "timer.h"
 #include "malloc.h"
@@ -297,52 +299,78 @@ static void icc_stop(ICC_Message* msg) {
 	task_destroy(1);
 }
 
-static void cmd_callback(char* result, int exit_status) {
-	cmd_update_var(result, exit_status);
-	printf("%s\n", result);
-}
+#define EXEC_NOT_FOUND_FILE	-1
+#define EXEC_ERROR		-2
+#define EXEC_NOT_ENOUGH_BUFFER	1
+#define EXEC_END		0
 
-static void exec(char* name) {
-	int fd = open(name, "r");
+static int exec(char* name) {
+	static int fd = 0;
+	static char line[CMD_SIZE];
+	static int head = 0;
+	static int eod = 0;
+	static int seek = 0;
+
+	if(fd == 0) {
+		fd = open(name, "r");
+	}
+
 	if(fd < 0) {
-		return ;
-	}
-	char line[CMD_SIZE];
-	int eof;
-	if((eof = read(fd, line, CMD_SIZE)) <= 0) {
-		printf("Read error\n");
-		close(fd);
-		return ;
+		return EXEC_NOT_FOUND_FILE;
 	}
 
-	char* ptr = line;
-	char* head = ptr;
+	while(eod += read(fd, &line[eod], CMD_SIZE - eod)) {
+		for(; seek < eod; seek++) {
+			if(line[seek] == '\n' || line[seek] == '\0') {
+				for(; head < seek; head++) {
+					if(line[head] == ' ')
+						head++;
+					else
+						break;
+				}
 
-	bool exec_line(void) {
-		int line_len = ptr - head;
-		head[line_len] = '\0';
-		int ret = cmd_exec(head,cmd_callback);
+				if(line[head] == '#') {
+					head = seek + 1;
+					continue;
+				}
 
-		if(ret != 0) {
-			printf("Exec error\n");
-			return false;
+				if(__stdin_tail >= __stdin_head) {
+					printf("%d %d\n", seek + 1 - head, __stdin_size - ( __stdin_tail - __stdin_head));
+					if((seek + 1 - head) > (__stdin_size - ( __stdin_tail - __stdin_head))) {
+						printf("Wrong2 %d %d\n", seek - head, __stdin_size - ( __stdin_tail - __stdin_head));
+						return EXEC_NOT_ENOUGH_BUFFER;
+					}
+				} else {
+					if((seek + 1 - head) > (__stdin_head - __stdin_tail)) {
+						printf("Wrong2_2 %d %d\n", seek - head, __stdin_head - __stdin_tail);
+						return EXEC_NOT_ENOUGH_BUFFER;
+					}
+				}
+
+				apic_disable();
+				for(;head <= seek; head++) {
+					stdio_putchar(line[head]);
+				}
+				apic_enable();
+			}
 		}
 
-		return true;
-	}
-
-	for(int i = 0; i < eof; i++, ptr++) {
-		if(*ptr == '\n' || *ptr == '\0') {
-			if(!exec_line()) {
-				close(fd);
-				return ;
+		if(head == 0 && eod == CMD_SIZE){
+			return EXEC_ERROR;
+		} else {
+			if((eod - head) > 0) {
+				memmove(line, &line[head], eod - head);
+				eod -= head;
+				seek = eod;
+				head = 0;
 			}
-
-			head = ptr + 1;
 		}
 	}
 
 	close(fd);
+	fd = 0;
+
+	return EXEC_END;
 }
 
 void main(void) {
@@ -481,14 +509,15 @@ void main(void) {
 		else
 			event_idle_add(idle_hlt_event, NULL);
 	}
-	
-	mp_sync();	// Barrier #3
-	
-	if(apic_id == 0) {
-		exec("/init.psh");
+
+	mp_sync();
+
+	if(core_id == 0) {
+		while(exec("/init.psh") > 0)
+			event_loop();
 	}
-	
-	while(1) {
+
+	while(1)
 		event_loop();
 	}
 }

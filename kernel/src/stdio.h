@@ -15,6 +15,7 @@ void stdio_print(const char* str, int row, int col);
 void stdio_print_32(uint32_t v, int row, int col);
 void stdio_print_64(uint64_t v, int row, int col);
 
+int stdio_putchar(const char ch);
 void stdio_scancode(int code);
 int stdio_getchar();
 
