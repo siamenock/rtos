@@ -36,6 +36,9 @@ static List* triggers;
 static List* idle_events;
 
 void event_init() {
+	extern uint64_t cpu_ms;
+	if(!cpu_ms)
+		time_init();
 	busy_events = list_create(NULL);
 	timer_events = list_create(NULL);
 	trigger_events = map_create(8, map_uint64_hash, map_uint64_equals, NULL);
