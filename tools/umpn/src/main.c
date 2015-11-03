@@ -105,7 +105,7 @@ static int cmd_vm_create(int argc, char** argv, void(*callback)(char* result, in
 			NICSpec* nicspec = &vmspec->nics[vmspec->nic_count];
 
 			nicspec->mac = 0;
-			nicspec->port = vmspec->nic_count;
+			//nicspec->port = vmspec->nic_count;
 			nicspec->input_buffer_size = 1024;
 			nicspec->output_buffer_size = 1024;
 			nicspec->pool_size = 0x400000;
@@ -189,7 +189,7 @@ static int cmd_vm_create(int argc, char** argv, void(*callback)(char* result, in
 	for(int i = 0; i < _vm->nic_count; i++) {
 		uint64_t attrs[] = {
 			NI_MAC, ((NEPort*)ne->nodes[i])->ti->mac,
-			NI_PORT, i,
+			NI_DEV, i,
 			NI_INPUT_BUFFER_SIZE, vmspec->nics[i].input_buffer_size,
 			NI_OUTPUT_BUFFER_SIZE, vmspec->nics[i].output_buffer_size,
 			NI_INPUT_BANDWIDTH, 1000000000, //not used

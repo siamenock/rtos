@@ -177,7 +177,7 @@ NI* ni_create(uint64_t* attrs) {
 			case NI_MAC:
 				ni->ni->mac = ni->mac = attrs[i * 2 + 1];
 				break;
-			case NI_PORT:
+			case NI_DEV:
 				ni->port = (int)attrs[i * 2 + 1];
 				break;
 			case NI_POOL_SIZE:
