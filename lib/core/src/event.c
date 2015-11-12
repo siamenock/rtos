@@ -207,10 +207,11 @@ uint64_t event_timer_add(EventFunc func, void* context, clock_t delay, clock_t p
 	return (uintptr_t)node;
 }
 
-bool event_timer_update(uint64_t id) {
+bool event_timer_update(uint64_t id, clock_t period) {
 	if(list_remove_data(timer_events, (void*)id)) {
 		TimerNode* node = (TimerNode*)id;
 		uint64_t time = time_us();
+		node->period = period;
 		node->delay = time + node->period;
 		
 		int index = list_index_of(timer_events, (void*)(uint64_t)node->delay, get_first_bigger);
