@@ -8,24 +8,24 @@ uint64_t _ioapic_address;
 
 static uint8_t redirection_map[24];
 
-void ioapic_init() {
-	bool init_IOInterruptEntry(MP_IOInterruptEntry* entry) {
-		if(entry->interrupt_type == 0x00 && entry->source_bus_id == mp_bus_isa_id()) {	// interrut_type == Interrupt
-			uint64_t redirection = 	((uint64_t)32 + entry->source_bus_irq) |
-						APIC_DM_PHYSICAL |
-						APIC_DMODE_FIXED |
-						APIC_PP_ACTIVEHIGH |
-						APIC_TM_EDGE |
-						APIC_IM_ENABLED |
-						((uint64_t)(entry->source_bus_irq == 0 ? 0xff : 0x00) << 56);
-			
-			ioapic_write64(IOAPIC_IDX_REDIRECTION_TABLE + entry->destination_io_apic_intin * 2, redirection);
-			redirection_map[entry->source_bus_irq] = entry->destination_io_apic_intin;
-			printf("\tISA IRQ remap: %d -> %d to %s\n", entry->destination_io_apic_intin, 32 + entry->source_bus_irq, entry->source_bus_irq == 0 ? "all" : "core 0");
-		}
-		return true;
+static bool init_IOInterruptEntry(MP_IOInterruptEntry* entry) {
+	if(entry->interrupt_type == 0x00 && entry->source_bus_id == mp_bus_isa_id()) {	// interrut_type == Interrupt
+		uint64_t redirection = 	((uint64_t)32 + entry->source_bus_irq) |
+					APIC_DM_PHYSICAL |
+					APIC_DMODE_FIXED |
+					APIC_PP_ACTIVEHIGH |
+					APIC_TM_EDGE |
+					APIC_IM_ENABLED |
+					((uint64_t)(entry->source_bus_irq == 0 ? 0xff : 0x00) << 56);
+		
+		ioapic_write64(IOAPIC_IDX_REDIRECTION_TABLE + entry->destination_io_apic_intin * 2, redirection);
+		redirection_map[entry->source_bus_irq] = entry->destination_io_apic_intin;
+		printf("\tISA IRQ remap: %d -> %d to %s\n", entry->destination_io_apic_intin, 32 + entry->source_bus_irq, entry->source_bus_irq == 0 ? "all" : "core 0");
 	}
+	return true;
+}
 	
+void ioapic_init() {
 	// Disable PIC mode
 	if(mp_FloatingPointerStructure()->feature[1] & 0x80) {
 		printf("\tDisable PIC mode...\n");

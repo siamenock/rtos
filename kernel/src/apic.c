@@ -201,10 +201,12 @@ void apic_dump(uint64_t vector, uint64_t error_code) {
 	for(int i = -20; i < 0; i += 4) {
 		printf("%016lx %016lx %016lx %016lx\n", p[i], p[i + 1], p[i + 2], p[i + 3]);
 	}
+	/*
 	printf("----------------------------\n");
 	for(int i = 0; i < 40; i += 4) {
 		printf("%016lx %016lx %016lx %016lx\n", p[i], p[i + 1], p[i + 2], p[i + 3]);
 	}
+	*/
 }
 
 void isr_exception_handler(uint64_t vector, uint64_t error_code) {

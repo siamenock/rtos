@@ -449,7 +449,7 @@ void manager_init() {
 	
 	manager_ni = vnic_create(attrs);
 	if(!manager_ni) {
-		printf("\tCan'nt create manager\n");
+		printf("\tCannot create manager\n");
 		return;
 	}
 

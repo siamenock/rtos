@@ -359,8 +359,7 @@ inline MP_FloatingPointerStructure* mp_FloatingPointerStructure() {
 
 void mp_iterate_IOInterruptEntry(bool(*fn)(MP_IOInterruptEntry*)) {
 	uint8_t* type = (uint8_t*)(uint64_t)fps->physical_address_pointer + sizeof(MP_ConfigurationTableHeader);
-	int i;
-	for(i = 0; i < cth->entry_count; i++) {
+	for(int i = 0; i < cth->entry_count; i++) {
 		switch(*type) {
 			case 0:
 				type += sizeof(MP_ProcessorEntry);
