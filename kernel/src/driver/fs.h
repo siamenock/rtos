@@ -10,8 +10,8 @@
 #include "disk.h"
 
 #define FS_SECTOR_SIZE		512
-#define FS_SECTOR_PER_CLUSTER	8
-#define FS_CLUSTER_SIZE		(512 * 8)   
+#define FS_SECTOR_PER_BLOCK	8
+#define FS_BLOCK_SIZE		(512 * FS_SECTOR_PER_BLOCK)
 
 #define FS_SEEK_SET		0x00
 #define FS_SEEK_CUR		0x01
@@ -22,8 +22,10 @@
 #define FS_TYPE_EXT2		0x02
 
 #define FS_MAX_DRIVERS		0x10
+#define FS_CACHE_BLOCK		35
 
-#define FS_DEFAULT_CACHE_SIZE	8192
+#define FS_NUMBER_OF_BLOCKS	FS_CACHE_BLOCK * 4
+#define FS_WRITE_BUF_SIZE	2560
 
 /* Available mounting devices for each driver */
 #define FS_MOUNTING_POINTS	8 
@@ -46,8 +48,10 @@ typedef struct _FileSystemDriver {
 	 * @return 0: succeed, -1: IO error
 	 */
 	int 		(*close)(FileSystemDriver* driver, File* file);
-	ssize_t		(*read)(FileSystemDriver* driver, File* file, void* buffer, size_t size);
-	ssize_t 	(*write)(FileSystemDriver* driver, File* file, const void* buffer, size_t size);
+	int		(*read)(DiskDriver* driver, uint32_t lba, size_t sector_count, void* buffer);
+	int		(*write)(DiskDriver* driver, uint32_t lba, size_t sector_count, void* buffer);
+	int		(*read_async)(DiskDriver* driver, List* blocks, void(*callback)(List* blocks, int count, void* context), void* context);
+	int		(*write_async)(DiskDriver* driver, List* blocks, void(*callback)(List* blocks, int count, void* context), void* context);
 	off_t 		(*lseek)(FileSystemDriver* driver, File* file, off_t offset, int whence);
 	
 	File* 		(*opendir)(FileSystemDriver* driver, File* dir, const char* dir_name);
@@ -62,6 +66,10 @@ typedef struct _FileSystemDriver {
 } FileSystemDriver;	// BFSDriver, EXT2Driver, ...
 
 bool fs_init();
+ssize_t fs_read(File* file, void* buffer, size_t size);
+ssize_t fs_write(File* file, void* buffer, size_t size);
+int fs_read_async(File* file, size_t size, bool(*callback)(List* blocks, int success, void* context), void* context);
+bool fs_write_async(File* file, void* buffer, size_t size, void(*callback)(void* buffer, size_t len, void* context), void* context, void(*sync_callback)(int errno, void* context2), void* context2);
 int fs_mount(int type, uint32_t device, const char* path);
 int fs_umount(const char* path);
 bool fs_register(const FileSystemDriver* driver);
@@ -69,8 +77,6 @@ FileSystemDriver* fs_driver(const char* path);
 
 /**
  * High level disk I/O function which uses disk cache
- */
-ssize_t fs_read(FileSystemDriver* driver, uint32_t lba, size_t sector_count, void* buf);
-ssize_t fs_write(FileSystemDriver* driver, uint32_t lba, size_t sector_count, void* buf);
 
+ */
 #endif /* __DRIVER_FS_H__ */

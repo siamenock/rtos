@@ -1,6 +1,16 @@
 #include <malloc.h>
+#include <gmalloc.h>
 #include <string.h>
 #include "fs.h"
+#include "../cpu.h"
+#include <util/event.h>
+
+
+typedef struct {
+	void(*callback)(void* buffer, size_t len, void* context);
+	void*			context;
+	void*			buffer;
+} FileContext;
 
 static File files[FILE_MAX_DESC]; 
 
@@ -90,27 +100,123 @@ int close(int fd) {
 	return 0;
 }
 
-ssize_t read(int fd, void* buffer, size_t size) {
-	File* file = files + fd;
+static int file_check(File* file) {
+	// Check if file is NULL or file type is invaild
+	if(file == NULL || file->type != FILE_TYPE_FILE) {
+		return -FILE_ERR_FTYPE;
+	}
 
-	if((file == 0) || (file->type != FILE_TYPE_FILE)) 
-		return -1;
+	// Check if offset indicates end of file
+	if(file->offset >= file->size) {
+		return FILE_EOF;
+	}
 
-	if(file->offset == file->size) 
-		return -2;
-
-	return file->driver->read(file->driver, file, buffer, size);
+	return FILE_OK;
 }
 
 ssize_t write(int fd, const void* buffer, size_t size) {
-	// Not yet implemted
+	File* file = files + fd;
+	
+	if(fd < 0 || fd >= FILE_MAX_DESC) {
+		return FILE_ERR_BADFD;
+	}
+
+	int err = file_check(file);
+	if(err != FILE_OK)
+		return err;
+
+	return fs_write(file, (void*)buffer, size);
+}
+
+ssize_t read(int fd, void* buffer, size_t size) {
+	File* file = files + fd;
+
+	if(fd < 0 || fd >= FILE_MAX_DESC) {
+		return FILE_ERR_BADFD;
+	}
+
+	int err = file_check(file);
+	if(err != FILE_OK)
+		return err;
+
+	return fs_read(file, buffer, size);
+}
+
+int read_async(int fd, void* buffer, size_t size, void(*callback)(void* buffer, size_t size, void* context), void* context) {
+	File* file = files + fd;
+
+	if(fd < 0 || fd >= FILE_MAX_DESC) {
+		callback(buffer, FILE_ERR_BADFD, context);
+		return FILE_ERR_BADFD;
+	}
+
+	int err = file_check(file);
+	if(err != FILE_OK) {
+		callback(buffer, err, context);
+		return err;
+	}
+
+	bool file_callback(List* blocks, int success, void* context) {
+		FileContext* file_context = context;
+		
+		int len = 0;
+		ListIterator iter;
+		list_iterator_init(&iter, blocks);
+		while(list_iterator_has_next(&iter)) {
+			BufferBlock* block = list_iterator_next(&iter);
+			memcpy((uint32_t*)((uint8_t*)file_context->buffer + len), block->buffer, block->size);
+			list_iterator_remove(&iter);
+			len += block->size;
+			free(block);
+		}
+
+		if(success < 0)
+			len = success;
+
+		file_context->callback(file_context->buffer, len, file_context->context);
+		free(file_context);
+		
+		return true;
+	}
+
+	FileContext* file_context = malloc(sizeof(FileContext));
+	file_context->callback = callback;
+	file_context->context = context;
+	file_context->buffer = buffer;
+
+	if(fs_read_async(file, size, file_callback, file_context) < 0) {
+		// If no buffer space available
+		callback(buffer, -FILE_ERR_NOBUFS, context);
+		free(file_context);
+		return -FILE_ERR_NOBUFS;
+	}
+
+	return 0;
+}
+
+int write_async(int fd, void* buffer, size_t size, void(*callback)(void* buffer, size_t size, void* context), void* context, void(*sync_callback)(int errno, void* context2), void* context2) {
+	File* file = files + fd;
+
+	if(fd < 0 || fd >= FILE_MAX_DESC) {
+		callback(buffer, FILE_ERR_BADFD, context);
+		return FILE_ERR_BADFD;
+	}
+
+	int err = file_check(file);
+	if(err != FILE_OK) {
+		callback(buffer, err, context);
+		return err;
+	}
+
+	fs_write_async(file, buffer, size, callback, context, sync_callback, context2);
+
 	return 0;
 }
 
 off_t lseek(int fd, off_t offset, int whence) {
 	File* file = files + fd;
 
-	if((file == 0) || (file->type != FILE_TYPE_FILE)) 
+	if(file == 0 || file->type != FILE_TYPE_FILE) 
 		return 0;
 
 	return file->driver->lseek(file->driver, file, offset, whence);

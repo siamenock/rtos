@@ -8,6 +8,7 @@ typedef enum {
 	DEVICE_TYPE_NIC,
 	DEVICE_TYPE_FILESYSTEM,
 	DEVICE_TYPE_PORT,
+	DEVICE_TYPE_VIRTIO_BLK,
 } DeviceType;
 
 DeviceType device_type;

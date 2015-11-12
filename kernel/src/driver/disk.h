@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <util/list.h>
 
 #define DISK_MAX_DRIVERS	0x10
 
@@ -11,6 +12,7 @@
 #define DISK_TYPE_PATA		0x01
 #define DISK_TYPE_SATA		0x02
 #define DISK_TYPE_USB		0x03
+#define DISK_TYPE_VIRTIO_BLK	0x04
 
 #define DISK_AVAIL_DEVICES	8 	/* Available disks for each driver */
 
@@ -23,8 +25,10 @@ typedef struct _DiskDriver {
 	
 	/* Low level file operation - disk specific */
 	int	(*init)(DiskDriver* driver, DiskDriver** disks);
-	int	(*read)(DiskDriver* driver, uint32_t lba, int sector_count, unsigned char* buf);
-	int	(*write)(DiskDriver* driver, uint32_t lba, int sector_count, unsigned char* buf);
+	int	(*read)(DiskDriver* driver, uint32_t lba, int sector_count, uint8_t* buf); 
+	int	(*read_async)(DiskDriver* driver, List* blocks, int sector_count, void(*callback)(List* blocks, int count, void* context), void* context);
+	int	(*write_async)(DiskDriver* driver, List* blocks, int sector_count, void(*callback)(List* blocks, int count, void* context), void* context);
+	int	(*write)(DiskDriver* driver, uint32_t lba, int sector_count, uint8_t* buf); 
 
 	// Probe information
 	void* 	priv;
