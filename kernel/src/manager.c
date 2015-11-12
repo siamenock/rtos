@@ -430,6 +430,30 @@ static bool manager_server_close() {
 
 	return true;
 }
+static bool manager_loop(void* context) {
+	ni_poll();
+	
+	if(!list_is_empty(actives)) {
+		ListIterator iter;
+		list_iterator_init(&iter, actives);
+		while(list_iterator_has_next(&iter)) {
+			RPC* rpc = list_iterator_next(&iter);
+			if(rpc_is_active(rpc)) {
+				rpc_loop(rpc);
+			} else {
+				list_iterator_remove(&iter);
+			}
+		}
+	}
+	
+	return true;
+}
+
+static bool manager_timer(void* context) {
+	ni_timer();
+	
+	return true;
+}
 
 void manager_init() {
 	uint64_t attrs[] = { 
@@ -473,31 +497,6 @@ void manager_init() {
 	manager_netif = ni_init(manager_ni->ni, manage, NULL);
 	
 	manager_server_open();
-	
-	bool manager_loop(void* context) {
-		ni_poll();
-		
-		if(!list_is_empty(actives)) {
-			ListIterator iter;
-			list_iterator_init(&iter, actives);
-			while(list_iterator_has_next(&iter)) {
-				RPC* rpc = list_iterator_next(&iter);
-				if(rpc_is_active(rpc)) {
-					rpc_loop(rpc);
-				} else {
-					list_iterator_remove(&iter);
-				}
-			}
-		}
-		
-		return true;
-	}
-	
-	bool manager_timer(void* context) {
-		ni_timer();
-		
-		return true;
-	}
 	
 	event_idle_add(manager_loop, NULL);
 	event_timer_add(manager_timer, NULL, 100000, 100000);
