@@ -21,3 +21,6 @@ sdk/bin/console
 sdk/include/*
 sdk/lib/*.a
 sdk/sysmte.img
+
+# bin
+bin

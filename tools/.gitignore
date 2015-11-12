@@ -5,3 +5,8 @@ src/rpc_callback.h
 src/rpc_callback_clnt.c
 src/rpc_callback_svc.c
 src/rpc_callback_xdr.c
+
+console/console
+pnkc/pnkc
+rewrite/rewrite
+smap/smap

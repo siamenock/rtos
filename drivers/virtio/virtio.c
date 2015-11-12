@@ -540,7 +540,7 @@ void destroy(int id) {
 	bfree(priv[id]->svq->vring.desc);
 	gfree(priv[id]->svq);
 	
-	if(device_has_feature(&priv[id]->vdev, VIRTIO_NET_F_CTRL_VQ) == 3) {
+	if(device_has_feature(&priv[id]->vdev, VIRTIO_NET_F_CTRL_VQ)) {
 		bfree(priv[id]->cvq->vring.desc);
 		gfree(priv[id]->rvq);
 	}

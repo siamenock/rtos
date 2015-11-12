@@ -24,3 +24,5 @@ zlib*/configure.log
 zlib*/example*
 zlib*/minigzip*
 zlib*/zlib.pc
+zlib*/Makefile
+
