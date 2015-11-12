@@ -17,6 +17,8 @@
 #define MMIO(bus, slot, function, reg)		(((uint64_t)bus << 20) | ((uint64_t)slot << 15) | ((uint64_t)function << 12) | ((uint64_t)reg))
 #define PORTIO(bus, slot, function, reg)	((1 << 31) | (bus << 16) | (slot << 11) | (function << 8) | (reg & 0xfc))
 
+#define PCI_DUMP		0
+
 void* pci_mmio[PCI_MAX_BUS];
 
 int pci_cache_line_size;
@@ -142,7 +144,8 @@ void pci_init() {
 	pci_devices_count = pci_count();
 
 	pci_analyze();
-		/*
+
+#if PCI_DUMP
 	for(int i = 0; i < pci_devices_count; i++) {
 		PCI_Device* device = &pci_devices[i];
 		if(!device->caps[PCI_CAP_ID_EXP])
@@ -169,7 +172,7 @@ void pci_init() {
 		}
 		printf("\n");
 	}
-		*/
+#endif
 	
 	// Probe PCIe port
 	pci_probe(port_device_type, port_device_probe, &port_device_driver);
