@@ -56,7 +56,7 @@ bool fs_init() {
 				write_buffers = list_create(NULL);
 				read_buffers = list_create(NULL);
 				wait_lists = list_create(NULL);
-#endif
+#endif /* _KERNEL_ */
 
 				return true;
 			}
@@ -255,14 +255,14 @@ int fs_read_async(File* file, size_t size, bool(*callback)(List* blocks, int suc
 		void*		context;
 		uint32_t	offset;
 		File*		file;
-	} FSContext;
+	} ReadContext;
 
 	FileSystemDriver* driver = file->driver;
-	FSContext* fs_context = malloc(sizeof(FSContext));
-	fs_context->offset = file->offset % FS_BLOCK_SIZE;
-	fs_context->callback= callback;
-	fs_context->context = context;
-	fs_context->file = file;
+	ReadContext* read_context= malloc(sizeof(ReadContext));
+	read_context->offset = file->offset % FS_BLOCK_SIZE;
+	read_context->callback= callback;
+	read_context->context = context;
+	read_context->file = file;
 
 	/* 
 	 * Set cache datas which are read successfully from the disk
@@ -272,8 +272,8 @@ int fs_read_async(File* file, size_t size, bool(*callback)(List* blocks, int suc
 	 * @param context a context
 	 */
 	void read_callback(List* blocks, int count, void* context) {
-		FSContext* fs_context = context;
-		File* file = fs_context->file;
+		ReadContext* read_context= context;
+		File* file = read_context->file;
 
 		int read_count = 0;
 		ListIterator iter;
@@ -293,10 +293,10 @@ int fs_read_async(File* file, size_t size, bool(*callback)(List* blocks, int suc
 
 		BufferBlock* first_block = list_get_first(blocks);
 		if(first_block)
-			first_block->buffer = (uint8_t*)first_block->buffer - fs_context->offset;
+			first_block->buffer = (uint8_t*)first_block->buffer - read_context->offset;
 
-		fs_context->callback(blocks, count, fs_context->context);
-		free(fs_context);
+		read_context->callback(blocks, count, read_context->context);
+		free(read_context);
 	}
 
 	size_t total_size = size;
@@ -328,28 +328,28 @@ int fs_read_async(File* file, size_t size, bool(*callback)(List* blocks, int suc
 
 	// If it needs to read from the disk
 	if(none_cached) {
-		driver->read_async(driver->driver, read_buffers, read_callback, fs_context);
+		driver->read_async(driver->driver, read_buffers, read_callback, read_context);
+#ifdef _KERNEL_
 	} else {	// If all the blocks are from the cache
 		typedef struct {
 			int count;
 			void* context;
-		} EventContext;
+		} ReadTickContext;
 
-		bool timer(void* context) {
-			EventContext* event_context = context;
-			read_callback(read_buffers, event_context->count, event_context->context);
-			free(event_context);
+		bool read_tick(void* context) {
+			ReadTickContext* read_tick_ctxt = context;
+			read_callback(read_buffers, read_tick_ctxt->count, read_tick_ctxt->context);
+			free(read_tick_ctxt);
 			return false;
 		}
 
-		EventContext* event_context = malloc(sizeof(EventContext));
-		event_context->count = count;
-		event_context->context = fs_context;
+		ReadTickContext* read_tick_ctxt = malloc(sizeof(ReadTickContext));
+		read_tick_ctxt->count = count;
+		read_tick_ctxt->context = read_context;
 
 		// Need to add event to prevent an infinite cycle
-#ifdef _KERNEL_
-		event_busy_add(timer, event_context);
-#endif
+		event_busy_add(read_tick, read_tick_ctxt);
+#endif /* _KERNEL_ */ 
 	}
 	return 1;
 }
@@ -359,21 +359,22 @@ typedef struct {
 	void*			context;
 	FileSystemDriver*	driver;
 	uint64_t*		event_id;
-} TimerContext;
+} SyncContext;
 
 // Flush the write buffer and sync with the disk
-static bool sync(void* context) {
-	TimerContext* timer_context= context;
-	FileSystemDriver* driver = timer_context->driver;
-	if(!driver->write_async(driver->driver, write_buffers, timer_context->callback, timer_context->context)) {
-		*timer_context->event_id = 0;
-		free(timer_context);
+static bool sync_tick(void* context) {
+	SyncContext* sync_context= context;
+	FileSystemDriver* driver = sync_context->driver;
+	if(!driver->write_async(driver->driver, write_buffers, sync_context->callback, sync_context->context)) {
+		*sync_context->event_id = 0;
+		free(sync_context);
 		return false;
 	}
 
 	return true;
 }
 
+// TODO: Combine write and fragment
 bool fs_write_async(File* file, void* buffer, size_t size, void(*callback)(void* buffer, size_t len, void* context), void* context, void(*sync_callback)(int errno, void* context2), void* context2) {
 #ifdef _KERNEL_
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
@@ -386,34 +387,34 @@ bool fs_write_async(File* file, void* buffer, size_t size, void(*callback)(void*
 		void(*callback)(void* buffer, size_t len, void* context);
 		void(*sync_callback)(int errno, void* context2);
 		void*		context;
-		void*		context2;
+		void*		sync_context;
 		File*		file;
 		void*		buffer;
 		size_t		size;
-	} WaitContext;
+	} LazyWriteContext;
 
 	typedef struct {
 		void(*callback)(int errno, void* context);
 		void*		context;
-	} SyncContext;
+	} SyncedContext;
 
-	void _sync_callback(List* blocks, int len, void* context) {
+	void synced_callback(List* blocks, int len, void* context) {
 		// Call the sync callback
-		SyncContext* sync_context = context;
-		if(sync_context->callback)
-			sync_context->callback(len, sync_context->context);
-		free(sync_context);
+		SyncedContext* synced_context = context;
+		if(synced_context->callback)
+			synced_context->callback(len, synced_context->context);
+		free(synced_context);
 
 		// If there are another write operations in the wating list. Do it now.
 		ListIterator iter;
 		list_iterator_init(&iter, wait_lists);
 		while(list_iterator_has_next(&iter)) {
-			WaitContext* wait_context = list_iterator_next(&iter);
+			LazyWriteContext* lazy_write = list_iterator_next(&iter);
 			list_iterator_remove(&iter);
 
 			// If write operation is done well, free the context and remove from the list
-			if(fs_write_async(wait_context->file, wait_context->buffer, wait_context->size, wait_context->callback, wait_context->context, wait_context->sync_callback, wait_context->context2)) {
-				free(wait_context);
+			if(fs_write_async(lazy_write->file, lazy_write->buffer, lazy_write->size, lazy_write->callback, lazy_write->context, lazy_write->sync_callback, lazy_write->sync_context)) {
+				free(lazy_write);
 			} else {	// If there's no room in the write buffer
 				break;
 			}
@@ -423,17 +424,17 @@ bool fs_write_async(File* file, void* buffer, size_t size, void(*callback)(void*
 	static uint64_t event_id = 0;
 	// If write buffer is full
 	if(FS_WRITE_BUF_SIZE - list_size(write_buffers) < size / FS_BLOCK_SIZE) {
-		WaitContext* wait_context = malloc(sizeof(WaitContext));
-		wait_context->callback = callback;
-		wait_context->sync_callback = sync_callback;
-		wait_context->context = context;
-		wait_context->context2 = context2;
-		wait_context->file = file;
-		wait_context->buffer = buffer;
-		wait_context->size = size;
+		LazyWriteContext* lazy_write = malloc(sizeof(LazyWriteContext));
+		lazy_write->callback = callback;
+		lazy_write->sync_callback = sync_callback;
+		lazy_write->context = context;
+		lazy_write->sync_context= context2;
+		lazy_write->file = file;
+		lazy_write->buffer = buffer;
+		lazy_write->size = size;
 
 		// Add context information into the list
-		list_add(wait_lists, wait_context);
+		list_add(wait_lists, lazy_write);
 
 		// Update the period of timer event to fire
 		event_timer_update(event_id, 0);
@@ -442,20 +443,22 @@ bool fs_write_async(File* file, void* buffer, size_t size, void(*callback)(void*
 	} else if(event_id) {
 		event_timer_update(event_id, 100000);
 	} else {	// If there's no timer event registered yet
-		SyncContext* sync_context = malloc(sizeof(SyncContext));
-		sync_context->callback = sync_callback;
-		sync_context->context = context2;
+		SyncedContext* synced_context = malloc(sizeof(SyncContext));
+		synced_context->callback = sync_callback;
+		synced_context->context = context2;
 
-		TimerContext* timer_context = malloc(sizeof(TimerContext));
-		timer_context->driver = file->driver;
-		timer_context->callback = _sync_callback;
-		timer_context->context = sync_context;
-		timer_context->event_id = &event_id;
+		SyncContext* sync_context= malloc(sizeof(SyncContext));
+		sync_context->driver = file->driver;
+		sync_context->callback = synced_callback;
+		sync_context->context = synced_context;
+		sync_context->event_id = &event_id;
 
-		event_id = event_timer_add(sync, timer_context, 100000, 100000);
+		event_id = event_timer_add(sync_tick, sync_context, 100000, 100000);
 	}
 
 	typedef struct {
+		void(*callback)(void* buffer, size_t len, void* context);
+		void*		usr_buffer;
 		List*		blocks;
 		void*		context;
 		void*		buffer[2];
@@ -497,27 +500,14 @@ bool fs_write_async(File* file, void* buffer, size_t size, void(*callback)(void*
 		offset += block->size;
 	}
 
-	typedef struct {
-		void(*callback)(void* buffer, size_t len, void* context);
-		void*		context;
-		void*		buffer;
-	} WriteContext;
-
-	void write_callback(size_t len, void* context) {
-		WriteContext* write_context = context;
-		if(write_context->callback)
-			write_context->callback(write_context->buffer, len, write_context->context);
-
-		free(write_context);
-	}
-
-	void read_callback(List* fragments, int count, void* context) {
+	void frag_read_callback(List* fragments, int count, void* context) {
 		FragContext* frag_context = context;
 		// If read error occurs
 		if(count < 0) {
 			list_destroy(frag_context->blocks);
 			list_destroy(fragments);
-			write_callback(count, frag_context->context);
+			if(frag_context->callback)
+				frag_context->callback(frag_context->usr_buffer, count, frag_context->context);
 			free(context);
 			return;
 		}
@@ -555,31 +545,28 @@ bool fs_write_async(File* file, void* buffer, size_t size, void(*callback)(void*
 		list_destroy(frag_context->blocks);
 
 		// Callback
-		write_callback(len, frag_context->context);
+		frag_context->callback(frag_context->usr_buffer, len, frag_context->context);
 		free(frag_context);
 	}
 
-	WriteContext* write_context = malloc(sizeof(WriteContext));
-	write_context->callback = callback;
-	write_context->context = context;
-	write_context->buffer = buffer;
-
-	frag_context->context = write_context;
+	frag_context->callback = callback;
+	frag_context->context = context;
+	frag_context->usr_buffer = buffer;
 	frag_context->blocks = blocks;
 
 	if(fragments) {
 		FileSystemDriver* driver = file->driver;
-		driver->read_async(driver->driver, fragments, read_callback, frag_context);
+		driver->read_async(driver->driver, fragments, frag_read_callback, frag_context);
 	} else {
-		bool timer(void* context) {
-			read_callback(NULL, 0, context);
+		bool write_tick(void* context) {
+			frag_read_callback(NULL, 0, context);
 			return false;
 		}
 
 		// Need to add event to prevent an infinite cycle
-		event_busy_add(timer, frag_context);
+		event_busy_add(write_tick, frag_context);
 	}
 
 	return true;
-#endif
+#endif /* _KERNEL_ */ 
 }
