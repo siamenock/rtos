@@ -875,12 +875,12 @@ static int cmd_send(int argc, char** argv, void(*callback)(char* result, int exi
 	return 0;
 }
 
-static int cmd_status_set(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
-	void status_setted(bool result, void* context) {
-		void(*callback)(char* result, int exit_status) = context;
-		callback(result ? "true" : "false", 0);
-	}
+static void status_setted(bool result, void* context) {
+	void(*callback)(char* result, int exit_status) = context;
+	callback(result ? "true" : "false", 0);
+}
 
+static int cmd_status_set(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	if(argc < 2) {
 		return CMD_STATUS_WRONG_NUMBER;
 	}

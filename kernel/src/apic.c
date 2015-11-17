@@ -61,12 +61,13 @@ void apic_activate() {
 	_apic_activate();
 }
 
+// Dummy interrupt handler
+static void dummy_timer_handler(uint64_t vector, uint64_t error_code) {
+	// Do nothing
+	apic_eoi();
+}
+
 void apic_init() {
-	// Dummy interrupt handler
-	void dummy_timer_handler(uint64_t vector, uint64_t error_code) {
-		// Do nothing
-		apic_eoi();
-	}
 	apic_register(32, dummy_timer_handler);
 	
 	apic_write32(APIC_REG_SIVR, apic_read32(APIC_REG_SIVR) | 0x100);

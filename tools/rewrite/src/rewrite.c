@@ -24,8 +24,6 @@ int main(int argc, char* argv[]) {
 	}
 
 	uint32_t total = state.st_size / 512;
-	printf("total : %d\n", total);
-	
 	if(total > UINT16_MAX) {
 		printf("Total size exceed: %d\n", total);
 		return 3;

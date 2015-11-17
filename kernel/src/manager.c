@@ -170,22 +170,22 @@ static void status_get_handler(RPC* rpc, uint32_t vmid, void* context, void(*cal
 	callback(rpc, status);
 }
 
-static void status_set_handler(RPC* rpc, uint32_t vmid, VMStatus status, void* context, void(*callback)(RPC* rpc, bool result)) {
-	typedef struct {
-		RPC* rpc;
-		struct tcp_pcb*	pcb;
-		void(*callback)(RPC* rpc, bool result);
-	} Data;
+typedef struct {
+	RPC* rpc;
+	struct tcp_pcb*	pcb;
+	void(*callback)(RPC* rpc, bool result);
+} Data;
+
+static void status_setted(bool result, void* context) {
+	Data* data = context;
 	
-	void status_setted(bool result, void* context) {
-		Data* data = context;
-		
-		if(list_index_of(clients, data->pcb, NULL) >= 0) {
-			data->callback(data->rpc, result);
-		}
-		free(data);
+	if(list_index_of(clients, data->pcb, NULL) >= 0) {
+		data->callback(data->rpc, result);
 	}
-	
+	free(data);
+}
+
+static void status_set_handler(RPC* rpc, uint32_t vmid, VMStatus status, void* context, void(*callback)(RPC* rpc, bool result)) {
 	Data* data = malloc(sizeof(Data));
 	data->rpc = rpc;
 	data->pcb = context;

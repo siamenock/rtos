@@ -10,7 +10,7 @@ typedef struct {
 	void(*callback)(void* buffer, size_t len, void* context);
 	void*			context;
 	void*			buffer;
-} FileContext;
+} ReadContext;
 
 static File files[FILE_MAX_DESC]; 
 
@@ -142,6 +142,29 @@ ssize_t read(int fd, void* buffer, size_t size) {
 	return fs_read(file, buffer, size);
 }
 
+static bool read_callback(List* blocks, int success, void* context) {
+	ReadContext* read_context = context;
+	
+	int len = 0;
+	ListIterator iter;
+	list_iterator_init(&iter, blocks);
+	while(list_iterator_has_next(&iter)) {
+		BufferBlock* block = list_iterator_next(&iter);
+		memcpy((uint32_t*)((uint8_t*)read_context->buffer + len), block->buffer, block->size);
+		list_iterator_remove(&iter);
+		len += block->size;
+		free(block);
+	}
+
+	if(success < 0)
+		len = success;
+
+	read_context->callback(read_context->buffer, len, read_context->context);
+	free(read_context);
+	
+	return true;
+}
+
 int read_async(int fd, void* buffer, size_t size, void(*callback)(void* buffer, size_t size, void* context), void* context) {
 	File* file = files + fd;
 
@@ -156,38 +179,15 @@ int read_async(int fd, void* buffer, size_t size, void(*callback)(void* buffer, 
 		return err;
 	}
 
-	bool file_callback(List* blocks, int success, void* context) {
-		FileContext* file_context = context;
-		
-		int len = 0;
-		ListIterator iter;
-		list_iterator_init(&iter, blocks);
-		while(list_iterator_has_next(&iter)) {
-			BufferBlock* block = list_iterator_next(&iter);
-			memcpy((uint32_t*)((uint8_t*)file_context->buffer + len), block->buffer, block->size);
-			list_iterator_remove(&iter);
-			len += block->size;
-			free(block);
-		}
+	ReadContext* read_context = malloc(sizeof(ReadContext));
+	read_context->callback = callback;
+	read_context->context = context;
+	read_context->buffer = buffer;
 
-		if(success < 0)
-			len = success;
-
-		file_context->callback(file_context->buffer, len, file_context->context);
-		free(file_context);
-		
-		return true;
-	}
-
-	FileContext* file_context = malloc(sizeof(FileContext));
-	file_context->callback = callback;
-	file_context->context = context;
-	file_context->buffer = buffer;
-
-	if(fs_read_async(file, size, file_callback, file_context) < 0) {
+	if(fs_read_async(file, size, read_callback, read_context) < 0) {
 		// If no buffer space available
 		callback(buffer, -FILE_ERR_NOBUFS, context);
-		free(file_context);
+		free(read_context);
 		return -FILE_ERR_NOBUFS;
 	}
 

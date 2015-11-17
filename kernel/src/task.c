@@ -94,25 +94,25 @@ void ts_clear();
 static uint32_t current_task;
 static uint32_t last_fpu_task = (uint32_t)-1;
 
-void task_init() {
-	void device_not_available_handler(uint64_t vector, uint64_t error_code) {
-		ts_clear();
-		
-		if(last_fpu_task != (uint32_t)-1) {
-			fxsave(tasks[last_fpu_task].fpu);
-		}
-		
-		Task* task = &tasks[current_task];
-		if(task->is_fpu_inited) {
-			fxrstor(task->fpu);
-		} else {
-			finit();
-			task->is_fpu_inited = true;
-		}
-		
-		last_fpu_task = current_task;
+static void device_not_available_handler(uint64_t vector, uint64_t error_code) {
+	ts_clear();
+	
+	if(last_fpu_task != (uint32_t)-1) {
+		fxsave(tasks[last_fpu_task].fpu);
 	}
 	
+	Task* task = &tasks[current_task];
+	if(task->is_fpu_inited) {
+		fxrstor(task->fpu);
+	} else {
+		finit();
+		task->is_fpu_inited = true;
+	}
+	
+	last_fpu_task = current_task;
+}
+
+void task_init() {
 	ts_clear();
 	finit();
 	tasks[0].is_fpu_inited = true;
