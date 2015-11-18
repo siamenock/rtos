@@ -238,6 +238,124 @@ ssize_t fs_read(File* file, void* buffer, size_t size) {
 	return read_count;
 }
 
+typedef struct {
+	bool(*callback)(List* blocks, int count, void* context);
+	void*		context;
+	uint32_t	offset;
+	File*		file;
+} ReadContext;
+
+/* 
+ * Set cache datas which are read successfully from the disk
+ * 
+ * @param blocks a list containing blocks
+ * @param count a number of successful read
+ * @param context a context
+ */
+static void read_callback(List* blocks, int count, void* context) {
+	ReadContext* read_context= context;
+	File* file = read_context->file;
+
+	int read_count = 0;
+	ListIterator iter;
+	list_iterator_init(&iter, blocks);
+	while(list_iterator_has_next(&iter)) {
+		BufferBlock* block = list_iterator_next(&iter);
+
+		if(read_count++ < count) {
+			// Cache setting
+			cache_set(cache, (void*)(uintptr_t)block->sector, block->buffer);
+			file->offset += block->size;
+		} else {
+			list_iterator_remove(&iter);
+			free(block);
+		}
+	}
+
+	BufferBlock* first_block = list_get_first(blocks);
+	if(first_block)
+		first_block->buffer = (uint8_t*)first_block->buffer - read_context->offset;
+
+	read_context->callback(blocks, count, read_context->context);
+	free(read_context);
+}
+
+typedef struct {
+	int count;
+	void* context;
+} ReadTickContext;
+
+static bool read_tick(void* context) {
+	ReadTickContext* read_tick_ctx = context;
+	read_callback(read_buffers, read_tick_ctx->count, read_tick_ctx->context);
+	free(read_tick_ctx);
+	
+	return false;
+}
+
+typedef struct {
+	void(*callback)(void* buffer, size_t len, void* context);
+	void*		usr_buffer;
+	List*		blocks;
+	void*		context;
+	void*		buffer[2];
+	size_t		offset[2];
+} FragContext;
+
+static void frag_read_callback(List* fragments, int count, void* context) {
+	FragContext* frag_context = context;
+	// If read error occurs
+	if(count < 0) {
+		list_destroy(frag_context->blocks);
+		list_destroy(fragments);
+		if(frag_context->callback)
+			frag_context->callback(frag_context->usr_buffer, count, frag_context->context);
+		free(context);
+		return;
+	}
+
+	for(int i = 0; i < count; i++) {
+		// Modify fragments to make a block
+		BufferBlock* block = list_remove_first(fragments);
+		memcpy(block->buffer + frag_context->offset[i], frag_context->buffer[i], block->size);
+
+		// Move modified block into the clean list
+		list_add(frag_context->blocks, block);
+	}
+
+	if(fragments)
+		list_destroy(fragments);
+
+	size_t len = 0;
+	ListIterator iter;
+	list_iterator_init(&iter, frag_context->blocks);
+	while(list_iterator_has_next(&iter)) {
+		BufferBlock* block = list_iterator_next(&iter);
+		list_iterator_remove(&iter);
+
+		// Move clean blocks into write buffers
+		list_add(write_buffers, block);
+
+		// Cache update
+		void* data = cache_get(cache, (void*)(uintptr_t)block->sector);
+		if(data)
+			memcpy(data, block->buffer, FS_BLOCK_SIZE);
+
+		len += block->size;
+	}
+
+	list_destroy(frag_context->blocks);
+
+	// Callback
+	frag_context->callback(frag_context->usr_buffer, len, frag_context->context);
+	free(frag_context);
+}
+
+static bool write_tick(void* context) {
+	frag_read_callback(NULL, 0, context);
+	return false;
+}
+
 int fs_read_async(File* file, size_t size, bool(*callback)(List* blocks, int success, void* context), void* context) {
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 	// If there is no space in the buffer
@@ -250,54 +368,12 @@ int fs_read_async(File* file, size_t size, bool(*callback)(List* blocks, int suc
 	// check request user block count > max cache blocks
 	size = MIN(FS_CACHE_BLOCK * FS_BLOCK_SIZE, size);
 
-	typedef struct {
-		bool(*callback)(List* blocks, int count, void* context);
-		void*		context;
-		uint32_t	offset;
-		File*		file;
-	} ReadContext;
-
 	FileSystemDriver* driver = file->driver;
 	ReadContext* read_context= malloc(sizeof(ReadContext));
 	read_context->offset = file->offset % FS_BLOCK_SIZE;
 	read_context->callback= callback;
 	read_context->context = context;
 	read_context->file = file;
-
-	/* 
-	 * Set cache datas which are read successfully from the disk
-	 * 
-	 * @param blocks a list containing blocks
-	 * @param count a number of successful read
-	 * @param context a context
-	 */
-	void read_callback(List* blocks, int count, void* context) {
-		ReadContext* read_context= context;
-		File* file = read_context->file;
-
-		int read_count = 0;
-		ListIterator iter;
-		list_iterator_init(&iter, blocks);
-		while(list_iterator_has_next(&iter)) {
-			BufferBlock* block = list_iterator_next(&iter);
-
-			if(read_count++ < count) {
-				// Cache setting
-				cache_set(cache, (void*)(uintptr_t)block->sector, block->buffer);
-				file->offset += block->size;
-			} else {
-				list_iterator_remove(&iter);
-				free(block);
-			}
-		}
-
-		BufferBlock* first_block = list_get_first(blocks);
-		if(first_block)
-			first_block->buffer = (uint8_t*)first_block->buffer - read_context->offset;
-
-		read_context->callback(blocks, count, read_context->context);
-		free(read_context);
-	}
 
 	size_t total_size = size;
 	size_t offset = file->offset;
@@ -331,24 +407,12 @@ int fs_read_async(File* file, size_t size, bool(*callback)(List* blocks, int suc
 		driver->read_async(driver->driver, read_buffers, read_callback, read_context);
 #ifdef _KERNEL_
 	} else {	// If all the blocks are from the cache
-		typedef struct {
-			int count;
-			void* context;
-		} ReadTickContext;
-
-		bool read_tick(void* context) {
-			ReadTickContext* read_tick_ctxt = context;
-			read_callback(read_buffers, read_tick_ctxt->count, read_tick_ctxt->context);
-			free(read_tick_ctxt);
-			return false;
-		}
-
-		ReadTickContext* read_tick_ctxt = malloc(sizeof(ReadTickContext));
-		read_tick_ctxt->count = count;
-		read_tick_ctxt->context = read_context;
+		ReadTickContext* read_tick_ctx = malloc(sizeof(ReadTickContext));
+		read_tick_ctx->count = count;
+		read_tick_ctx->context = read_context;
 
 		// Need to add event to prevent an infinite cycle
-		event_busy_add(read_tick, read_tick_ctxt);
+		event_busy_add(read_tick, read_tick_ctx);
 #endif /* _KERNEL_ */ 
 	}
 	return 1;
@@ -374,7 +438,44 @@ static bool sync_tick(void* context) {
 	return true;
 }
 
-// TODO: Combine write and fragment
+typedef struct {
+	void(*callback)(void* buffer, size_t len, void* context);
+	void(*sync_callback)(int errno, void* context2);
+	void*		context;
+	void*		sync_context;
+	File*		file;
+	void*		buffer;
+	size_t		size;
+} LazyWriteContext;
+
+typedef struct {
+	void(*callback)(int errno, void* context);
+	void*		context;
+} SyncedContext;
+
+static void synced_callback(List* blocks, int len, void* context) {
+	// Call the sync callback
+	SyncedContext* synced_context = context;
+	if(synced_context->callback)
+		synced_context->callback(len, synced_context->context);
+	free(synced_context);
+
+	// If there are another write operations in the wating list. Do it now.
+	ListIterator iter;
+	list_iterator_init(&iter, wait_lists);
+	while(list_iterator_has_next(&iter)) {
+		LazyWriteContext* lazy_write = list_iterator_next(&iter);
+		list_iterator_remove(&iter);
+
+		// If write operation is done well, free the context and remove from the list
+		if(fs_write_async(lazy_write->file, lazy_write->buffer, lazy_write->size, lazy_write->callback, lazy_write->context, lazy_write->sync_callback, lazy_write->sync_context)) {
+			free(lazy_write);
+		} else {	// If there's no room in the write buffer
+			break;
+		}
+	}
+}
+
 bool fs_write_async(File* file, void* buffer, size_t size, void(*callback)(void* buffer, size_t len, void* context), void* context, void(*sync_callback)(int errno, void* context2), void* context2) {
 #ifdef _KERNEL_
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
@@ -382,44 +483,6 @@ bool fs_write_async(File* file, void* buffer, size_t size, void(*callback)(void*
 	size = MIN(file->size - file->offset, size);
 	// Temporarily set the maximum size : FS_BLOCK_SIZE(4K) * 2560 : 10M
 	size = MIN(size, FS_BLOCK_SIZE * FS_WRITE_BUF_SIZE);
-
-	typedef struct {
-		void(*callback)(void* buffer, size_t len, void* context);
-		void(*sync_callback)(int errno, void* context2);
-		void*		context;
-		void*		sync_context;
-		File*		file;
-		void*		buffer;
-		size_t		size;
-	} LazyWriteContext;
-
-	typedef struct {
-		void(*callback)(int errno, void* context);
-		void*		context;
-	} SyncedContext;
-
-	void synced_callback(List* blocks, int len, void* context) {
-		// Call the sync callback
-		SyncedContext* synced_context = context;
-		if(synced_context->callback)
-			synced_context->callback(len, synced_context->context);
-		free(synced_context);
-
-		// If there are another write operations in the wating list. Do it now.
-		ListIterator iter;
-		list_iterator_init(&iter, wait_lists);
-		while(list_iterator_has_next(&iter)) {
-			LazyWriteContext* lazy_write = list_iterator_next(&iter);
-			list_iterator_remove(&iter);
-
-			// If write operation is done well, free the context and remove from the list
-			if(fs_write_async(lazy_write->file, lazy_write->buffer, lazy_write->size, lazy_write->callback, lazy_write->context, lazy_write->sync_callback, lazy_write->sync_context)) {
-				free(lazy_write);
-			} else {	// If there's no room in the write buffer
-				break;
-			}
-		}
-	}
 
 	static uint64_t event_id = 0;
 	// If write buffer is full
@@ -456,15 +519,6 @@ bool fs_write_async(File* file, void* buffer, size_t size, void(*callback)(void*
 		event_id = event_timer_add(sync_tick, sync_context, 100000, 100000);
 	}
 
-	typedef struct {
-		void(*callback)(void* buffer, size_t len, void* context);
-		void*		usr_buffer;
-		List*		blocks;
-		void*		context;
-		void*		buffer[2];
-		size_t		offset[2];
-	} FragContext;
-
 	int len = 0;
 	int head = 0;
 	size_t offset = file->offset;
@@ -500,55 +554,6 @@ bool fs_write_async(File* file, void* buffer, size_t size, void(*callback)(void*
 		offset += block->size;
 	}
 
-	void frag_read_callback(List* fragments, int count, void* context) {
-		FragContext* frag_context = context;
-		// If read error occurs
-		if(count < 0) {
-			list_destroy(frag_context->blocks);
-			list_destroy(fragments);
-			if(frag_context->callback)
-				frag_context->callback(frag_context->usr_buffer, count, frag_context->context);
-			free(context);
-			return;
-		}
-
-		for(int i = 0; i < count; i++) {
-			// Modify fragments to make a block
-			BufferBlock* block = list_remove_first(fragments);
-			memcpy(block->buffer + frag_context->offset[i], frag_context->buffer[i], block->size);
-
-			// Move modified block into the clean list
-			list_add(frag_context->blocks, block);
-		}
-
-		if(fragments)
-			list_destroy(fragments);
-
-		size_t len = 0;
-		ListIterator iter;
-		list_iterator_init(&iter, frag_context->blocks);
-		while(list_iterator_has_next(&iter)) {
-			BufferBlock* block = list_iterator_next(&iter);
-			list_iterator_remove(&iter);
-
-			// Move clean blocks into write buffers
-			list_add(write_buffers, block);
-
-			// Cache update
-			void* data = cache_get(cache, (void*)(uintptr_t)block->sector);
-			if(data)
-				memcpy(data, block->buffer, FS_BLOCK_SIZE);
-
-			len += block->size;
-		}
-
-		list_destroy(frag_context->blocks);
-
-		// Callback
-		frag_context->callback(frag_context->usr_buffer, len, frag_context->context);
-		free(frag_context);
-	}
-
 	frag_context->callback = callback;
 	frag_context->context = context;
 	frag_context->usr_buffer = buffer;
@@ -558,11 +563,6 @@ bool fs_write_async(File* file, void* buffer, size_t size, void(*callback)(void*
 		FileSystemDriver* driver = file->driver;
 		driver->read_async(driver->driver, fragments, frag_read_callback, frag_context);
 	} else {
-		bool write_tick(void* context) {
-			frag_read_callback(NULL, 0, context);
-			return false;
-		}
-
 		// Need to add event to prevent an infinite cycle
 		event_busy_add(write_tick, frag_context);
 	}
