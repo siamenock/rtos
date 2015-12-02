@@ -26,4 +26,8 @@ void stdio_dump(int coreno, int fd, char* buffer, volatile size_t* head, volatil
 void stdio_scancode(int code);
 int stdio_getchar();
 
+void stdio_print(const char* str, int row, int col);
+void stdio_print_32(uint32_t v, int row, int col);
+void stdio_print_64(uint64_t v, int row, int col);
+
 #endif /* __STDIO_H__ */

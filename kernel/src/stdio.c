@@ -626,16 +626,74 @@ int stdio_getchar() {
 int stdio_putchar(const char ch) {
 	return ring_write(__stdin, __stdin_head, &__stdin_tail, __stdin_size, &ch, 1);
 }
-/*
-void _print(const char* str, int row, int col) {
-	char* v = (char*)0xb8000 + (row * 160) + col * 2;
+
+void stdio_print(const char* str, int row, int col) {
+	char* video = (char*)0xb8000 + (row * 160) + col * 2;
 	while(*str != 0) {
-		*(v++) = *str;
-		*(v++) = 0x07;
+		*(video++) = *str;
+		*(video++) = 0x07;
 		str++;
 	}
 }
-*/
+
+void stdio_print_32(uint32_t v, int row, int col) {
+	char* video = (char*)0xb8000 + (row * 160) + col * 2;
+	
+	*video++ = HEX(v >> 28);
+	*video++ = 0x07;
+	*video++ = HEX(v >> 24);
+	*video++ = 0x07;
+	*video++ = HEX(v >> 20);
+	*video++ = 0x07;
+	*video++ = HEX(v >> 16);
+	*video++ = 0x07;
+	*video++ = HEX(v >> 12);
+	*video++ = 0x07;
+	*video++ = HEX(v >> 8);
+	*video++ = 0x07;
+	*video++ = HEX(v >> 4);
+	*video++ = 0x07;
+	*video++ = HEX(v >> 0);
+	*video++ = 0x07;
+}
+
+void stdio_print_64(uint64_t v, int row, int col) {
+	char* video = (char*)0xb8000 + (row * 160) + col * 2;
+	
+	*video++ = HEX(v >> 60);
+	*video++ = 0x07;
+	*video++ = HEX(v >> 56);
+	*video++ = 0x07;
+	*video++ = HEX(v >> 52);
+	*video++ = 0x07;
+	*video++ = HEX(v >> 48);
+	*video++ = 0x07;
+	*video++ = HEX(v >> 44);
+	*video++ = 0x07;
+	*video++ = HEX(v >> 40);
+	*video++ = 0x07;
+	*video++ = HEX(v >> 36);
+	*video++ = 0x07;
+	*video++ = HEX(v >> 32);
+	*video++ = 0x07;
+	
+	*video++ = HEX(v >> 28);
+	*video++ = 0x07;
+	*video++ = HEX(v >> 24);
+	*video++ = 0x07;
+	*video++ = HEX(v >> 20);
+	*video++ = 0x07;
+	*video++ = HEX(v >> 16);
+	*video++ = 0x07;
+	*video++ = HEX(v >> 12);
+	*video++ = 0x07;
+	*video++ = HEX(v >> 8);
+	*video++ = 0x07;
+	*video++ = HEX(v >> 4);
+	*video++ = 0x07;
+	*video++ = HEX(v >> 0);
+	*video++ = 0x07;
+}
 
 int vsprintf(char *str, const char *format, va_list va) {
 	char* str0 = str;
