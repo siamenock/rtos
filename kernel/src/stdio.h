@@ -3,7 +3,7 @@
 
 #include <stddef.h>
 #include <stdbool.h>
-#include <stdint.h>
+#include <util/types.h>
 
 #define STDIO_NORMAL  0x07
 #define STDIO_PASS    0x02
