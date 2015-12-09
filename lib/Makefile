@@ -1,6 +1,6 @@
 .PHONY: all clean cleanall core newlib
 
-all: libtlsf.a libtlsf_32.a libjsmn.a libcore.a libcore_32.a libcore_linux.a libc.a libm.a libz.a libssl.a liblwip.a libxdr.a libpacketngin.a libumpn.a
+all: libtlsf.a libtlsf_32.a libjsmn.a libcore.a libcore_32.a libcore_linux.a libc.a libm.a libexpat.a libz.a libssl.a liblwip.a libxdr.a libpacketngin.a libumpn.a
 
 libtlsf.a: 
 	make -C TLSF/src
@@ -63,6 +63,7 @@ libpacketngin.a: libc.a libm.a libtlsf.a libcore.a
 	cd obj; ar x ../libm.a
 	cd obj; ar x ../libtlsf.a
 	cd obj; ar x ../libcore.a
+	cd obj; ar x ../libexpat.a
 	cd obj; ar rcs ../$@ *.o
 	rm -r obj
 	mkdir -p ../sdk/include
@@ -75,6 +76,16 @@ libumpn.a: libtlsf.a libcore.a
 	cd obj; ar x ../libcore_linux.a
 	cd obj; ar rcs ../$@ *.o
 	rm -r obj
+
+expat/libexpat.a:
+	cd expat; ./configure --prefix=$(PACKETNGIN_BASE)/expat CFLAGS="-g -fno-stack-protector -O3 -m64"
+	cd expat; make
+	cd expat; make install
+
+libexpat.a: expat/libexpat.a
+	cp expat/lib/libexpat.a .
+	mkdir -p ../sdk/include
+	cp -rL expat/include/* ../sdk/include
 
 zlib/libz.a:
 	cd zlib; CFLAGS="-fno-stack-protector -O3" ./configure --static --64
@@ -110,7 +121,7 @@ libxdr.a: xdr/linux/libxdr.a
 	cp xdr/linux/libxdr.a .
 
 clean: 
-	rm -f libtlsf.a libtlsf_32.a libjsmn.a libcore.a libcore_32.a libcore_linux.a libc.a libm.a libz.a libssl.a libcrypto.a liblwip.a libpacketngin.a
+	rm -f libtlsf.a libtlsf_32.a libjsmn.a libcore.a libcore_32.a libcore_linux.a libc.a libm.a libz.a libssl.a libcrypto.a liblwip.a libpacketngin.a libexpat.a
 
 cleanall: clean
 	-make -C TLSF/src clean
@@ -120,4 +131,5 @@ cleanall: clean
 	-make -C zlib distclean
 	-make -C lwip clean
 	-make -C openssl clean
+	-make -C expat clean
 	-make -C xdr -f Makefile.unix realclean
