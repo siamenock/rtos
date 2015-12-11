@@ -57,6 +57,11 @@
 	const typeof( ((type *)0)->member ) *__mptr = (ptr);    \
 	(type *)( (char *)__mptr - offsetof(type,member) );})
 
+/*
+ * min()/max()/clamp() macros that also do
+ * strict type-checking.. See the
+ * "unnecessary" pointer comparison.
+ */
 #define min(x, y) ({                             \
          typeof(x) _min1 = (x);                  \
          typeof(y) _min2 = (y);                  \
@@ -69,12 +74,39 @@
          (void) (&_max1 == &_max2);              \
 	 _max1 > _max2 ? _max1 : _max2; })
 
+/*
+ * ..and if you can't take the strict
+ * types, you can specify one yourself.
+ *
+ * Or not use min/max/clamp at all, of course.
+ */
+#define min_t(type, x, y) ({			\
+	type __min1 = (x);			\
+	type __min2 = (y);			\
+	__min1 < __min2 ? __min1: __min2; })
+
+#define max_t(type, x, y) ({			\
+	type __max1 = (x);			\
+	type __max2 = (y);			\
+	__max1 > __max2 ? __max1: __max2; })
+
 #define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))
 
 #define dev_err(dev, format, ...) //fprintf(stderr, format, ##__VA_ARGS__)
 #define dev_warn(dev, format, ...) //fprintf(stderr, format, ##__VA_ARGS__)
 
 #define uninitialized_var(x)	x = x
+
+/*
+ * ..and if you can't take the strict
+ * types, you can specify one yourself.
+ *
+ * Or not use min/max/clamp at all, of course.
+ */
+#define min_t(type, x, y) ({			\
+	type __min1 = (x);			\
+	type __min2 = (y);			\
+	__min1 < __min2 ? __min1: __min2; })
 
 #endif /* __LINUX_KERNEL_H__ */
 

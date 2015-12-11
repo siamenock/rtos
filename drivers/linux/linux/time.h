@@ -2,6 +2,7 @@
 #define __LINUX_TIME_H__
 
 #include <linux/types.h> 
+#define NSEC_PER_SEC	1000000000L
 
 # define __isleap(year)	\
   ((year) % 4 == 0 && ((year) % 100 != 0 || (year) % 400 == 0))
@@ -29,6 +30,10 @@ struct tm {
 };
 
 void time_to_tm(time_t totalsecs, int offset, struct tm *result);
+struct timespec ns_to_timespec(const int64_t nsec);
 
+static inline int64_t timespec_to_ns(const struct timespec *ts) {
+	return ((int64_t)ts->tv_sec * NSEC_PER_SEC) + ts->tv_nsec;
+}
 #endif /* __LINUX_TIME_H__ */
 

@@ -2,6 +2,7 @@
 #define __LINUX_WORKQUEUE_H__
 
 #include <stdbool.h> 
+#include <linux/types.h>
 
 #define NR_CPUS		1 //CONFIG_NR_CPUS  // Maximum supported processors
 #define work_data_bits(work) ((unsigned long *)(&(work)->data)) //
@@ -49,6 +50,7 @@ struct delayed_work {
 struct workqueue_struct* alloc_workqueue(const char *fmt, unsigned int flags, int max_active, const char *lock_name);
 bool queue_work(struct workqueue_struct *wq, struct work_struct *work);
 bool schedule_work(struct work_struct *work);
+bool schedule_delayed_work(struct delayed_work *work, clock_t delay);
 void cancel_work_sync(struct work_struct *work);
 void synchronize_sched();
 

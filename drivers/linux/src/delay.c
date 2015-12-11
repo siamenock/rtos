@@ -12,4 +12,3 @@ void mdelay(unsigned int d) {
 void msleep(unsigned int d) {
 	timer_mwait(d);
 }	
-

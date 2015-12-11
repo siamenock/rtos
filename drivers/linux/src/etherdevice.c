@@ -14,11 +14,6 @@ static inline bool is_zero_ether_addr(const u8 *addr)
 #endif
 }
 
-static inline bool is_multicast_ether_addr(const u8 *addr)
-{
-	return 0x01 & addr[0];
-}
-
 bool is_valid_ether_addr(const u8 *addr) {
 	/* FF:FF:FF:FF:FF:FF is a multicast address so we don't need to
 	 * explicitly check for it here. */

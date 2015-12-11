@@ -1,6 +1,7 @@
 #ifndef __LINUX_IF_ETHER_H__
 #define __LINUX_IF_ETHER_H__
 
+#include <linux/types.h>
 /*
  *	IEEE 802.3 Ethernet magic constants.  The frame sizes omit the preamble
  *	and FCS/CRC (frame check sequence).

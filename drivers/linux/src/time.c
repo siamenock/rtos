@@ -75,3 +75,21 @@ void time_to_tm(time_t totalsecs, int offset, struct tm *result)
 	result->tm_mday = days + 1;
 }
 
+struct timespec ns_to_timespec(const int64_t nsec) {
+	struct timespec ts;
+	int32_t rem;
+
+	if(!nsec)
+		return (struct timespec){0, 0};
+
+	rem = nsec % NSEC_PER_SEC;
+	ts.tv_sec = nsec / NSEC_PER_SEC;
+
+	if(rem < 0) {
+		ts.tv_sec--;
+		rem += NSEC_PER_SEC;
+	}
+	ts.tv_nsec = rem;
+
+	return ts;
+}

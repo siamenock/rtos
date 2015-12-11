@@ -53,6 +53,13 @@ void atomic64_set(atomic64_t *v, long long i)
 	v->counter = i;
 }
 
+void atomic_add(long long i, atomic_t *v)
+{
+	asm volatile(LOCK_PREFIX "addq %1,%0"
+		     : "=m" (v->counter)
+		     : "er" (i), "m" (v->counter));
+}
+
 void atomic64_add(long long i, atomic64_t *v)
 {
 	asm volatile(LOCK_PREFIX "addq %1,%0"

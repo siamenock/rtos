@@ -20,7 +20,7 @@ void* pci_alloc_consistent(struct pci_dev *hwdev, size_t size, dma_addr_t *dma_h
 
 	if (p != NULL) {
 		/* Address of the aligned memory according to the align parameter*/
-		ptr = (void*) (((uint64_t)p + sizeof(void*) + align -1) & ~(align-1));
+		ptr = (void*)(((uint64_t)p + sizeof(void*) + align -1) & ~(align-1));
 		/* store the address of the malloc() above
 		 * at the beginning of our total memory area.
 		 * You can also use *((void **)ptr-1) = p
@@ -218,4 +218,85 @@ void pci_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr, size_t size, i
 
 int pci_dma_mapping_error(struct pci_dev *pdev, dma_addr_t dma_addr) { 
 	return 0; 
+}
+
+static inline u16 pcie_caps_reg(struct pci_dev *dev) {
+	return pci_read16(dev, dev->caps[PCI_CAP_ID_EXP] + PCI_EXP_FLAGS);
+}
+
+static inline int pci_pcie_type(struct pci_dev *dev)
+{
+	return (pcie_caps_reg(dev) & PCI_EXP_FLAGS_TYPE) >> 4;
+}
+
+bool pcie_downstream_port(struct pci_dev *dev)
+{
+	int type = pci_pcie_type(dev);
+
+	return type == PCI_EXP_TYPE_ROOT_PORT ||
+	       type == PCI_EXP_TYPE_DOWNSTREAM;
+}
+
+static inline bool pcie_cap_has_lnkctl(struct pci_dev *dev)
+{
+	int type = pci_pcie_type(dev);
+
+	return type == PCI_EXP_TYPE_ENDPOINT ||
+	       type == PCI_EXP_TYPE_LEG_END ||
+	       type == PCI_EXP_TYPE_ROOT_PORT ||
+	       type == PCI_EXP_TYPE_UPSTREAM ||
+	       type == PCI_EXP_TYPE_DOWNSTREAM ||
+	       type == PCI_EXP_TYPE_PCI_BRIDGE ||
+	       type == PCI_EXP_TYPE_PCIE_BRIDGE;
+}
+
+static inline bool pcie_cap_has_sltctl(struct pci_dev *dev)
+{
+	return pcie_downstream_port(dev) &&
+	       pcie_caps_reg(dev) & PCI_EXP_FLAGS_SLOT;
+}
+
+bool pcie_capability_reg_implemented(struct pci_dev *dev, int pos)
+{
+	if (!pci_is_pcie(dev))
+		return false;
+
+	switch (pos) {
+	case PCI_EXP_FLAGS:
+		return true;
+	case PCI_EXP_DEVCAP:
+	case PCI_EXP_DEVCTL:
+	case PCI_EXP_DEVSTA:
+		return true;
+	case PCI_EXP_LNKCAP:
+	case PCI_EXP_LNKCTL:
+	case PCI_EXP_LNKSTA:
+		return pcie_cap_has_lnkctl(dev);
+	/* Start of GurumNetworks modification
+	case PCI_EXP_SLTCAP:
+	case PCI_EXP_SLTCTL:
+	case PCI_EXP_SLTSTA:
+		return pcie_cap_has_sltctl(dev);
+	case PCI_EXP_RTCTL:
+	case PCI_EXP_RTCAP:
+	case PCI_EXP_RTSTA:
+		return pcie_cap_has_rtctl(dev);
+	case PCI_EXP_DEVCAP2:
+	case PCI_EXP_DEVCTL2:
+	case PCI_EXP_LNKCAP2:
+	case PCI_EXP_LNKCTL2:
+	case PCI_EXP_LNKSTA2:
+		return pcie_cap_version(dev) > 1;
+	End of GurumNetworks modificatoin */
+	default:
+		return false;
+	}
+}
+
+void pci_dump(struct pci_dev *dev) {
+	int idx = 0;
+	while(idx < 256) {
+		printf("%8x", pci_read32(dev, idx));
+		idx += 4;
+	}
 }

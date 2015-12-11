@@ -18,4 +18,7 @@ void set_bit(int nr, volatile unsigned long *addr);
 void clear_bit(int nr, volatile unsigned long *addr);
 int test_bit(int nr, const volatile unsigned long *addr);
 
+static inline void clear_bit_unlock(long nr, volatile unsigned long *addr) {
+	clear_bit(nr, addr);
+}
 #endif /* __ASM_BITOPS_H__ */

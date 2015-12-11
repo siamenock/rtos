@@ -6,6 +6,7 @@
 #include <linux/types.h>
 #include <linux/mod_devicetable.h>
 #include <linux/io.h>
+#include <linux/printk.h>
 
 #define PCI_DMA_BIDIRECTIONAL	0
 #define PCI_DMA_TODEVICE	1
@@ -79,6 +80,23 @@ struct msix_entry {
 	u16	entry;
 };
 
+
+/* If you want to know what to call your pci_dev, ask this function.
+ * Again, it's a wrapper around the generic device.
+ */
+static inline const char *pci_name(const struct pci_dev *pdev)
+{
+	return pdev->name;
+}
+
+static inline int pci_channel_offline(struct pci_dev *pdev)
+{
+	/* Start of GurumNetworks modification
+	return (pdev->error_state != pci_channel_io_normal);
+	End of GurumNetworks modification */
+	return 0;
+}
+
 void* pci_alloc_consistent(struct pci_dev *hwdev, size_t size, dma_addr_t *dma_handle);
 void pci_free_consistent(struct pci_dev *hwdev, size_t size, void *vaddr, dma_addr_t dma_handle);
 int pci_enable_device(struct pci_dev *dev);
@@ -118,5 +136,8 @@ int pci_dma_mapping_error(struct pci_dev *pdev, dma_addr_t dma_addr);
 
 volatile void __iomem *pci_iomap(struct pci_dev *dev, int bar, unsigned long maxlen);
 void pci_iounmap(struct pci_dev *dev, volatile void __iomem * addr);
+bool pcie_capability_reg_implemented(struct pci_dev *dev, int pos);
+bool pcie_downstream_port(struct pci_dev *dev);
+void pci_dump(struct pci_dev *dev);
 #endif /* __LINUX_PCI_H__ */
 

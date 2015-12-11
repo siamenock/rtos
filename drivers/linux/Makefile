@@ -29,7 +29,8 @@ OBJS = obj/cdev.o 		\
 	obj/net.o		\
 	obj/firmware.o 		\
 	obj/timer.o		\
-	obj/printk.o
+	obj/printk.o		\
+	obj/time64.o
 
 obj/%.o: src/%.c 
 	mkdir -p obj

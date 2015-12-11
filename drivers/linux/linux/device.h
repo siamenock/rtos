@@ -20,6 +20,8 @@ void __driver##_exit(void) \
 } \
 module_exit(__driver##_exit);
 
+#define dev_info(dev, fmt, args...)			printf("dev_info: " fmt, ##args)
+
 struct class {
 	const char		*name;
 	struct module		*owner;

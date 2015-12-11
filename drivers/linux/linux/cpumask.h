@@ -10,4 +10,10 @@
 
 #define for_each_possible_cpu(cpu) for_each_cpu((cpu), cpu_possible_mask)
 
+#if NR_CPUS > 1
+#define num_online_cpus()	cpumask_weight(cpu_online_mask)
+#else
+#define num_online_cpus()	1U
+#endif /* NR_CPUS */
+
 #endif /* __LINUX_CPU_MASK_H__ */

@@ -16,6 +16,10 @@ bool schedule_work(struct work_struct *work) {
 	return true;
 }
 
+bool schedule_delayed_work(struct delayed_work *work, clock_t delay) {
+	event_timer_add((void*)(work->work).func, work, delay, delay);
+	return true;
+}
 void cancel_work_sync(struct work_struct *work) {
 }
 

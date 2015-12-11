@@ -13,8 +13,10 @@ struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name,
 }
 
 void free_netdev(struct net_device *dev) {
-	gfree(dev->priv);
-	gfree(dev);
+	if(dev) {
+		gfree(dev->priv);
+		gfree(dev);
+	}
 }
 
 void netif_device_detach(struct net_device *dev) {
@@ -22,11 +24,34 @@ void netif_device_detach(struct net_device *dev) {
 }
 
 void netif_carrier_on(struct net_device *dev) {
-	printf("netif: carrier on\n");
+//	printf("netif: carrier on\n");
+	if(!test_and_clear_bit(__LINK_STATE_NOCARRIER, &dev->state)) {
+	}
 }
 
 void netif_carrier_off(struct net_device *dev) {
-	printf("netif: carrier off\n");
+//	printf("netif: carrier off\n");
+	if(!test_and_set_bit(__LINK_STATE_NOCARRIER, &dev->state)) {
+	}
+}
+
+void netif_tx_start_all_queues(struct net_device *dev) {
+	unsigned int i;
+
+	for (i = 0; i < dev->num_tx_queues; i++) {
+		struct netdev_queue *txq = netdev_get_tx_queue(dev, i);
+		txq->state = 1;
+		netif_tx_start_queue(txq);
+	}
+}
+
+void netif_tx_stop_all_queues(struct net_device *dev) {
+	uint32_t i;
+	for(i = 0; i < dev->num_tx_queues; i++) {
+		struct netdev_queue *txq = netdev_get_tx_queue(dev, i);
+		txq->state = 0;
+		netif_tx_stop_queue(txq);
+	}
 }
 
 int netif_running(const struct net_device *dev) {
@@ -193,8 +218,20 @@ void netif_wake_queue(struct net_device *dev) {
 	dev->tx_queue = 1;
 }
 
+void netif_wake_subqueue(struct net_device *dev, u16 queue_index) {
+	(&dev->_tx[queue_index])->state = 1;
+}
+
+int netif_set_real_num_tx_queues(struct net_device *dev, unsigned int txq) {
+	return 0;
+}
+
+int netif_set_real_num_rx_queues(struct net_device *dev, unsigned int rxq) {
+	return 0;
+}
+
 void napi_enable(struct napi_struct* n) {
-	printf("napi: enable\n");
+//	printf("napi: enable\n");
 	n->enabled = true;
 }
 

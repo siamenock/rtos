@@ -8,9 +8,11 @@ void atomic64_set(atomic64_t *v, long long i);
 
 void atomic64_add(long long a, atomic64_t *v);
 void atomic64_sub(long long a, atomic64_t *v);
+void atomic_add(long long a, atomic_t *v);
 long long atomic64_add_return(long long a, atomic64_t *v);
 long long atomic64_sub_return(long long a, atomic64_t *v);
 
+#define atomic_inc(v)			atomic_add(1, (v))
 #define atomic64_add_negative(a, v)	(atomic64_add_return((a), (v)) < 0)
 #define atomic64_inc(v)			atomic64_add(1LL, (v))
 #define atomic64_inc_return(v)		atomic64_add_return(1LL, (v))
