@@ -358,7 +358,7 @@ uint32_t pci_read32(PCI_Device* device, uint32_t reg);
 void pci_write32(PCI_Device* device, uint32_t reg, uint32_t data);
 
 uint8_t pci_pcie_ver(PCI_Device* device);
-uint8_t pci_pcie_type(PCI_Device* device);
+//uint8_t pci_pcie_type(PCI_Device* device);
 
 int pci_probe(DeviceType type, PCI_DEVICE_PROBE probe, Driver* driver);
 

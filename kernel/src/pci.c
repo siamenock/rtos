@@ -323,9 +323,9 @@ uint8_t pci_pcie_ver(PCI_Device* device) {
 	return pci_read8(device, device->caps[PCI_CAP_ID_EXP] + PCI_EXP_FLAGS) & 0x0f;
 }
 
-uint8_t pci_pcie_type(PCI_Device* device) {
-	return (pci_read8(device, device->caps[PCI_CAP_ID_EXP] + PCI_EXP_FLAGS) >> 4) & 0x0f;
-}
+//uint8_t pci_pcie_type(PCI_Device* device) {
+//	return (pci_read8(device, device->caps[PCI_CAP_ID_EXP] + PCI_EXP_FLAGS) >> 4) & 0x0f;
+//}
 
 int pci_probe(DeviceType type, PCI_DEVICE_PROBE probe, Driver* driver) {
 	int count = 0;
