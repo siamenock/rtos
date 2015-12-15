@@ -1,32 +1,25 @@
 .PHONY: all clean
 
-CFLAGS = -I../lib/TLSF/src -I../lib/core/include -m32 -masm=intel -ffreestanding -std=gnu99 #-DUSB_DEBUG
+CFLAGS = -m32 -Wall -Werror -ffreestanding -std=gnu99
 
-DIR = obj obj/driver obj/driver/usb 
+DIR = obj
 
-USB = obj/driver/usb/usbinit.o obj/driver/usb/usb.o obj/driver/usb/usb_dev.o \
-      obj/driver/usb/generic_hub.o obj/driver/usb/usbhub.o \
-      obj/driver/usb/ehci.o obj/driver/usb/ehci_rh.o \
-      obj/driver/usb/pci.o obj/driver/usb/quirks.o \
-      obj/driver/usb/__udivdi3.o  obj/driver/usb/__umoddi3.o \
-      obj/driver/usb/usbhid.o obj/driver/usb/usbmsc.o \
-      obj/driver/usb/usbclient.o \
-      obj/driver/usb/video.o obj/driver/usb/console.o obj/driver/usb/vga.o \
-      obj/driver/usb/ctype.o obj/driver/usb/printf.o \
-
-OBJS = obj/main.o obj/page.o obj/mode_switch.o obj/driver/bfs.o obj/driver/pata.o \
-       obj/port.o obj/driver/fs.o obj/string.o obj/cpu.o \
-       obj/driver/disk.o obj/driver/file.o $(USB) 
-
-LIBS = ../lib/libtlsf_32.a ../lib/libcore_32.a
+OBJS = obj/entry.o obj/main.o obj/print.o obj/time.o obj/apic.o
 
 all: loader.bin
 
-$(DIR):
-	mkdir -p $@
+obj/entry_tmp.o: obj/entry_tmp.asm
+	nasm -f elf32 -o $@ $<
 
-obj/entry.bin: src/entry.asm $(DIR)
-	nasm -o $@ $<
+obj/entry_tmp.asm: src/entry.asm
+	mkdir -p $(DIR)
+	./set_tmp
+
+obj/entry.o: obj/entry.asm
+	nasm -f elf32 -o $@ $<
+
+obj/entry.asm: loader.tmp
+	./set_value
 
 obj/%.o: src/%.asm
 	nasm -f elf32 -o $@ $<
@@ -34,14 +27,22 @@ obj/%.o: src/%.asm
 obj/%.o: src/%.c
 	gcc $(CFLAGS) -c -o $@ $<
 
-obj/loader.bin: $(OBJS) $(LIBS)
-	ld -melf_i386 -T elf_i386.ld -nostdlib -e main -Ttext 0x10200 -o obj/loader.elf $^ 
-	objcopy -j .text -j .data -j .rodata -j .bss -S -O binary obj/loader.elf $@
+obj/x64.o: src/x64.asm
+	nasm -o $@ $<
 
-loader.bin: obj/entry.bin obj/loader.bin
-	cat $^ > $@
-	../tools/truncate $@
+kernel: ../kernel.bin
+	cp $< $@
+
+boot: src/boot.asm
+	nasm -o $@ $<
+
+loader.tmp: obj/entry_tmp.o $(filter-out obj/entry.o, $(OBJS))
+	ld -melf_i386 -T linker.ld -e start -o $@ $^ 
+
+loader.bin: loader.tmp $(OBJS)
+	ld -melf_i386 -T linker.ld -e start -o $@ $(filter-out loader.tmp, $^)
 
 clean:
 	rm -rf obj
+	rm -f loader.tmp
 	rm -f loader.bin

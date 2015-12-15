@@ -1,0 +1,46 @@
+# Ref: http://pete.akeo.ie/2014/05/compiling-and-installing-grub2-for.html
+
+IMAGE=disk.img		# disk image name
+SIZE=64			# total size in MB
+BOOT=3			# Boot partition size in MB
+ROOT=12			# Root partition size in MB
+			# Rest of space will be user parition
+
+cd tools/grub/grub-core
+../grub-mkimage -v -O i386-pc -d. -p\(hd0,msdos1\)/boot/grub biosdisk part_msdos fat exfat bfs multiboot2 -o core.img
+cd ../../..
+
+dd if=/dev/zero of=$IMAGE bs=512 count=$(($SIZE * 2048))
+
+parted -s $IMAGE --			\
+	mklabel msdos			\
+	mkpart primary fat32 1MiB $(($BOOT + 1))MiB	\
+	mkpart primary fat32 $(($BOOT + 1))MiB $(($BOOT + 1 + $ROOT))MiB	\
+	mkpart primary ext2  $(($BOOT + 1 + $ROOT))MiB -1s	\
+	set 1 boot on
+
+KPARTX=`sudo kpartx -a -s -v $IMAGE`
+echo $KPARTX
+HDD=`echo $KPARTX | awk 'BEGIN { RS=""; FS=" "} {print $8 }'`
+HDD1=`echo $KPARTX | awk 'BEGIN { RS=""; FS=" "} {print $3 }'`
+HDD2=`echo $KPARTX | awk 'BEGIN { RS=""; FS=" "} {print $12 }'`
+HDD3=`echo $KPARTX | awk 'BEGIN { RS=""; FS=" "} {print $21 }'`
+
+sudo mkfs.vfat -F32 /dev/mapper/$HDD1
+sudo mkfs.vfat -F32 /dev/mapper/$HDD2
+#sudo tools/mkfs.bfs /dev/mapper/$HDD2
+sudo mkfs.ext2 /dev/mapper/$HDD3
+
+sudo tools/grub/grub-bios-setup -d tools/grub/grub-core -b boot.img -c core.img $HDD
+
+sudo mount /dev/mapper/$HDD1 mnt
+sudo mkdir -p mnt/boot/grub/i386-pc
+sudo cp loader/loader.bin mnt/boot
+sudo cp kernel.bin mnt/boot
+sudo cp kernel.smap mnt/boot
+sudo cp tools/grub.cfg mnt/boot/grub
+sudo cp tools/grub/grub-core/*.mod mnt/boot/grub/i386-pc
+
+sudo umount mnt
+
+sudo kpartx -d $IMAGE

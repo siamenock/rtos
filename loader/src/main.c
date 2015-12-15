@@ -1,452 +1,556 @@
-#include "string.h"
+#include "multiboot2.h"
 #include "page.h"
-#include "mode_switch.h"
+#include "print.h"
 #include "pnkc.h"
-#include "port.h"
-#include "tlsf.h"
+#include "symbols.h"
 #include "time.h"
-#include "driver/fs.h"
-#include "driver/bfs.h"
-#include "driver/pata.h"
-#include "driver/usb/usb.h"
+#include "apic.h"
 
-#define DEBUG	0
+/***
+ * Error code list
+ * multiboot2 	0x1?
+ * cpuid 	0x2?
+ * longmode	0x3?
+ * gdt		0x4?
+ * page table	0x5?
+ * pae		0x6?
+ * pml4		0x7?
+ * longmode	0x8?
+ * paging	0x9?
+ * kernel	0x10?
+ */
+static uint32_t kernel_start;
+static uint32_t kernel_end;
+static uint32_t multiboot2_addr;
 
-#define NORMAL	0x07
-#define PASS	0x02
-#define FAIL	(0x04 | 0x08)
+static void log(char* title) {
+	print(title);
+}
 
-static void print(int x, int y, const char* str, char attr);
-static void print_32(int x, int y, uint32_t v, char attr);
-static void print_64(int x, int y, uint64_t v, char attr);
-static void print_ptr(int x, int y, void* ptr, char attr);
-static void clean(volatile uint32_t* addr, uint32_t size);
-static uint8_t get_core_id();
-static int check_memory_size();
-static void malloc_init();
-static void get_cpu_vendor_string(char* str);
-static int check_x86_64_support();
-static int find_kernel(PNKC* pnkc);
-static int copy_kernel(PNKC* pnkc);
-static int copy_kernel_half(uint8_t core_id);
-static void dump(int x, int y, void* addr);
+static void log_32(char* title, uint32_t value) {
+	print(title);
+	print_32(value);
+}
 
-void main(void) {
-	uint8_t core_id = get_core_id();;
+static void log_pass() {
+	tab(75);
+	print_attr = PASS;
+	print("OK\n");
+	print_attr = NORMAL;
+}
+
+static void log_fail(uint32_t code, char* message) {
+	tab(75);
+	print_attr = FAIL;
+	print("FAIL\n");
+	print("    Error Code: ");
+	print_32(code);
+	print("    ");
+	print(message);
 	
-	// BSP routine
-	if(core_id == 0) {
-		print(0, 1, "Switched to protected mode...", NORMAL);
-		
-		print(0, 2, "Checking memory size", NORMAL);
-		if(check_memory_size()) {
-			print(50, 2, "Pass", PASS);
-		} else {
-			print(50, 2, "Fail", FAIL);
-			while(1) asm("hlt");
-		}
-	
-		print(0, 3, "Getting CPU vendor string", NORMAL);
-		char vendor[13] = { 0, };
-		get_cpu_vendor_string(vendor);
-		print(50, 3, vendor, PASS);
+	while(1)
+		asm("hlt");
+}
 
-		print(0, 4, "Initializing malloc memory", NORMAL);
-		malloc_init();
-		print(50, 4, "Pass", PASS);
-	
-		print(0, 5, "Checking x86_64 supported", NORMAL);
-		if(check_x86_64_support()) {
-			print(50, 5, "Pass", PASS);
-		} else {
-			print(50, 5, "Fail", FAIL);
-			while(1) asm("hlt");
-		}
-
-		print(0, 6, "Measuring CPU clock", NORMAL);
-		time_init();
-		print(50, 6, "Pass", PASS);
-
-		#ifdef DEBUG
-		/** 
-		 * VGA driver
-		 */
-		console_init();
-		#endif
-
-		print(0, 7, "Initializing USB controller driver", NORMAL);
-		usb_initialize();
-		print(50, 7, "Pass", PASS);
-
-		print(0, 8, "Initializing disk drivers", NORMAL);
-		disk_init0();
-		disk_register(&pata_driver);
-		disk_register(&usb_msc_driver);
-	
-		if(disk_init()) {
-			print(50, 8, "Pass", PASS);
-		} else {
-			print(50, 8, "Fail", FAIL);
-			while(1) asm("hlt");
-		}
-
-		print(0, 9, "Initializing file system", NORMAL);
-		if(!bfs_init()) {
-			print(50, 9, "Fail BFS", FAIL);
-			while(1) asm("hlt");
-		}
-
-		if(!fs_init()) {
-			print(50, 9, "Fail FS", FAIL);
-			while(1) asm("hlt");
-		} else {
-			print(50, 9, "Pass", PASS);
-		}
-
-		print(0, 10, "Copying kernel", NORMAL);
-		PNKC pnkc;
-		if(!find_kernel(&pnkc)) {
-			print(50, 10, "Fail", FAIL);
-			while(1) asm("hlt");
-		}
-
-		if(copy_kernel(&pnkc)) {
-			print(50, 10, "Pass", PASS);
-		} else {
-			print(50, 10, "Fail", FAIL);
-			while(1) asm("hlt");
-		}
-
-		print(0, 11, "Initialize memory page tables", NORMAL);
-		if(init_page_tables(core_id)) {
-			print(50, 10, "Pass", PASS);
-		} else {
-			print(50, 10, "Fail", FAIL);
-			while(1) asm("hlt");
-		}
-
-		print(0, 12, "Switching to 64 bit mode...", NORMAL);
-		asm("nop" : : "d"((uint32_t)core_id));
-
-		mode_switch();
-	} else { // AP routine
-		copy_kernel_half(core_id);
-		init_page_tables(core_id);
-		
-		asm("nop" : : "d"((uint32_t)core_id));
-
-		mode_switch();
-	}
+static void cpuid(uint32_t* a, uint32_t* b, uint32_t* c, uint32_t* d) {
+	asm volatile("cpuid"
+		: "=a"(*a), "=b"(*b), "=c"(*c), "=d"(*d)
+		: "a"(*a), "c"(*c));
 }
 
 uint8_t get_core_id() {
-	void cpuid(uint32_t* a, uint32_t* b, uint32_t* c, uint32_t* d) {
-		asm volatile("cpuid"
-			: "=a"(*a), "=b"(*b), "=c"(*c), "=d"(*d)
-			: "a"(*a), "b"(*b), "c"(*c), "d"(*d));
-	}
+	uint32_t a = 0x01, b, c, d;
+	cpuid(&a, &b, &c, &d);
+	
+	return (b >> 24) & 0xff;
+}
 
-	bool check_extended_topology() {
-		uint32_t a, b, c, d;
-		a = 0x0;
-		cpuid(&a, &b, &c, &d);
-
-		if(a >= 11) {
-			a = 0x0b;
-			c = 0x0;
-			cpuid(&a, &b, &c, &d);
-
-			if(b)
-				return true;
-			else
-				return false;
-		} else
-			return false;
-	}
-
-	uint32_t a, b, c, d;
-	if(check_extended_topology()) {
-		a = 0x0b;
-		c = 0x0;
-		cpuid(&a, &b, &c, &d);
-
-		if((b & 0xffff) == 1) {
-			return ((d & 0xff) >> (a & 0xf));
-		} else {
-			return d & 0xff;
-		}
+void check_multiboot2(uint32_t magic, uint32_t addr) {
+	log_32("Check multiboot2 bootloader: ", magic);
+	if(magic != MULTIBOOT2_BOOTLOADER_MAGIC) {
+		log_fail(0x10, "Illegal multiboot2 bootloader magic");
 	} else {
-		a = 0x01;
-		cpuid(&a, &b, &c, &d);
-
-		return (b >> 24) & 0xff;
-	}
-}
-
-int check_memory_size() {
-	volatile uint32_t* addr = (uint32_t*)0x100000;	// 1MB
-	while(addr < (uint32_t*)0x4000000) {	// 64MB
-		uint32_t old = *addr;
-		*addr = 0x12345678;
-		if(*addr != 0x12345678)
-			return 0;
-		*addr = old;
-		
-		addr += 0x100000 / sizeof(uint32_t*);
+		log_pass();
 	}
 	
-	return 1;
-}
-
-extern void* __malloc_pool;
-
-static void malloc_init() {
-	/**
-	 * Heap size is 192kB. Loader starts at 0x10000 guranteed 256kB size
-	 * Be aware of caculating loader size. Data + ROData + BSS. 
-	 * Currently loader is 74kB, it affect 0x44ee8. 
-	 */
-	uintptr_t start = 0x50000;
-	uintptr_t end = 0x80000; 
-
-	__malloc_pool = (uintptr_t*)start;
-
-	init_memory_pool((uint32_t)(end - start), __malloc_pool, 0);
-}
-
-void clean(volatile uint32_t* addr, uint32_t size) {
-	volatile uint32_t* end = addr + size / 4;
-	while(addr < end)
-		*addr++ = 0;
-}
-
-void get_cpu_vendor_string(char* str) {
-	uint32_t* s = (uint32_t*)str;
+	log_32("Check multiboot2 header: 0x", addr);
+	if(addr == 0) {
+		log_fail(0x11, "Cannot find multiboot2 header");
+	} else {
+		log_pass();
+	}
 	
-	uint32_t a, b, c, d;
-	asm("cpuid" 
-		: "=a"(a), "=b"(b), "=c"(c), "=d"(d) 
-		: "a"(0));
-	s[0] = b;
-	s[1] = d;
-	s[2] = c;
-}
-
-int check_x86_64_support() {
-	uint32_t a, b, c, d;
-	asm("cpuid" 
-		: "=a"(a), "=b"(b), "=c"(c), "=d"(d) 
-		: "a"(0x80000001));
+	multiboot2_addr = addr;
 	
-	return d & (1 << 29);
-}
-
-int find_kernel(PNKC* pnkc) {
-	int fd = open("/kernel.bin", "r"); 
-	if(fd < 0) 
-		return 0;
+	uint32_t end = addr + *(uint32_t*)addr;
+	addr += 8;
 	
-	int pnkc_size = sizeof(PNKC);
-
-	// PNKC writted at entry.bin
-	if(read(fd, pnkc, pnkc_size) == pnkc_size) {
-		if(pnkc->magic == PNKC_MAGIC) {
-			close(fd);
-
-			return 1;
-		}
-	} 
-
-	close(fd);
-
-	return 0;
-}
-
-int copy_section(int fd, uint32_t location, uint32_t size) {
-	int animate = 0;
-	char animation[4] = { '-', '/', '|', '\\' };
-	static const int x = 50, y = 10;
-	char* video = (char*)0xb8000 + (y * 160) + x * 2;
-	video[1] = NORMAL;
-	uint32_t count = 0;
-	
-	void memcpy(uint32_t* dest, uint32_t* src, uint32_t size) {
-		while(size > 0) {
-			if(size >= 4) {
-				*dest++ = *src++;
-				size -= 4;
-			} else {
-				uint8_t* d = (uint8_t*)dest;
-				uint8_t* s = (uint8_t*)src;
-				while(size > 0) {
-					*d++ = *s++;
-					size--;
+	while(addr < end) {
+		struct multiboot_tag* tag = (struct multiboot_tag*)addr;
+		switch(tag->type) {
+			case MULTIBOOT_TAG_TYPE_END:
+				goto done;
+			case MULTIBOOT_TAG_TYPE_CMDLINE:
+				break;
+			case MULTIBOOT_TAG_TYPE_BOOT_LOADER_NAME:
+				break;
+			case MULTIBOOT_TAG_TYPE_MODULE:
+				;
+				struct multiboot_tag_module* module = (struct multiboot_tag_module*)tag;
+				uint64_t* magic = (uint64_t*)module->mod_start;
+				if(*magic == PNKC_MAGIC) {
+					kernel_start = module->mod_start;
+					kernel_end = module->mod_end;
 				}
-			}
-			
-			if(count++ % 512 == 0) {
-				video[0] = animation[animate++ % 4];
-			}
+				break;
+			case MULTIBOOT_TAG_TYPE_BASIC_MEMINFO:
+				break;
+			case MULTIBOOT_TAG_TYPE_BOOTDEV:
+				break;
+			case MULTIBOOT_TAG_TYPE_MMAP:
+			case MULTIBOOT_TAG_TYPE_VBE:
+			case MULTIBOOT_TAG_TYPE_FRAMEBUFFER:
+			case MULTIBOOT_TAG_TYPE_ELF_SECTIONS:
+			case MULTIBOOT_TAG_TYPE_APM:
+			case MULTIBOOT_TAG_TYPE_EFI32:
+			case MULTIBOOT_TAG_TYPE_EFI64:
+			case MULTIBOOT_TAG_TYPE_SMBIOS:
+			case MULTIBOOT_TAG_TYPE_ACPI_OLD:
+			case MULTIBOOT_TAG_TYPE_ACPI_NEW:
+			case MULTIBOOT_TAG_TYPE_NETWORK:
+			case MULTIBOOT_TAG_TYPE_EFI_MMAP:
+			case MULTIBOOT_TAG_TYPE_EFI_BS:
+				break;
+		}
+		
+		addr = (addr + tag->size + 7) & ~7;
+	}
+done:
+	
+	log_32("Check kernel module: 0x", kernel_start);
+	print(" ("); print_32(kernel_end - kernel_start); print(")");
+	if(kernel_start == 0) {
+		log_fail(0x12, "Cannot find kernel");
+	} else {
+		log_pass();
+	}
+}
+
+void check_cpuid() {
+	uint32_t flags = 0;
+	asm volatile("pushfl\n"
+		"pop %0\n"
+		: "=r"(flags));
+	
+	log_32("Check CPUID supported: ", flags);
+	if((flags & (1 << 21)) == 0) {
+		log_fail(0x20, "CPUID not supported");
+	} else {
+		log_pass();
+	}
+}
+
+void check_longmode() {
+	uint32_t a = 0x80000000, b, c = 0x00, d;
+	cpuid(&a, &b, &c, &d);
+	
+	log_32("Check CPUID extention: ", a);
+	if(a <= 0x80000000) {
+		log_fail(0x30, "CPUID extention not supported");
+	} else {
+		log_pass();
+	}
+	
+	a = 0x80000001, c = 0x00;
+	cpuid(&a, &b, &c, &d);
+	log_32("Check long-mode supported: ", d);
+	
+	if((d & (1 << 29)) == 0) {
+		log_fail(0x31, "Long-mode not supported");
+	} else {
+		log_pass();
+	}
+}
+
+void load_gdt(uint8_t core_id) {
+	extern uint32_t gdtr;
+	void lgdt(uint32_t addr);
+	
+	if(core_id == 0) {
+		log_32("Load global descriptor table: 0x", (uint32_t)&gdtr);
+	}
+	
+	lgdt((uint32_t)&gdtr);
+	
+	asm volatile("movw %0, %%ax\n"
+		"movw %%ax, %%ds\n"
+		"movw %%ax, %%es\n"
+		"movw %%ax, %%fs\n"
+		"movw %%ax, %%gs\n"
+		"movw %%ax, %%ss\n"
+		: : "r"((uint16_t)0x20));
+	
+	void change_cs();
+	change_cs();
+	
+	if(core_id == 0) {
+		log_pass();
+	}
+}
+
+/**
+ * TLB size: 256KB
+ * TLB address: 6MB + core_id * 2MB - 256KB
+ * TLB Blocks(4K blocks)
+ * TLB[0] => l2
+ * TLB[1] => l3u
+ * TLB[2] => l3k
+ * TLB[3~61] => l4u
+ * TLB[62~63] => l4k
+ */
+void init_page_tables(uint8_t core_id) {
+	uint32_t base = 0x600000 + core_id * 0x200000 - 0x40000;
+	if(core_id == 0)
+		log_32("Initializing page table: 0x", base);
+	
+	PageDirectory* l2 = (PageDirectory*)(base + PAGE_TABLE_SIZE * PAGE_L2_INDEX);
+	PageDirectory* l3u = (PageDirectory*)(base + PAGE_TABLE_SIZE * PAGE_L3U_INDEX);
+	PageDirectory* l3k = (PageDirectory*)(base + PAGE_TABLE_SIZE * PAGE_L3K_INDEX);
+	PageTable* l4u = (PageTable*)(base + PAGE_TABLE_SIZE * PAGE_L4U_INDEX);
+	PageTable* l4k = (PageTable*)(base + PAGE_TABLE_SIZE * PAGE_L4K_INDEX);
+	
+	// Clean TLB area
+	volatile uint32_t* p = (uint32_t*)base;
+	for(int i = 0; i < 65536; i++)
+		*p++ = 0;
+	
+	// Level 2
+	l2[0].base = (uint32_t)l3u >> 12;
+	l2[0].p = 1;
+	l2[0].us = 1;
+	l2[0].rw = 1;
+	
+	l2[511].base = (uint32_t)l3k >> 12;
+	l2[511].p = 1;
+	l2[511].us = 0;
+	l2[511].rw = 1;
+	
+	// Level 3
+	for(int i = 0; i < PAGE_L4U_SIZE; i++) {
+		l3u[i].base = (uint32_t)&l4u[i * PAGE_ENTRY_COUNT] >> 12;
+		l3u[i].p = 1;
+		l3u[i].us = 1;
+		l3u[i].rw = 1;
+	}
+	
+	for(int i = 0; i < PAGE_L4K_SIZE; i++) {
+		l3k[PAGE_ENTRY_COUNT - PAGE_L4K_SIZE + i].base = (uint32_t)&l4k[i * PAGE_ENTRY_COUNT] >> 12;
+		l3k[PAGE_ENTRY_COUNT - PAGE_L4K_SIZE + i].p = 1;
+		l3k[PAGE_ENTRY_COUNT - PAGE_L4K_SIZE + i].us = 0;
+		l3k[PAGE_ENTRY_COUNT - PAGE_L4K_SIZE + i].rw = 1;
+	}
+	
+	// Level 4
+	for(int i = 0; i < PAGE_L4U_SIZE * PAGE_ENTRY_COUNT; i++) {
+		l4u[i].base = i;
+		l4u[i].p = 1;
+		l4u[i].us = 0;
+		l4u[i].rw = 1;
+		l4u[i].ps = 1;
+	}
+	
+	// Kernel global area(gmalloc, segment descriptor, IDT, code, rodata)
+	// Mapping 256MB to kernel
+	for(int i = 0; i < 128; i++) {
+		l4k[i].base = i;
+		l4k[i].p = 1;
+		l4k[i].us = 0;
+		l4k[i].rw = 1;
+		l4k[i].ps = 1;
+		l4k[i].exb = 1;
+	}
+	
+	// Kernel global area(code, rodata, modules, gmalloc)
+	l4k[1].exb = 0;
+	
+	// Kernel local area(malloc, TLB, TS, data, bss, stack)
+	l4k[2 + core_id] = l4k[2];
+	
+	l4k[2].base = 2 + core_id;	// 2 * (2 + core_id)MB
+	l4k[2].p = 1;
+	l4k[2].us = 0;
+	l4k[2].rw = 1;
+	l4k[2].ps = 1;
+	
+	if(core_id == 0)
+		log_pass();
+}
+
+static void clean(void* addr, uint32_t size, uint8_t core_id) {
+	uint32_t* d = (uint32_t*)addr;
+	
+	size = (size + 3) / 4;
+	uint32_t unit = size / 20;
+	unit = unit == 0 ? 1 : unit;
+	for(uint32_t i = 0; i < size; i++) {
+		/*
+		if(*d != 0) {
+			print("NOT NULL: ");
+			print_32((uint32_t)d);
+			print(" ");
+			print_32(*d);
+		}
+		*/
+		*d++ = 0;
+		
+		if(core_id == 0 && (i + 1) % unit == 0)
+			print(".");
+	}
+}
+
+static void copy(void* destination, void* source, uint32_t size, uint8_t core_id) {
+	uint32_t* d = (uint32_t*)destination;
+	uint32_t* s = (uint32_t*)source;
+	
+	size = (size + 3) / 4;
+	uint32_t unit = size / 20;
+	unit = unit == 0 ? 1 : unit;
+	for(uint32_t i = 0; i < size; i++) {
+		*d++ = *s++;
+		
+		if(core_id == 0 && (i + 1) % unit == 0)
+			print(".");
+	}
+}
+
+void copy_kernel(uint8_t core_id) {
+	void* pos = (uint32_t*)kernel_start;
+	uint32_t size = (uint32_t)(kernel_end - kernel_start);
+	
+	PNKC* pnkc = (PNKC*)pos;
+	pos += sizeof(PNKC);
+	
+	if(core_id == 0) {
+		log_32("Check PacketNgin Kernel Container: ", pnkc->magic >> 32); print_32(pnkc->magic);
+		
+		if(size < sizeof(PNKC) && pnkc->magic != PNKC_MAGIC) {
+			log_fail(0x100, "Illegal PNKC header");
+		} else {
+			log_pass();
 		}
 	}
-
-	uint8_t buf[FS_SECTOR_SIZE];
-	int len, total_len = 0;
-	int offset = 0;
-	int copy_size = FS_SECTOR_SIZE;
-
-	while((len = read(fd, buf, copy_size)) > 0) {
-		total_len += len;
-		size -= copy_size;
-
-		memcpy((uint32_t*)(location + offset), (uint32_t*)buf, copy_size);
-		offset += FS_SECTOR_SIZE;
-
-		if(size < FS_SECTOR_SIZE)
-			copy_size = size;
-
-		if(size == 0) 
-			break;
+	
+	if(core_id == 0) {
+		log("Copying kernel:\n");
 	}
-
-	return 1;
-}
-
-int copy_kernel(PNKC* pnkc) {
-	int fd = open("/kernel.bin", "r");
-	if(fd < 0) 
-		return -1;
-
-	if(!lseek(fd, sizeof(PNKC), FS_SEEK_SET)) 
-		return -2;
-
-	clean((uint32_t*)0x200000, 0x400000);
-
+	
+	// Clean
+	if(core_id == 0) {
+		print("    clean 0x00200000 (00400000): ");
+		clean((void*)0x200000, 0x200000, core_id);
+	}
+	clean((void*)(0x200000 + 0x200000 * (core_id + 1)), core_id == 0 ? 0x400000 : 0x200000, core_id);
+	
 	// Copy .text
-	if(!copy_section(fd, 0x200000 + pnkc->text_offset, pnkc->text_size)) 
-		return 0;
-
+	if(core_id == 0) {
+		print("\n    .text 0x");
+		print_32(0x200000 + pnkc->text_offset); print(" ("); print_32(pnkc->text_size); print(") ");
+		copy((void*)0x200000 + pnkc->text_offset, pos, pnkc->text_size, core_id);
+	}
+	pos += pnkc->text_size;
+	
 	// Copy .rodata
-	if(!copy_section(fd, 0x200000 + pnkc->rodata_offset, pnkc->rodata_size)) 
-		return 0;
+	if(core_id == 0) {
+		print("\n    .rodata: 0x");
+		print_32(0x200000 + pnkc->rodata_offset); print(" ("); print_32(pnkc->rodata_size); print(") ");
+		copy((void*)0x200000 + pnkc->rodata_offset, pos, pnkc->rodata_size, core_id);
+	}
+	pos += pnkc->rodata_size;
+	
+	// Copy smap
+	if(core_id == 0) {
+		print("\n    smap: 0x");
+		print_32(0x200000 + pnkc->smap_offset); print(" ("); print_32(pnkc->smap_size); print(") ");
+		copy((void*)0x200000 + pnkc->smap_offset, pos, pnkc->smap_size, core_id);
+	}
+	pos += pnkc->smap_size;
 	
 	// Copy .data
-	if(!copy_section(fd, 0x400000 + pnkc->data_offset, pnkc->data_size)) 
-		return 0;
+	if(core_id == 0) {
+		print("\n    .data: 0x");
+		print_32(0x400000 + pnkc->data_offset); print(" ("); print_32(pnkc->data_size); print(") ");
+	}
+	copy((void*)(0x200000 + 0x200000 * (core_id + 1)) + pnkc->data_offset, pos, pnkc->data_size, core_id);
+	pos += pnkc->data_size;
 	
 	// .bss is already inited
-
+	
 	// Write PNKC
-	memcpy((uint32_t*)(0x200200 /* Kernel entry end */ - sizeof(PNKC)), (uint32_t*)pnkc, sizeof(PNKC));
-
-	close(fd);
-
-	return 1;
-}
-
-int copy_kernel_half(uint8_t core_id) {
-	clean((uint32_t*)(0x400000 + core_id * 0x200000), 0x200000);
-
-	PNKC* pnkc = (PNKC*)(0x200200 - sizeof(PNKC));
-
-	// Copy .data
-	memcpy((void*)(0x400000 + core_id * 0x200000 + pnkc->data_offset),
-			(void*)(0x400000 + pnkc->data_offset), pnkc->data_size);
-	// .bss is already inited
-
-	return 1;
-}
-
-void dump(int x, int y, void* addr) {
-	uint8_t* a = addr;
-	uint8_t* v = (uint8_t*)0xb8000 + (y * 160) + x * 2;
-
-	int i;
-	for(i = 0; i < 32; i++) {
-		v[i * 4] = (a[i] & 0xf) > 9 ? (a[i] & 0xf) - 10 + 'a' : (a[i] & 0xf) + '0';
-		v[i * 4 + 2] = ((a[i] >> 4) & 0xf) > 9 ? ((a[i] >> 4) & 0xf) - 10 + 'a' : ((a[i] >> 4) & 0xf) + '0';
+	if(core_id == 0) {
+		print("\n    PNKC: 0x");
+		print_32(0x200200 - sizeof(PNKC)); print(" ("); print_32(sizeof(PNKC)); print(") ");
+		copy((void*)(0x200200 /* Kernel entry end */ - sizeof(PNKC)), pnkc, sizeof(PNKC), core_id);
+	}
+	
+	// Write multiboot2 tags
+	if(core_id == 0) {
+		uint32_t size = *(uint32_t*)multiboot2_addr;
+		pos = (void*)(((uint32_t)pos + 7) & ~7);
+		
+		print("\n    multiboot2: 0x");
+		print_32((uint32_t)pos); print(" ("); print_32(size); print(") ");
+		copy(pos, (void*)multiboot2_addr, size, core_id);
+	}
+	
+	if(core_id == 0) {
+		log_pass();
 	}
 }
 
-void print(int x, int y, const char* str, char attr) {
-	char* video = (char*)0xb8000 + (y * 160) + x * 2;
-
-	for(int i = 0; str[i] != 0; i++) {
-		video[i * 2] = str[i];
-		video[i * 2 + 1] = attr;
+void activate_pae(uint8_t core_id) {
+	#define PAE 0x620	// OSXMMEXCPT=1, OSFXSR=1, PAE=1
+	
+	uint32_t cr4;
+	asm volatile("movl %%cr4, %0" : "=r"(cr4));
+	
+	cr4 |= PAE;
+	asm volatile("movl %0, %%cr4" : : "r"(cr4));
+	
+	if(core_id == 0) {
+		log_32("Activate physical address extension: 0x", cr4);
+		log_pass();
 	}
 }
 
-void print_32(int x, int y, uint32_t v, char attr) {
-	char* video = (char*)0xb8000 + (y * 160) + x * 2;
+void activate_pml4(uint8_t core_id) {
+	uint32_t pml4 = 0x5c0000 + 0x200000 * core_id;
+	asm volatile("movl %0, %%cr3" : : "r"(pml4));
 	
-	#define HEX(v)  (((v) & 0x0f) > 9 ? ((v) & 0x0f) - 10 + 'a' : ((v) & 0x0f) + '0')
-	*video++ = HEX(v >> 28);
-	*video++ = attr;
-	*video++ = HEX(v >> 24);
-	*video++ = attr;
-	*video++ = HEX(v >> 20);
-	*video++ = attr;
-	*video++ = HEX(v >> 16);
-	*video++ = attr;
-	*video++ = HEX(v >> 12);
-	*video++ = attr;
-	*video++ = HEX(v >> 8);
-	*video++ = attr;
-	*video++ = HEX(v >> 4);
-	*video++ = attr;
-	*video++ = HEX(v >> 0);
-	*video++ = attr;
+	if(core_id == 0) {
+		log_32("Activate PML4 table: 0x", pml4);
+		log_pass();
+	}
 }
 
-void print_64(int x, int y, uint64_t v, char attr) {
-	char* video = (char*)0xb8000 + (y * 160) + x * 2;
+void activate_longmode(uint8_t core_id) {
+	#define LONGMODE	0x0901	// NXE=1, LME=1, SCE=1
 	
-	#define HEX(v)  (((v) & 0x0f) > 9 ? ((v) & 0x0f) - 10 + 'a' : ((v) & 0x0f) + '0')
-	*video++ = HEX(v >> 60);
-	*video++ = attr;
-	*video++ = HEX(v >> 56);
-	*video++ = attr;
-	*video++ = HEX(v >> 52);
-	*video++ = attr;
-	*video++ = HEX(v >> 48);
-	*video++ = attr;
-	*video++ = HEX(v >> 44);
-	*video++ = attr;
-	*video++ = HEX(v >> 40);
-	*video++ = attr;
-	*video++ = HEX(v >> 36);
-	*video++ = attr;
-	*video++ = HEX(v >> 32);
-	*video++ = attr;
-	*video++ = HEX(v >> 28);
-	*video++ = attr;
-	*video++ = HEX(v >> 24);
-	*video++ = attr;
-	*video++ = HEX(v >> 20);
-	*video++ = attr;
-	*video++ = HEX(v >> 16);
-	*video++ = attr;
-	*video++ = HEX(v >> 12);
-	*video++ = attr;
-	*video++ = HEX(v >> 8);
-	*video++ = attr;
-	*video++ = HEX(v >> 4);
-	*video++ = attr;
-	*video++ = HEX(v >> 0);
-	*video++ = attr;
+	uint32_t msr;
+	asm volatile("movl %1, %%ecx\n"
+		"rdmsr\n" 
+		"movl %%eax, %0\n"
+		: "=r"(msr)
+		: "r"(0xc0000080));
+	
+	msr |= LONGMODE;
+	
+	asm volatile("movl %0, %%eax\n"
+		"wrmsr"
+		: : "r"(msr));
+	
+	if(core_id == 0) {
+		log_32("Activate long-mode: 0x", msr);
+		log_pass();
+	}
 }
 
-void print_ptr(int x, int y, void* ptr, char attr) {
-	char* video = (char*)0xb8000 + (y * 160) + x * 2;
+void activate_paging(uint8_t core_id) {
+	#define ADD	0xe000003e	// PG=1, CD=1, NW=1, NE=1, TS=1, EM=1, MP=1
+	#define REMOVE	0x60000004	//       CD=1, NW=1,             EM=1
 	
-	#define HEX(v)  (((v) & 0x0f) > 9 ? ((v) & 0x0f) - 10 + 'a' : ((v) & 0x0f) + '0')
-	uint8_t* p = ptr;
-	for(int i = 0; i < 8; i++) {
-		*video++ = HEX(*p >> 4);
-		*video++ = attr;
-		*video++ = HEX(*p);
-		*video++ = attr;
-		p++;
+	uint32_t cr0;
+	asm volatile("movl %%cr0, %0" : "=r"(cr0));
+	cr0 |= ADD;
+	cr0 ^= REMOVE;
+	
+	if(core_id == 0) {
+		log_32("Activate caching and paging: 0x", cr0);
+	}
+	
+	asm volatile("movl %0, %%cr0" : : "r"(cr0));
+	
+	if(core_id == 0) {
+		log_pass();
+	}
+}
+
+
+void activate_aps() {
+	log("Activate application processors: ");
+	
+	print(".");
+	apic_write64(APIC_REG_ICR, APIC_DSH_OTHERS |
+		APIC_TM_LEVEL |
+		APIC_LV_ASSERT |
+		APIC_DM_PHYSICAL |
+		APIC_DMODE_INIT);
+	
+	time_uwait(100);
+	
+	if(apic_read32(APIC_REG_ICR) & APIC_DS_PENDING) {
+		log_fail(0x00, "First INIT IPI is pending");
+	}
+	
+	print(".");
+	apic_write64(APIC_REG_ICR, APIC_DSH_OTHERS |
+		APIC_TM_LEVEL |
+		APIC_LV_ASSERT |
+		APIC_DM_PHYSICAL |
+		APIC_DMODE_INIT);
+	
+	time_uwait(100);
+	
+	if(apic_read32(APIC_REG_ICR) & APIC_DS_PENDING) {
+		log_fail(0x00, "Second INIT IPI is pending");
+	}
+	
+	print(".");
+	
+	apic_write64(APIC_REG_ICR, APIC_DSH_OTHERS |
+		APIC_TM_EDGE |
+		APIC_LV_ASSERT |
+		APIC_DM_PHYSICAL |
+		APIC_DMODE_STARTUP |
+		0x10);   // Startup address: 0x10 = 0x10000 / 4KB
+	
+	time_uwait(200);
+	
+	if(apic_read32(APIC_REG_ICR) & APIC_DS_PENDING) {
+		log_fail(0x00, "STARTUP IPI is pending");
+	}
+	
+	log_pass();
+}
+
+void main(uint32_t magic, uint32_t addr) {
+	uint8_t core_id = get_core_id();
+	if(core_id == 0) {
+		print_init();
+		
+		check_multiboot2(magic, addr);
+		check_cpuid();
+		check_longmode();
+		copy_kernel(core_id);
+		init_page_tables(core_id);
+		load_gdt(core_id);
+		activate_pae(core_id);
+		activate_pml4(core_id);
+		activate_longmode(core_id);
+		activate_paging(core_id);
+		
+		time_init();
+		apic_init();
+		activate_aps();
+		
+		print("Jump to 64bit kernel: 0x00200000");
+		tab(75);
+	} else {
+		copy_kernel(core_id);
+		init_page_tables(core_id);
+		load_gdt(core_id);
+		activate_pae(core_id);
+		activate_pml4(core_id);
+		activate_longmode(core_id);
+		activate_paging(core_id);
 	}
 }

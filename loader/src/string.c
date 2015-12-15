@@ -1,1 +1,0 @@
-../../kernel/src/string.c

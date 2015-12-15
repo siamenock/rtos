@@ -1,8 +1,8 @@
 ; Ref: http://os.phil-opp.com/
 ; Ref: http://download-mirror.savannah.gnu.org/releases/grub/phcoder/multiboot.pdf
 
-%define	GDTR		0x$GDTR$		; gdtr - 0x10000
-%define PROTECTEDMODE	0x$PROTECTMODE$		; protectedmode
+%define	GDTR		0x0000		; gdtr - 0x10000
+%define PROTECTEDMODE	0x0000		; protectedmode
 %define STACK_SIZE	256
 %define CORE_COUNT	16
 
