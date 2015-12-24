@@ -67,6 +67,7 @@ char* task_symbols[] = {
 	"__barrior",
 	"__shared",
 	"__cpu_frequency",
+	"__fio",
 };
 
 typedef struct {

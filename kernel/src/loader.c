@@ -5,6 +5,10 @@
 #include <elf.h>
 #include <errno.h>
 #include <timer.h>
+#include <fio.h>
+#include <file.h>
+#include "../../loader/src/page.h"
+#include "vfio.h"
 #include "task.h"
 #include "mp.h"
 
@@ -30,7 +34,7 @@ uint32_t loader_load(VM* vm) {
 	// TODO: map storage to memory
 	if(!check_header(vm->storage.blocks[0]))
 		return (uint32_t)-1;
-	
+
 	void* malloc_pool = NULL;
 	void* gmalloc_pool = NULL;
 	uint32_t id = load(vm, &malloc_pool, &gmalloc_pool);
@@ -383,6 +387,40 @@ static bool relocate(VM* vm, void* malloc_pool, void* gmalloc_pool, uint32_t tas
 		if(__stderr) {
 			*(uint64_t*)task_addr(task_id, SYM_STDERR) = (uint64_t)__stderr;
 			*(size_t*)task_addr(task_id, SYM_STDERR_SIZE) = 4096;
+		} else {
+			errno = 0x31;
+			return false;
+		}
+
+		// FIO allocation : Only one FIO is needed in a VM
+		FIO* user_fio;
+		if(!vm->fio) {
+			user_fio = fio_create(gmalloc_pool);
+
+			vm->fio = malloc_ex(sizeof(VFIO), gmalloc_pool);
+			vm->fio->input_buffer = malloc_ex(sizeof(FIFO), gmalloc_pool);
+			vm->fio->output_buffer = malloc_ex(sizeof(FIFO), gmalloc_pool);
+
+			vm->fio = (VFIO*)TRANSLATE_TO_PHYSICAL((uint64_t)vm->fio);
+			vm->fio->user_fio = (FIO*)TRANSLATE_TO_PHYSICAL((uint64_t)user_fio);
+			vm->fio->input_buffer = (FIFO*)TRANSLATE_TO_PHYSICAL((uint64_t)vm->fio->input_buffer);
+			vm->fio->output_buffer = (FIFO*)TRANSLATE_TO_PHYSICAL((uint64_t)vm->fio->output_buffer);
+			vm->fio->input_addr = (FIFO*)TRANSLATE_TO_PHYSICAL((uint64_t)vm->fio->user_fio->input_buffer);
+			vm->fio->output_addr = (FIFO*)TRANSLATE_TO_PHYSICAL((uint64_t)vm->fio->user_fio->output_buffer);
+
+			vm->fio->input_buffer->head = 0;
+			vm->fio->input_buffer->tail = 0;
+			vm->fio->input_buffer->size = FIO_INPUT_BUFFER_SIZE;
+			vm->fio->input_buffer->array = (void**)TRANSLATE_TO_PHYSICAL((uint64_t)vm->fio->input_addr->array);
+
+			vm->fio->output_buffer->head = 0;
+			vm->fio->output_buffer->tail = 0;
+			vm->fio->output_buffer->size = FIO_OUTPUT_BUFFER_SIZE;
+			vm->fio->output_buffer->array = (void**)TRANSLATE_TO_PHYSICAL((uint64_t)vm->fio->output_addr->array);
+		}
+
+		if(user_fio) {
+			*(uint64_t*)task_addr(task_id, SYM_FIO) = (uint64_t)user_fio;
 		} else {
 			errno = 0x31;
 			return false;

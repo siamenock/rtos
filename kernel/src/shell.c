@@ -835,7 +835,7 @@ static int cmd_vm_delete(int argc, char** argv, void(*callback)(char* result, in
 	return 0;
 }
 
-static int cmd_vm_list(int argc, char** argv, void(*callback)(char* result, int eixt_status)) {
+static int cmd_vm_list(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	uint32_t vmids[MAX_VM_COUNT];
 	int len = vm_list(vmids, MAX_VM_COUNT);
 

@@ -2,6 +2,7 @@
 #define __SHARED_H__
 
 #include <stdint.h>
+#include <file.h>
 
 struct _PCI_Device;
 struct _FIFO;

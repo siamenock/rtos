@@ -709,7 +709,7 @@ void gdestroy() {
 }
 
 int main(int argc, char** argv) {
-	printf("Thread %d bootting\n", thread_id());
+	printf("Thread %d booting\n", thread_id());
 	if(thread_id() == 0) {
 		int err = ginit(argc, argv);
 		if(err != 0)

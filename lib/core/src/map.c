@@ -9,14 +9,14 @@
 Map* map_create(size_t initial_capacity, uint64_t(*hash)(void*), bool(*equals)(void*,void*), void* pool) {
 	if(!equals)
 		equals = map_uint64_equals;
-	
+
 	if(!hash)
 		hash = map_uint64_hash;
-	
+
 	size_t capacity = 1;
 	while(capacity < initial_capacity)
 		capacity <<= 1;
-	
+
 	Map* map = __malloc(sizeof(Map), pool);
 	if(!map)
 		return NULL;
@@ -34,7 +34,7 @@ Map* map_create(size_t initial_capacity, uint64_t(*hash)(void*), bool(*equals)(v
 	map->hash = hash;
 	map->equals = equals;
 	map->pool = pool;
-	
+
 	return map;
 }
 

@@ -304,6 +304,69 @@ static bool read_tick(void* context) {
 	return false;
 }
 
+int fs_read_async(File* file, size_t size, bool(*callback)(List* blocks, int success, void* context), void* context) {
+#define MIN(x, y) (((x) < (y)) ? (x) : (y))
+	// If there is no space in the buffer
+	if(FS_NUMBER_OF_BLOCKS - list_size(read_buffers) == 0) {
+		return -FILE_ERR_NOBUFS;
+	}
+
+	// Check request user block count > file size
+	size = MIN(file->size - file->offset, size);
+	// check request user block count > max cache blocks
+	size = MIN(FS_CACHE_BLOCK * FS_BLOCK_SIZE, size);
+
+	FileSystemDriver* driver = file->driver;
+	ReadContext* read_context= malloc(sizeof(ReadContext));
+	read_context->offset = file->offset % FS_BLOCK_SIZE;
+	read_context->callback= callback;
+	read_context->context = context;
+	read_context->file = file;
+
+	size_t total_size = size;
+	size_t offset = file->offset;
+	size_t len = 0;
+	int count = 0;
+	bool none_cached = false;
+
+	while(len < total_size) {
+		BufferBlock* block= malloc(sizeof(BufferBlock));
+		if(!block) 
+			break;
+
+		block->sector = file->sector + (offset / FS_BLOCK_SIZE * FS_SECTOR_PER_BLOCK);
+		block->size = MIN(FS_BLOCK_SIZE - (offset % FS_BLOCK_SIZE), total_size - len);
+
+		// Check if cache has a specific buffer
+		block->buffer = cache_get(cache, (void*)(uintptr_t)block->sector);
+		if(!block->buffer)
+			none_cached = true;
+
+		// Add blocks into the list to copy into the buffer from callback
+		list_add(read_buffers, block);
+
+		len += block->size;
+		offset += block->size;
+		count++;
+	}
+
+	// If it needs to read from the disk
+	if(none_cached) {
+		driver->read_async(driver->driver, read_buffers, read_callback, read_context);
+#ifdef _KERNEL_
+	} else {	// If all the blocks are from the cache
+		ReadTickContext* read_tick_ctx = malloc(sizeof(ReadTickContext));
+		read_tick_ctx->count = count;
+		read_tick_ctx->context = read_context;
+
+		// Need to add event to prevent an infinite cycle
+		event_busy_add(read_tick, read_tick_ctx);
+#endif /* _KERNEL_ */ 
+	}
+
+	return 1;
+}
+
 typedef struct {
 	void(*callback)(void* buffer, size_t len, void* context);
 	void*		usr_buffer;
@@ -365,68 +428,6 @@ static void frag_read_callback(List* fragments, int count, void* context) {
 static bool write_tick(void* context) {
 	frag_read_callback(NULL, 0, context);
 	return false;
-}
-
-int fs_read_async(File* file, size_t size, bool(*callback)(List* blocks, int success, void* context), void* context) {
-#define MIN(x, y) (((x) < (y)) ? (x) : (y))
-	// If there is no space in the buffer
-	if(FS_NUMBER_OF_BLOCKS - list_size(read_buffers) == 0) {
-		return -FILE_ERR_NOBUFS;
-	}
-
-	// Check request user block count > file size
-	size = MIN(file->size - file->offset, size);
-	// check request user block count > max cache blocks
-	size = MIN(FS_CACHE_BLOCK * FS_BLOCK_SIZE, size);
-
-	FileSystemDriver* driver = file->driver;
-	ReadContext* read_context= malloc(sizeof(ReadContext));
-	read_context->offset = file->offset % FS_BLOCK_SIZE;
-	read_context->callback= callback;
-	read_context->context = context;
-	read_context->file = file;
-
-	size_t total_size = size;
-	size_t offset = file->offset;
-	size_t len = 0;
-	int count = 0;
-	bool none_cached = false;
-
-	while(len < total_size) {
-		BufferBlock* block= malloc(sizeof(BufferBlock));
-		if(!block) 
-			break;
-
-		block->sector = file->sector + (offset / FS_BLOCK_SIZE * FS_SECTOR_PER_BLOCK);
-		block->size = MIN(FS_BLOCK_SIZE - (offset % FS_BLOCK_SIZE), total_size - len);
-
-		// Check if cache has a specific buffer
-		block->buffer = cache_get(cache, (void*)(uintptr_t)block->sector);
-		if(!block->buffer)
-			none_cached = true;
-
-		// Add blocks into the list to copy into the buffer from callback
-		list_add(read_buffers, block);
-
-		len += block->size;
-		offset += block->size;
-		count++;
-	}
-
-	// If it needs to read from the disk
-	if(none_cached) {
-		driver->read_async(driver->driver, read_buffers, read_callback, read_context);
-#ifdef _KERNEL_
-	} else {	// If all the blocks are from the cache
-		ReadTickContext* read_tick_ctx = malloc(sizeof(ReadTickContext));
-		read_tick_ctx->count = count;
-		read_tick_ctx->context = read_context;
-
-		// Need to add event to prevent an infinite cycle
-		event_busy_add(read_tick, read_tick_ctx);
-#endif /* _KERNEL_ */ 
-	}
-	return 1;
 }
 
 typedef struct {

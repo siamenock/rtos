@@ -210,7 +210,7 @@ static inline struct sk_buff *skb_get(struct sk_buff *skb)
 	return skb;
 }
 
-void skb_trim(struct sk_buff *skb, unsigned int len); 
+void skb_trim(struct sk_buff *skb, unsigned int len);
 bool skb_partial_csum_set(struct sk_buff *skb, u16 start, u16 off);
 int skb_to_sgvec(struct sk_buff *skb, struct scatterlist *sg, int offset, int len);
 struct sk_buff *__netdev_alloc_skb_ip_align(struct net_device *dev, unsigned int length, gfp_t gfp);
@@ -229,4 +229,3 @@ static inline bool skb_can_coalesce(struct sk_buff *skb, int i, const struct pag
 
 
 #endif /* __LINUX_SKBUFF_H__ */
-

@@ -5,12 +5,14 @@
 #include <util/event.h>
 #include <util/ring.h>
 #include <net/md5.h>
+#include <tlsf.h>
 #include <timer.h>
+#include <file.h>
+#include "vm.h"
 #include "apic.h"
 #include "icc.h"
 #include "gmalloc.h"
 #include "stdio.h"
-#include "vm.h"
 
 static uint32_t	last_vmid = 1;
 //static Map*	vms;
@@ -451,7 +453,7 @@ uint32_t vm_create(VMSpec* vm_spec) {
 			return 0;
 		}
 	}
-	
+
 	// Allocate storage
 	uint32_t storage_size = vm_spec->storage_size;
 	storage_size = (storage_size + (VM_STORAGE_SIZE_ALIGN - 1)) & ~(VM_STORAGE_SIZE_ALIGN - 1);
@@ -523,6 +525,7 @@ uint32_t vm_create(VMSpec* vm_spec) {
 			return 0;
 		}
 	}
+
 	// Dump info
 	printf("Manager: VM[%d] created(cores [", vmid);
 	for(int i = 0; i < vm->core_size; i++) {
@@ -723,6 +726,14 @@ int vm_status_get(uint32_t vmid) {
 		return -1;
 	
 	return vm->status;
+}
+
+VM* vm_get(uint32_t vmid) {
+	VM* vm = map_get(vms, (void*)(uint64_t)vmid);
+	if(!vm)
+		return NULL;
+	
+	return vm;
 }
 
 ssize_t vm_storage_read(uint32_t vmid, void** buf, size_t offset, size_t size) {

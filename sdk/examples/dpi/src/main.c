@@ -129,7 +129,7 @@ static bool iterator(int context, char* word) {
 }
 
 int main(int argc, char** argv) {
-	printf("Thread %d bootting\n", thread_id());
+	printf("Thread %d booting\n", thread_id());
 	if(thread_id() == 0) {
 		ginit(argc, argv);
 	}
@@ -167,14 +167,11 @@ int main(int argc, char** argv) {
 			if(!strcmp(token, "list")) {
 				// Print all keywords in the list
 				iterator(1, NULL);
-			}
 
-			else if(!strcmp(token, "size")) {
+			} else if(!strcmp(token, "size")) {
 				printf("size %d\n", list_size(list));
-			}
 
-			else if(!strcmp(token, "add")) {
-
+			} else if(!strcmp(token, "add")) {
 				Keyword* keyword = gmalloc(sizeof(Keyword));
 
 				strcpy(keyword->keyword, strtok(NULL, " "));
@@ -186,8 +183,7 @@ int main(int argc, char** argv) {
 				if(err)
 					list_add(list, keyword);
 
-			}
-			else if(!strcmp(token, "remove")) {
+			} else if(!strcmp(token, "remove")) {
 				char* cmp = strtok(NULL, " ");
 
 				// Find the keyword and remove

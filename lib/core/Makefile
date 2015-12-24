@@ -14,7 +14,7 @@ OBJS = ether.o crc.o checksum.o ni.o interface.o status.o  \
 	malloc.o types.o _string.o _malloc.o rpc.o readline.o \
 	arp.o icmp.o \
 	packet.o ip.o udp.o tcp.o tftp.o cmd.o \
-	cache.o	md5.o 
+	fio.o file.o cache.o md5.o 
 
 OBJS_32 := $(OBJS)	
 

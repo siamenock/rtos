@@ -21,7 +21,7 @@ typedef struct {
 
 	Device*		device;
 	uint16_t	port;	//port(4) + vlan_id(12)
-	
+
 	// Information
 	uint64_t	mac;
 	uint64_t	input_bandwidth;
@@ -36,7 +36,7 @@ typedef struct {
 	uint16_t	max_buffer_size;
 	List*		input_accept;
 	List*		output_accept;
-	
+
 	// Buffer
 	uint64_t	input_closed;
 	uint64_t	output_closed;

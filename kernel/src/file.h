@@ -1,8 +1,7 @@
 #ifndef __FILE_H__
 #define __FILE_H__
 
-// User API set
-#define FILE_MAX_NAME_LEN 	256
+#include <file.h>
 #define FILE_MAX_DESC		0x100
 
 #define FILE_TYPE_NONE		0x00
@@ -17,12 +16,9 @@
 #define FILE_ERR_FTYPE		79	/* Inappropriate file type */
 #define FILE_ERR_NOBUFS		105	/* No buffer space available */
 
-typedef struct _FileSystemDriver FileSystemDriver;
+#define FILE_MAX_NAME_LEN	256
 
-typedef struct {
-	uint32_t 		inode;
-	char			name[FILE_MAX_NAME_LEN];
-} Dirent;
+typedef struct _FileSystemDriver FileSystemDriver;
 
 typedef struct _File {
 	uint32_t		inode;
@@ -51,10 +47,10 @@ int read_async(int fd, void* buffer, size_t size, void(*callback)(void* buffer, 
 int write_async(int fd, void* buffer, size_t size, void(*callback)(void* buffer, size_t size, void* context), void* context, void(*sync_callback)(int errno, void* context2), void* context2);
 off_t lseek(int fd, off_t offset, int whence);
 
-File* opendir(const char* dir_name);
-Dirent* readdir(File* dir); 
+int opendir(const char* dir_name);
+Dirent* readdir(int fd); 
 void rewinddir(File* dir);
-int closedir(File* dir);
+int closedir(int fd);
 
 int stat(const char* file_name, Stat* stat);
 

@@ -222,22 +222,27 @@ off_t lseek(int fd, off_t offset, int whence) {
 	return file->driver->lseek(file->driver, file, offset, whence);
 }
 
-File* opendir(const char* dir_name) {
+int opendir(const char* dir_name) {
 	File* file = alloc_descriptor();
 
 	if(file == NULL)
-		return NULL;
+		return -1;
 
 	file->driver = fs_driver(dir_name);
 	if(!file->driver) {
 		free_descriptor(file);
-		return NULL;
+		return -2;
 	}
 
-	return file->driver->opendir(file->driver, file, dir_name);
+	if(file->driver->opendir(file->driver, file, dir_name))
+		return file - files;
+	
+	return -3;
 }
 
-Dirent* readdir(File* dir) {
+Dirent* readdir(int fd) {
+	File* dir = files + fd;
+
 	if((dir == NULL) || (dir->type != FILE_TYPE_DIR)) 
 		return NULL;
 
@@ -251,7 +256,9 @@ void rewinddir(File* dir) {
 	// Not implemented yet
 }
 
-int closedir(File* dir) {
+int closedir(int fd) {
+	File* dir = files + fd;
+
 	if((dir == 0) || (dir->type != FILE_TYPE_DIR)) 
 		return -1;
 

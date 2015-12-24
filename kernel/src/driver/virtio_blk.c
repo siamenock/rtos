@@ -107,6 +107,7 @@ int add_event(List* blocks, List* free_list, List* status_list, int count, void(
 	event_context->blocks = blocks;
 	event_context->free_list = free_list;
 	event_context->status_list = status_list;
+
 	event_context->event_id = event_busy_add(event, event_context);
 	
 	return event_context->event_id;
@@ -167,6 +168,7 @@ static int block_op(void* buffer, uint32_t type, uint32_t sector, int sector_cou
 			return err;
 		}
 	}
+
 	return 1;
 }
 
@@ -231,6 +233,7 @@ int virtio_blk_read_async(DiskDriver* driver, List* blocks, int sector_count, vo
 	list_destroy(req_list);
 
 	add_event(blocks, free_list, status_list, count, callback, context);
+
 	return 0;
 }
 
@@ -454,7 +457,6 @@ bool virtio_device_probe(PCI_Device* pci, char** name, void** data) {
 	return 0;
 }
 static int virtio_blk_init(DiskDriver* driver, DiskDriver** disks) {
-
 	int err, count;
 
 	priv = gmalloc(sizeof(VirtBlkPriv));

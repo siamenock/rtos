@@ -140,7 +140,7 @@ uint32_t configure(char* cmd_line) {
 }
 
 int main(int argc, char** argv) {
-	printf("Thread %d bootting\n", thread_id());
+	printf("Thread %d booting\n", thread_id());
 	if(thread_id() == 0) {
 		ginit(argc, argv);
 	}

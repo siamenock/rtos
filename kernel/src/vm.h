@@ -1,8 +1,9 @@
-#ifndef __VM_H__
+#ifndef __VM_H__ 
 #define __VM_H__
 
 #include <sys/types.h>
 #include <control/vmspec.h>
+#include "vfio.h"
 #include "mp.h"
 #include "vnic.h"
 
@@ -27,6 +28,7 @@ typedef struct {
 	Block		storage;
 	int		nic_count;
 	VNIC**		nics;	// gmalloc, ni_create
+	VFIO*		fio;
 	
 	int		argc;
 	char**		argv;	// gmalloc
@@ -45,6 +47,7 @@ int vm_list(uint32_t* vmids, int size);
 typedef void(*VM_STATUS_CALLBACK)(bool, void*);
 void vm_status_set(uint32_t vmid, int status, VM_STATUS_CALLBACK callback, void* context);
 int vm_status_get(uint32_t vmid);
+VM* vm_get(uint32_t vmid);
 
 ssize_t vm_storage_read(uint32_t vmid, void** buf, size_t offset, size_t size);
 ssize_t vm_storage_write(uint32_t vmid, void* buf, size_t offset, size_t size);

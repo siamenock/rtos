@@ -50,7 +50,6 @@ static inline bool device_has_feature(const VirtIODevice* vdev, uint32_t fbit) {
 #define VIRTIO_BLK_T_BARRIER	0x80000000	/* High bit indicates that this request acts as a barrier and that all preceeding request must be complete before this one, and all following requests must not be started until this is complete. */
 
 typedef struct {
-
 #define VIRTIO_BLK_T_IN		0	/* Type of the request for read */
 #define VIRTIO_BLK_T_OUT	1	/* Type of the request for write */
 #define VIRTIO_BLK_T_FLUSH	4	/* Type of the request for flush */
