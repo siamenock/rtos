@@ -95,7 +95,7 @@ static bool push_request(FIORequest* req) {
 int file_open(const char* file_name, char* flags, void(*callback)(int fd, void* context), void* context) {
 	FIORequest* req = malloc(sizeof(FIORequest));
 	if(!req)
-		return -FILE_ERR_;	// TODO: Set errno
+		return -FILE_ERR_NOSPC;	// TODO: Set errno
 
 	req->type = FILE_T_OPEN;
 	req->context = context;
