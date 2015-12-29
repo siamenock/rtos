@@ -312,6 +312,8 @@ typedef struct pci_dev {
 	
 	uint16_t	vendor_id;
 	uint16_t	device_id;
+	uint16_t	subvendor_id;
+	uint16_t	subdevice_id;
 	
 	uint8_t		bus;
 	uint8_t		slot;
