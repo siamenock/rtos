@@ -248,18 +248,17 @@ static const struct layout_maps keyboard_layouts[] = {
 #define MOD_SHIFT    (1 << 0)
 #define MOD_ALT      (1 << 1)
 #define MOD_CTRL     (1 << 2)
-//
-//static void usb_hid_keyboard_queue(int ch) {
-//	/* ignore key presses if buffer full */
-//	if (keycount < KEYBOARD_BUFFER_SIZE)
-//		keybuffer[keycount++] = ch;
-//}
-//
+
+static void usb_hid_keyboard_queue(int ch) {
+	/* ignore key presses if buffer full */
+	if (keycount < KEYBOARD_BUFFER_SIZE)
+		keybuffer[keycount++] = ch;
+}
+
 #define KEYBOARD_REPEAT_MS	30
 #define INITIAL_REPEAT_DELAY	10
 #define REPEAT_DELAY		 2
 
-static bool is_cap;
 static void
 usb_hid_process_keyboard_event(usbhid_inst_t *const inst,
 		const usb_hid_keyboard_event_t *const current)
@@ -291,7 +290,7 @@ usb_hid_process_keyboard_event(usbhid_inst_t *const inst,
 		if (inst->repeat_delay) {
 			inst->repeat_delay--;
 		} else {
-			//usb_hid_keyboard_queue(inst->lastkeypress);
+			usb_hid_keyboard_queue(inst->lastkeypress);
 			inst->repeat_delay = REPEAT_DELAY;
 		}
 
@@ -316,13 +315,9 @@ usb_hid_process_keyboard_event(usbhid_inst_t *const inst,
 		if (skip)
 			continue;
 
-		if(current->keys[i] == 57) {
-			is_cap = !is_cap;
-			continue;
-		}
 		/* Mask off MOD_CTRL */
 		keypress = map->map[modifiers & 0x03][current->keys[i]];
-		//printf("index keypress: %d\n", keypress);
+
 		if (modifiers & MOD_CTRL) {
 			switch (keypress) {
 			case 'a' ... 'z':
@@ -345,45 +340,7 @@ usb_hid_process_keyboard_event(usbhid_inst_t *const inst,
 			continue;
 		}
 
-		//usb_hid_keyboard_queue(keypress);
-#ifdef _KERNEL_
-		int stdio_putchar(const char ch);
-		void stdio_scancode(int code);
-		if(keypress >= 0x106) {
-			switch(keypress) {
-				case 0x106:	// home
-					stdio_putchar(0x1b);
-					stdio_putchar('O');
-					stdio_putchar('H');
-					break;
-				case 0x153:
-					stdio_putchar(0x1b);
-					stdio_putchar('[');
-					stdio_putchar(0x35);
-					stdio_putchar('~');
-					break;
-				case 0x166:
-					stdio_putchar(0x1b);
-					stdio_putchar('O');
-					stdio_putchar('F');
-					stdio_putchar('~');
-					break;
-				case 0x152:
-					stdio_putchar(0x1b);
-					stdio_putchar('[');
-					stdio_putchar(0x36);
-					stdio_putchar('~');
-					break;
-			}
-		} else {
-			if(keypress >= 'a' && keypress <= 'z') {
-				if(is_cap) {
-					keypress -= 32;
-				}
-			}
-			stdio_putchar((const char)keypress);
-		}
-#endif
+		usb_hid_keyboard_queue(keypress);
 
 		/* Remember for authentic key repeat */
 		inst->lastkeypress = keypress;
@@ -405,7 +362,6 @@ usb_hid_poll (usbdev_t *dev)
 
 #ifdef _KERNEL_
 	int stdio_putchar(const char ch);
-	void stdio_scancode(int code);
 
 	int ch;
 	while((ch = usbhid_getchar()) > 0)

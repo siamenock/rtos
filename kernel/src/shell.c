@@ -1,4 +1,5 @@
 #include <stdio.h>
+
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
@@ -158,7 +159,7 @@ static bool parse_addr(char* argv, uint32_t* address) {
 
 static int cmd_manager(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	if(manager_ni == NULL) {
-		printf("Can't found manager nic\n");
+		printf("Can'nt found manager\n");
 		return -1;
 	}
 
@@ -412,8 +413,7 @@ static int cmd_vnic(int argc, char** argv, void(*callback)(char* result, int exi
 			printf("\n\n");
 		}
 
-		if(manager_ni != NULL)
-			print_vnic(manager_ni, 0, 0);
+		print_vnic(manager_ni, 0, 0);
 
 		extern Map* vms;
 		MapIterator iter;
@@ -616,11 +616,6 @@ static bool arping_timeout(void* context) {
 }
 
 static int cmd_arping(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
-	if(manager_ni == NULL) {
-		printf("Can't found manager nic\n");
-		return -1;
-	}
-
 	if(argc < 2) {
 		return CMD_STATUS_WRONG_NUMBER;
 	}
@@ -1298,6 +1293,18 @@ bool shell_process(Packet* packet) {
 				arping_count--;
 				
 				if(arping_count > 0) {
+					bool arping(void* context) {
+						arping_time = time_ns();
+						if(arp_request(manager_ni->ni, arping_addr, 0)) {
+							arping_event = event_timer_add(arping_timeout, NULL, 1000000, 1000000);
+						} else {
+							arping_count = 0;
+							printf("Cannot send ARP packet\n");
+						}
+						
+						return false;
+					}
+					
 					event_timer_add(arping, NULL, 1000000, 1000000);
 				} else {
 					printf("Done\n");
