@@ -60,8 +60,7 @@ bool fs_init() {
 	if(!cache)
 		return false;
 	
-
-	return true;
+	return false;
 }
 
 int fs_mount(uint32_t disk, uint8_t partition, int type, const char* path) {
@@ -220,7 +219,7 @@ ssize_t fs_read(File* file, void* buffer, size_t size) {
 
 		void* read_buf = cache_get(cache, (void*)(uintptr_t)sector);
 		if(!read_buf) {
-			read_buf = gmalloc(FS_BLOCK_SIZE);
+			read_buf = malloc(FS_BLOCK_SIZE);
 			if(!read_buf) {
 				printf("malloc error\n");
 				return -1;
@@ -239,8 +238,7 @@ ssize_t fs_read(File* file, void* buffer, size_t size) {
 			}
 		}
 
-		memcpy((uint32_t*)((uint8_t*)buffer + read_count),
-				(uint32_t*)(read_buf + offset_in_cluster), read_size);
+		memcpy((void*)((uint8_t*)buffer + read_count), (void*)(read_buf + offset_in_cluster), read_size);
 
 		read_count += read_size;
 		file->offset += read_size;
