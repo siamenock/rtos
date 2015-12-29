@@ -1,4 +1,4 @@
-prefix=/home/gurumnetwork/test/testos/rtos/lib/expat
+prefix=/home/gurum/qqqq/rtos/lib/expat
 exec_prefix=${prefix}
 libdir=${exec_prefix}/lib
 includedir=${prefix}/include

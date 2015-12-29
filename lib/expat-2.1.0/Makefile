@@ -24,7 +24,7 @@ srcdir = .
 top_srcdir = .
 
 
-prefix = /home/gurumnetwork/test/testos/rtos/lib/expat
+prefix = /home/gurum/qqqq/rtos/lib/expat
 exec_prefix = ${prefix}
 
 bindir = ${exec_prefix}/bin
