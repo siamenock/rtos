@@ -11,7 +11,7 @@ int request_firmware(const struct firmware **fw, const char *name, PCI_Device *d
 	}
 
 	Stat state;
-	if(stat(name, &state) != 0) {
+	if(stat(fd, &state) != 0) {
 		printf("\tCannot get state of file: %s\n", name);
 		return -2;
 	}
