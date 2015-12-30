@@ -270,30 +270,16 @@ int closedir(int fd) {
 	return 0;
 }
 
-int stat(const char* file_name, Stat* stat) {
-	// Name validation check
-	int len = strlen(file_name);
-	
-	if((len > FILE_MAX_NAME_LEN - 1) || (len == 0)) 
+int stat(int fd, Stat* stat) {
+	File* descriptor = files + fd;
+
+	if((descriptor == 0) || (descriptor->type != FILE_TYPE_FILE))
 		return -1;
 
-	File* descriptor = files;
+	stat->inode = descriptor->inode;
+	stat->size = descriptor->size;
+	stat->type = descriptor->type;
 
-	for(int i = 0; i < FILE_MAX_DESC; i++) {
-		if(descriptor->type != FILE_TYPE_NONE) {
-			if(strncmp(descriptor->name , file_name, len) == 0) {
-				// TODO: Add more status 
-				stat->inode = descriptor->inode;
-				stat->size = descriptor->size;
-				stat->type = descriptor->type;
-
-				return 0;
-			}
-		}
-
-		descriptor++;
-	}
-
-	return -2;
+	return 0;
 }
 

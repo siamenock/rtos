@@ -52,7 +52,7 @@ Dirent* readdir(int fd);
 void rewinddir(File* dir);
 int closedir(int fd);
 
-int stat(const char* file_name, Stat* stat);
+int stat(int fd, Stat* stat);
 
 // Device driver API set
 typedef struct {
