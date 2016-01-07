@@ -5,8 +5,7 @@
 #include <stdbool.h>
 
 #define MP_MAX_CORE_COUNT	16
-
-#define MP_CORE(ptr, id)	(void*)((uint64_t)(ptr) + id * 0x200000)
+#define MP_CORE(ptr, id)        (void*)((uint64_t)(ptr) + id * 0x200000)
 
 typedef struct {
 	uint8_t		signature[4];
@@ -103,23 +102,23 @@ typedef struct {
 	uint32_t	predefined_range_list;
 } __attribute__((packed)) MP_CompatabilityBusAddressSpaceModifierEntry;
 
-extern bool mp_apics[];
+typedef struct {
+	bool(*parse_fps)(MP_FloatingPointerStructure*);
+	bool(*parse_cth)(MP_ConfigurationTableHeader*);
+	bool(*parse_pe)(MP_ProcessorEntry*);
+	bool(*parse_be)(MP_BusEntry*);
+	bool(*parse_iae)(MP_IOAPICEntry*);
+	bool(*parse_iie)(MP_IOInterruptEntry*);
+	bool(*parse_lie)(MP_LocalInterruptEntry*);
+	bool(*parse_sase)(MP_SystemAddressSpaceEntry*);
+	bool(*parse_bhde)(MP_BusHierarchyDescriptorEntry*);
+	bool(*parse_cbasme)(MP_CompatabilityBusAddressSpaceModifierEntry*);
+} MP_Parser;
 
-void mp_init0();
-void mp_analyze();
 void mp_init();
-void mp_wait_init();
-bool mp_wait(uint8_t core_id, uint32_t us);
-void mp_wakeup();
-void mp_sync();
-uint8_t mp_core_count();
-uint8_t mp_thread_count();
-uint8_t mp_core_id();
 uint8_t mp_apic_id();
-uint8_t mp_core_id_to_apic_id(uint8_t core_id);
-uint8_t mp_bus_isa_id();
-uint8_t mp_bus_pci_id();
-MP_FloatingPointerStructure* mp_FloatingPointerStructure();
-void mp_iterate_IOInterruptEntry(bool(*fn)(MP_IOInterruptEntry*));
+uint8_t mp_core_id();
+void mp_sync();
+void mp_parse_fps(MP_Parser* parser);
 
 #endif /* __MP_H__ */

@@ -12,7 +12,7 @@
 
 int main(int argc, char* argv[]) {
 	if(argc < 3) {
-		printf("Usage: pnkc [kernel elf] [kernel pnkc]\n");
+		printf("Usage: pnkc [kernel elf] [kernel smap] [kernel pnkc]\n");
 		return 0;
 	}
 	
@@ -68,10 +68,22 @@ int main(int argc, char* argv[]) {
 		}
 	}
 	
-	// Write header
-	int fd2 = open(argv[2], O_RDWR | O_CREAT, 0644);
-	if(fd2 < 0) {
+	int fd3 = open(argv[2], O_RDONLY);
+	if(fd3 < 0) {
 		printf("Cannot open file: %s\n", argv[2]);
+		return 1;
+	}
+	
+	struct stat state2;
+	if(stat(argv[2], &state2) != 0) {
+		printf("Cannot get state of file: %s\n", argv[2]);
+		return 2;
+	}
+	
+	// Write header
+	int fd2 = open(argv[3], O_RDWR | O_CREAT, 0644);
+	if(fd2 < 0) {
+		printf("Cannot open file: %s\n", argv[3]);
 		return 1;
 	}
 	
@@ -81,6 +93,8 @@ int main(int argc, char* argv[]) {
 	pnkc.text_size = get_size(".text");
 	pnkc.rodata_offset = get_offset(".rodata", 0xffffffff80200000);
 	pnkc.rodata_size = get_size(".rodata");
+	pnkc.smap_offset = (pnkc.rodata_offset + pnkc.rodata_size + 7) & ~7;
+	pnkc.smap_size = state2.st_size;
 	pnkc.data_offset = get_offset(".data", 0xffffffff80400000);
 	pnkc.data_size = get_size(".data");
 	pnkc.bss_offset = get_offset(".bss", 0xffffffff80400000);
@@ -96,10 +110,21 @@ int main(int argc, char* argv[]) {
 		}
 	}
 	
+	void write_smap() {
+		uint8_t buf[1024];
+		int len = read(fd3, buf, 1024);
+		while(len > 0) {
+			write(fd2, buf, len);
+			len = read(fd3, buf, 1024);
+		}
+	}
+	
 	write_body(".text");
 	write_body(".rodata");
+	write_smap();
 	write_body(".data");
 	
+	close(fd3);
 	close(fd2);
 	close(fd);
 	

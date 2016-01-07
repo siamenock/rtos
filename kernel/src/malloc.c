@@ -1,12 +1,9 @@
-#include "../../loader/src/page.h"
 #include <tlsf.h>
 #include <malloc.h>
 #include "stdio.h"
 #include "pnkc.h"
+#include "page.h"
 #include "malloc.h"
-#include "asm.h"
-
-#include "mp.h"
 
 #define DEBUG	0
 
@@ -32,13 +29,12 @@ int debug_free_count;
 
 extern void* __malloc_pool;	// Defined in malloc.c from libcore
 
-void malloc_init() {
+void malloc_init(uint64_t end) {
 	PNKC* pnkc = (PNKC*)(0x200200 /* Kernel entry end */ - sizeof(PNKC));
 
 	uint64_t addr1 = pnkc->data_offset + pnkc->data_size;
 	uint64_t addr2 = pnkc->bss_offset + pnkc->bss_size;
 	uint64_t start = PHYSICAL_TO_VIRTUAL(0x400000 + (addr1 > addr2 ? addr1 : addr2));
-	uint64_t end = PHYSICAL_TO_VIRTUAL(0x600000 - 0x60000);
 	
 	__malloc_pool = (void*)start;
 	init_memory_pool((uint32_t)(end - start), __malloc_pool, 0);

@@ -1,12 +1,12 @@
 #include <string.h>
 #include <stdint.h>
+#include <stddef.h>
 #include <time.h>
 
-uint64_t cpu_ms;
-uint64_t cpu_us;
-uint64_t cpu_ns;
+uint64_t tsc_ms;
+uint64_t tsc_us;
+uint64_t tsc_ns;
 uint64_t TIMER_FREQUENCY_PER_SEC;
-char cpu_brand[4 * 4 * 3 + 1];
 
 uint64_t timer_frequency() {
 	uint64_t time;
@@ -16,54 +16,9 @@ uint64_t timer_frequency() {
 	return time;
 }
 
-void time_init() {
-	uint32_t* p = (uint32_t*)cpu_brand;
+void timer_init() {
+	extern char* cpu_brand;
 	
-	uint32_t eax = 0x80000002;
-	for(int i = 0; i < 12; i += 4) {
-		asm volatile("cpuid" 
-			: "=a"(p[i + 0]), "=b"(p[i + 1]), "=c"(p[i + 2]), "=d"(p[i + 3]) 
-			: "a"(eax++));
-	}
-	
-	void measure() {
-#define PIT_CONTROL     0x43
-#define PIT_COUNTER0    0x40
-#define PIT_FREQUENCY	1193182
-		uint8_t port_in8(uint16_t port) {
-			uint8_t ret;
-			asm volatile ("inb %%dx,%%al":"=a" (ret):"d" (port));
-			return ret;
-		}
-
-		void port_out8(uint16_t port, uint8_t data) {
-			asm volatile ("outb %%al,%%dx": :"d" (port), "a" (data));
-		}
-
-		uint16_t read_counter() {
-			port_out8(PIT_CONTROL, 0x00 << 6 | 0x00 << 4 | 0x01 << 1 | 0x00 << 0);  // SC=Counter0, RW=Latch, Mode=1, BCD=Binary
-			return (uint16_t)port_in8(PIT_COUNTER0) | ((uint16_t)port_in8(PIT_COUNTER0) << 8);
-		}
-
-		// Make PIT Counter stopped
-		port_out8(PIT_CONTROL, 0x00 << 6 | 0x03 << 4 | 0x00 << 1 | 0x00 << 0);	// SC=Counter0, RW=0b11, Mode=0, BCD=Binary
-
-		uint16_t freq = PIT_FREQUENCY * 50 / 1000;	// 50 ms
-		port_out8(PIT_COUNTER0, freq & 0xff);
-
-		uint64_t base = timer_frequency();
-		port_out8(PIT_COUNTER0, freq >> 8);
-
-		// Wait using PIT controller
-		port_out8(PIT_CONTROL, 0x00 << 6 | 0x03 << 4 | 0x01 << 1 | 0x00 << 0);	// SC=Counter0, RW=0b11, Mode=1, BCD=Binary
-
-		uint16_t count = freq;
-		while(!(count == 0 || count > freq)) {
-			count = read_counter();
-		}
-		TIMER_FREQUENCY_PER_SEC = (timer_frequency() - base) * 20;
-	}
-
 	// Intel(R) Core(TM) i7-3770 CPU @ 3.40GHz
 	if(strstr(cpu_brand, "Intel") != NULL && strstr(cpu_brand, "@ ") != NULL) {
 		int number = 0;
@@ -103,43 +58,115 @@ void time_init() {
 		}
 		TIMER_FREQUENCY_PER_SEC = frequency * number;
 	} else {
-		measure();
+		#define PIT_CONTROL     0x43
+		#define PIT_COUNTER0    0x40
+		#define PIT_FREQUENCY	1193182
+		
+		void measure(uint64_t* tsc, uint16_t* pit, uint64_t loop) {
+			uint64_t base_tsc = timer_frequency();
+			
+			uint8_t pit0, pit1;
+			asm volatile ("inb %%dx,%%al" : "=a"(pit0) : "d"(PIT_COUNTER0));
+			asm volatile ("inb %%dx,%%al" : "=a"(pit1) : "d"(PIT_COUNTER0));
+			uint16_t base_pit = (uint16_t)pit0 | (uint16_t)pit1 << 8;
+			
+			for(uint64_t i = 0; i < loop; i++) {
+				asm("nop");
+			}
+			
+			uint64_t time_tsc = timer_frequency();
+			
+			asm volatile ("inb %%dx,%%al" : "=a"(pit0) : "d"(PIT_COUNTER0));
+			asm volatile ("inb %%dx,%%al" : "=a"(pit1) : "d"(PIT_COUNTER0));
+			uint16_t time_pit = (uint16_t)pit0 | (uint16_t)pit1 << 8;
+			
+			*tsc = time_tsc - base_tsc;
+			*pit = time_pit > base_pit ? 0xffff - (time_pit - base_pit) : base_pit - time_pit;
+		}
+		
+		uint16_t target = PIT_FREQUENCY / 100;
+		
+		uint64_t last_tsc = 0;
+		//uint32_t last_loop = 0;
+		uint16_t last_d = 0xffff;
+		
+		int retry = 0;
+		uint32_t u = 0;
+		uint64_t loop = 100000;
+		for(int i = 0; i < 30; i++) {
+			uint64_t tsc;
+			uint16_t pit;
+			measure(&tsc, &pit, loop);
+			
+			uint16_t d = pit < target ? target - pit : pit - target;
+			if(d < last_d) {
+				last_tsc = tsc;
+				//last_loop = loop;
+				last_d = d;
+			} else if(d == 0) {
+				break;
+			}
+			
+			int scale = target / pit;
+			if(scale > 1) {
+				loop *= scale;
+			} else {
+				if(u == 0) {
+					u = loop / 3;
+				} else if(u == 1) {
+					if(++retry >= 3)
+						break;
+				} else {
+					u /= 2;
+					if(u <= 0)
+						u = 1;
+				}
+				
+				if(pit < target) {
+					loop += u;
+				} else {
+					loop -= u;
+				}
+			}
+		}
+		
+		TIMER_FREQUENCY_PER_SEC = last_tsc * 100;
 	}
-
-	cpu_ms = TIMER_FREQUENCY_PER_SEC / 1000;
-	cpu_us = cpu_ms / 1000;
-	cpu_ns = cpu_us / 1000;
+	
+	tsc_ms = TIMER_FREQUENCY_PER_SEC / 1000;
+	tsc_us = tsc_ms / 1000;
+	tsc_ns = tsc_us / 1000;
 }
 
-void time_swait(uint32_t s) {
+void timer_swait(uint32_t s) {
 	uint64_t time = timer_frequency();
 	time += TIMER_FREQUENCY_PER_SEC * s;
 	while(timer_frequency() < time)
 		asm volatile("nop");
 }
 
-void time_mwait(uint32_t ms) {
+void timer_mwait(uint32_t ms) {
 	uint64_t time = timer_frequency();
-	time += cpu_ms * ms;
+	time += tsc_ms * ms;
 	while(timer_frequency() < time)
 		asm volatile("nop");
 }
 
-void time_uwait(uint32_t us) {
+void timer_uwait(uint32_t us) {
 	uint64_t time = timer_frequency();
-	time += cpu_us * us;
+	time += tsc_us * us;
 	while(timer_frequency() < time)
 		asm volatile("nop");
 }
 
-void time_nwait(uint32_t ns) {
+void timer_nwait(uint32_t ns) {
 	uint64_t time = timer_frequency();
-	time += cpu_ns * ns;
+	time += tsc_ns * ns;
 	while(timer_frequency() < time)
 		asm volatile("nop");
 }
 
-uint64_t time_ns() {
+uint64_t timer_ns() {
 #ifdef LINUX
 	struct timespec ts;
 	if(clock_gettime(CLOCK_MONOTONIC, &ts) != 0)
@@ -149,19 +176,19 @@ uint64_t time_ns() {
 
 #else /* LINUX */
 	/* (Current CPU Time Stamp Counter / CPU frequency per nano-seconds) */
-	return (uint64_t)(timer_frequency() / cpu_ns); 
+	return (uint64_t)(timer_frequency() / tsc_ns); 
 #endif
 }
 
-uint64_t time_us() {
-	return time_ns() / 1000;
+uint64_t timer_us() {
+	return timer_ns() / 1000;
 }
 
-uint64_t time_ms() {
-	return time_ns() / 1000000;
+uint64_t timer_ms() {
+	return timer_ns() / 1000000;
 }
 
-uint64_t time_s() {
-	return time_ns() / 1000000000;
+uint64_t timer_s() {
+	return timer_ns() / 1000000000;
 }
 

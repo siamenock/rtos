@@ -2,8 +2,9 @@
 #define __MALLOC_H__
 
 #include <stdint.h>
+#include <sys/types.h>
 
-void malloc_init();
+void malloc_init(uint64_t end);
 size_t malloc_total();
 size_t malloc_used();
 

@@ -2,6 +2,7 @@
 * Required Packages
   * git
   * nasm
+  * multiboot
   * libcurl4-gnutls-dev
   * qemu-kvm
   * bridge-utils

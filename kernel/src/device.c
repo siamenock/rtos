@@ -66,6 +66,7 @@ Device* device_get(DeviceType type, int idx) {
 	return NULL;
 }
 
+/*
 int device_module_init() {
 	int count = 0;
 	for(int i = 0; i < module_count; i++) {
@@ -83,3 +84,4 @@ int device_module_init() {
 	
 	return count;
 }
+*/

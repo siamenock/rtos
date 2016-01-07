@@ -12,9 +12,10 @@
 static CharInCallback callback;
 
 static bool event(void* data) {
+	/*
 	if(usb_keyboard) 
 		usb_hid_poll(usb_keyboard);
-
+	*/
 	if(callback)
 		callback();
 

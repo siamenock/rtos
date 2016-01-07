@@ -122,6 +122,7 @@ int main(int argc, char* argv[]) {
 		return 1;
 	}
 	
+	// Write symbols
 	int len = write(fd2, symbols, total);
 	if(len != total) {
 		printf("Cannot write fully: %d < %d\n", len, total);

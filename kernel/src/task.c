@@ -7,7 +7,7 @@
 #include "malloc.h"
 #include "gmalloc.h"
 #include "vnic.h"
-#include "../../loader/src/page.h"
+#include "page.h"
 
 #include "task.h"
 

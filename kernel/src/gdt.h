@@ -2,7 +2,7 @@
 #define __GDT_H__
 
 #include <stdint.h>
-#include "../../loader/src/page.h"
+#include "page.h"
 #include "mp.h"
 
 #define GDTR_ADDR	PHYSICAL_TO_VIRTUAL(0x100000)

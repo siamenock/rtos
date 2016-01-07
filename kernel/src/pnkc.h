@@ -11,6 +11,8 @@ typedef struct {
 	uint32_t	text_size;
 	uint32_t	rodata_offset;
 	uint32_t	rodata_size;
+	uint32_t	smap_offset;
+	uint32_t	smap_size;
 	uint32_t	data_offset;
 	uint32_t	data_size;
 	uint32_t	bss_offset;

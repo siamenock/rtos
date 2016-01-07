@@ -55,8 +55,7 @@ void apic_activate() {
 	port_out8(PIC_MASTER_PORT2, 0xff);
 	port_out8(PIC_SLAVE_PORT2, 0xff);
 
-	printf("\tActivate local APICs...\n");
-
+	//printf("\tActivate local APICs...\n");
 	void _apic_activate();
 	_apic_activate();
 }

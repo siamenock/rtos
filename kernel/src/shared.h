@@ -12,10 +12,6 @@ typedef struct {
 } Icc;
 
 typedef struct {
-	volatile uint8_t	mp_sync_lock;
-	volatile uint32_t	mp_sync_map;
-	volatile uint32_t	mp_wait_map;
-	
 	struct _FIFO*		icc_pool;
 	volatile uint8_t	icc_lock_alloc;
 	volatile uint8_t	icc_lock_free;

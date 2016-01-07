@@ -102,7 +102,7 @@ int event_loop() {
 		return count;
 	
 	// Timer events
-	uint64_t time = time_us();
+	uint64_t time = timer_us();
 	while(next_timer <= time) {
 		TimerNode* node = list_remove_first(timer_events);
 		if(node->func(node->context)) {
@@ -184,7 +184,7 @@ uint64_t event_timer_add(EventFunc func, void* context, clock_t delay, clock_t p
 		return 0;
 	node->func = func;
 	node->context = context;
-	uint64_t time = time_us();
+	uint64_t time = timer_us();
 
 	node->delay = time + delay;
 	node->period = period;
@@ -210,7 +210,7 @@ uint64_t event_timer_add(EventFunc func, void* context, clock_t delay, clock_t p
 bool event_timer_update(uint64_t id, clock_t period) {
 	if(list_remove_data(timer_events, (void*)id)) {
 		TimerNode* node = (TimerNode*)id;
-		uint64_t time = time_us();
+		uint64_t time = timer_us();
 		node->period = period;
 		node->delay = time + node->period;
 		

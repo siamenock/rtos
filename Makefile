@@ -22,7 +22,7 @@ system.img:
 	make -C kernel
 	make -C drivers
 	bin/smap kernel/kernel.elf kernel.smap
-	bin/pnkc kernel/kernel.elf kernel.bin
+	bin/pnkc kernel/kernel.elf kernel.smap kernel.bin
 	# Make root.img
 	dd if=/dev/zero of=root.img count=$(SYSTEM_IMG_SIZE)
 	mkdir -p mnt

@@ -8,6 +8,7 @@ uint64_t _ioapic_address;
 
 static uint8_t redirection_map[24];
 
+/*
 static bool init_IOInterruptEntry(MP_IOInterruptEntry* entry) {
 	if(entry->interrupt_type == 0x00 && entry->source_bus_id == mp_bus_isa_id()) {	// interrut_type == Interrupt
 		uint64_t redirection = 	((uint64_t)32 + entry->source_bus_irq) |
@@ -24,8 +25,10 @@ static bool init_IOInterruptEntry(MP_IOInterruptEntry* entry) {
 	}
 	return true;
 }
-	
+*/
+
 void ioapic_init() {
+	/*
 	// Disable PIC mode
 	if(mp_FloatingPointerStructure()->feature[1] & 0x80) {
 		printf("\tDisable PIC mode...\n");
@@ -44,6 +47,8 @@ void ioapic_init() {
 	
 	// Redirect interrupt next
 	mp_iterate_IOInterruptEntry(init_IOInterruptEntry);
+	*/
+	redirection_map[0] = 0;
 }
 
 inline uint32_t ioapic_read32(int idx) {

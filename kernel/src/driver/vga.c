@@ -14,6 +14,7 @@
 #define LINE			(COLS * 2)
 #define SCREEN			(LINE * ROWS)
 
+static CharOutInit init_data;
 static char* buffer;
 static int head;
 static int tail;
@@ -21,6 +22,7 @@ static int size = ROWS;
 static int screen;
 static int row;
 static int col;
+static uint8_t attr = DEFAULT_ATTRIBUTE;
 	
 static void cursor_hide() {
 	int index = -1;
@@ -86,13 +88,16 @@ static void extend(int lines) {
 }
 
 static void render() {
-	if(screen + ROWS >= size) {
-		int len1 = (size - screen) * LINE;
-		int len2 = SCREEN - len1;
-		memcpy((char*)0xb8000, buffer + screen * LINE, len1);
-		memcpy((char*)0xb8000 + len1, buffer, len2);
-	} else {
-		memcpy((char*)0xb8000, buffer + screen * LINE, SCREEN);
+	if(init_data.is_render) {
+		if(screen + ROWS >= size) {
+			int len1 = (size - screen) * LINE;
+			int len2 = SCREEN - len1;
+			
+			memcpy((char*)0xb8000, buffer + screen * LINE, len1);
+			memcpy((char*)0xb8000 + len1, buffer, len2);
+		} else {
+			memcpy((char*)0xb8000, buffer + screen * LINE, SCREEN);
+		}
 	}
 }
 
@@ -186,16 +191,31 @@ static ssize_t vga_read(Device* device, void* buf, size_t size) {
 */
 
 static int init(void* device, void* data) {
-	char* ch = (char*)0xb8000 + SCREEN - 2;
-	while(*ch == 0) {
-		ch -= 2;
+	if(data == NULL)
+		return -1;
+	
+	memcpy(&init_data, data, sizeof(CharOutInit));
+	
+	buffer = init_data.buf;
+	screen = 0;
+	head = 0;
+	tail = ROWS;
+	size = init_data.len / LINE;
+	
+	if(init_data.is_capture) {
+		memcpy(buffer, (char*)0xb8000, 80 * 2 * 25);
+		
+		uint16_t pos = 0;
+		
+		port_out8(REG_ADDR, CURSOR_UPPER);
+		pos |= (uint16_t)port_in8(REG_DATA) << 8;
+		
+		port_out8(REG_ADDR, CURSOR_LOWER);
+		pos |= port_in8(REG_DATA);
+		
+		row = pos / COLS;
+		col = pos % COLS;
 	}
-	
-	row = ((ch - (char*)0xb8000) / LINE) + 1;
-	col = 0;
-	
-	if(row >= ROWS)
-		row = ROWS - 1;
 	
 	return 0;
 }
@@ -225,8 +245,13 @@ static int write(int id, const char* buf, int len) {
 				break;
 			case '\b':
 				if(row != 0 && col != 0) {
-					s[-2] = v[-2] = 0;
-					s[-1] = v[-1] = DEFAULT_ATTRIBUTE;
+					s[-2] = 0;
+					s[-1] = attr;
+					
+					if(init_data.is_render) {
+						v[-2] = 0;
+						v[-1] = attr;
+					}
 					
 					col--;
 					
@@ -258,10 +283,98 @@ static int write(int id, const char* buf, int len) {
 					row--;
 				}
 				break;
-			// TODO: ESC code
+			case 0x1b:	// ESC code
+				;
+				ch++;
+				uint32_t code = 0;
+				while(*ch >= '0' && *ch <= '9') {
+					code *= 10;
+					code += *ch - '0';
+					ch++;
+				}
+				
+				switch(*ch) {
+					case 'm':
+						switch(code) {
+							case 0:
+								attr = DEFAULT_ATTRIBUTE;
+								break;
+							case 30:
+								attr = (attr & 0xf0) | 0x00;
+								break;
+							case 31:
+								attr = (attr & 0xf0) | 0x04;
+								break;
+							case 32:
+								attr = (attr & 0xf0) | 0x02;
+								break;
+							case 33:
+								attr = (attr & 0xf0) | 0x06;
+								break;
+							case 34:
+								attr = (attr & 0xf0) | 0x01;
+								break;
+							case 35:
+								attr = (attr & 0xf0) | 0x05;
+								break;
+							case 36:
+								attr = (attr & 0xf0) | 0x03;
+								break;
+							case 37:
+								attr = (attr & 0xf0) | 0x07;
+								break;
+							case 38:
+								// None
+								break;
+							case 39:
+								attr = (attr & 0xf0) | (DEFAULT_ATTRIBUTE & 0x0f);
+								break;
+							case 40:
+								attr = (attr & 0x0f) | 0x00;
+								break;
+							case 41:
+								attr = (attr & 0x0f) | 0x40;
+								break;
+							case 42:
+								attr = (attr & 0x0f) | 0x20;
+								break;
+							case 43:
+								attr = (attr & 0x0f) | 0x60;
+								break;
+							case 44:
+								attr = (attr & 0x0f) | 0x10;
+								break;
+							case 45:
+								attr = (attr & 0x0f) | 0x50;
+								break;
+							case 46:
+								attr = (attr & 0x0f) | 0x30;
+								break;
+							case 47:
+								attr = (attr & 0x0f) | 0x70;
+								break;
+							case 48:
+								// None
+								break;
+							case 49:
+								attr = (attr & 0x0f) | (DEFAULT_ATTRIBUTE & 0xf0);
+								break;
+							default:
+								;
+						}
+						break;
+					default:
+						; // Unknown ESC code
+				}
+				break;
 			default:
-				s[0] = v[0] = *ch;
-				s[1] = v[1] = DEFAULT_ATTRIBUTE;
+				s[0] = *ch;
+				s[1] = attr;
+				
+				if(init_data.is_render) {
+					v[0] = *ch;
+					v[1] = attr;
+				}
 				col++;
 		}
 		ch++;
@@ -299,16 +412,6 @@ static int scroll(int id, int lines) {
 	return lines;
 }
 
-static void set_buffer(int id, char* buf, int len) {
-	buffer = buf;
-	screen = 0;
-	head = 0;
-	tail = ROWS;
-	size = len / 160;
-	
-	memcpy(buffer, (char*)0xb8000, 80 * 2 * 25);
-}
-
 static void set_cursor(int id, int rows, int cols) {
 	row = rows;
 	col = cols;
@@ -320,6 +423,14 @@ static void get_cursor(int id, int* rows, int* cols) {
 	*cols = col;
 }
 
+static void set_render(int id, int is_render) {
+	init_data.is_render = is_render;
+}
+
+static int is_render(int id) {
+	return init_data.is_render;
+}
+
 DeviceType vga_type = DEVICE_TYPE_CHAR_OUT;
 
 CharOut vga_driver = {
@@ -327,7 +438,8 @@ CharOut vga_driver = {
 	.destroy = destroy,
 	.write = write,
 	.scroll = scroll,
-	.set_buffer = set_buffer,
 	.set_cursor = set_cursor,
-	.get_cursor = get_cursor
+	.get_cursor = get_cursor,
+	.set_render = set_render,
+	.is_render = is_render
 };

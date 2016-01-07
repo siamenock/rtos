@@ -4,7 +4,7 @@
 #include <errno.h>
 #include <string.h>
 #include <elf.h>
-#include "../../loader/src/page.h"
+#include "page.h"
 #include "driver/file.h"
 #include "driver/fs.h"
 #include "driver/bfs.h"
