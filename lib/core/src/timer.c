@@ -3,10 +3,10 @@
 #include <stddef.h>
 #include <time.h>
 
+uint64_t TIMER_FREQUENCY_PER_SEC;
 uint64_t tsc_ms;
 uint64_t tsc_us;
 uint64_t tsc_ns;
-uint64_t TIMER_FREQUENCY_PER_SEC;
 
 uint64_t timer_frequency() {
 	uint64_t time;
@@ -16,10 +16,8 @@ uint64_t timer_frequency() {
 	return time;
 }
 
-void timer_init() {
-	extern char* cpu_brand;
-	
-	// Intel(R) Core(TM) i7-3770 CPU @ 3.40GHz
+void timer_init(const char* cpu_brand) {
+	// e.g. Intel(R) Core(TM) i7-3770 CPU @ 3.40GHz
 	if(strstr(cpu_brand, "Intel") != NULL && strstr(cpu_brand, "@ ") != NULL) {
 		int number = 0;
 		int is_dot_found = 0;

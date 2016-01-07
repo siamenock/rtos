@@ -7,9 +7,6 @@
 
 char cpu_brand[4 * 4 * 3 + 1];
 
-//uint32_t cpu_infos[CPU_INFOS_SIZE][4];
-//uint32_t cpu_extended_infos[CPU_EXTENDED_INFOS_SIZE][4];
-
 void cpu_init() {
 	uint32_t* p = (uint32_t*)cpu_brand;
 	

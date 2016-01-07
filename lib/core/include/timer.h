@@ -5,7 +5,7 @@
 
 extern const uint64_t TIMER_FREQUENCY_PER_SEC;
 
-void timer_init();
+void timer_init(const char* cpu_brand);
 uint64_t timer_frequency();
 
 uint64_t timer_s();
