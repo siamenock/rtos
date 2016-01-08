@@ -395,11 +395,12 @@ void copy_kernel(uint8_t core_id) {
 	// Write multiboot2 tags
 	if(core_id == 0) {
 		uint32_t size = *(uint32_t*)multiboot2_addr;
-		pos = (void*)(((uint32_t)pos + 7) & ~7);
+		uint32_t addr = (0x200000 + pnkc->smap_offset + pnkc->smap_size + 7) & ~7;
+		//pos = (void*)(((uint32_t)pos + 7) & ~7);
 		
 		print("\n    multiboot2: 0x");
-		print_32((uint32_t)pos); print(" ("); print_32(size); print(") ");
-		copy(pos, (void*)multiboot2_addr, size, core_id);
+		print_32(addr); print(" ("); print_32(size); print(") ");
+		copy((void*)addr, (void*)multiboot2_addr, size, core_id);
 	}
 	
 	if(core_id == 0) {

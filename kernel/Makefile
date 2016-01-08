@@ -6,7 +6,7 @@ DIR = obj obj/driver obj/driver/usb
 
 OBJS = obj/entry.o \
 	obj/main.o obj/stdio.o obj/port.o obj/asm.o \
-	obj/malloc.o obj/gmalloc.o obj/string.o \
+	obj/malloc.o obj/gmalloc.o obj/string.o obj/shared.o \
 	obj/device.o obj/apic.o obj/apic_asm.o obj/cpu.o obj/mp.o obj/ioapic.o \
 	obj/driver/vga.o obj/driver/keyboard.o
 

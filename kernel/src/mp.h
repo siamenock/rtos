@@ -120,5 +120,6 @@ uint8_t mp_apic_id();
 uint8_t mp_core_id();
 void mp_sync();
 void mp_parse_fps(MP_Parser* parser);
+uint8_t* mp_core_map();
 
 #endif /* __MP_H__ */

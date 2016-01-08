@@ -36,6 +36,7 @@ void main(void) {
 		
 		printf("Analyze CPU information...\n");
 		cpu_init();
+		gmalloc_init();
 		timer_init(cpu_brand);
 		
 		mp_sync();

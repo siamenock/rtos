@@ -200,3 +200,7 @@ void mp_parse_fps(MP_Parser* parser) {
 		}
 	}
 }
+
+uint8_t* mp_core_map() {
+	return cores;
+}
