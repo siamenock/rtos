@@ -177,10 +177,8 @@ static void* _remove(List* list, ListNode* node) {
 
 void* list_remove(List* list, int index) {
 	ListNode* node = list->head;
-	while(index) {
-		if(!node->next)
-			return NULL;
-		
+
+	while(index && node) {
 		node = node->next;
 		index--;
 	}
@@ -212,6 +210,9 @@ void* list_remove_first(List* list) {
 }
 
 void* list_remove_last(List* list) {
+	if(list->tail == NULL)
+		return NULL;
+
 	return _remove(list, list->tail);
 }
 
