@@ -205,6 +205,9 @@ bool list_remove_data(List* list, void* data) {
 }
 
 void* list_remove_first(List* list) {
+	if(list->head == NULL)
+		return NULL;
+
 	return _remove(list, list->head);
 }
 
