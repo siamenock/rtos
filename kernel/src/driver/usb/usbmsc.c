@@ -548,7 +548,7 @@ usb_msc_test_unit_ready (usbdev_t *dev)
 		case MSC_COMMAND_OK:
 			break;
 		case MSC_COMMAND_FAIL:
-			time_mwait(100);
+			timer_mwait(100);
 			usb_debug (".");
 		//	gettimeofday (&tv, NULL);
 			continue;
@@ -578,7 +578,7 @@ usb_msc_test_unit_ready (usbdev_t *dev)
 			usb_debug (" OK.");
 			break;
 		case MSC_COMMAND_FAIL:
-			time_mwait(100);
+			timer_mwait(100);
 			continue;
 		default:
 			/* Device detached, return immediately */

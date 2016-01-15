@@ -11,6 +11,13 @@
 #include "mp.h"
 #include "cpu.h"
 
+// Disk
+#include "driver/pata.h"
+#include "driver/usb/usb.h"
+// File system
+#include "driver/fs.h"
+#include "driver/bfs.h"
+
 static void ap_timer_init() {
 	extern const uint64_t TIMER_FREQUENCY_PER_SEC;
 	extern uint64_t tsc_ms;
@@ -30,7 +37,7 @@ void main(void) {
 	uint64_t vga_buffer = PHYSICAL_TO_VIRTUAL(0x600000 - 0x70000);
 	stdio_init(apic_id, (void*)vga_buffer, 64 * 1024);
 	malloc_init(vga_buffer);
-	mp_sync();
+	mp_sync();	// Barrier #1
 	if(apic_id == 0) {
 		printf("\x1b""32mOK""\x1b""0m\n");
 		
@@ -39,9 +46,21 @@ void main(void) {
 		gmalloc_init();
 		timer_init(cpu_brand);
 		
-		mp_sync();
+		mp_sync();	// Barrier #2
+		
+		printf("Initializing USB controller driver...\n");
+		usb_initialize();
+		
+		printf("Initializing disk drivers...\n");
+		disk_init();
+		disk_register(&pata_driver);
+		disk_register(&usb_msc_driver);
+		
+		printf("Initializing file system...\n");
+		bfs_init();
+		fs_init();
 	} else {
-		mp_sync();
+		mp_sync();	// Barrier #2
 		ap_timer_init();
 	}
 	

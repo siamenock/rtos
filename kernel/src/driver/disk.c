@@ -3,54 +3,40 @@
 #include "util/list.h"
 #include "util/map.h"
 
-static List* drivers;
+static DiskDriver* drivers[DISK_MAX_DRIVERS];
 static Map* disks;
 
-bool disk_init0() {
-	drivers = list_create(NULL);
+bool disk_register(DiskDriver* driver) {
+	for(int i = 0; i < DISK_MAX_DRIVERS; i++) {
+		if(drivers[i] == NULL) {
+			drivers[i] = driver;
+			goto found;
+		}
+	}
 	
-	return drivers != NULL;
-}
+	return false;	// driver count exceeded
 
-bool disk_register(const DiskDriver* driver) {
-	if(list_size(drivers) >= DISK_MAX_DRIVERS) 
-		return false; // Disk driver table is full
-
-	list_add(drivers, (void*)driver);
-
+found:
+	;
+	DiskDriver* temp[DISK_AVAIL_DEVICES]; 
+	int count = driver->init(driver, temp);
+	if(count < 0) {
+		// Nothing to initialize
+		return true;
+	}
+	
+	for(int i = 0; i < count; i++) {
+		// Key is 32bit type + number 
+		uint32_t key = (temp[i]->type << 16) | (temp[i]->number);
+		if(!map_put(disks, (void*)(uintptr_t)key, temp[i])) 
+			return false;
+	}
+	
 	return true;
 }
 
 bool disk_init() {
-	// Disk map initialization 
 	disks = map_create(DISK_MAX_DRIVERS * DISK_AVAIL_DEVICES, map_uint64_hash, map_uint64_equals, NULL);	
-
-	// There is no disks at all
-	if(list_size(drivers) == 0)
-		return false;
-
-	// Disk drivers initialization
-	ListIterator iter;
-	list_iterator_init(&iter, drivers);
-	DiskDriver* driver;
-
-	while(list_iterator_has_next(&iter)) {
-		driver = list_iterator_next(&iter);
-
-		DiskDriver* temp[DISK_AVAIL_DEVICES]; 
-		int count = driver->init(driver, temp);
-		if(count < 0) {
-			// Initialization fail
-			continue;
-		}
-		
-		for(int i = 0; i < count; i++) {
-			// Key is 32bit type + number 
-			uint32_t key = (temp[i]->type << 16) | (temp[i]->number);
-			if(map_put(disks, (void*)(uintptr_t)key, temp[i]) == false) 
-				return false;
-		}
-	}
 
 	return true;
 }

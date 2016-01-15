@@ -78,7 +78,7 @@ ehci_rh_hand_over_port (usbdev_t *dev, int port)
 	/* TOTEST: how long to wait? trying 100ms for now */
 	int timeout = 10; /* timeout after 10 * 10ms == 100ms */
 	while (!(RH_INST(dev)->ports[port] & P_CONN_STATUS_CHANGE) && timeout--)
-		time_mwait(10);
+		timer_mwait(10);
 	if (!(RH_INST(dev)->ports[port] & P_CONN_STATUS_CHANGE)) {
 		usb_debug("Warning: Handing port over to companion timed out.\n");
 	}
@@ -101,7 +101,7 @@ ehci_rh_scanport (usbdev_t *dev, int port)
 	}
 	/* device connected, handle */
 	if (RH_INST(dev)->ports[port] & P_CURR_CONN_STATUS) {
-		time_mwait(100); // usb20 spec 9.1.2
+		timer_mwait(100); // usb20 spec 9.1.2
 //		if (!IS_ENABLED(CONFIG_LP_USB_EHCI_HOSTPC_ROOT_HUB_TT) &&
 //				(RH_INST(dev)->ports[port] & P_LINE_STATUS) ==
 //				P_LINE_STATUS_LOWSPEED) {
@@ -115,7 +115,7 @@ ehci_rh_scanport (usbdev_t *dev, int port)
 		RH_INST(dev)->ports[port] = (RH_INST(dev)->ports[port] & ~P_PORT_ENABLE) | P_PORT_RESET;
 
 		/* Wait a bit while reset is active (+1 to avoid Tegra race). */
-		time_mwait(50 + 1); // usb20 spec 7.1.7.5 (TDRSTR)
+		timer_mwait(50 + 1); // usb20 spec 7.1.7.5 (TDRSTR)
 
 		/* Deassert reset. */
 		RH_INST(dev)->ports[port] &= ~P_PORT_RESET;
@@ -123,13 +123,13 @@ ehci_rh_scanport (usbdev_t *dev, int port)
 		/* Wait max. 2ms (ehci spec 2.3.9) for flag change to finish. */
 		int timeout = 20; /* time out after 20 * 100us == 2ms */
 		while ((RH_INST(dev)->ports[port] & P_PORT_RESET) && timeout--)
-			time_uwait(100);
+			timer_uwait(100);
 		if (RH_INST(dev)->ports[port] & P_PORT_RESET) {
 			usb_debug("Error: ehci_rh: port reset timed out.\n");
 			return;
 		}
 
-		time_mwait(10); /* TRSTRCY (USB 2.0 spec 7.1.7.5) */
+		timer_mwait(10); /* TRSTRCY (USB 2.0 spec 7.1.7.5) */
 
 		/* If the host controller enabled the port, it's a high-speed
 		 * device, otherwise it's full-speed.
@@ -199,7 +199,7 @@ ehci_rh_init (usbdev_t *dev)
 			RH_INST(dev)->ports[i] |= P_PP;
 	}
 
-	time_mwait(20); // ehci spec 2.3.9
+	timer_mwait(20); // ehci spec 2.3.9
 
 	dev->speed = HIGH_SPEED;
 	dev->address = 0;

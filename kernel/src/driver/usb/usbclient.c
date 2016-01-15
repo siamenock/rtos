@@ -120,7 +120,7 @@ static int usb_msc_read(DiskDriver* driver, uint32_t lba, int sector_count, unsi
 	return result;
 }
 
-const DiskDriver usb_msc_driver = {
+DiskDriver usb_msc_driver = {
 	.type = DISK_TYPE_USB,
 	.init = usb_client_init,
 	.read = usb_msc_read,

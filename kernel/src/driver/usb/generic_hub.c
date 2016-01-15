@@ -72,7 +72,7 @@ generic_hub_debounce(usbdev_t *const dev, const int port)
 	int total_ms = 0;
 	int stable_ms = 0;
 	while (stable_ms < at_least_ms && total_ms < timeout_ms) {
-		time_mwait(step_ms);
+		timer_mwait(step_ms);
 
 		const int changed = hub->ops->port_status_changed(dev, port);
 		const int connected = hub->ops->port_connected(dev, port);
@@ -106,7 +106,7 @@ generic_hub_wait_for_port(usbdev_t *const dev, const int port,
 			return -1;
 		else if (!!state == wait_for)
 			return timeout_steps;
-		time_uwait(step_us);
+		timer_uwait(step_us);
 		--timeout_steps;
 	} while (timeout_steps);
 	return 0;
@@ -121,7 +121,7 @@ generic_hub_resetport(usbdev_t *const dev, const int port)
 		return -1;
 
 	/* wait for 10ms (usb20 spec 11.5.1.5: reset should take 10 to 20ms) */
-	time_mwait(10);
+	timer_mwait(10);
 
 	/* now wait 12ms for the hub to finish the reset */
 	const int ret = generic_hub_wait_for_port(
@@ -172,7 +172,7 @@ generic_hub_attach_dev(usbdev_t *const dev, const int port)
 	if (speed >= 0) {
 		usb_debug("generic_hub: Success at port %d\n", port);
 		if (hub->ops->reset_port)
-			time_mwait(10); /* Reset recovery time
+			timer_mwait(10); /* Reset recovery time
 				       (usb20 spec 7.1.7.5) */
 		hub->ports[port] = usb_attach_device(
 				dev->controller, dev->address, port, speed);
@@ -258,7 +258,7 @@ generic_hub_init(usbdev_t *const dev, const int num_ports,
 		for (port = 1; port <= num_ports; ++port)
 			ops->enable_port(dev, port);
 		/* wait once for all ports */
-		time_mwait(20);
+		timer_mwait(20);
 	}
 
 	return 0;

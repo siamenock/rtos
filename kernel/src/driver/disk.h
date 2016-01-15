@@ -6,7 +6,7 @@
 #include <stddef.h>
 #include <util/list.h>
 
-#define DISK_MAX_DRIVERS	0x10
+#define DISK_MAX_DRIVERS	16
 
 #define DISK_TYPE_NULL 		0x00
 #define DISK_TYPE_PATA		0x01
@@ -34,9 +34,8 @@ typedef struct _DiskDriver {
 	void* 	priv;
 } DiskDriver;
 
-bool disk_init0();
-bool disk_register(const DiskDriver* driver);
 bool disk_init();
+bool disk_register(DiskDriver* driver);
 size_t disk_count();
 int disk_ids(uint32_t* ids, int size);
 DiskDriver* disk_get(uint32_t id);

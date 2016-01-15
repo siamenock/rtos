@@ -39,6 +39,6 @@
 
 #define WAITTIME			500 	// 500ms
 
-extern const DiskDriver pata_driver;
+extern DiskDriver pata_driver;
 
 #endif /* __PATA_H__ */

@@ -53,9 +53,9 @@ static uint8_t read_hdd_status(bool primary) {
 }
 
 static bool wait_for_hdd(bool primary, int flag) {
-	uint64_t time = time_ms();
+	uint64_t time = timer_ms();
 
-	while((time_ms() - time) <= WAITTIME) {
+	while((timer_ms() - time) <= WAITTIME) {
 		uint8_t status = read_hdd_status(primary);
 
 		switch(flag) {
@@ -78,7 +78,7 @@ static bool wait_for_hdd(bool primary, int flag) {
 				return false;
 		}
 
-		time_mwait(1);
+		timer_mwait(1);
 	}
 	
 	return false;
@@ -348,7 +348,7 @@ static int pata_init(DiskDriver* driver, DiskDriver** disks) {
 	return count;
 }
 
-const DiskDriver pata_driver = {
+DiskDriver pata_driver = {
 	.type = DISK_TYPE_PATA,
 	.init = pata_init,
 	.read = pata_read,

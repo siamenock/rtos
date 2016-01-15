@@ -179,7 +179,7 @@ int getchar_timeout(int *ms)
 		if (havekey())
 			return getchar();
 
-		time_mwait(100);
+		timer_mwait(100);
 		*ms -= 100;
 	}
 

@@ -337,7 +337,7 @@ generic_set_address (hci_t *controller, usb_speed speed,
 		return NULL;
 	}
 
-	time_mwait(SET_ADDRESS_MDELAY);
+	timer_mwait(SET_ADDRESS_MDELAY);
 
 	u8 buf[8];
 	dev->address = adr;
@@ -396,7 +396,7 @@ set_address (hci_t *controller, usb_speed speed, int hubport, int hubaddr)
 	}
 	/* workaround for some USB devices: wait until they're ready, or
 	 * they send a NAK when they're not allowed to do. 1ms is enough */
-	time_mwait(1);
+	timer_mwait(1);
 	dev->configuration = malloc(buf[1]);
 	if (!dev->configuration) {
 		usb_debug ("could not allocate %d bytes for DT_CFG\n", buf[1]);

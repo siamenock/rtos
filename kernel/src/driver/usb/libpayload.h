@@ -459,7 +459,7 @@ void fatal(const char *msg) __attribute__ ((noreturn));
  */
 struct usbdev;
 extern struct usbdev* usb_keyboard;
-extern const DiskDriver usb_msc_driver;
+extern DiskDriver usb_msc_driver;
 #define fatal(x) do { while(1) asm("hlt"); } while(0)
 
 /* Kernel & loader wrapping fucntion */
