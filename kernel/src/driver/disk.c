@@ -62,7 +62,7 @@ int disk_ids(uint32_t* ids, int size) {
 		ids[i++] = (uint32_t)(uintptr_t)entry->key;
 	}
 	
-	return count;
+	return i;
 }
 
 DiskDriver* disk_get(uint32_t id) {

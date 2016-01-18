@@ -1,7 +1,6 @@
 #include <malloc.h>
 #include <util/event.h>
 #include "bfs.h"
-#include "fs.h"
 #include "string.h"
 #include "../gmalloc.h"
 #include "../cpu.h"
@@ -387,7 +386,7 @@ static int bfs_closedir(FileSystemDriver* driver, File* dir) {
 	return 0;
 }
 
-static const FileSystemDriver bfs_driver = {
+FileSystemDriver bfs_driver = {
 	.type = FS_TYPE_BFS,
 
 	.mount = bfs_mount,

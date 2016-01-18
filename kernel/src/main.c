@@ -57,8 +57,9 @@ void main(void) {
 		disk_register(&usb_msc_driver);
 		
 		printf("Initializing file system...\n");
-		bfs_init();
 		fs_init();
+		fs_register(&bfs_driver);
+		fs_mount_root();
 	} else {
 		mp_sync();	// Barrier #2
 		ap_timer_init();

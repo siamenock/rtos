@@ -8,7 +8,7 @@
 #include <util/cache.h>
 #include <util/event.h>
 
-static List* drivers;
+static FileSystemDriver* drivers[DISK_MAX_DRIVERS];
 static List* read_buffers;
 static List* write_buffers;
 static List* wait_lists;
@@ -18,13 +18,40 @@ static Map* mounts;	// Key: path string, Value: file system driver
 bool fs_init() {
 	// Mounting map initialization 
 	mounts = map_create(FS_MAX_DRIVERS * FS_MOUNTING_POINTS, map_string_hash, map_string_equals, NULL);	
-
-	// There is no file system at all
-	if(list_size(drivers) == 0) {
-		printf("There is no file system at all\n");
+	if(!mounts)
+		return false; // Memory allocation fail
+	
+	uint32_t ids[DISK_MAX_DRIVERS * DISK_AVAIL_DEVICES];
+	int count;
+	
+	if((count = disk_ids(ids, DISK_MAX_DRIVERS * DISK_AVAIL_DEVICES)) < 0) {
+		printf("Disk not found\n");
 		return false;
 	}
+	
+	write_buffers = list_create(NULL);
+	if(!write_buffers)
+		return false;
+	
+	read_buffers = list_create(NULL);
+	if(!read_buffers)
+		return false;
+	
+	wait_lists = list_create(NULL);
+	if(!wait_lists)
+		return false;
+	
+	cache = cache_create(FS_CACHE_BLOCK, gfree, NULL); 
+	if(!cache)
+		return false;
+	
+	return true;
+}
 
+int fs_mount_root() {
+	// TODO: Current - Mount first disk:partition to root partition
+	// TODO: Future - Mount ramdisk to root partition
+	
 	// Get disk IDs
 	uint32_t ids[DISK_MAX_DRIVERS * DISK_AVAIL_DEVICES];
 	int count;
@@ -35,28 +62,15 @@ bool fs_init() {
 	}
 
 	// Try to mount root directory
-	ListIterator iter;
-	list_iterator_init(&iter, drivers);
-	FileSystemDriver* driver;
-
-	while(list_iterator_has_next(&iter)) {
-		driver = list_iterator_next(&iter);
-
+	for(int i = 0; i < DISK_MAX_DRIVERS; i++) {
+		FileSystemDriver* driver = drivers[i];
+		if(driver == NULL)
+			break;
+		
 		for(int i = 0; i < count; i++) {
 			if(fs_mount(driver->type, ids[i], "/") == 0) {
 				// Cache size is (FS_CACHE_BLOCK * FS_BLOCK_SIZE(normally 4K))
-				cache = cache_create(FS_CACHE_BLOCK, gfree, NULL); 
-				if(!cache) {
-					printf("Create cache fail\n");
-					return false;
-				}
-
 				driver->cache = cache;
-#ifdef _KERNEL_
-				write_buffers = list_create(NULL);
-				read_buffers = list_create(NULL);
-				wait_lists = list_create(NULL);
-#endif /* _KERNEL_ */
 
 				return true;
 			}
@@ -68,22 +82,19 @@ bool fs_init() {
 }
 
 int fs_mount(int type, uint32_t device, const char* path) {
-	if(list_size(drivers) == 0) 
-		return -1; // File system not found 
-
 	// Find file system driver 
-	ListIterator iter;
-	list_iterator_init(&iter, drivers);
-	FileSystemDriver* driver;
-	
-	while(list_iterator_has_next(&iter)) {
-		driver = list_iterator_next(&iter);
-	
-		if(driver->type == type) 
+	FileSystemDriver* driver = NULL;
+	for(int i = 0; i < DISK_MAX_DRIVERS; i++) {
+		if(drivers[i] == NULL)
 			break;
+			
+		if(drivers[i]->type == type) {
+			driver = drivers[i];
+			break;
+		}
 	}
-
-	if(driver->type != type) {
+	
+	if(driver == NULL) {
 		printf("Required file system not found\n");
 		return -2; // Required file system not found
 	}
@@ -127,9 +138,6 @@ FileSystemDriver* fs_driver(const char* path) {
 }
 
 int fs_umount(const char* path) {
-	if(list_size(drivers) == 0)
-		return -1; // File system not found 
-
 	FileSystemDriver* driver = fs_driver(path);
 
 	if(!driver) 
@@ -143,18 +151,18 @@ int fs_umount(const char* path) {
 	return 0;
 }
 
-bool fs_register(const FileSystemDriver* driver) {
-	// Driver list initialization
-	if(!drivers) {
-		drivers = list_create(NULL);
-		if(!drivers)
-			return false; // Memory allocation fail
+bool fs_register(FileSystemDriver* driver) {
+	for(int i = 0; i < DISK_MAX_DRIVERS; i++) {
+		if(drivers[i] == NULL) {
+			drivers[i] = driver;
+			goto done;
+		}
 	}
+	
+	// Disk driver count exceed
+	return false;
 
-	if(list_size(drivers) == DISK_MAX_DRIVERS) 
-		return false; // Disk driver table is full
-
-	list_add(drivers, (void*)driver);
+done:
 
 	return true;
 }
