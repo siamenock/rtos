@@ -8,6 +8,21 @@
 #include <util/cache.h>
 #include <util/event.h>
 
+typedef struct {
+	uint8_t			status;
+	uint8_t			first_chs_addr[3];
+	uint8_t			partition_type;
+	uint8_t			last_chs_addr[3];
+	uint32_t		first_lba;
+	uint32_t		num_of_sec;
+} __attribute__((packed)) PartEntry;
+ 
+typedef struct {
+	uint8_t			code[446];
+	PartEntry		part_entry[4];
+	uint8_t			boot_signature[2];
+} __attribute__((packed)) BootSector;
+
 static FileSystemDriver* drivers[DISK_MAX_DRIVERS];
 static List* read_buffers;
 static List* write_buffers;
@@ -46,19 +61,6 @@ bool fs_init() {
 		return false;
 	
 
-	// Partition table analyze
-	for(int i = 0; i < count; i++) {
-		DiskDriver* disk_driver = disk_get(ids[i]);
-		if(disk_driver) {
-			BootSector* boot_sector = malloc(512);
-			if(disk_driver->read(disk_driver, 0, 1, (void*)boot_sector) < 0) {
-				free(boot_sector);
-			} else {
-				disk_driver->boot_sector = boot_sector;
-			}
-		}
-	}
-
 	return true;
 }
 
@@ -82,7 +84,7 @@ int fs_mount_root() {
 			break;
 		
 		for(int i = 0; i < count; i++) {
-			if(fs_mount(driver->type, ids[i], "/", 1) == 0) {
+			if(fs_mount(ids[i], 1, driver->type, "/") == 0) {
 				// Cache size is (FS_CACHE_BLOCK * FS_BLOCK_SIZE(normally 4K))
 				driver->cache = cache;
 
@@ -95,7 +97,7 @@ int fs_mount_root() {
 	return false;
 }
 
-int fs_mount(int type, uint32_t device, const char* path, uint8_t partition) {
+int fs_mount(uint32_t disk, uint8_t partition, int type, const char* path) {
 	if(map_contains(mounts, (void*)path)) {
 		printf("path '%s' is already mounted\n", path);
 		return -1;
@@ -118,24 +120,34 @@ int fs_mount(int type, uint32_t device, const char* path, uint8_t partition) {
 		return -2; // Required file system not found
 	}
 
-	DiskDriver* disk_driver = disk_get(device);
+	DiskDriver* disk_driver = disk_get(disk);
 	if(!disk_driver) {
 		printf("Disk not found\n");
 		return -3; // Disk not found
 	}
 
-	BootSector* boot_sector = disk_driver->boot_sector;
+	// Read a boot sector
+	BootSector* boot_sector = (BootSector*)malloc(sizeof(BootSector));
+	if(disk_driver->read(disk_driver, 0, 1, (void*)boot_sector) < 0) {
+		free(boot_sector);
+		printf("Boot sector read error\n");
+		return -4;
+	}
+
+	// Check if a boot sector ends with 0x55aa
 	if(boot_sector->boot_signature[0] != 0x55 || boot_sector->boot_signature[1] != 0xaa)
 		disk_driver->type = DISK_TYPE_RAMDISK;
 
 	PartEntry* part_entry = &boot_sector->part_entry[partition];
 	if(driver->mount(driver, disk_driver, part_entry->first_lba, part_entry->num_of_sec) < 0) {
+		free(boot_sector);
 		printf("Bad superblock\n");
-		return -4; // Bad superblock
+		return -5; // Bad superblock
 	}
 
 	// Success - mounting information is filled from now
 	map_put(mounts, (void*)path, driver);
+	free(boot_sector);
 
 	return 0;
 }
