@@ -137,7 +137,7 @@ uint32_t icc_send(ICC_Message* msg, uint8_t core_id) {
 //	uint64_t time = timer_frequency() + cpu_ms * 100;
 //
 //	while(timer_frequency() < time);
-	time_mwait(100);
+	timer_mwait(100);
 
 	return _icc_id;
 }
