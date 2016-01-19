@@ -8,8 +8,12 @@ OBJS = obj/entry.o \
 	obj/main.o obj/stdio.o obj/port.o obj/asm.o \
 	obj/malloc.o obj/gmalloc.o obj/string.o obj/shared.o \
 	obj/device.o obj/apic.o obj/apic_asm.o obj/cpu.o obj/mp.o obj/ioapic.o \
+	obj/gdt.o obj/idt.o obj/isr.o obj/acpi.o obj/pci.o obj/task.o obj/task_asm.o \
+	obj/symbols.o obj/icc.o \
+	\
 	obj/driver/vga.o obj/driver/keyboard.o \
 	obj/driver/disk.o obj/driver/pata.o obj/driver/bfs.o obj/driver/fs.o \
+	obj/driver/port.o \
 	\
 	obj/driver/usb/usbinit.o obj/driver/usb/usb.o obj/driver/usb/usb_dev.o \
 	obj/driver/usb/generic_hub.o obj/driver/usb/usbhub.o \

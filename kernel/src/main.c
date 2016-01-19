@@ -1,8 +1,12 @@
+// Standard C
 #include <stdio.h>
 #include <string.h>
 
-#include "timer.h"
+// Core
+#include <util/event.h>
 
+// Kernel
+#include "timer.h"
 #include "malloc.h"
 #include "gmalloc.h"
 #include "page.h"
@@ -10,10 +14,20 @@
 #include "port.h"
 #include "mp.h"
 #include "cpu.h"
+#include "gdt.h"
+#include "idt.h"
+#include "acpi.h"
+#include "pci.h"
+#include "apic.h"
+#include "ioapic.h"
+#include "task.h"
+#include "icc.h"
+#include "symbols.h"
 
 // Disk
 #include "driver/pata.h"
 #include "driver/usb/usb.h"
+
 // File system
 #include "driver/fs.h"
 #include "driver/bfs.h"
@@ -46,6 +60,10 @@ void main(void) {
 		gmalloc_init();
 		timer_init(cpu_brand);
 		
+		gdt_init();
+		tss_init();
+		idt_init();
+		
 		mp_sync();	// Barrier #2
 		
 		printf("Initializing USB controller driver...\n");
@@ -59,13 +77,59 @@ void main(void) {
 		printf("Initializing file system...\n");
 		fs_init();
 		fs_register(&bfs_driver);
-		fs_mount_root();
+		//fs_mount_root();
+		
+		printf("Loading GDT...\n");
+		gdt_load();
+		
+		printf("Loading TSS...\n");
+		tss_load();
+		
+		printf("Loading IDT...\n");
+		idt_load();
+		
+		printf("Initializing ACPI...\n");
+		acpi_init();
+		
+		printf("Initializing PCI...\n");
+		pci_init();
+	
+		printf("Initailizing local APIC...\n");
+		apic_init();
+		
+		printf("Initializing I/O APIC...\n");
+		ioapic_init();
+		apic_enable();
+		
+		printf("Initializing Multi-tasking...\n");
+		task_init();
+		
+		printf("Initializing events...\n");
+		event_init();
+		
+		printf("Initializing inter-core communications...\n");
+		icc_init();
+		
+		printf("Initializing kernel symbols...\n");
+		symbols_init();
+		
 	} else {
 		mp_sync();	// Barrier #2
 		ap_timer_init();
+		
+		gdt_load();
+		tss_load();
+		idt_load();
+		
+		apic_init();
+		apic_enable();
+		
+		task_init();
+		event_init();
+		icc_init();
 	}
 	
-	mp_sync();
+	mp_sync();	// Barrier #3
 	for(uint32_t i = 0; ; i++) {
 		stdio_print_64(TIMER_FREQUENCY_PER_SEC, apic_id, 0);
 		stdio_print_32(i, apic_id, 15);

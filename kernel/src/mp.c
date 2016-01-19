@@ -11,6 +11,8 @@
 
 static uint8_t apic_id;		// APIC ID
 static uint8_t cores[MP_MAX_CORE_COUNT];
+static uint8_t core_id;
+static uint8_t core_count;
 
 static uint32_t sync_map;
 #define SYNC_MAP	*(uint32_t volatile*)VIRTUAL_TO_PHYSICAL((uint64_t)&sync_map)
@@ -57,6 +59,18 @@ void mp_init() {
 	};
 	
 	mp_parse_fps(&parser);
+	
+	// Calculate core ID
+	for(int i = 0; i <= apic_id; i++) {
+		if(cores[i])
+			core_id++;
+	}
+	
+	// Calculate core count
+	for(int i = 0; i <= MP_MAX_CORE_COUNT; i++) {
+		if(cores[i])
+			core_count++;
+	}
 }
 
 uint8_t mp_apic_id() {
@@ -64,13 +78,20 @@ uint8_t mp_apic_id() {
 }
 
 uint8_t mp_core_id() {
-	uint8_t core_id = 0;
+	return core_id;
+}
+
+uint8_t mp_core_count() {
+	return core_count;
+}
+
+uint8_t mp_core_id_to_apic_id(uint8_t core_id) {
 	for(int i = 0; i <= apic_id; i++) {
-		if(cores[i])
-			core_id++;
+		if(cores[i] && --core_id == 0)
+			return i;
 	}
 	
-	return core_id;
+	return -1;
 }
 
 void mp_sync() {
