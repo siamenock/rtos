@@ -40,7 +40,7 @@ typedef struct _FileSystemDriver {
 	/**
 	 * @return 0: OK, -1: I/O error, -2: Illegal file system
 	 */
-	int		(*mount)(FileSystemDriver* driver, DiskDriver* disk_driver);
+	int		(*mount)(FileSystemDriver* driver, DiskDriver* disk_driver, uint32_t lba, size_t size);
 	int		(*umount)(FileSystemDriver* driver);
 	
 	File* 		(*open)(FileSystemDriver* driver, File* file, const char* file_name, char* flags);
@@ -71,7 +71,7 @@ ssize_t fs_write(File* file, void* buffer, size_t size);
 int fs_read_async(File* file, size_t size, bool(*callback)(List* blocks, int success, void* context), void* context);
 bool fs_write_async(File* file, void* buffer, size_t size, void(*callback)(void* buffer, size_t len, void* context), void* context, void(*sync_callback)(int errno, void* context2), void* context2);
 int fs_mount_root();
-int fs_mount(int type, uint32_t device, const char* path);
+int fs_mount(int type, uint32_t device, const char* path, uint8_t partition);
 int fs_umount(const char* path);
 bool fs_register(FileSystemDriver* driver);
 FileSystemDriver* fs_driver(const char* path);

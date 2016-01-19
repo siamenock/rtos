@@ -186,7 +186,7 @@ static int read_hdd_sector(bool primary, bool master, uint32_t lba, int sector_c
 		status = read_hdd_status(primary);
 
 		if((status & STATUS_ERROR) == STATUS_ERROR) {
-			printf("Status error\n");
+			//printf("Status error\n");
 			return -3;
 		}
 

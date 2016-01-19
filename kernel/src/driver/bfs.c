@@ -58,58 +58,44 @@ typedef struct {
  */
 
 // TODO: Checking superblock only, not investigate whole disks
-static int bfs_mount(FileSystemDriver* fs_driver, DiskDriver* disk_driver) {
+static int bfs_mount(FileSystemDriver* fs_driver, DiskDriver* disk_driver, uint32_t lba, size_t size) {
 	// Size of loader is now about 60kB. Investigate til 200kB (50 Clusters)
 	BFSSuperBlock* sb;
 
 	void* temp = gmalloc(FS_BLOCK_SIZE);
 
 	for(int i = 0; i < 50; i++) {
-// 		TODO: sync -> async {
-//		bool is_read = false;
-//		callback() {
-//			....	
-//			is_read = true;
-//		}
-//		disk_driver->read...(callback);
-//		while(!is_read)
-//			event_loop();
-//		}
-		
-		if(disk_driver->read(disk_driver, FS_SECTOR_PER_BLOCK * i, FS_SECTOR_PER_BLOCK, temp) != 0) {
+		if(disk_driver->read(disk_driver, lba, 8, temp) != 0) {
 			sb = (BFSSuperBlock*)temp;
+			if(sb->magic == BFS_MAGIC) {
+				// Read 1 more sector for 8th sector
+				if(disk_driver->read(disk_driver, lba + 1, 1, temp) != 0) {
+					// Create private data structure
+					fs_driver->priv = malloc(sizeof(BFSPriv));
+					BFSPriv* priv = fs_driver->priv;
 
-			for(int j = 0; j < FS_SECTOR_PER_BLOCK; j++) {
-				if(sb->magic == BFS_MAGIC) {
-					// Read 1 more sector for 8th sector
-					if(disk_driver->read(disk_driver, (FS_SECTOR_PER_BLOCK * i) + j + 1, 1, temp) != 0) {
-						// Create private data structure
-						fs_driver->priv = malloc(sizeof(BFSPriv));
-						BFSPriv* priv = fs_driver->priv;
+					priv->reserved_addr = lba;
+					priv->reserved_size = 1;
 
-						priv->reserved_addr = (FS_SECTOR_PER_BLOCK * i) + j;
-						priv->reserved_size = 1;
+					priv->link_table_addr = lba+ 1;
+					BFSInode* inode = (BFSInode*)temp;
+					priv->link_table_size = inode->first /* Start of Data */ 
+						- 1 /* Super block */;
 
-						priv->link_table_addr = (FS_SECTOR_PER_BLOCK * i) + j + 1;
-						BFSInode* inode = (BFSInode*)temp;
-						priv->link_table_size = inode->first /* Start of Data */ 
-							- 1 /* Super block */;
+					priv->data_addr = lba + inode->first;
 
-						priv->data_addr = (FS_SECTOR_PER_BLOCK* i) + j + inode->first;
-					
-						int size = sb->end - sb->start; // Total size (bytes)
-						priv->total_cluster_count = (size - 4095) / 4096;
+					int size = sb->end - sb->start; // Total size (bytes)
+					priv->total_cluster_count = (size - 4095) / 4096;
 
-						// Disk driver attachment
-						fs_driver->driver = disk_driver;
-					
-						return 0;
-					}
+					// Disk driver attachment
+					fs_driver->driver = disk_driver;
+
+					return 0;
 				}
-
-				sb = (BFSSuperBlock*)((uintptr_t)sb + 512);
 			}
-		} 
+
+			sb = (BFSSuperBlock*)((uintptr_t)sb + 512);
+		}
 	}
 
 	return -1; 

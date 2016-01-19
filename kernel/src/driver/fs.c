@@ -45,6 +45,20 @@ bool fs_init() {
 	if(!cache)
 		return false;
 	
+
+	// Partition table analyze
+	for(int i = 0; i < count; i++) {
+		DiskDriver* disk_driver = disk_get(ids[i]);
+		if(disk_driver) {
+			BootSector* boot_sector = malloc(512);
+			if(disk_driver->read(disk_driver, 0, 1, (void*)boot_sector) < 0) {
+				free(boot_sector);
+			} else {
+				disk_driver->boot_sector = boot_sector;
+			}
+		}
+	}
+
 	return true;
 }
 
@@ -68,7 +82,7 @@ int fs_mount_root() {
 			break;
 		
 		for(int i = 0; i < count; i++) {
-			if(fs_mount(driver->type, ids[i], "/") == 0) {
+			if(fs_mount(driver->type, ids[i], "/", 1) == 0) {
 				// Cache size is (FS_CACHE_BLOCK * FS_BLOCK_SIZE(normally 4K))
 				driver->cache = cache;
 
@@ -81,7 +95,12 @@ int fs_mount_root() {
 	return false;
 }
 
-int fs_mount(int type, uint32_t device, const char* path) {
+int fs_mount(int type, uint32_t device, const char* path, uint8_t partition) {
+	if(map_contains(mounts, (void*)path)) {
+		printf("path '%s' is already mounted\n", path);
+		return -1;
+	}
+
 	// Find file system driver 
 	FileSystemDriver* driver = NULL;
 	for(int i = 0; i < DISK_MAX_DRIVERS; i++) {
@@ -105,7 +124,12 @@ int fs_mount(int type, uint32_t device, const char* path) {
 		return -3; // Disk not found
 	}
 
-	if(driver->mount(driver, disk_driver) < 0) {
+	BootSector* boot_sector = disk_driver->boot_sector;
+	if(boot_sector->boot_signature[0] != 0x55 || boot_sector->boot_signature[1] != 0xaa)
+		disk_driver->type = DISK_TYPE_RAMDISK;
+
+	PartEntry* part_entry = &boot_sector->part_entry[partition];
+	if(driver->mount(driver, disk_driver, part_entry->first_lba, part_entry->num_of_sec) < 0) {
 		printf("Bad superblock\n");
 		return -4; // Bad superblock
 	}
@@ -163,7 +187,6 @@ bool fs_register(FileSystemDriver* driver) {
 	return false;
 
 done:
-
 	return true;
 }
 
