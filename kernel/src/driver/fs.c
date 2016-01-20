@@ -64,39 +64,6 @@ bool fs_init() {
 	return true;
 }
 
-int fs_mount_root() {
-	// TODO: Current - Mount first disk:partition to root partition
-	// TODO: Future - Mount ramdisk to root partition
-	
-	// Get disk IDs
-	uint32_t ids[DISK_MAX_DRIVERS * DISK_AVAIL_DEVICES];
-	int count;
-	
-	if((count = disk_ids(ids, DISK_MAX_DRIVERS * DISK_AVAIL_DEVICES)) < 0) {
-		printf("Disk not found\n");
-		return false;
-	}
-
-	// Try to mount root directory
-	for(int i = 0; i < DISK_MAX_DRIVERS; i++) {
-		FileSystemDriver* driver = drivers[i];
-		if(driver == NULL)
-			break;
-		
-		for(int i = 0; i < count; i++) {
-			if(fs_mount(ids[i], 1, driver->type, "/") == 0) {
-				// Cache size is (FS_CACHE_BLOCK * FS_BLOCK_SIZE(normally 4K))
-				driver->cache = cache;
-
-				return true;
-			}
-		}
-	}
-
-	printf("File system init fail\n");
-	return false;
-}
-
 int fs_mount(uint32_t disk, uint8_t partition, int type, const char* path) {
 	if(map_contains(mounts, (void*)path)) {
 		printf("path '%s' is already mounted\n", path);
@@ -144,6 +111,8 @@ int fs_mount(uint32_t disk, uint8_t partition, int type, const char* path) {
 		printf("Bad superblock\n");
 		return -5; // Bad superblock
 	}
+
+	driver->cache = cache;
 
 	// Success - mounting information is filled from now
 	map_put(mounts, (void*)path, driver);

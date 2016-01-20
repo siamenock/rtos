@@ -12,7 +12,8 @@ OBJS = obj/entry.o \
 	obj/symbols.o obj/icc.o \
 	\
 	obj/driver/vga.o obj/driver/keyboard.o \
-	obj/driver/disk.o obj/driver/pata.o obj/driver/bfs.o obj/driver/fs.o \
+	obj/driver/disk.o obj/driver/pata.o obj/driver/bfs.o obj/driver/ramdisk.o \
+	obj/driver/fs.o obj/driver/file.o \
 	obj/driver/port.o \
 	\
 	obj/driver/usb/usbinit.o obj/driver/usb/usb.o obj/driver/usb/usb_dev.o \

@@ -283,7 +283,6 @@ static off_t bfs_lseek(FileSystemDriver* driver, File* file, off_t offset, int w
 }
 
 static File* bfs_opendir(FileSystemDriver* driver, File* dir, const char* dir_name) {
-
 	DiskDriver* disk_driver = driver->driver;
 	// BFS only have root directory, so forget about the name
 	BFSInode* inode = get_inode_entry(driver, 2); // Root directory is at inode 2

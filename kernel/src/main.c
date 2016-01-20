@@ -23,10 +23,12 @@
 #include "task.h"
 #include "icc.h"
 #include "symbols.h"
+#include "driver/file.h"
 
 // Disk
 #include "driver/pata.h"
 #include "driver/usb/usb.h"
+#include "driver/ramdisk.h"
 
 // File system
 #include "driver/fs.h"
@@ -39,9 +41,19 @@ static void ap_timer_init() {
 	extern uint64_t tsc_ns;
 
 	*(uint64_t*)&TIMER_FREQUENCY_PER_SEC = *(uint64_t*)VIRTUAL_TO_PHYSICAL((uint64_t)&TIMER_FREQUENCY_PER_SEC);
-	tsc_ms= *(uint64_t*)VIRTUAL_TO_PHYSICAL((uint64_t)&tsc_ms);
-	tsc_us= *(uint64_t*)VIRTUAL_TO_PHYSICAL((uint64_t)&tsc_us);
-	tsc_ns= *(uint64_t*)VIRTUAL_TO_PHYSICAL((uint64_t)&tsc_ns);
+	tsc_ms = *(uint64_t*)VIRTUAL_TO_PHYSICAL((uint64_t)&tsc_ms);
+	tsc_us = *(uint64_t*)VIRTUAL_TO_PHYSICAL((uint64_t)&tsc_us);
+	tsc_ns = *(uint64_t*)VIRTUAL_TO_PHYSICAL((uint64_t)&tsc_ns);
+}
+
+static bool ramdisk_init(uint32_t initrd_start, uint32_t initrd_end) {
+	uintptr_t ramdisk_addr = 0x400000 + 0x200000 * MP_MAX_CORE_COUNT;
+	size_t ramdisk_size = 0x200000;
+	memcpy((void*)ramdisk_addr, (void*)(uintptr_t)initrd_start, initrd_end - initrd_start);
+	
+	char cmdline[32];
+	sprintf(cmdline, "-addr 0x%x -size 0x%x", ramdisk_addr, ramdisk_size);
+	return disk_register(&ramdisk_driver, cmdline);
 }
 
 void main(void) {
@@ -76,18 +88,27 @@ void main(void) {
 		
 		printf("Initializing disk drivers...\n");
 		disk_init();
-		disk_register(&pata_driver, NULL);
-		disk_register(&usb_msc_driver, NULL);
+		if(!disk_register(&pata_driver, NULL)) {
+			printf("\tPATA driver registration FAILED!\n");
+			while(1) asm("hlt");
+		}
+		
+		if(!disk_register(&usb_msc_driver, NULL)) {
+			printf("\tUSB MSC driver registration FAILED!\n");
+			while(1) asm("hlt");
+		}
 		
 		printf("Initializing RAM disk...\n");
-		memcpy((void*)0x400000 + 0x200000 * MP_MAX_CORE_COUNT, (void*)(uintptr_t)initrd_start, initrd_end - initrd_start);
-		disk_register(&ramdisk_driver, "-addr 0x123456 -size 0x1234");
+		if(!ramdisk_init(initrd_start, initrd_end)) {
+			printf("\tRAM disk driver registration FAILED!\n");
+			while(1) asm("hlt");
+		}
 		
 		printf("Initializing file system...\n");
 		fs_init();
 		fs_register(&bfs_driver);
-		//fs_mount_root();
-		
+		fs_mount(DISK_TYPE_RAMDISK << 16 | 0x00, 0, 0x01, "/");
+
 		printf("Loading GDT...\n");
 		gdt_load();
 		
@@ -122,6 +143,12 @@ void main(void) {
 		printf("Initializing kernel symbols...\n");
 		symbols_init();
 		
+		File* dir = opendir("/");
+		Dirent* entry = readdir(dir);
+		while(entry) {
+			printf("Dir: %s\n", entry->name);
+			entry = readdir(dir);
+		}
 	} else {
 		mp_sync();	// Barrier #2
 		ap_timer_init();
