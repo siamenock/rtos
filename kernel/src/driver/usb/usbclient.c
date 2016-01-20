@@ -63,7 +63,7 @@ int usb_read(usbdev_t* dev, const sector_t sector, const int sector_count, void 
 }
 
 /* These fucntions added for PacketNgin */
-static int usb_client_init(DiskDriver* driver, DiskDriver** disks) {
+static int usb_client_init(DiskDriver* driver, const char* cmdline, DiskDriver** disks) {
 	usb_poll();
 	
 	int i;
