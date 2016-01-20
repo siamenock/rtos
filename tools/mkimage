@@ -6,6 +6,7 @@ BOOT=3			# Boot partition size in MB
 ROOT=12			# Root partition size in MB
 			# Rest of space will be user parition
 
+# Make disk image
 cd tools/grub/grub-core
 ../grub-mkimage -v -O i386-pc -d. -p\(hd0,msdos1\)/boot/grub biosdisk part_msdos fat exfat bfs multiboot2 -o core.img
 cd ../../..
@@ -33,14 +34,16 @@ sudo mkfs.ext2 /dev/mapper/$HDD3
 
 sudo tools/grub/grub-bios-setup -d tools/grub/grub-core -b boot.img -c core.img $HDD
 
+mkdir -p mnt
 sudo mount /dev/mapper/$HDD1 mnt
 sudo mkdir -p mnt/boot/grub/i386-pc
 sudo cp loader/loader.bin mnt/boot
 sudo cp kernel.bin mnt/boot
-sudo cp kernel.smap mnt/boot
+sudo cp initrd.img mnt/boot
 sudo cp tools/grub.cfg mnt/boot/grub
 sudo cp tools/grub/grub-core/*.mod mnt/boot/grub/i386-pc
 
 sudo umount mnt
+rmdir mnt
 
 sudo kpartx -d $IMAGE

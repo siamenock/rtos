@@ -70,11 +70,19 @@ void gmalloc_init() {
 	} Block;
 	
 	Block reserved[2 + MP_MAX_CORE_COUNT];
-	reserved[0].start = 0x100000;	// Description table
-	reserved[0].end = 0x200000;
-	reserved[1].start = 0x200000;	// Kernel global
-	reserved[1].end = 0x400000;
-	int reserved_count = 2;
+	int reserved_count = 0;
+	reserved[reserved_count].start = 0x100000;	// Description table
+	reserved[reserved_count].end = 0x200000;
+	reserved_count++;
+	
+	reserved[reserved_count].start = 0x200000;	// Kernel global
+	reserved[reserved_count].end = 0x400000;
+	reserved_count++;
+	
+	reserved[reserved_count].start = 0x400000 + 0x200000 * MP_MAX_CORE_COUNT;	// RAM disk
+	reserved[reserved_count].end = 0x400000 + 0x200000 * (MP_MAX_CORE_COUNT + 1);
+	reserved_count++;
+	
 	uint8_t* core_map = mp_core_map();
 	for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
 		if(!core_map[i])
