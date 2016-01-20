@@ -94,7 +94,9 @@ Signature        : 7f
 0x07c00 ~ +512B	: boot.img(grub)
 0x070000 	: core.img(grub)
 64KB		: loader.bin (entry, loader, GDT, stacks for 16 cores)
-1MB		: modules (kernel.bin)
+1MB		:
+	+315K?	: kernel.bin (grub module)
+	+1M	: initrd.img (grub module)
 
 2MB		: 
 	+256KB?	: Kernel (PNKC, .text)

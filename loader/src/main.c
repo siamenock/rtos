@@ -21,6 +21,8 @@
  */
 static uint32_t kernel_start;
 static uint32_t kernel_end;
+static uint32_t initrd_start;
+static uint32_t initrd_end;
 static uint32_t multiboot2_addr;
 
 static void log(char* title) {
@@ -98,9 +100,13 @@ void check_multiboot2(uint32_t magic, uint32_t addr) {
 				;
 				struct multiboot_tag_module* module = (struct multiboot_tag_module*)tag;
 				uint64_t* magic = (uint64_t*)module->mod_start;
+				uint32_t* magic2 = (uint32_t*)module->mod_start;
 				if(*magic == PNKC_MAGIC) {
 					kernel_start = module->mod_start;
 					kernel_end = module->mod_end;
+				} else if(*magic2 == 0x1BADFACE) {
+					initrd_start = module->mod_start;
+				        initrd_end = module->mod_end;
 				}
 				break;
 			case MULTIBOOT_TAG_TYPE_BASIC_MEMINFO:
@@ -542,6 +548,10 @@ void main(uint32_t magic, uint32_t addr) {
 		time_init();
 		apic_init();
 		activate_aps();
+		
+		// 64bit kernel arguments
+		*(uint32_t*)(0x5c0000 - 0x400) = initrd_start;
+		*(uint32_t*)(0x5c0000 - 0x400 + 8) = initrd_end;
 		
 		print("Jump to 64bit kernel: 0x00200000");
 		tab(75);

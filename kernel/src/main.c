@@ -51,8 +51,13 @@ void main(void) {
 	uint64_t vga_buffer = PHYSICAL_TO_VIRTUAL(0x600000 - 0x70000);
 	stdio_init(apic_id, (void*)vga_buffer, 64 * 1024);
 	malloc_init(vga_buffer);
+	
 	mp_sync();	// Barrier #1
 	if(apic_id == 0) {
+		// Parse kernel arguments
+		uint32_t initrd_start = *(uint32_t*)(0x5c0000 - 0x400);
+		uint32_t initrd_end = *(uint32_t*)(0x5c0000 - 0x400 + 8);
+		
 		printf("\x1b""32mOK""\x1b""0m\n");
 		
 		printf("Analyze CPU information...\n");

@@ -1,0 +1,23 @@
+#
+
+INITRD=initrd.img	# initial root disk
+INITRD_SIZE=1		# initial root disk size in MB
+
+FILES="drivers/virtio.ko LICENSE"
+
+# Make initial root disk image
+dd if=/dev/zero of=$INITRD bs=512 count=$(($INITRD_SIZE * 2048))
+
+sudo losetup -f $INITRD
+DEVICE=`losetup -j $INITRD | awk '{ split($1, a, ":"); print a[1] }'`
+sudo tools/mkfs.bfs $DEVICE
+mkdir -p mnt
+sudo mount $DEVICE mnt
+echo $FILES
+sudo cp $FILES mnt
+sync
+sudo umount mnt
+rmdir mnt
+
+sudo losetup -d $DEVICE
+
