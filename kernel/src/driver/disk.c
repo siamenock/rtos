@@ -6,7 +6,7 @@
 static DiskDriver* drivers[DISK_MAX_DRIVERS];
 static Map* disks;
 
-bool disk_register(DiskDriver* driver) {
+bool disk_register(DiskDriver* driver, const char* cmdline) {
 	for(int i = 0; i < DISK_MAX_DRIVERS; i++) {
 		if(drivers[i] == NULL) {
 			drivers[i] = driver;
@@ -19,7 +19,7 @@ bool disk_register(DiskDriver* driver) {
 found:
 	;
 	DiskDriver* temp[DISK_AVAIL_DEVICES]; 
-	int count = driver->init(driver, temp);
+	int count = driver->init(driver, cmdline, temp);
 	if(count < 0) {
 		// Nothing to initialize
 		return true;
