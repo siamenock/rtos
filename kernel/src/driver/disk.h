@@ -25,7 +25,7 @@ typedef struct _DiskDriver {
 	uint16_t number;
 	
 	/* Low level file operation - disk specific */
-	int	(*init)(DiskDriver* driver, DiskDriver** disks);
+	int	(*init)(DiskDriver* driver, const char* cmdline, DiskDriver** disks);
 	int	(*read)(DiskDriver* driver, uint32_t lba, int sector_count, uint8_t* buf); 
 	int	(*read_async)(DiskDriver* driver, List* blocks, int sector_count, void(*callback)(List* blocks, int count, void* context), void* context);
 	int	(*write_async)(DiskDriver* driver, List* blocks, int sector_count, void(*callback)(List* blocks, int count, void* context), void* context);

@@ -297,7 +297,7 @@ static int pata_write(DiskDriver* driver, uint32_t lba, int sector_count, unsign
 	return write_hdd_sector(manager->primary, manager->master, lba, sector_count, buf);
 }
 
-static int pata_init(DiskDriver* driver, DiskDriver** disks) {
+static int pata_init(DiskDriver* driver, const char* cmdline, DiskDriver** disks) {
 	// Disable interrupt
 	port_out8(PORT_PRIMARY + PORT_DIGITALOUTPUT, 2);
 	port_out8(PORT_SECONDARY + PORT_DIGITALOUTPUT, 2);
@@ -354,4 +354,3 @@ DiskDriver pata_driver = {
 	.read = pata_read,
 	.write = pata_write, 
 };
-
