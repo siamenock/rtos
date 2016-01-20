@@ -11,6 +11,7 @@ typedef struct {
 	size_t		size;		// TODO: bytes(current)? sector? cluster?
 } RamDisk;
 
+// e.g. -addr 0x123456 -size 0x1234
 static bool parse(char* argv, uint64_t* address, size_t* size) {
 	if(strncmp(argv, "-addr ", 6))
 		return false;

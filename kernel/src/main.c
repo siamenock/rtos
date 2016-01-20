@@ -76,8 +76,12 @@ void main(void) {
 		
 		printf("Initializing disk drivers...\n");
 		disk_init();
-		disk_register(&pata_driver);
-		disk_register(&usb_msc_driver);
+		disk_register(&pata_driver, NULL);
+		disk_register(&usb_msc_driver, NULL);
+		
+		printf("Initializing RAM disk...\n");
+		memcpy((void*)0x400000 + 0x200000 * MP_MAX_CORE_COUNT, (void*)(uintptr_t)initrd_start, initrd_end - initrd_start);
+		disk_register(&ramdisk_driver, "-addr 0x123456 -size 0x1234");
 		
 		printf("Initializing file system...\n");
 		fs_init();
