@@ -133,7 +133,7 @@ Signature        : 7f
 	+32KB?	: Kernel.smap (8 bytes aligned)
 	+2KB?	: multiboot2 tags (8 bytes aligned)
 
-2MB + 2MB * core:
+4MB + 2MB * apicid:
 	+200KB?	: Kernel (.data, .bss)
 	...	: Local malloc
 	64KB	: VGA buffer
@@ -141,3 +141,6 @@ Signature        : 7f
 	32KB	: Kernel interrupt stack
 	64KB	: Kernel stack
 	256KB	: TLB
+
+2MB + 2MB * 16	: RAM disk
+

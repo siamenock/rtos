@@ -23,7 +23,7 @@ typedef struct {
 } __attribute__((packed)) SMAP;
 
 
-void gmalloc_init();
+void gmalloc_init(uintptr_t ramdisk_addr, uint32_t ramdisk_size);
 void gmalloc_extend();
 size_t gmalloc_total();
 size_t gmalloc_used();

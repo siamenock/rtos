@@ -55,7 +55,7 @@ static struct multiboot_tag_mmap* find_mmap() {
 	return NULL;
 }
 
-void gmalloc_init() {
+void gmalloc_init(uintptr_t ramdisk_addr, uint32_t ramdisk_size) {
 	uint64_t start = VIRTUAL_TO_PHYSICAL(IDT_END_ADDR);
 	uint64_t end = VIRTUAL_TO_PHYSICAL((uint64_t)shared);
 	
@@ -75,12 +75,12 @@ void gmalloc_init() {
 	reserved[reserved_count].end = 0x200000;
 	reserved_count++;
 	
-	reserved[reserved_count].start = 0x200000;	// Kernel global
-	reserved[reserved_count].end = 0x400000;
+	reserved[reserved_count].start = ramdisk_addr;	// Kernel global
+	reserved[reserved_count].end = ramdisk_addr + ramdisk_size;
 	reserved_count++;
 	
-	reserved[reserved_count].start = 0x400000 + 0x200000 * MP_MAX_CORE_COUNT;	// RAM disk
-	reserved[reserved_count].end = 0x400000 + 0x200000 * (MP_MAX_CORE_COUNT + 1);
+	reserved[reserved_count].start = ramdisk_addr;	// RAM disk
+	reserved[reserved_count].end = ramdisk_addr + ramdisk_size;
 	reserved_count++;
 	
 	uint8_t* core_map = mp_core_map();

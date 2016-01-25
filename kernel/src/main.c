@@ -34,6 +34,8 @@
 #include "driver/fs.h"
 #include "driver/bfs.h"
 
+#define RAMDISK_ADDR	(0x400000 + 0x200000 * MP_MAX_CORE_COUNT)
+
 static void ap_timer_init() {
 	extern const uint64_t TIMER_FREQUENCY_PER_SEC;
 	extern uint64_t tsc_ms;
@@ -44,16 +46,6 @@ static void ap_timer_init() {
 	tsc_ms = *(uint64_t*)VIRTUAL_TO_PHYSICAL((uint64_t)&tsc_ms);
 	tsc_us = *(uint64_t*)VIRTUAL_TO_PHYSICAL((uint64_t)&tsc_us);
 	tsc_ns = *(uint64_t*)VIRTUAL_TO_PHYSICAL((uint64_t)&tsc_ns);
-}
-
-static bool ramdisk_init(uint32_t initrd_start, uint32_t initrd_end) {
-	uintptr_t ramdisk_addr = 0x400000 + 0x200000 * MP_MAX_CORE_COUNT;
-	size_t ramdisk_size = 0x200000;
-	memcpy((void*)ramdisk_addr, (void*)(uintptr_t)initrd_start, initrd_end - initrd_start);
-	
-	char cmdline[32];
-	sprintf(cmdline, "-addr 0x%x -size 0x%x", ramdisk_addr, ramdisk_size);
-	return disk_register(&ramdisk_driver, cmdline);
 }
 
 void main(void) {
@@ -72,9 +64,12 @@ void main(void) {
 		
 		printf("\x1b""32mOK""\x1b""0m\n");
 		
+		printf("Copy RAM disk image from 0x%x to 0x%x (%d)\n", initrd_start, RAMDISK_ADDR, initrd_end - initrd_start);
+		memcpy((void*)RAMDISK_ADDR, (void*)(uintptr_t)initrd_start, initrd_end - initrd_start);
+		
 		printf("Analyze CPU information...\n");
 		cpu_init();
-		gmalloc_init();
+		gmalloc_init(RAMDISK_ADDR, initrd_end - initrd_start);
 		timer_init(cpu_brand);
 		
 		gdt_init();
@@ -99,7 +94,9 @@ void main(void) {
 		}
 		
 		printf("Initializing RAM disk...\n");
-		if(!ramdisk_init(initrd_start, initrd_end)) {
+		char cmdline[32];
+		sprintf(cmdline, "-addr 0x%x -size 0x%x", RAMDISK_ADDR, initrd_end - initrd_start);
+		if(!disk_register(&ramdisk_driver, cmdline)) {
 			printf("\tRAM disk driver registration FAILED!\n");
 			while(1) asm("hlt");
 		}
@@ -108,7 +105,7 @@ void main(void) {
 		fs_init();
 		fs_register(&bfs_driver);
 		fs_mount(DISK_TYPE_RAMDISK << 16 | 0x00, 0, 0x01, "/");
-
+		
 		printf("Loading GDT...\n");
 		gdt_load();
 		
