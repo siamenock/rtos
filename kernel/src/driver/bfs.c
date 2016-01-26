@@ -171,10 +171,9 @@ static int find_directory_entry(FileSystemDriver* driver, const char* name, File
 
 	// Return entry which corresponds to file name 
 	BFSDir* bfs_dir = (BFSDir*)temp;
-	int len = strlen(name);
 
 	for(int i = 2; i < 0x40; i++) {
-		if(strncmp((char*)bfs_dir[i].name, name, len) == 0) {
+		if(strcmp((char*)bfs_dir[i].name, name) == 0) {
 			BFSInode* inode = get_inode_entry(driver, bfs_dir[i].inode);
 			
 			if(inode == 0) {
