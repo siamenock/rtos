@@ -3,15 +3,20 @@
 #include <xmmintrin.h>
 #include <smmintrin.h>
 
-void* memcpy(void *dst, void *src, size_t len) {
+_PTR
+_DEFUN (memcpy, (dst, src, len),
+	_PTR dst _AND
+	_CONST _PTR src _AND
+	size_t len)
+{
 	uint8_t* a = (uint8_t*)dst;
 	uint8_t* b = (uint8_t*)src;
 
 	int aligned_a = 0, aligned_b = 0;
 	int i = 0;
 
-	aligned_a = ((unsigned long)a & (sizeof(__m128i)-1));
-	aligned_b = ((unsigned long)b & (sizeof(__m128i)-1));
+	aligned_a = ((uintptr_t)a & (sizeof(__m128i)-1));
+	aligned_b = ((uintptr_t)b & (sizeof(__m128i)-1));
 
 	/* Not aligned */
 	if(aligned_a != aligned_b) {
@@ -27,7 +32,7 @@ void* memcpy(void *dst, void *src, size_t len) {
 
 	/* aligned */
 	if(aligned_a) {
-		while(len && ((unsigned long) &a[i] & (sizeof(__m128i)-1))) {
+		while(len && ((uintptr_t) &a[i] & (sizeof(__m128i)-1))) {
 			a[i] = b[i];
 
 			i++;
@@ -90,7 +95,7 @@ void* memcpy(void *dst, void *src, size_t len) {
 	}
 
 	while(len >= 4) {
-		*(long*)(&a[i]) = *(long*)(&b[i]);
+		*(uint32_t*)(&a[i]) = *(uint32_t*)(&b[i]);
 
 		i += 4;
 		len -= 4;

@@ -13,8 +13,8 @@ void* memmove(void *dst, void *src, size_t len) {
 	if(src < dst && dst < src + len) {
 		/* Destructive overlap...have to copy backwards */
 		i = len;
-		aligned_a = ((unsigned long)&a[i] & (sizeof(__m128i)-1));
-		aligned_b = ((unsigned long)&b[i] & (sizeof(__m128i)-1));
+		aligned_a = ((uintptr_t)&a[i] & (sizeof(__m128i)-1));
+		aligned_b = ((uintptr_t)&b[i] & (sizeof(__m128i)-1));
 
 		/* Not aligned */
 		if(aligned_a != aligned_b) {
@@ -28,7 +28,7 @@ void* memmove(void *dst, void *src, size_t len) {
 
 		/* align */
 		if(aligned_a) {
-			while(i && ((unsigned long) &a[i] & (sizeof(__m128i)-1))) {
+			while(i && ((uintptr_t) &a[i] & (sizeof(__m128i)-1))) {
 				i--;
 				a[i] = b[i];
 			}
@@ -87,8 +87,8 @@ void* memmove(void *dst, void *src, size_t len) {
 			a[i] = b[i];
 		}
 	} else {
-		aligned_a = ( (unsigned long)a & (sizeof(__m128i)-1) );
-		aligned_b = ( (unsigned long)b & (sizeof(__m128i)-1) );
+		aligned_a = ((uintptr_t)a & (sizeof(__m128i)-1) );
+		aligned_b = ((uintptr_t)b & (sizeof(__m128i)-1) );
 
 		/* Not aligned */
 		if(aligned_a != aligned_b) {
@@ -104,7 +104,7 @@ void* memmove(void *dst, void *src, size_t len) {
 
 		/* aligned */
 		if(aligned_a) {
-			while(len && ((unsigned long) &a[i] & ( sizeof(__m128i)-1))) {
+			while(len && ((uintptr_t) &a[i] & ( sizeof(__m128i)-1))) {
 				a[i] = b[i];
 
 				i++;
@@ -167,7 +167,7 @@ void* memmove(void *dst, void *src, size_t len) {
 		}
 
 		while(len >= 4) {
-			*(long*)(&a[i]) = *(long*)(&b[i]);
+			*(uint32_t*)(&a[i]) = *(uint32_t*)(&b[i]);
 
 			i += 4;
 			len -= 4;

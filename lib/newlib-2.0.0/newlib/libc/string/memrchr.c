@@ -13,10 +13,10 @@ void* memrchr(void *dst, int c, size_t len) {
 	int i = len;
 	int aligned_a = 0;
 
-	aligned_a = ((unsigned long)a & (sizeof(__m128i) - 1));
+	aligned_a = ((uintptr_t)a & (sizeof(__m128i) - 1));
 	/* aligned */
 	if(aligned_a) {
-		while(i && ((unsigned long) &a[i] & ( sizeof(__m128i)-1))) {
+		while(i && ((uintptr_t) &a[i] & ( sizeof(__m128i)-1))) {
 			i--;
 			if(a[i] == (char)c) {
 				return a + i;

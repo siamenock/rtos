@@ -9,8 +9,8 @@ void* mempcpy(void *dst, void *src, size_t len) {
 	int aligned_a = 0, aligned_b = 0;
 	int i = 0;
 
-	aligned_a = ((unsigned long)a & (sizeof(__m128i)-1));
-	aligned_b = ((unsigned long)b & (sizeof(__m128i)-1));
+	aligned_a = ((uintptr_t)a & (sizeof(__m128i)-1));
+	aligned_b = ((uintptr_t)b & (sizeof(__m128i)-1));
 
 	/* Not aligned */
 	if(aligned_a != aligned_b) {
@@ -26,7 +26,7 @@ void* mempcpy(void *dst, void *src, size_t len) {
 
 	/* aligned */
 	if(aligned_a) {
-		while(len && ((unsigned long) &a[i] & (sizeof(__m128i)-1))) {
+		while(len && ((uintptr_t) &a[i] & (sizeof(__m128i)-1))) {
 			a[i] = b[i];
 
 			i++;
@@ -89,7 +89,7 @@ void* mempcpy(void *dst, void *src, size_t len) {
 	}
 
 	while(len >= 4) {
-		*(long*)(&a[i]) = *(long*)(&b[i]);
+		*(uint64_t*)(&a[i]) = *(uint64_t*)(&b[i]);
 
 		i += 4;
 		len -= 4;
