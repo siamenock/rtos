@@ -7,13 +7,9 @@
 #include <util/event.h>
 
 // Kernel
-#include <time.h>
-<<<<<<< HEAD
 #include <timer.h>
-
-=======
 #include <file.h>
->>>>>>> FIO and File API for user are added
+
 #include "asm.h"
 #include "timer.h"
 #include "malloc.h"
@@ -42,15 +38,10 @@
 
 // Disk
 #include "driver/pata.h"
-<<<<<<< HEAD
 #include "driver/usb/usb.h"
 #include "driver/ramdisk.h"
 #include "driver/nic.h"
-
-// File system
-=======
 #include "driver/virtio_blk.h"
->>>>>>> FIO and File API for user are added
 #include "driver/fs.h"
 #include "driver/bfs.h"
 
@@ -107,7 +98,6 @@ static void init_nics(int count) {
 				(info.mac[j] >> 0) & 0xff,
 				manager_mac == 0 ? '*' : ' ');
 
-<<<<<<< HEAD
 			if(!manager_mac)
 				manager_mac = info.mac[j];
 
@@ -115,11 +105,10 @@ static void init_nics(int count) {
 		}
 	}
 }
-=======
+
 #define VGA_BUFFER_PAGES	12
 //static uint64_t idle_time;
 extern Device* nic_devices[];
->>>>>>> FIO and File API for user are added
 
 static bool idle0_event(void* data) {
 	/*
@@ -410,49 +399,8 @@ static int exec(char* name) {
 }
 
 void main(void) {
-<<<<<<< HEAD
 	mp_init();
 	uint8_t apic_id = mp_apic_id();
-=======
-	cpu_init();
-	time_init();
-	mp_init0();
-
-	uint8_t core_id = mp_core_id();
-	if(core_id == 0) {
-		stdio_init();
-
-		// Bootstrap processor
-		printf("Initializing shared area...\n");
-		shared_init();
-
-		printf("Initializing malloc...\n");
-		malloc_init();
-
-		printf("Initializing gmalloc...\n");
-		gmalloc_init();
-		stdio_init2(gmalloc(4000 * VGA_BUFFER_PAGES), 4000 * VGA_BUFFER_PAGES);
-
-		printf("Initializing USB controller driver...\n");
-		usb_initialize();
-
-		printf("Initializing PCI...\n");
-		pci_init();
-
-		printf("Initializing disk drivers...\n");
-		disk_init0();
-//		disk_register(&virtio_blk_driver);
-		disk_register(&pata_driver);
-		disk_register(&usb_msc_driver);
-		disk_init();
-
-		printf("Initializing file system...\n");
-		bfs_init();
-		fs_init();
-
-		printf("Analyzing CPU information...\n");
-		cpu_info();
->>>>>>> FIO and File API for user are added
 	
 	uint64_t vga_buffer = PHYSICAL_TO_VIRTUAL(0x600000 - 0x70000);
 	stdio_init(apic_id, (void*)vga_buffer, 64 * 1024);
@@ -492,13 +440,8 @@ void main(void) {
 		printf("Initializing APICs...\n");
 		apic_activate();
 		
-<<<<<<< HEAD
 		printf("Initializing PCI...\n");
 		pci_init();
-=======
-		printf("Initializing APICs...\n");
-		apic_activate();
->>>>>>> FIO and File API for user are added
 		
 		printf("Initailizing local APIC...\n");
 		apic_init();
@@ -506,7 +449,7 @@ void main(void) {
 		printf("Initializing I/O APIC...\n");
 		ioapic_init();
 		apic_enable();
-		
+
 		printf("Initializing Multi-tasking...\n");
 		task_init();
 		
@@ -585,13 +528,8 @@ void main(void) {
 		icc_register(ICC_TYPE_RESUME, icc_resume);
 		icc_register(ICC_TYPE_STOP, icc_stop);
 		apic_register(49, icc_pause);
-<<<<<<< HEAD
 		
 		if(cpu_has_feature(CPU_FEATURE_MONITOR_MWAIT) && cpu_has_feature(CPU_FEATURE_MWAIT_INTERRUPT))
-=======
-
-		if(CPU_IS_MONITOR_MWAIT & CPU_IS_MWAIT_INTERRUPT)
->>>>>>> FIO and File API for user are added
 			event_idle_add(idle_monitor_event, NULL);
 		else
 			event_idle_add(idle_hlt_event, NULL);
@@ -601,12 +539,8 @@ void main(void) {
 	mp_sync();
 
 	if(core_id == 0) {
-<<<<<<< HEAD
 		while(exec("/init.psh") > 0)
 			event_loop();
-=======
-		exec("/init.psh");
->>>>>>> FIO and File API for user are added
 	}
 
 	while(1) {

@@ -15,6 +15,7 @@ void hlt();
 //bool cmpxchg(volatile uint8_t* s1, uint8_t s2, uint8_t d);
 void clflush(void* addr);
 void wbinvd();
+uint64_t read_cr0();
 uint64_t read_cr2();
 void write_cr2(uint64_t cr2);
 uint64_t read_cr3();

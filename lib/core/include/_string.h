@@ -7,9 +7,13 @@
 #include <stddef.h>
 
 void *__memset(void *s, int c, size_t n);
+void *__memset_sse(void *dst, int value, size_t len);
 void *__memcpy(void *dest, const void *src, size_t n);
-void * __memmove ( void *dest, const void *src, size_t len );
+void *__memcpy_sse(void *dest, const void *src, size_t n);
+void * __memmove(void *dest, const void *src, size_t len );
+void * __memmove_sse(void *dest, const void *src, size_t len );
 int __memcmp(const void* v1, const void* v2, size_t size);
+int __memcmp_sse(const void* v1, const void* v2, size_t size);
 void __bzero(void* dest, size_t size);
 size_t __strlen(const char* s);
 char* __strstr(const char* haystack, const char* needle);

@@ -1,6 +1,6 @@
 .PHONY: all clean
 
-CFLAGS = -m32 -Wall -Werror -ffreestanding -std=gnu99
+CFLAGS = -m32 -Wall -Werror -ffreestanding -std=gnu99 -D__MODE_32_BIT__#-DUSB_DEBUG
 
 DIR = obj
 

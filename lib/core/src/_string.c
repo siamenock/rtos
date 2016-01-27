@@ -2,32 +2,51 @@
 #include <stdint.h>
 #include <malloc.h>
 #include <stdio.h>
+#include <stdbool.h>
 
-#ifdef __SSE_4_1__
 #include <xmmintrin.h>
 #include <smmintrin.h>
-#endif
 
-#ifdef __SSE_4_1__
-void* __memset(void *dst, int value, size_t len) {
+void *__memset(void *s, int c, size_t n) {
+	uint64_t c8;
+	int8_t *p = (void*)&c8;
+
+	for(int i = 0; i < 8; i++)
+		p[i] = (int8_t)c;
+
+	uint64_t* d = s;
+
+	int count = n / 8;
+	while(count--)
+		*d++ = c8;
+
+	uint8_t* d2 = (uint8_t*)d;
+	count = n % 8;
+	while(count--)
+		*d2++ = c;
+
+	return s;
+}
+
+void *__memset_sse(void *dst, int value, size_t len) {
 	uint8_t* a = dst;
 
 	int aligned_a = 0;
 	int i = 0;
 
-	aligned_a = ((unsigned long)a & (sizeof(__m128i)-1));
+	aligned_a = ((uintptr_t)a & (sizeof(__m128i)-1));
 
 	/* aligned */
 	if(aligned_a) {
-		while(len && ((unsigned long) &a[i] & (sizeof(__m128i)-1))) {
-			a[i] = (char)value;
+		while(len && ((uintptr_t) &a[i] & (sizeof(__m128i)-1))) {
+			a[i] = (uint8_t)value;
 
 			i++;
 			len--;
 		}
 	}
 
-	if(len >= 4) {
+	if(len >= 16) {
 		uint32_t buf_32 = value;
 		buf_32 |= (buf_32 << 8);
 		buf_32 |= (buf_32 << 16);
@@ -73,13 +92,6 @@ void* __memset(void *dst, int value, size_t len) {
 				i += 16;
 				len -= 16;
 			}
-
-			if(len >= 8) {
-				*(uint64_t*)(&a[i]) = buf_32;
-
-				i += 8;
-				len -= 8;
-			}
 		}
 
 		while(len >= 4) {
@@ -91,7 +103,7 @@ void* __memset(void *dst, int value, size_t len) {
 	}
 
 	while(len) {
-		a[i] = (char)value;
+		a[i] = (uint8_t)value;
 
 		i++;
 		len--;
@@ -99,39 +111,16 @@ void* __memset(void *dst, int value, size_t len) {
 
 	return dst;
 }
-#else
-void *__memset(void *s, int c, size_t n) {
-	uint64_t c8;
-	int8_t *p = (void*)&c8;
-	
-	for(int i = 0; i < 8; i++)
-		p[i] = (int8_t)c;
-	
-	uint64_t* d = s;
-	
-	int count = n / 8;
-	while(count--)
-		*d++ = c8;
-	
-	uint8_t* d2 = (uint8_t*)d;
-	count = n % 8;
-	while(count--)
-		*d2++ = c;
-	
-	return s;
-}
-#endif
 
-#ifdef __SSE_4_1__
-void* __memcpy(void *dst, const void *src, size_t len) {
+void* __memcpy_sse(void *dst, const void *src, size_t len) {
 	uint8_t* a = (uint8_t*)dst;
 	uint8_t* b = (uint8_t*)src;
 
 	int aligned_a = 0, aligned_b = 0;
 	int i = 0;
 
-	aligned_a = ((unsigned long)a & (sizeof(__m128i)-1));
-	aligned_b = ((unsigned long)b & (sizeof(__m128i)-1));
+	aligned_a = ((uintptr_t)a & (sizeof(__m128i)-1));
+	aligned_b = ((uintptr_t)b & (sizeof(__m128i)-1));
 
 	/* Not aligned */
 	if(aligned_a != aligned_b) {
@@ -147,7 +136,7 @@ void* __memcpy(void *dst, const void *src, size_t len) {
 
 	/* aligned */
 	if(aligned_a) {
-		while(len && ((unsigned long) &a[i] & (sizeof(__m128i)-1))) {
+		while(len && ((uintptr_t) &a[i] & (sizeof(__m128i)-1))) {
 			a[i] = b[i];
 
 			i++;
@@ -210,7 +199,7 @@ void* __memcpy(void *dst, const void *src, size_t len) {
 	}
 
 	while(len >= 4) {
-		*(long*)(&a[i]) = *(long*)(&b[i]);
+		*(uint32_t*)(&a[i]) = *(uint32_t*)(&b[i]);
 
 		i += 4;
 		len -= 4;
@@ -225,7 +214,7 @@ void* __memcpy(void *dst, const void *src, size_t len) {
 
 	return dst;
 }
-#else
+
 void * __attribute__ (( noinline )) __memcpy ( void *dest, const void *src,
 					       size_t len ) {
 	void *edi = dest;
@@ -248,10 +237,8 @@ void * __attribute__ (( noinline )) __memcpy ( void *dest, const void *src,
 			       : "memory" );
 	return dest;
 }
-#endif
 
-#ifdef __SSE_4_1__
-void* __memmove(void *dst, const void *src, size_t len) {
+void* __memmove_sse(void *dst, const void *src, size_t len) {
 	uint8_t* a = (uint8_t*)dst;
 	uint8_t* b = (uint8_t*)src;
 
@@ -261,8 +248,8 @@ void* __memmove(void *dst, const void *src, size_t len) {
 	if(src < dst && dst < src + len) {
 		/* Destructive overlap...have to copy backwards */
 		i = len;
-		aligned_a = ((unsigned long)&a[i] & (sizeof(__m128i)-1));
-		aligned_b = ((unsigned long)&b[i] & (sizeof(__m128i)-1));
+		aligned_a = ((uintptr_t)&a[i] & (sizeof(__m128i)-1));
+		aligned_b = ((uintptr_t)&b[i] & (sizeof(__m128i)-1));
 
 		/* Not aligned */
 		if(aligned_a != aligned_b) {
@@ -276,7 +263,7 @@ void* __memmove(void *dst, const void *src, size_t len) {
 
 		/* align */
 		if(aligned_a) {
-			while(i && ((unsigned long) &a[i] & (sizeof(__m128i)-1))) {
+			while(i && ((uintptr_t) &a[i] & (sizeof(__m128i)-1))) {
 				i--;
 				a[i] = b[i];
 			}
@@ -335,8 +322,8 @@ void* __memmove(void *dst, const void *src, size_t len) {
 			a[i] = b[i];
 		}
 	} else {
-		aligned_a = ((unsigned long)a & (sizeof(__m128i) - 1));
-		aligned_b = ((unsigned long)b & (sizeof(__m128i) - 1));
+		aligned_a = ((uintptr_t)a & (sizeof(__m128i) - 1));
+		aligned_b = ((uintptr_t)b & (sizeof(__m128i) - 1));
 
 		/* Not aligned */
 		if(aligned_a != aligned_b) {
@@ -352,7 +339,7 @@ void* __memmove(void *dst, const void *src, size_t len) {
 
 		/* aligned */
 		if(aligned_a) {
-			while(len && ((unsigned long) &a[i] & (sizeof(__m128i)-1))) {
+			while(len && ((uintptr_t) &a[i] & (sizeof(__m128i)-1))) {
 				a[i] = b[i];
 
 				i++;
@@ -415,7 +402,7 @@ void* __memmove(void *dst, const void *src, size_t len) {
 		}
 
 		while(len >= 4) {
-			*(long*)(&a[i]) = *(long*)(&b[i]);
+			*(uint32_t*)(&a[i]) = *(uint32_t*)(&b[i]);
 
 			i += 4;
 			len -= 4;
@@ -431,7 +418,6 @@ void* __memmove(void *dst, const void *src, size_t len) {
 
 	return dst;
 }
-#else
 /**
  * Copy memory area backwards
  *
@@ -468,10 +454,8 @@ void * __memmove( void *dest, const void *src, size_t len ) {
 		return __memcpy_reverse ( dest, src, len );
 	}
 }
-#endif
 
-#ifdef __SSE_4_1__
-int __memcmp(const void *dst, const void *src, size_t len) {
+int __memcmp_sse(const void *dst, const void *src, size_t len) {
 	uint8_t* a = (uint8_t*)dst;
 	uint8_t* b = (uint8_t*)src;
 
@@ -481,8 +465,8 @@ int __memcmp(const void *dst, const void *src, size_t len) {
 	int aligned_a = 0, aligned_b = 0;
 	int i = 0;
 
-	aligned_a = ((unsigned long)a & (sizeof(__m128i)-1));
-	aligned_b = ((unsigned long)b & (sizeof(__m128i)-1));
+	aligned_a = ((uintptr_t)a & (sizeof(__m128i)-1));
+	aligned_b = ((uintptr_t)b & (sizeof(__m128i)-1));
 
 	while(len) {
 		if (a[i] != b[i])
@@ -508,7 +492,7 @@ int __memcmp(const void *dst, const void *src, size_t len) {
 
 	/* aligned */
 	if(aligned_a) {
-		while(len && (((unsigned long) &a[i]) & (sizeof(__m128i)-1))) {
+		while(len && (((uintptr_t) &a[i]) & (sizeof(__m128i)-1))) {
 			if(a[i] != b[i]) {
 				return b[i] - a[i];
 			}
@@ -541,7 +525,7 @@ int __memcmp(const void *dst, const void *src, size_t len) {
 	}
 
 	while(len >= 4) {
-		if(*(long*)(&a[i]) != *(long*)(&b[i])) {
+		if(*(uint32_t*)(&a[i]) != *(uint32_t*)(&b[i])) {
 			break;
 		}
 
@@ -559,7 +543,7 @@ int __memcmp(const void *dst, const void *src, size_t len) {
 
 	return 0;
 }
-#else
+
 int __memcmp(const void* v1, const void* v2, size_t size) {
 	const uint64_t* d = v1;
 	const uint64_t* s = v2;
@@ -589,7 +573,6 @@ int __memcmp(const void* v1, const void* v2, size_t size) {
 	
 	return 0;
 }
-#endif
 
 void __bzero(void* dest, size_t size) {
 	uint64_t* d = dest;

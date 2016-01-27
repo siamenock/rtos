@@ -7,6 +7,7 @@ global sti, cli, pushfq
 global rdtsc, hlt;, cmpxchg
 global clflush, wbinvd
 global pause
+global read_cr0
 global read_cr2, write_cr2
 global read_cr3, write_cr3
 global refresh_cr3
@@ -75,6 +76,10 @@ wbinvd:
 ;pause:
 ;	pause
 ;	ret
+
+read_cr0:
+	mov	rax, cr0
+	ret
 
 read_cr2:
 	mov	rax, cr2
