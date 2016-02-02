@@ -1,5 +1,5 @@
-#ifndef __DRIVER_FILE_H__
-#define __DRIVER_FILE_H__
+#ifndef __FILE_H__
+#define __FILE_H__
 
 // User API set
 #define FILE_MAX_NAME_LEN 	256
@@ -65,4 +65,4 @@ typedef struct {
 	uint32_t 		sector;
 } BufferBlock;
 
-#endif /* __DRIVER_FILE_H__ */
+#endif /* __FILE_H__ */

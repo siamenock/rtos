@@ -1,8 +1,8 @@
 #include <malloc.h>
 #include <gmalloc.h>
 #include <string.h>
-#include "fs.h"
-#include "../cpu.h"
+#include "driver/fs.h"
+#include "cpu.h"
 #include <util/event.h>
 
 

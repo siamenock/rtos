@@ -37,6 +37,6 @@ typedef struct {
 	void	(*get_status)(int id, NICStatus* status);
 	bool	(*set_status)(int id, NICStatus* status);
 	void	(*get_info)(int id, NICInfo* info);
-} NICDriver;	//
+} NICDriver;
 
 #endif /* __DRIVER_NIC__ */

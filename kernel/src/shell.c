@@ -26,9 +26,9 @@
 #include "acpi.h"
 #include "vm.h"
 #include "asm.h"
+#include "file.h"
 #include "driver/charout.h"
 #include "driver/charin.h"
-#include "driver/file.h"
 #include "driver/nic.h"
 
 #include "shell.h"
@@ -60,7 +60,7 @@ static int cmd_sleep(int argc, char** argv, void(*callback)(char* result, int ex
 	if(argc >= 2 && is_uint32(argv[1])) {
 		time = parse_uint32(argv[1]);
 	}
-	time_mwait(time);
+	timer_mwait(time);
 	
 	return 0;
 }
@@ -516,7 +516,7 @@ static int cmd_turbo(int argc, char** argv, void(*callback)(char* result, int ex
 
 	uint64_t perf_status = read_msr(0x00000198);
 	perf_status = ((perf_status & 0xff00) >> 8);
-	if(!CPU_IS_TURBO_BOOST) {
+	if(!cpu_has_feature(CPU_FEATURE_TURBO_BOOST)) {
 		printf("Not Support Turbo Boost\n");
 		printf("\tPerfomance status : %d.%d Ghz\n", perf_status / 10, perf_status % 10);
 
@@ -600,7 +600,7 @@ static bool arping_timeout(void* context) {
 	if(arping_count <= 0)
 		return false;
 	
-	arping_time = time_ns();
+	arping_time = timer_ns();
 	
 	printf("Reply timeout\n");
 	arping_count--;
@@ -628,7 +628,7 @@ static int cmd_arping(int argc, char** argv, void(*callback)(char* result, int e
 		return -1;
 	}
 	
-	arping_time = time_ns();
+	arping_time = timer_ns();
 	
 	arping_count = 1;
 	if(argc >= 4) {
@@ -1186,7 +1186,7 @@ void shell_init() {
 }
 
 static bool arping(void* context) {
-	arping_time = time_ns();
+	arping_time = timer_ns();
 	if(arp_request(manager_ni->ni, arping_addr, 0)) {
 		arping_event = event_timer_add(arping_timeout, NULL, 1000000, 1000000);
 	} else {
@@ -1213,7 +1213,7 @@ bool shell_process(Packet* packet) {
 			uint32_t sip = endian32(arp->spa);
 			
 			if(arping_addr == sip) {
-				uint32_t time = time_ns() - arping_time;
+				uint32_t time = timer_ns() - arping_time;
 				uint32_t ms = time / 1000;
 				uint32_t ns = time - ms * 1000; 
 				

@@ -28,12 +28,12 @@ static void cpuid(uint32_t* a, uint32_t* b, uint32_t* c, uint32_t* d) {
 		: "a"(*a), "b"(*b), "c"(*c), "d"(*d));
 }
 
-static bool parse_iae(MP_IOAPICEntry* entry) {
+static bool parse_iae(MP_IOAPICEntry* entry, void* context) {
 	_ioapic_address = (uint64_t)entry->io_apic_address;
 	return true;
 }
 
-static bool parse_pe(MP_ProcessorEntry* entry) {
+static bool parse_pe(MP_ProcessorEntry* entry, void* context) {
 	cores[entry->local_apic_id] = 1;
 	return true;
 }
@@ -58,10 +58,10 @@ void mp_init() {
 		.parse_pe = parse_pe
 	};
 	
-	mp_parse_fps(&parser);
+	mp_parse_fps(&parser, NULL);
 	
 	// Calculate core ID
-	for(int i = 0; i <= apic_id; i++) {
+	for(int i = 0; i < apic_id; i++) {
 		if(cores[i])
 			core_id++;
 	}
@@ -115,7 +115,7 @@ void mp_sync() {
 		asm volatile("nop");
 }
 
-void mp_parse_fps(MP_Parser* parser) {
+void mp_parse_fps(MP_Parser* parser, void* context) {
 	MP_FloatingPointerStructure* find_FloatingPointerStructure() {
 		bool is_FloatingPointerStructure(uint8_t* p) {
 			if(memcmp(p, "_MP_", 4) == 0) {
@@ -156,61 +156,64 @@ void mp_parse_fps(MP_Parser* parser) {
 	}
 	
 	// Read MP information
-	MP_FloatingPointerStructure* fps = find_FloatingPointerStructure();
-	if(!fps || (parser->parse_fps && !parser->parse_fps(fps)))
+	static MP_FloatingPointerStructure* fps;
+	if(!fps)
+		fps = find_FloatingPointerStructure();
+	
+	if(!fps || (parser->parse_fps && !parser->parse_fps(fps, context)))
 		return;
 	
 	MP_ConfigurationTableHeader* cth = (MP_ConfigurationTableHeader*)(uint64_t)fps->physical_address_pointer;
-	if(!cth || (parser->parse_cth && !parser->parse_cth(cth)))
+	if(!cth || (parser->parse_cth && !parser->parse_cth(cth, context)))
 		return;
 	
 	uint8_t* type = (uint8_t*)(uint64_t)fps->physical_address_pointer + sizeof(MP_ConfigurationTableHeader);
 	for(int i = 0; i < cth->entry_count; i++) {
 		switch(*type) {
 			case 0:
-				if(parser->parse_pe && !parser->parse_pe((MP_ProcessorEntry*)type))
+				if(parser->parse_pe && !parser->parse_pe((MP_ProcessorEntry*)type, context))
 					return;
 				
 				type += sizeof(MP_ProcessorEntry);
 				break;
 			case 1:
-				if(parser->parse_be && !parser->parse_be((MP_BusEntry*)type))
+				if(parser->parse_be && !parser->parse_be((MP_BusEntry*)type, context))
 					return;
 				
 				type += sizeof(MP_BusEntry);
 				break;
 			case 2:
-				if(parser->parse_iae && !parser->parse_iae((MP_IOAPICEntry*)type))
+				if(parser->parse_iae && !parser->parse_iae((MP_IOAPICEntry*)type, context))
 					return;
 				
 				type += sizeof(MP_IOAPICEntry);
 				break;
 			case 3:
-				if(parser->parse_iie && !parser->parse_iie((MP_IOInterruptEntry*)type))
+				if(parser->parse_iie && !parser->parse_iie((MP_IOInterruptEntry*)type, context))
 					return;
 				
 				type += sizeof(MP_IOInterruptEntry);
 				break;
 			case 4:
-				if(parser->parse_lie && !parser->parse_lie((MP_LocalInterruptEntry*)type))
+				if(parser->parse_lie && !parser->parse_lie((MP_LocalInterruptEntry*)type, context))
 					return;
 				
 				type += sizeof(MP_LocalInterruptEntry);
 				break;
 			case 128:
-				if(parser->parse_sase && !parser->parse_sase((MP_SystemAddressSpaceEntry*)type))
+				if(parser->parse_sase && !parser->parse_sase((MP_SystemAddressSpaceEntry*)type, context))
 					return;
 				
 				type += type[1] * 16;
 				break;
 			case 129:
-				if(parser->parse_bhde && !parser->parse_bhde((MP_BusHierarchyDescriptorEntry*)type))
+				if(parser->parse_bhde && !parser->parse_bhde((MP_BusHierarchyDescriptorEntry*)type, context))
 					return;
 				
 				type += type[1] * 16;
 				break;
 			case 130:
-				if(parser->parse_cbasme && !parser->parse_cbasme((MP_CompatabilityBusAddressSpaceModifierEntry*)type))
+				if(parser->parse_cbasme && !parser->parse_cbasme((MP_CompatabilityBusAddressSpaceModifierEntry*)type, context))
 					return;
 				
 				type += type[1] * 16;

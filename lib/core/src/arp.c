@@ -41,7 +41,7 @@ bool arp_process(Packet* packet) {
 		}
 	}
 	
-	uint64_t current = time_us(); 
+	uint64_t current = timer_us(); 
 	
 	// GC
 	uint64_t gc_time = (uintptr_t)ni_config_get(packet->ni, ARP_TABLE_GC);

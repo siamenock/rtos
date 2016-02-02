@@ -103,16 +103,16 @@ typedef struct {
 } __attribute__((packed)) MP_CompatabilityBusAddressSpaceModifierEntry;
 
 typedef struct {
-	bool(*parse_fps)(MP_FloatingPointerStructure*);
-	bool(*parse_cth)(MP_ConfigurationTableHeader*);
-	bool(*parse_pe)(MP_ProcessorEntry*);
-	bool(*parse_be)(MP_BusEntry*);
-	bool(*parse_iae)(MP_IOAPICEntry*);
-	bool(*parse_iie)(MP_IOInterruptEntry*);
-	bool(*parse_lie)(MP_LocalInterruptEntry*);
-	bool(*parse_sase)(MP_SystemAddressSpaceEntry*);
-	bool(*parse_bhde)(MP_BusHierarchyDescriptorEntry*);
-	bool(*parse_cbasme)(MP_CompatabilityBusAddressSpaceModifierEntry*);
+	bool(*parse_fps)(MP_FloatingPointerStructure*, void*);
+	bool(*parse_cth)(MP_ConfigurationTableHeader*, void*);
+	bool(*parse_pe)(MP_ProcessorEntry*, void*);
+	bool(*parse_be)(MP_BusEntry*, void*);
+	bool(*parse_iae)(MP_IOAPICEntry*, void*);
+	bool(*parse_iie)(MP_IOInterruptEntry*, void*);
+	bool(*parse_lie)(MP_LocalInterruptEntry*, void*);
+	bool(*parse_sase)(MP_SystemAddressSpaceEntry*, void*);
+	bool(*parse_bhde)(MP_BusHierarchyDescriptorEntry*, void*);
+	bool(*parse_cbasme)(MP_CompatabilityBusAddressSpaceModifierEntry*, void*);
 } MP_Parser;
 
 void mp_init();
@@ -121,7 +121,7 @@ uint8_t mp_core_id();
 uint8_t mp_core_count();
 uint8_t mp_core_id_to_apic_id(uint8_t core_id);
 void mp_sync();
-void mp_parse_fps(MP_Parser* parser);
+void mp_parse_fps(MP_Parser* parser, void* context);
 uint8_t* mp_core_map();
 
 #endif /* __MP_H__ */

@@ -6,7 +6,7 @@
 #include <util/event.h>
 #include <tlsf.h>
 #include "disk.h"
-#include "file.h"
+#include "../file.h"
 #include "../gmalloc.h"
 #include "../port.h"
 #include "../cpu.h"

@@ -334,6 +334,18 @@ static bool vm_loop(void* context) {
 		break;
 	}
 	
+	extern char* __stdout;
+	extern volatile size_t __stdout_head;
+	extern volatile size_t __stdout_tail;
+	extern size_t __stdout_size;
+
+	extern char* __stderr;
+	extern volatile size_t __stderr_head;
+	extern volatile size_t __stderr_tail;
+	extern size_t __stderr_size;
+	
+	void stdio_dump(int coreno, int fd, char* buffer, volatile size_t* head, volatile size_t* tail, size_t size);
+	
 	for(int i = 1; i < core_count; i++) {
 		if(cores[i].status == VM_STATUS_INVALID)
 			continue;

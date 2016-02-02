@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 #include "mp.h"
 #include "port.h"
 #include "apic.h"
@@ -8,9 +9,26 @@ uint64_t _ioapic_address;
 
 static uint8_t redirection_map[24];
 
-/*
-static bool init_IOInterruptEntry(MP_IOInterruptEntry* entry) {
-	if(entry->interrupt_type == 0x00 && entry->source_bus_id == mp_bus_isa_id()) {	// interrut_type == Interrupt
+static bool parse_fps(MP_FloatingPointerStructure* entry, void* context) {
+	*(uint8_t*)context = entry->feature[1];
+	
+	return false;
+}
+
+static bool parse_be(MP_BusEntry* entry, void* context) {
+	if(memcmp(entry->bus_type, "ISA", 3) == 0) {
+		*(uint8_t*)context = entry->bus_id;
+		
+		return false;
+	}
+	
+	return true;
+}
+
+static bool parse_iie(MP_IOInterruptEntry* entry, void* context) {
+	uint8_t bus_isa_id = *(uint8_t*)context;
+	
+	if(entry->interrupt_type == 0x00 && entry->source_bus_id == bus_isa_id) {	// interrut_type == Interrupt
 		uint64_t redirection = 	((uint64_t)32 + entry->source_bus_irq) |
 					APIC_DM_PHYSICAL |
 					APIC_DMODE_FIXED |
@@ -25,12 +43,16 @@ static bool init_IOInterruptEntry(MP_IOInterruptEntry* entry) {
 	}
 	return true;
 }
-*/
+	
 
 void ioapic_init() {
-	/*
 	// Disable PIC mode
-	if(mp_FloatingPointerStructure()->feature[1] & 0x80) {
+	uint8_t feature1;
+	
+	MP_Parser parser = { .parse_fps = parse_fps };
+	mp_parse_fps(&parser, &feature1);
+	
+	if(feature1 & 0x80) {
 		printf("\tDisable PIC mode...\n");
 		port_out8(0x22, 0x70);
 		port_out8(0x23, 0x01);
@@ -45,10 +67,16 @@ void ioapic_init() {
 		ioapic_write64(IOAPIC_IDX_REDIRECTION_TABLE + i * 2, redirection);
 	}
 	
+	// Parse ISA/PCI bus ID
+	uint8_t bus_isa_id = (uint8_t)-1;
+	bzero(&parser, sizeof(MP_Parser));
+	parser.parse_be = parse_be;
+	mp_parse_fps(&parser, &bus_isa_id);
+	
 	// Redirect interrupt next
-	mp_iterate_IOInterruptEntry(init_IOInterruptEntry);
-	*/
-	redirection_map[0] = 0;
+	bzero(&parser, sizeof(MP_Parser));
+	parser.parse_iie = parse_iie;
+	mp_parse_fps(&parser, &bus_isa_id);
 }
 
 inline uint32_t ioapic_read32(int idx) {

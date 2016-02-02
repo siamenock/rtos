@@ -1,23 +1,64 @@
-# Ref: http://pete.akeo.ie/2014/05/compiling-and-installing-grub2-for.html
+#!/bin/bash
 
-IMAGE=disk.img		# disk image name
-SIZE=64			# total size in MB
-BOOT=3			# Boot partition size in MB
-ROOT=12			# Root partition size in MB
+MODULES="boot.mod crypto.mod extcmd.mod gettext.mod normal.mod terminal.mod"
+
+# Ref: http://pete.akeo.ie/2014/05/compiling-and-installing-grub2-for.html
+function part_to_fs() {
+	case $1 in
+		"fat32") 
+			echo "vfat"
+		;;
+		*)
+			echo $1
+		;;
+	esac
+}
+
+function check_number() {
+	if [ $2 -eq $2 ]; then
+		:
+	else
+		echo "$1 must be a number: $2"
+		exit
+	fi
+}
+
+if [ $# -lt 8 ]; then
+	echo "tools/mkimage [image name] [image size] [boot part size] [boot part type] [root part size] [root part type] [user part type] [boot files]"
+	exit
+fi
+
+IMAGE=$1		# system.img
+SIZE=$2			# 64
+BOOT=$3			# 3
+ROOT=$4			# 12
 			# Rest of space will be user parition
+BOOT_TYPE=$5		# fat32
+ROOT_TYPE=$6		# fat32
+USER_TYPE=$7		# ext2
+
+BOOT_FS=$(part_to_fs $BOOT_TYPE)
+ROOT_FS=$(part_to_fs $ROOT_TYPE)
+USER_FS=$(part_to_fs $USER_TYPE)
+
+FILES=${@:8}
+
+check_number "image size" $SIZE
+check_number "boot size" $BOOT
+check_number "root size" $ROOT
 
 # Make disk image
-cd tools/grub/grub-core
+pushd tools/grub/grub-core 2> /dev/null
 ../grub-mkimage -v -O i386-pc -d. -p\(hd0,msdos1\)/boot/grub biosdisk part_msdos fat exfat bfs multiboot2 -o core.img
-cd ../../..
+popd 2> /dev/null
 
 dd if=/dev/zero of=$IMAGE bs=512 count=$(($SIZE * 2048))
 
 parted -s $IMAGE --			\
 	mklabel msdos			\
-	mkpart primary fat32 1MiB $(($BOOT + 1))MiB	\
-	mkpart primary fat32 $(($BOOT + 1))MiB $(($BOOT + 1 + $ROOT))MiB	\
-	mkpart primary ext2  $(($BOOT + 1 + $ROOT))MiB -1s	\
+	mkpart primary $BOOT_TYPE 1MiB $(($BOOT + 1))MiB	\
+	mkpart primary $ROOT_TYPE $(($BOOT + 1))MiB $(($BOOT + 1 + $ROOT))MiB	\
+	mkpart primary $USER_TYPE  $(($BOOT + 1 + $ROOT))MiB -1s	\
 	set 1 boot on
 
 KPARTX=`sudo kpartx -a -s -v $IMAGE`
@@ -27,21 +68,22 @@ HDD1=`echo $KPARTX | awk 'BEGIN { RS=""; FS=" "} {print $3 }'`
 HDD2=`echo $KPARTX | awk 'BEGIN { RS=""; FS=" "} {print $12 }'`
 HDD3=`echo $KPARTX | awk 'BEGIN { RS=""; FS=" "} {print $21 }'`
 
-sudo mkfs.vfat -F32 /dev/mapper/$HDD1
-sudo mkfs.vfat -F32 /dev/mapper/$HDD2
-#sudo tools/mkfs.bfs /dev/mapper/$HDD2
-sudo mkfs.ext2 /dev/mapper/$HDD3
+sudo mkfs.$ROOT_FS -F32 /dev/mapper/$HDD1
+sudo mkfs.$BOOT_FS -F32 /dev/mapper/$HDD2
+sudo mkfs.$USER_FS /dev/mapper/$HDD3
 
 sudo tools/grub/grub-bios-setup -d tools/grub/grub-core -b boot.img -c core.img $HDD
 
 mkdir -p mnt
 sudo mount /dev/mapper/$HDD1 mnt
 sudo mkdir -p mnt/boot/grub/i386-pc
-sudo cp loader/loader.bin mnt/boot
-sudo cp kernel.bin mnt/boot
-sudo cp initrd.img mnt/boot
+sudo cp $FILES mnt/boot/
+#sudo cp loader/loader.bin mnt/boot
+#sudo cp kernel.bin mnt/boot
+#sudo cp initrd.img mnt/boot
 sudo cp tools/grub.cfg mnt/boot/grub
-sudo cp tools/grub/grub-core/*.mod mnt/boot/grub/i386-pc
+#sudo cp tools/grub/grub-core/*.mod mnt/boot/grub/i386-pc
+pushd tools/grub/grub-core > /dev/null ; sudo cp $MODULES ../../../mnt/boot/grub/i386-pc/; popd > /dev/null
 
 sudo umount mnt
 rmdir mnt

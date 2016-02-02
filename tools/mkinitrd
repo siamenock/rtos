@@ -1,9 +1,20 @@
-#
+#!/bin/bash
 
-INITRD=initrd.img	# initial root disk
-INITRD_SIZE=1		# initial root disk size in MB
+if [ $# -lt 3 ]; then
+	echo "tools/mkinitrd [image name] [image size in MB] [files...]"
+	exit
+fi
 
-FILES="drivers/virtio.ko LICENSE"
+INITRD=$1		# initrd.img
+INITRD_SIZE=$2		# 1
+FILES=${@:3}		# drivers/*.ko
+
+if [ $INITRD_SIZE -eq $INITRD_SIZE ]; then
+	:
+else
+	echo "image size must be a number: $INITRD_SIZE"
+	exit
+fi
 
 # Make initial root disk image
 dd if=/dev/zero of=$INITRD bs=512 count=$(($INITRD_SIZE * 2048))

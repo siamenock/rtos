@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <util/list.h>
 #include "ramdisk.h"
-#include "file.h"
+#include "../file.h"
 
 #define RAMDISK_SECTOR_SIZE	512
 typedef struct {

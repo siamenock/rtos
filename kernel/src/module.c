@@ -4,71 +4,64 @@
 #include <errno.h>
 #include <string.h>
 #include <elf.h>
-#include "page.h"
-#include "driver/file.h"
-#include "driver/fs.h"
-#include "driver/bfs.h"
+#include "file.h"
 #include "pnkc.h"
+#include "page.h"
 #include "symbols.h"
-#include "module.h"
 #include "gmalloc.h"
+#include "module.h"
 
 #define MODULE_ALIGNMENT	128
 #define SECTION_ALIGNMENT	128
 #define MAX_SECTION_COUNT	16
 #define MAX_NAME_SIZE		16
-#define ALIGN(addr, align)	(((uint64_t)(addr) + (align) - 1) & ~((align) - 1))
+#define ALIGN(addr, align)	(((uintptr_t)(addr) + (align) - 1) & ~((align) - 1))
 
 int module_count;
 void* modules[MAX_MODULE_COUNT];
 
+// TODO: Check not to exceed 2~4MB
+// TODO: Data to separated area
 void module_init() {
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
-	PNKC* pnkc = (PNKC*)(0x200200 /* Kernel entry end */ - sizeof(PNKC));
-
-	uint32_t* size = pnkc->text_offset + pnkc->text_size > pnkc->rodata_offset + pnkc->rodata_size ? &pnkc->text_size : &pnkc->rodata_size;
-	void* addr = (void*)PHYSICAL_TO_VIRTUAL(0x200000 + MAX(pnkc->text_offset + pnkc->text_size, pnkc->rodata_offset + pnkc->rodata_size));
-
-	void* org_addr = addr;
-	void* mmap = bmalloc(); // 2MB buffer in memory
-	if(!mmap) 
-		return ;
-
+	PNKC* pnkc = (PNKC*)(0x200200 - sizeof(PNKC));
+	
+	void* addr = (void*)0x200000 + (((uintptr_t)pnkc->smap_offset + (uintptr_t)pnkc->smap_size + 7) & ~7);
+	addr += *(uint32_t*)addr;
+	addr = (void*)PHYSICAL_TO_VIRTUAL((uintptr_t)addr);
+	
+	void* buffer = bmalloc(); // 2MB buffer in memory
+	if(!buffer) 
+		return;
+	
 	// Open root directory
 	File* dir = opendir("/");
 	if(!dir) 
 		return;
-
+	
 	int len;
 	Dirent* dirent;
 	// Memory map pointer
-	uint8_t* ptr = (uint8_t*)mmap;
-
 	while((dirent = readdir(dir))) {
 		if(strstr((const char*)dirent->name, ".ko") + 3 - (char*)dirent->name == strlen((const char*)dirent->name)) {
 			// Attach root directory for full path
 			char file_name[FILE_MAX_NAME_LEN];
 			file_name[0] = '/';
 			strcpy(&file_name[1], dirent->name);
-
+			
 			int fd = open(file_name, "r");
 			if(fd < 0) {
 				printf("\tModule cannot open: %s\n", dirent->name);
 				continue;
 			} else {
-				if((len = read(fd, ptr, 0x200000)) != 0) {
-					printf("\tModule loading: %s(%d bytes)\n", dirent->name, len);
-
-					void* base = module_load(ptr, 0, &addr);
+				if((len = read(fd, buffer, 0x200000)) > 0) {
+					printf("\tModule loading: %s (%d bytes)\n", dirent->name, len);
+					void* base = module_load(buffer, &addr);
 					if(base) {
 						modules[module_count++] = base;
 					} else {
 						printf("\t\tFAILED: %s, errno: 0x%x.\n", dirent->name, errno);
 					}
-
-					ptr += len;
-
-					close(fd);
 				} else {
 					printf("\tModule read error: %s\n", dirent->name);
 					continue;
@@ -79,11 +72,8 @@ void module_init() {
 	}
 
 	closedir(dir);
-
-	// Extend kernel code/rodata area
-	*size += addr - org_addr;
-
-	bfree(mmap);
+	
+	bfree(buffer);
 }
 
 static bool check_header(Elf64_Ehdr* ehdr) {
@@ -125,7 +115,7 @@ static bool check_header(Elf64_Ehdr* ehdr) {
 	return true;
 }
 
-void* module_load(void* file, size_t size, void **addr) {
+void* module_load(void* file, void **addr) {
 	// Check header
 	Elf64_Ehdr* ehdr = (Elf64_Ehdr*)file;
 	if(!check_header(ehdr))
@@ -181,12 +171,13 @@ void* module_load(void* file, size_t size, void **addr) {
 					strstr(name, ".strtab") == name ||
 					strstr(name, ".symtab") == name) {
 
-				Elf64_Addr sec_addr = ALIGN(*addr, shdr[i].sh_addralign > SECTION_ALIGNMENT ? shdr[i].sh_addralign : SECTION_ALIGNMENT);
+				int align = shdr[i].sh_addralign > SECTION_ALIGNMENT ? shdr[i].sh_addralign : SECTION_ALIGNMENT;
+				Elf64_Addr sec_addr = ALIGN(*addr, align);
 				Elf64_Xword sec_size = shdr[i].sh_size;
-
+				
 				shdr[i].sh_addr = shdr2[i].sh_addr = sec_addr;
 				*addr = (void*)sec_addr + sec_size;
-
+				
 				printf("\t\tLoading %s to 0x%p (%d bytes)\n", name, sec_addr, sec_size);
 				if(strstr(name, ".bss") == name) {
 					bzero((void*)sec_addr, sec_size);
@@ -195,10 +186,10 @@ void* module_load(void* file, size_t size, void **addr) {
 				}
 			}
 		}
-
+		
 		return base;
 	}
-
+	
 	// Load sections
 	void* base = load();
 	if(!base)

@@ -132,6 +132,7 @@ Signature        : 7f
 	+25KB?	: Kernel (.rodata)
 	+32KB?	: Kernel.smap (8 bytes aligned)
 	+2KB?	: multiboot2 tags (8 bytes aligned)
+	+n?	: modules (8 bytes aligned)
 
 4MB + 2MB * apicid:
 	+200KB?	: Kernel (.data, .bss)

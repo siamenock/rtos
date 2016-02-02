@@ -6,7 +6,7 @@
 #include <stddef.h>
 #include <sys/types.h>
 #include <util/cache.h>
-#include "file.h"
+#include "../file.h"
 #include "disk.h"
 
 #define FS_SECTOR_SIZE		512

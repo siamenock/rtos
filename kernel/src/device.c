@@ -66,7 +66,7 @@ Device* device_get(DeviceType type, int idx) {
 	return NULL;
 }
 
-/*
+#include "driver/nic.h"
 int device_module_init() {
 	int count = 0;
 	for(int i = 0; i < module_count; i++) {
@@ -75,6 +75,8 @@ int device_module_init() {
 			continue;
 		
 		void* driver = module_find(modules[i], "device_driver", MODULE_TYPE_DATA);
+		if(!driver)
+			continue;
 		
 		PCI_DEVICE_PROBE probe = module_find(modules[i], "pci_device_probe", MODULE_TYPE_FUNC);
 		if(probe) {
@@ -84,4 +86,3 @@ int device_module_init() {
 	
 	return count;
 }
-*/

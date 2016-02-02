@@ -2,9 +2,6 @@
 
 all: rewrite/rewrite pnkc/pnkc smap/smap console/console 
 
-rewrite/rewrite:
-	make -C rewrite
-
 pnkc/pnkc:
 	make -C pnkc
 

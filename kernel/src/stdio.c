@@ -35,9 +35,9 @@ volatile size_t __stderr_head;
 volatile size_t __stderr_tail;
 size_t __stderr_size = BUFFER_SIZE;
 
-static Device* device_stdin;
-static Device* device_stdout;
-static Device* device_stderr;
+Device* device_stdin;
+Device* device_stdout;
+Device* device_stderr;
 
 #define write1(_buf, _len) ((CharOut*)device_stdout->driver)->write(device_stdout->id, _buf, _len)
 #define write2(_buf, _len) ((CharOut*)device_stderr->driver)->write(device_stderr->id, _buf, _len)
@@ -135,6 +135,98 @@ void stdio_print_64(uint64_t v, int row, int col) {
 	*video++ = DEFAULT_ATTRIBUTE;
 	*video++ = HEX(v >> 0);
 	*video++ = DEFAULT_ATTRIBUTE;
+}
+
+void stdio_dump(int coreno, int fd, char* buffer, volatile size_t* head, volatile size_t* tail, size_t size) {
+#define HEX(v)	(((v) & 0x0f) > 9 ? ((v) & 0x0f) - 10 + 'a' : ((v) & 0x0f) + '0')
+
+	if(*head == *tail)
+		return;
+
+	char header[10] = "Core 01> ";
+	header[5] = HEX(coreno >> 4);
+	header[6] = HEX(coreno >> 0);
+	header[7] = '>';
+
+	int header_len = strlen(header);
+	int body_len = 80 - header_len;
+
+	char* strchrn(const char* s, const char* e, int c) {
+		char* ch = (char*)s;
+
+		while(*ch != c && *ch != '\0' && ch < e)
+			ch++;
+
+		return ch < e && *ch == c ? ch: NULL;
+	}
+
+	char* dump_lines(char* h, char* e) {
+		char* t = strchrn(h, e, '\n');
+		while(t) {
+			t++;
+			while(t - h > body_len) {
+				write1(header, header_len);
+				write1(h, body_len);
+
+				h += body_len;
+			}
+
+			write1(header, header_len);
+			write1(h, t - h);
+
+			if(t >= e)
+				return NULL;
+
+			h = t;
+			t = strchrn(h, e, '\n');
+		}
+
+		while(e - h > body_len) {
+			write1(header, header_len);
+			write1(h, body_len);
+
+			h += body_len;
+		}
+
+		return h < e ? h : NULL;
+	}
+
+	char* h = buffer + *head;
+	char* e = buffer + *tail;
+	if(*head > *tail) {
+		h = dump_lines(h, buffer + size);
+		if(h) {
+			int len1 = buffer + size - h;
+			write1(header, header_len);
+			write1(h, len1);
+
+			int len2 = body_len - len1;
+			if(len2 > *tail)
+				len2 = *tail;
+
+			char* t = strchrn(h, buffer + len2, '\n');
+			if(t) {
+				t++;
+				write1(h, t - h);
+				h = t;
+			} else {
+				write1(buffer, len2);
+				write1("\n", 1);
+				h = buffer + len2;
+			}
+		} else {
+			h = buffer;
+		}
+	}
+
+	h = dump_lines(h, e);
+	if(h) {
+		write1(header, header_len);
+		write1(h, e - h);
+		write1("\n", 1);
+	}
+
+	*head = *tail;
 }
 
 // Ref: http://www.powerindex.net/U_convt/ascii/ascii.htm

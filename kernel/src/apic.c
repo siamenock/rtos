@@ -54,8 +54,8 @@ void apic_activate() {
 	
 	port_out8(PIC_MASTER_PORT2, 0xff);
 	port_out8(PIC_SLAVE_PORT2, 0xff);
-
-	//printf("\tActivate local APICs...\n");
+	
+	printf("\tActivate local APICs...\n");
 	void _apic_activate();
 	_apic_activate();
 }
@@ -291,10 +291,6 @@ void isr_exception_handler(uint64_t vector, uint64_t error_code) {
 			*v++ = 0x40;
 			
 			while(1) asm("nop");
-			/*
-			for(int i = 0; i < 1000000; i++)
-				asm("nop");
-			*/
 		}
 	}
 }

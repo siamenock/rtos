@@ -21,6 +21,4 @@ typedef struct {
 
 Shared* shared;
 
-void shared_init();
-
 #endif /* __SHARED_H__ */

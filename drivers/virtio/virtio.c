@@ -393,7 +393,7 @@ static bool virtnet_send_command(int id, uint8_t class, uint8_t cmd, void* data)
 	kick(priv[id]->cvq);
 
 	// Wait for a sec till host send ACK 
-	time_mwait(100);
+	timer_mwait(100);
 
 	VirtIONetCtrlPacket* ctrl_ack = (VirtIONetCtrlPacket*)get_buf(priv[id]->cvq, NULL);
 

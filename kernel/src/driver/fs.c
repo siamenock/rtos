@@ -219,7 +219,6 @@ ssize_t fs_read(File* file, void* buffer, size_t size) {
 		size_t read_size = MIN(FS_BLOCK_SIZE - offset_in_cluster, total_size - read_count);
 
 		void* read_buf = cache_get(cache, (void*)(uintptr_t)sector);
-
 		if(!read_buf) {
 			read_buf = gmalloc(FS_BLOCK_SIZE);
 			if(!read_buf) {
