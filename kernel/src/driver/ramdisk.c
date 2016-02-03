@@ -55,7 +55,8 @@ static int ramdisk_init(DiskDriver* driver, const char* cmdline, DiskDriver** di
 
 	memcpy(disks[0], driver, sizeof(DiskDriver));
 	disks[0]->number = 0;
-	disks[0]->priv= ramdisk;
+	disks[0]->priv = ramdisk;
+	driver->priv = ramdisk;
 
 	return 1;
 }

@@ -1,4 +1,7 @@
 #include <stddef.h>
+#include <string.h>
+#include <malloc.h>
+#include <gmalloc.h>
 #include "disk.h"
 #include "util/list.h"
 #include "util/map.h"
@@ -31,6 +34,15 @@ found:
 		if(!map_put(disks, (void*)(uintptr_t)key, temp[i])) 
 			return false;
 	}
+
+	if(driver->type == DISK_TYPE_USB)
+		return true;
+		
+	BootSector* boot_sector = (BootSector*)gmalloc(sizeof(BootSector));
+	if(driver->read(driver, 0, 1, (void*)boot_sector) < 0)
+		return false;
+
+	driver->boot_sector = boot_sector;
 	
 	return true;
 }

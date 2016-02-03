@@ -13,7 +13,8 @@ OBJS = obj/entry.o \
 	obj/vnic.o obj/vm.o obj/manager.o obj/shell.o obj/rtc.o obj/loader.o obj/vfio.o \
 	\
 	obj/driver/vga.o obj/driver/keyboard.o obj/driver/port.o \
-	obj/driver/disk.o obj/driver/pata.o obj/driver/bfs.o obj/driver/ramdisk.o obj/driver/fs.o \
+	obj/driver/disk.o obj/driver/pata.o obj/driver/virtio_blk.o obj/driver/virtio_ring.o \
+	obj/driver/bfs.o obj/driver/ramdisk.o obj/driver/fs.o \
 	obj/driver/stdout.o obj/driver/stdin.o \
 	\
 	obj/driver/usb/usbinit.o obj/driver/usb/usb.o obj/driver/usb/usb_dev.o \

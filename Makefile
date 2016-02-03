@@ -3,11 +3,13 @@
 # QEMU can select boot device - USB MSC, HDD
 USB = -drive if=none,id=usbstick,file=./system.img -usb -device usb-ehci,id=ehci -device usb-storage,bus=ehci.0,drive=usbstick
 
+VIRTIO = -drive file=./system.img,if=virtio 
+
 HDD = -hda system.img
 
 NIC = virtio #rtl8139
 
-QEMU = qemu-system-x86_64 $(shell tools/qemu-params) -m 1024 -M pc -smp 8 -d cpu_reset -net nic,model=$(NIC) -net tap,script=tools/qemu-ifup -net nic,model=$(NIC) -net tap,script=tools/qemu-ifup $(USB) --no-shutdown --no-reboot  #$(HDD)
+QEMU = qemu-system-x86_64 $(shell tools/qemu-params) -m 1024 -M pc -smp 8 -d cpu_reset -net nic,model=$(NIC) -net tap,script=tools/qemu-ifup -net nic,model=$(NIC) -net tap,script=tools/qemu-ifup $(VIRTIO) $(USB) --no-shutdown --no-reboot  #$(HDD)
 
 all: system.img
 
@@ -20,10 +22,10 @@ system.img:
 	make -C kernel
 	make -C drivers
 	# Make system map and kernel
-	bin/smap kernel/kernel.elf kernel.smap
+	sudo bin/smap kernel/kernel.elf kernel.smap
 	bin/pnkc kernel/kernel.elf kernel.smap kernel.bin
 	# Make init ram disk image
-	tools/mkimage initrd.img 1 drivers/*.ko
+	sudo tools/mkinitrd initrd.img 1 drivers/*.ko
 	# Make system.img
 	tools/mkimage system.img 64 3 12 fat32 fat32 ext2 loader/loader.bin kernel.bin initrd.img
 

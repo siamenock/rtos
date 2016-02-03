@@ -474,6 +474,11 @@ void main(void) {
 			printf("\tUSB MSC driver registration FAILED!\n");
 			while(1) asm("hlt");
 		}
+
+		if(!disk_register(&virtio_blk_driver, NULL)) {
+			printf("\tVIRTIO BLOCK driver registration FAILED!\n");
+			while(1) asm("hlt");
+		}
 		
 		printf("Initializing RAM disk...\n");
 		char cmdline[32];
@@ -486,7 +491,7 @@ void main(void) {
 		printf("Initializing file system...\n");
 		fs_init();
 		fs_register(&bfs_driver);
-		fs_mount(DISK_TYPE_RAMDISK << 16 | 0x00, 0, FS_TYPE_BFS, "/");
+		fs_mount(DISK_TYPE_RAMDISK << 16 | 0x00, 0,  FS_TYPE_BFS, "/");
 		
 		printf("Initializing modules...\n");
 		module_init();

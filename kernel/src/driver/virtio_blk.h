@@ -99,7 +99,7 @@ struct _VirtQueue {
 
 /* If the device has VIRTIO_BLK_F_SCSI feature, it can also support scsi packet command requests */
 /* All fields are in guest's native endian */
-extern const DiskDriver virtio_blk_driver;
+extern DiskDriver virtio_blk_driver;
 
 /* Check whether device used avail buffer */
 static inline bool hasUsedIdx(VirtQueue* vq) {

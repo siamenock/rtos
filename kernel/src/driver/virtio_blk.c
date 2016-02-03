@@ -456,7 +456,7 @@ bool virtio_device_probe(PCI_Device* pci, char** name, void** data) {
 	}
 	return 0;
 }
-static int virtio_blk_init(DiskDriver* driver, DiskDriver** disks) {
+static int virtio_blk_init(DiskDriver* driver, const char* cmdline, DiskDriver** disks) {
 	int err, count;
 
 	priv = gmalloc(sizeof(VirtBlkPriv));
@@ -503,7 +503,7 @@ static int virtio_blk_init(DiskDriver* driver, DiskDriver** disks) {
 	return count;
 }
 
-const DiskDriver virtio_blk_driver = {
+DiskDriver virtio_blk_driver = {
 	.type = DISK_TYPE_VIRTIO_BLK,
 	.init = virtio_blk_init,
 	.read = virtio_blk_read,
