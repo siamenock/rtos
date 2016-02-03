@@ -497,6 +497,11 @@ static int cmd_vlan(int argc, char** argv, void(*callback)(char* result, int exi
 		if(!dev)
 			return -2;
 
+		if(!(port & 0xfff)) { //vid == 0
+			printf("VLan ID is 0\n");
+			return -2;
+		}
+
 		if(!map_remove(((NICPriv*)dev->priv)->nics, (void*)(uint64_t)port)) {
 			printf("Can'nt remove VLAN\n");
 			return -2;
