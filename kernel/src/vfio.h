@@ -20,6 +20,8 @@ typedef struct {
 	uint32_t		request_id;		///< Request id
 } VFIO;
 
-void vfio_poll(void* vm);
+typedef struct _VM VM;
+
+void vfio_poll(VM* _vm);
 
 #endif /* __VFIO_H__ */

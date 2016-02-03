@@ -1,7 +1,8 @@
 #ifndef __FILE_H__
 #define __FILE_H__
 
-#include <file.h>
+#include <fio.h> 
+
 #define FILE_MAX_DESC		0x100
 
 #define FILE_TYPE_NONE		0x00

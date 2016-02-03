@@ -60,6 +60,6 @@ typedef struct {
 	uint64_t exb: 1;	// Execute Disable
 } __attribute__ ((packed)) PageTable;
 
-int init_page_tables(uint8_t core_id);
+void init_page_tables(uint8_t core_id);
 
 #endif /* __PAGE_H__ */

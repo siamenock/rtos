@@ -20,7 +20,7 @@ typedef struct {
 	void**		blocks;	// gmalloc(array), bmalloc(content)
 } Block;
 
-typedef struct {
+typedef struct _VM {
 	uint32_t	id;
 	int		core_size;
 	uint8_t		cores[MP_MAX_CORE_COUNT];

@@ -3,6 +3,7 @@
 
 #include <util/types.h>
 #include <util/fifo.h>
+#include <fio.h>
 
 #define FIO_INPUT_BUFFER_SIZE	1024
 #define FIO_OUTPUT_BUFFER_SIZE	1024

@@ -71,11 +71,8 @@ void module_init() {
 		}
 	}
 
-	closedir(dir);
+	closedir(fd);
 	bfree(buffer);
-
-	// Extend kernel code/rodata area
-	*size += addr - org_addr;
 }
 
 static bool check_header(Elf64_Ehdr* ehdr) {

@@ -22,7 +22,7 @@ system.img:
 	# Make system map and kernel
 	bin/smap kernel/kernel.elf kernel.smap
 	bin/pnkc kernel/kernel.elf kernel.smap kernel.bin
-	# Make init ran disk image
+	# Make init ram disk image
 	tools/mkimage initrd.img 1 drivers/*.ko
 	# Make system.img
 	tools/mkimage system.img 64 3 12 fat32 fat32 ext2 loader/loader.bin kernel.bin initrd.img

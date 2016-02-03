@@ -7,9 +7,6 @@
 #include <util/event.h>
 
 // Kernel
-#include <timer.h>
-#include <file.h>
-
 #include "asm.h"
 #include "timer.h"
 #include "malloc.h"
@@ -35,6 +32,7 @@
 #include "manager.h"
 #include "shell.h"
 #include "loader.h"
+#include "vfio.h"
 
 // Disk
 #include "driver/pata.h"
@@ -156,7 +154,7 @@ static bool idle0_event(void* data) {
 			fio->user_fio->request_id = fio->request_id + fifo_size(fio->input_addr);
 
 		// Check if there's something in the input fifo
-		if(fifo_size(fio->input_addr) > 0);
+		if(fifo_size(fio->input_addr) > 0)
 			vfio_poll(vm);
 	}
 
@@ -488,7 +486,7 @@ void main(void) {
 		printf("Initializing file system...\n");
 		fs_init();
 		fs_register(&bfs_driver);
-		fs_mount(DISK_TYPE_RAMDISK << 16 | 0x00, 0, 0x01, "/");
+		fs_mount(DISK_TYPE_RAMDISK << 16 | 0x00, 0, FS_TYPE_BFS, "/");
 		
 		printf("Initializing modules...\n");
 		module_init();
@@ -538,7 +536,7 @@ void main(void) {
 
 	mp_sync();
 
-	if(core_id == 0) {
+	if(apic_id == 0) {
 		while(exec("/init.psh") > 0)
 			event_loop();
 	}

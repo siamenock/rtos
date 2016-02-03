@@ -1,3 +1,7 @@
 [submodule "drivers/rtos_commercial"]
 	path = drivers/rtos_commercial
 	url = https://github.com/gurumnet/rtos-commercial.git
+
+[submodule "tools/grub"]
+	path = tools/grub 
+	url = git://git.savannah.gnu.org/grub.git 

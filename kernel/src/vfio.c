@@ -1,7 +1,7 @@
 #include <string.h>
 #include <malloc.h>
 #include "../../loader/src/page.h"
-#include "driver/file.h"
+#include "file.h"
 #include "vfio.h"
 #include "vm.h"
 
@@ -87,7 +87,7 @@ exit:
 	return;
 }
 
-void vfio_poll(void* _vm) {
+void vfio_poll(VM* _vm) {
 	VM* vm = _vm;
 	VFIO* fio = vm->fio;
 

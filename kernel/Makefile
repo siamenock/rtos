@@ -5,13 +5,12 @@ CFLAGS = -I ../lib/TLSF/src -I ../lib/core/include -I ../lib/lwip/include -I ../
 DIR = obj obj/driver obj/driver/usb
 
 OBJS = obj/entry.o \
-<<<<<<< HEAD
 	obj/main.o obj/stdio.o obj/port.o obj/asm.o \
 	obj/malloc.o obj/gmalloc.o obj/string.o obj/shared.o \
 	obj/apic.o obj/apic_asm.o obj/cpu.o obj/mp.o obj/ioapic.o \
 	obj/gdt.o obj/idt.o obj/isr.o obj/acpi.o obj/pci.o obj/task.o obj/task_asm.o \
 	obj/symbols.o obj/icc.o obj/file.o obj/module.o obj/device.o \
-	obj/vnic.o obj/vm.o obj/manager.o obj/shell.o obj/rtc.o obj/loader.o \
+	obj/vnic.o obj/vm.o obj/manager.o obj/shell.o obj/rtc.o obj/loader.o obj/vfio.o \
 	\
 	obj/driver/vga.o obj/driver/keyboard.o obj/driver/port.o \
 	obj/driver/disk.o obj/driver/pata.o obj/driver/bfs.o obj/driver/ramdisk.o obj/driver/fs.o \
@@ -26,21 +25,6 @@ OBJS = obj/entry.o \
 	obj/driver/usb/usbclient.o \
 	obj/driver/usb/video.o obj/driver/usb/console.o obj/driver/usb/vga.o \
 	obj/driver/usb/ctype.o
-=======
-	obj/main.o obj/stdio.o obj/shell.o obj/port.o obj/asm.o obj/gdt.o obj/idt.o \
-	obj/isr.o obj/device.o obj/pci.o obj/malloc.o obj/gmalloc.o obj/task.o obj/task_asm.o \
-	obj/mp.o obj/apic.o obj/apic_asm.o obj/ioapic.o obj/rtc.o obj/cpu.o \
-	obj/acpi.o \
-	obj/loader.o obj/shared.o obj/vnic.o obj/icc.o \
-	obj/string.o obj/module.o obj/symbols.o \
-	obj/driver/dummy.o \
-	obj/driver/vga.o obj/driver/keyboard.o obj/driver/stdin.o obj/driver/stdout.o obj/driver/bfs.o \
-	obj/driver/port.o \
-	obj/vm.o obj/vfio.o obj/manager.o \
-	obj/driver/pata.o \
-	obj/driver/fs.o obj/driver/disk.o obj/driver/file.o $(USB) \
-	obj/driver/virtio_blk.o obj/driver/virtio_ring.o \
->>>>>>> FIO and File API for user are added
 
 LIBS = ../lib/libtlsf.a ../lib/libcore.a ../lib/liblwip.a
 

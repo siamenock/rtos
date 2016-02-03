@@ -1244,18 +1244,6 @@ void shell_init() {
 	cmd_init();
 }
 
-static bool arping(void* context) {
-	arping_time = timer_ns();
-	if(arp_request(manager_ni->ni, arping_addr, 0)) {
-		arping_event = event_timer_add(arping_timeout, NULL, 1000000, 1000000);
-	} else {
-		arping_count = 0;
-		printf("Cannot send ARP packet\n");
-	}
-	
-	return false;
-}
-
 bool shell_process(Packet* packet) {
 	if(arping_count == 0)
 		return false;
@@ -1294,7 +1282,7 @@ bool shell_process(Packet* packet) {
 				
 				if(arping_count > 0) {
 					bool arping(void* context) {
-						arping_time = time_ns();
+						arping_time = timer_ns();
 						if(arp_request(manager_ni->ni, arping_addr, 0)) {
 							arping_event = event_timer_add(arping_timeout, NULL, 1000000, 1000000);
 						} else {
