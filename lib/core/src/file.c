@@ -9,10 +9,9 @@
 FIO* __fio;
 
 static Map* request_ids;
-static uint64_t event_id = 0;
-
 void file_init() {
 	request_ids = map_create(8, NULL, NULL, NULL);
+	__fio->event_id = 0;
 }
 
 static bool poll_event(void* context) {
@@ -65,7 +64,7 @@ static bool poll_event(void* context) {
 
 		// If there's no more request in the map, polling ends
 		if(map_is_empty(request_ids)) {
-			event_id = 0;
+			__fio->event_id = 0;
 			return false;
 		}
 	}
@@ -80,8 +79,8 @@ static bool push_request(FIORequest* req) {
 		// Check if ring is available
 		if(fifo_push(__fio->input_buffer, req)) {
 			__fio->input_lock = 0;
-			if(event_id == 0)	// We need only one polling event
-				event_id = event_busy_add(poll_event, NULL);
+			if(__fio->event_id == 0)	// We need only one polling event
+				__fio->event_id = event_busy_add(poll_event, NULL);
 
 			return true;
 		}
@@ -93,9 +92,12 @@ static bool push_request(FIORequest* req) {
 }
 
 int file_open(const char* file_name, char* flags, void(*callback)(int fd, void* context), void* context) {
+	int ret = FIO_OK;
 	FIORequest* req = malloc(sizeof(FIORequest));
-	if(!req)
-		return -FILE_ERR_NOSPC;	// TODO: Set errno
+	if(!req) {
+		ret = -FIO_ERR_NOSPC;
+		goto out;
+	}
 
 	req->type = FILE_T_OPEN;
 	req->context = context;
@@ -104,42 +106,78 @@ int file_open(const char* file_name, char* flags, void(*callback)(int fd, void* 
 	memcpy(req->op.open.name, file_name, strlen(file_name));
 	memcpy(req->op.open.flags, flags, strlen(flags));
 
-	map_put(request_ids, (void*)(uintptr_t)req->id, callback);
+	if(!push_request(req)) {
+		free(req);
+		ret = -FIO_ERR_FIFOBUSY;
+		goto out;
+	}
 
-	if(!push_request(req))
-		return -2;
+	if(callback)
+		map_put(request_ids, (void*)(uintptr_t)req->id, callback);
 
-	return 0;
+	return ret;
+
+out:
+	if(callback)
+		callback(ret, context);
+	
+	return ret;
 }
 
 int file_close(int fd, void(*callback)(int ret, void* context), void* context) {
-	if(fd < 0)
-		return -FILE_ERR_BADFD;
+	int ret = FIO_OK;
+	if(fd < 0) {
+		ret = -FIO_ERR_BADFD;
+		goto out;
+	}
 
 	FIORequest* req = malloc(sizeof(FIORequest));
-	if(!req)
-		return -FILE_ERR_NOSPC;
+	if(!req) {
+		ret = -FIO_ERR_NOSPC;
+		goto out;
+	}
 
 	req->type = FILE_T_CLOSE;
 	req->context = context;
 	req->fd = fd;
 	req->id = (__fio->request_id++) % FIO_MAX_REQUEST_ID;
 
-	map_put(request_ids, (void*)(uintptr_t)req->id, callback);
+	if(!push_request(req)) {
+		free(req);
+		ret = -FIO_ERR_FIFOBUSY;
+		goto out;
+	}
 
-	if(!push_request(req))
-		return -2;
+	if(callback)
+		map_put(request_ids, (void*)(uintptr_t)req->id, callback);
 
-	return 0;
+	return ret;
+
+out:
+	if(callback)
+		callback(ret, context);
+	
+	return ret;
 }
 
 int file_read(int fd, void* buffer, size_t size, void(*callback)(void* buffer, size_t size, void* context), void* context) {
-	if(fd < 0)
-		return -FILE_ERR_BADFD;
+	int ret = FIO_OK;
+	if(fd < 0) {
+		ret = -FIO_ERR_BADFD;
+		goto out;
+	} else if(size < 0) {
+		ret = -FIO_ERR_BADSIZE;
+		goto out;
+	} else if(!buffer) {
+		ret = -FIO_ERR_BADBUF;
+		goto out;
+	}
 
 	FIORequest* req = malloc(sizeof(FIORequest));
-	if(!req)
-		return -FILE_ERR_NOSPC;
+	if(!req) {
+		ret = -FIO_ERR_NOSPC;
+		goto out;
+	}
 
 	req->type = FILE_T_READ;
 	req->context = context;
@@ -149,21 +187,42 @@ int file_read(int fd, void* buffer, size_t size, void(*callback)(void* buffer, s
 	req->op.file_io.buffer = buffer;
 	req->op.file_io.size = size;
 
-	map_put(request_ids, (void*)(uintptr_t)req->id, callback);
+	if(!push_request(req)) {
+		free(req);
+		ret = -FIO_ERR_FIFOBUSY;
+		goto out;
+	}
 
-	if(!push_request(req))
-		return -2;
+	if(callback)
+		map_put(request_ids, (void*)(uintptr_t)req->id, callback);
 
-	return 0;
+	return ret;
+
+out:
+	if(callback)
+		callback(buffer, ret, context);
+
+	return ret;
 }
 
-int file_write(int fd, const void* buffer, size_t size, void(*callback)(void* buffer, size_t size, void* context), void* context) {
-	if(fd < 0)
-		return -FILE_ERR_BADFD;
+int file_write(int fd, const void* buffer, size_t size, void(*callback)(void* buffer, int size, void* context), void* context, void(*sync_callback)(int errno, void* context), void* context2) {
+	int ret = FIO_OK;
+	if(fd < 0) {
+		ret = -FIO_ERR_BADFD;
+		goto out;
+	} else if(size < 0) {
+		ret = -FIO_ERR_BADSIZE;
+		goto out;
+	} else if(!buffer) {
+		ret = -FIO_ERR_BADBUF;
+		goto out;
+	}
 
 	FIORequest* req = malloc(sizeof(FIORequest));
-	if(!req)
-		return -FILE_ERR_NOSPC;
+	if(!req) {
+		ret = -FIO_ERR_NOSPC;
+		goto out;
+	}
 
 	req->type = FILE_T_WRITE;
 	req->context = context;
@@ -173,39 +232,67 @@ int file_write(int fd, const void* buffer, size_t size, void(*callback)(void* bu
 	req->op.file_io.buffer = (void*)buffer;
 	req->op.file_io.size = size;
 
-	map_put(request_ids, (void*)(uintptr_t)req->id, callback);
+	if(!push_request(req)) {
+		free(req);
+		ret = -FIO_ERR_FIFOBUSY;
+		goto out;
+	}
 
-	if(!push_request(req))
-		return -2;
+	if(callback)
+		map_put(request_ids, (void*)(uintptr_t)req->id, callback);
 
-	return 0;
+	return ret;
+
+out:
+	if(callback)
+		callback((void*)buffer, ret, context);
+	
+	return ret;
 }
 
 int file_opendir(const char* dir_name, void(*callback)(int fd, void* context), void* context) {
+	int ret = FIO_OK;
 	FIORequest* req = malloc(sizeof(FIORequest));
-	if(!req)
-		return -FILE_ERR_NOSPC;
+	if(!req) {
+		ret = -FIO_ERR_NOSPC;
+		goto out;
+	}
 	
 	req->type = FILE_T_OPENDIR;
 	req->context = context;
 	memcpy(req->op.open.name, dir_name, strlen(dir_name));
 	req->id = (__fio->request_id++) % FIO_MAX_REQUEST_ID;
 
-	map_put(request_ids, (void*)(uintptr_t)req->id, callback);
+	if(!push_request(req)) {
+		free(req);
+		ret = -FIO_ERR_FIFOBUSY;
+		goto out;
+	}
 
-	if(!push_request(req))
-		return -2;
+	if(callback)
+		map_put(request_ids, (void*)(uintptr_t)req->id, callback);
 
-	return 0;
+	return ret;
+
+out:
+	if(callback)
+		callback(ret, context);
+	
+	return ret;
 }
 
 int file_readdir(int fd, Dirent* dir, void(*callback)(Dirent* dir, void* context), void* context) {
-	if(fd < 0)
-		return -FILE_ERR_BADFD;
+	int ret = FIO_OK;
+	if(fd < 0) {
+		ret = -FIO_ERR_BADFD;
+		goto out;
+	}
 
 	FIORequest* req = malloc(sizeof(FIORequest));
-	if(!req)
-		return -FILE_ERR_NOSPC;
+	if(!req) {
+		ret = -FIO_ERR_NOSPC;
+		goto out;
+	}
 
 	req->type = FILE_T_READDIR;
 	req->context = context;
@@ -213,31 +300,53 @@ int file_readdir(int fd, Dirent* dir, void(*callback)(Dirent* dir, void* context
 	req->op.read_dir.dir = dir;
 	req->id = (__fio->request_id++) % FIO_MAX_REQUEST_ID;
 
-	map_put(request_ids, (void*)(uintptr_t)req->id, callback);
+	if(!push_request(req)) {
+		free(req);
+		ret = -FIO_ERR_FIFOBUSY;
+		goto out;
+	}
 
-	if(!push_request(req))
-		return -2;
+	if(callback)
+		map_put(request_ids, (void*)(uintptr_t)req->id, callback);
 
-	return 0;
+	return ret;
+
+out:
+	return ret;
 }
 
 int file_closedir(int fd, void(*callback)(int ret, void* context), void* context) {
-	if(fd < 0)
-		return -FILE_ERR_BADFD;
+	int ret = FIO_OK;
+	if(fd < 0) {
+		ret = -FIO_ERR_BADFD;
+		goto out;
+	}
 
 	FIORequest* req = malloc(sizeof(FIORequest));
-	if(!req)
-		return -FILE_ERR_NOSPC;
+	if(!req) {
+		ret = -FIO_ERR_NOSPC;
+		goto out;
+	}
 
 	req->type = FILE_T_CLOSEDIR;
 	req->context = context;
 	req->fd = fd;
 	req->id = (__fio->request_id++) % FIO_MAX_REQUEST_ID;
 	
-	map_put(request_ids, (void*)(uintptr_t)req->id, callback);
-	
-	if(!push_request(req))
-		return -2;
+	if(!push_request(req)) {
+		free(req);
+		ret = -FIO_ERR_FIFOBUSY;
+		goto out;
+	}
 
-	return 0;
+	if(callback)
+		map_put(request_ids, (void*)(uintptr_t)req->id, callback);
+
+	return ret;
+
+out:
+	if(callback)
+		callback(ret, context);
+	
+	return ret;
 }

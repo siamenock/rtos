@@ -40,9 +40,9 @@ void module_init() {
 		return;
 	
 	int len;
-	Dirent* dirent;
+	Dirent* dirent = gmalloc(sizeof(Dirent));
 
-	while((dirent = readdir(fd))) {
+	while(readdir(fd, dirent) > 0) {
 		if(strstr((const char*)dirent->name, ".ko") + 3 - (char*)dirent->name == strlen((const char*)dirent->name)) {
 			// Attach root directory for full path
 			char file_name[FILE_MAX_NAME_LEN];
@@ -71,6 +71,7 @@ void module_init() {
 		}
 	}
 
+	gfree(dirent);
 	closedir(fd);
 	bfree(buffer);
 }

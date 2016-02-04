@@ -50,6 +50,10 @@ typedef struct {
 	uint32_t	link_table_size;	///< Sector count of inode table
 	uint32_t	data_addr;		///< Data block address
 	uint32_t	total_cluster_count;	///< Total cluster count of BFS
+
+	List*		read_buffers;
+	List*		write_buffers;
+	List*		wait_lists;
 } BFSPriv;
 
 
@@ -74,7 +78,7 @@ static int bfs_mount(FileSystemDriver* fs_driver, DiskDriver* disk_driver, uint3
 				priv->reserved_addr = lba;
 				priv->reserved_size = 1;
 
-				priv->link_table_addr = lba+ 1;
+				priv->link_table_addr = lba + 1;
 				BFSInode* inode = (BFSInode*)temp;
 				priv->link_table_size = inode->first /* Start of Data */ 
 					- 1 /* Super block */;
@@ -83,6 +87,10 @@ static int bfs_mount(FileSystemDriver* fs_driver, DiskDriver* disk_driver, uint3
 
 				int size = sb->end - sb->start; // Total size (bytes)
 				priv->total_cluster_count = (size - 4095) / 4096;
+
+				priv->read_buffers = list_create(NULL);
+				priv->write_buffers = list_create(NULL);
+				priv->wait_lists = list_create(NULL);
 
 				// Disk driver attachment
 				fs_driver->driver = disk_driver;
@@ -144,7 +152,7 @@ static BFSInode* get_inode_entry(FileSystemDriver* driver, uint32_t idx) {
 }
 
 // Find directory entry which corresponds to file name from root directory
-static int find_directory_entry(FileSystemDriver* driver, const char* name, File* file) { 
+static int find_directory_entry(FileSystemDriver* driver, const char* name, BFSFile* file) { 
 	BFSPriv* priv = driver->priv;
 	DiskDriver* disk_driver = driver->driver;
 
@@ -189,55 +197,253 @@ static int find_directory_entry(FileSystemDriver* driver, const char* name, File
 }
 
 /* High level function */
-static File* bfs_open(FileSystemDriver* driver, File* file, const char* file_name, char* flags) { 
+static int bfs_open(FileSystemDriver* driver, const char* file_name, char* flags, void** priv) {
+	BFSFile* file = malloc(sizeof(BFSFile));
 	int inode = find_directory_entry(driver, file_name, file);
 
 	if(inode < 0)  
-		return NULL;
+		return -1;
 
 	int len = strlen(file_name);
 	if(len > BFS_NAME_LEN - 1) 
-		return NULL;
+		return -2;
 
 	memcpy(file->name, file_name, len + 1);
-	file->type = FILE_TYPE_FILE;
 	file->inode = inode;
 
 	// Offset initialization
 	file->offset = 0;
 	//file->index = 0;
 
-	return file;
+	*priv = file;
+	return FILE_OK;
 }
 
-static int bfs_close(FileSystemDriver* driver, File* file) { 
+static int bfs_close(FileSystemDriver* driver, void* file) { 
 	// Nothing to do. Left for comfortability 
 	return 0;
 }
 
-static int bfs_write(DiskDriver* driver, uint32_t sector, size_t sector_count, void* buffer) {
-	if(driver->write(driver, sector, sector_count, buffer) < 0)
-		return -FILE_ERR_IO;
+static int bfs_write(FileSystemDriver* driver, void* _file, void* buffer, size_t size) {
+#define MIN(x, y) (((x) < (y)) ? (x) : (y))
+	BFSFile* file = (BFSFile*)_file;
+	if(file->offset >= file->size)
+		return FILE_EOF;
+
+	DiskDriver* disk_driver = driver->driver;
+	size_t write_count = 0;
+	size_t total_size;
+
+	total_size =  MIN(file->size - file->offset, size);
+
+	while(write_count != total_size) {
+		uint32_t offset_in_cluster = file->offset % FS_BLOCK_SIZE;
+		uint32_t sector = file->sector + (file->offset / FS_BLOCK_SIZE * FS_SECTOR_PER_BLOCK);
+		size_t write_size = MIN(FS_BLOCK_SIZE - offset_in_cluster, total_size - write_count);
+		void* write_buf = buffer + write_count;
+
+		void* data = cache_get(driver->cache, (void*)(uintptr_t)sector);
+		if(data) 
+			memcpy(data, write_buf, FS_BLOCK_SIZE);
+
+		// Write operation
+		if(disk_driver->write(disk_driver, sector, FS_SECTOR_PER_BLOCK, write_buf)) {
+			printf("Write fail\n");
+			return -2;
+		}
+
+		write_count += write_size;
+		file->offset += write_size;
+	}
+
+	return write_count;
+}
+
+static int bfs_read(FileSystemDriver* driver, void* _file, void* buffer, size_t size) {
+#define MIN(x, y) (((x) < (y)) ? (x) : (y))
+	BFSFile* file = (BFSFile*)_file;
+	if(file->offset >= file->size)
+		return FILE_EOF;
+
+	DiskDriver* disk_driver = driver->driver;
+	size_t read_count = 0;
+	size_t total_size;
+
+	total_size =  MIN(file->size - file->offset, size);
+
+	while(read_count != total_size) {
+		uint32_t offset_in_cluster = file->offset % FS_BLOCK_SIZE;
+		uint32_t sector = file->sector + (file->offset / FS_BLOCK_SIZE * FS_SECTOR_PER_BLOCK);
+		size_t read_size = MIN(FS_BLOCK_SIZE - offset_in_cluster, total_size - read_count);
+
+		void* read_buf = cache_get(driver->cache, (void*)(uintptr_t)sector);
+
+		if(!read_buf) {
+			read_buf = malloc(FS_BLOCK_SIZE);
+			if(!read_buf) {
+				printf("malloc error\n");
+				return -1;
+			}
+
+			if(disk_driver->read(disk_driver, sector, FS_SECTOR_PER_BLOCK, read_buf) < 0) {
+				printf("read error\n");
+				gfree(read_buf);
+				return -2;
+			}
+
+			if(!cache_set(driver->cache, (void*)(uintptr_t)sector, read_buf)) {
+				printf("cache setting error\n");
+				gfree(read_buf);
+				return -3;
+			}
+		}
+
+		memcpy((void*)((uint8_t*)buffer + read_count), (void*)(read_buf + offset_in_cluster), read_size);
+
+		read_count += read_size;
+		file->offset += read_size;
+	}
+
+	return read_count;
+}
+
+typedef struct {
+	bool(*callback)(List* blocks, int success, void* context);
+	void*		context;
+	uint32_t	offset;
+	BFSFile*	file;
+	List*		read_buffers;
+	Cache*		cache;
+} ReadContext;
+
+/* 
+ * Set cache datas which are read successfully from the disk
+ * 
+ * @param blocks a list containing blocks
+ * @param count a number of successful read
+ * @param context a context
+ */
+static void read_callback(List* blocks, int count, void* context) {
+	ReadContext* read_context = context;
+	BFSFile* file = read_context->file;
+	Cache* cache = read_context->cache;
+
+	int read_count = 0;
+	ListIterator iter;
+	list_iterator_init(&iter, blocks);
+	while(list_iterator_has_next(&iter)) {
+		BufferBlock* block = list_iterator_next(&iter);
+
+		if(read_count++ < count) {
+			// Cache setting
+			cache_set(cache, (void*)(uintptr_t)block->sector, block->buffer);
+			file->offset += block->size;
+		} else {
+			list_iterator_remove(&iter);
+			free(block);
+		}
+	}
+
+	BufferBlock* first_block = list_get_first(blocks);
+	if(first_block)
+		first_block->buffer = (uint8_t*)first_block->buffer - read_context->offset;
+
+	read_context->callback(blocks, count, read_context->context);
+	free(read_context);
+}
+
+typedef struct {
+	int count;
+	void* context;
+	List* read_buffers;
+} ReadTickContext;
+
+static bool read_tick(void* context) {
+	ReadTickContext* read_tick_ctx = context;
+	List* read_buffers = read_tick_ctx->read_buffers;
+	read_callback(read_buffers, read_tick_ctx->count, read_tick_ctx->context);
+	free(read_tick_ctx);
 	
-	return 0;
-}
-static int bfs_read(DiskDriver* driver, uint32_t sector, size_t sector_count, void* buffer) {
-	if(driver->read(driver, sector, sector_count, buffer) < 0)
-		return -FILE_ERR_IO;
-
-	return 0;
+	return false;
 }
 
-static int bfs_read_async(DiskDriver* driver, List* blocks, void(*callback)(List* blocks, int count, void* context), void* context) {
-	driver->read_async(driver, blocks, FS_SECTOR_PER_BLOCK, callback, context);
-	return 0;
+static int bfs_read_async(FileSystemDriver* driver, void* _file, size_t size, bool(*callback)(List* blocks, int success, void* context), void* context) {
+#define MIN(x, y) (((x) < (y)) ? (x) : (y))
+	BFSFile* file = (BFSFile*)_file;
+	if(file->offset >= file->size)
+		return FILE_EOF;
+
+	BFSPriv* priv = (BFSPriv*)driver->priv;
+	List* read_buffers = priv->read_buffers;
+	DiskDriver* disk_driver = driver->driver;
+
+	// If there is no space in the buffer
+	if(FS_NUMBER_OF_BLOCKS - list_size(read_buffers) <= 0) {
+		return -FILE_ERR_NOBUFS;
+	}
+
+	// Optimize the size that we can handle
+	size = MIN(file->size - file->offset, size);
+	size = MIN(FS_CACHE_BLOCK * FS_BLOCK_SIZE, size);
+
+	ReadContext* read_context = malloc(sizeof(ReadContext));
+	read_context->offset = file->offset % FS_BLOCK_SIZE; // offset for first block
+	read_context->callback = callback;
+	read_context->context = context;
+	read_context->cache = driver->cache;
+	read_context->file = file;
+
+	size_t total_size = size;
+	size_t offset = file->offset;
+	size_t len = 0;
+	int count = 0;
+	bool none_cached = false;
+
+	while(len < total_size) {
+		BufferBlock* block = malloc(sizeof(BufferBlock));
+		if(!block) 
+			break;
+
+		block->sector = file->sector + (offset / FS_BLOCK_SIZE * FS_SECTOR_PER_BLOCK);
+		block->size = MIN(FS_BLOCK_SIZE - (offset % FS_BLOCK_SIZE), total_size - len);
+
+		// Check if cache has a specific buffer
+		block->buffer = cache_get(driver->cache, (void*)(uintptr_t)block->sector);
+		if(!block->buffer)
+			none_cached = true;
+
+		// Add blocks into the list to copy into the buffer from callback
+		list_add(read_buffers, block);
+
+		len += block->size;
+		offset += block->size;
+		count++;
+	}
+
+	// If it needs to read from the disk
+	if(none_cached) {
+		disk_driver->read_async(disk_driver, read_buffers, FS_SECTOR_PER_BLOCK, read_callback, read_context);
+#ifdef _KERNEL_
+	} else {	// If all the blocks are from the cache
+		ReadTickContext* read_tick_ctx = malloc(sizeof(ReadTickContext));
+		read_tick_ctx->count = count;
+		read_tick_ctx->context = read_context;
+		read_tick_ctx->read_buffers = read_buffers;
+
+		// Need to add event to prevent an infinite cycle
+		event_busy_add(read_tick, read_tick_ctx);
+#endif 
+	}
+
+	return 1;
 }
 
-static int bfs_write_async(DiskDriver* driver, List* blocks, void(*callback)(List* blocks, int count, void* context), void* context) {
-	return driver->write_async(driver, blocks, FS_SECTOR_PER_BLOCK, callback, context);
-}
+//static int bfs_write_async(DiskDriver* driver, List* blocks, void(*callback)(List* blocks, int count, void* context), void* context) {
+//	return driver->write_async(driver, blocks, FS_SECTOR_PER_BLOCK, callback, context);
+//}
 
-static off_t bfs_lseek(FileSystemDriver* driver, File* file, off_t offset, int whence) {
+static off_t bfs_lseek(FileSystemDriver* driver, void* _file, off_t offset, int whence) {
+	BFSFile* file = (BFSFile*)_file;
 	// BFS doesn't support having pointer over file size
 	switch(whence) {
 		// From start of file
@@ -277,7 +483,8 @@ static off_t bfs_lseek(FileSystemDriver* driver, File* file, off_t offset, int w
 	return offset;
 }
 
-static File* bfs_opendir(FileSystemDriver* driver, File* dir, const char* dir_name) {
+static void* bfs_opendir(FileSystemDriver* driver, const char* dir_name) {
+	BFSFile* dir = malloc(sizeof(BFSFile));
 	DiskDriver* disk_driver = driver->driver;
 	// BFS only have root directory, so forget about the name
 	BFSInode* inode = get_inode_entry(driver, 2); // Root directory is at inode 2
@@ -318,14 +525,13 @@ static File* bfs_opendir(FileSystemDriver* driver, File* dir, const char* dir_na
 	BFSDir* bfs_dir = (BFSDir*)temp;
 
 	for(int i = 0; i < count; i++) {
-		dirent[i].inode = bfs_dir->inode; 
+		//dirent[i].inode = bfs_dir->inode; 
 		memcpy(&dirent[i].name, bfs_dir->name, BFS_NAME_LEN); 
 		bfs_dir++;
 	}
 
 	// Root directory name is "/"
 	memcpy(dir->name, "/", 2);
-	dir->type = FILE_TYPE_DIR;
 
 	// Offset initialization
 	//dir->index = 0;
@@ -334,36 +540,51 @@ static File* bfs_opendir(FileSystemDriver* driver, File* dir, const char* dir_na
 	return dir;
 }
 
-static Dirent* bfs_readdir(FileSystemDriver* driver, File* dir) {
+static int bfs_readdir(FileSystemDriver* driver, void* _dir, Dirent* dirent) {
+	BFSFile* dir = (BFSFile*)_dir;
+	if(dir->offset == dir->size) 
+		return FILE_EOF;
+
 	int index = dir->offset / sizeof(BFSDir);
 
-	Dirent* dirent = (Dirent*)(dir->buf + index * sizeof(Dirent));
+	Dirent* kdirent = (Dirent*)(dir->buf + index * sizeof(Dirent));
 
 	while(dir->offset != dir->size) { 
-		if(dirent->name != NULL) {
+		if(kdirent->name != NULL) {
 			dir->offset += sizeof(BFSDir);
+			strcpy(dirent->name, kdirent->name);
 
-			return dirent;
+			return 1;
 		}
 
 		dir->offset += sizeof(BFSDir);
-		dirent++;
+		kdirent++;
 	}	
 
-	return NULL;
+	return -2;
 }
 
-static void bfs_rewinddir(FileSystemDriver* driver, File* dir) {
+static void bfs_rewinddir(FileSystemDriver* driver, void* _dir) {
 	// Not implemented yet
 }
 
-static int bfs_closedir(FileSystemDriver* driver, File* dir) {
+static int bfs_closedir(FileSystemDriver* driver, void* _dir) {
+	BFSFile* dir = (BFSFile*)_dir;
 	if(dir->buf)
 		free(dir->buf);
 	else 
 		return -1;
 
 	return 0;
+}
+
+static int bfs_file_size(void* _file) {
+	BFSFile* file = (BFSFile*)_file;
+	return file->size;
+}
+
+static bool bfs_check_sync(void* _file) {
+	return true;
 }
 
 FileSystemDriver bfs_driver = {
@@ -377,8 +598,10 @@ FileSystemDriver bfs_driver = {
 	.read = bfs_read,
 	.write = bfs_write,
 	.read_async = bfs_read_async,
-	.write_async = bfs_write_async,
+//	.write_async = bfs_write_async,
 	.lseek = bfs_lseek,
+	.file_size = bfs_file_size,
+	.check_sync = bfs_check_sync,
 
 	.opendir = bfs_opendir,
 	.readdir = bfs_readdir,

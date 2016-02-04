@@ -10,13 +10,12 @@ int request_firmware(const struct firmware **fw, const char *name, PCI_Device *d
 		return -1;
 	}
 
-	Stat state;
-	if(stat(fd, &state) != 0) {
+	uint32_t size = file_size(fd);
+	if(size < 0) {
 		printf("\tCannot get state of file: %s\n", name);
 		return -2;
 	}
 		
-	uint32_t size = state.size;
 	struct firmware* f = gmalloc(sizeof(struct firmware));
 	void* data = gmalloc(size);
 

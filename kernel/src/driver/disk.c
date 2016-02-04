@@ -43,7 +43,7 @@ found:
 		return false;
 
 	driver->boot_sector = boot_sector;
-	
+
 	return true;
 }
 

@@ -7,9 +7,10 @@
 
 
 typedef struct {
-	void(*callback)(void* buffer, size_t len, void* context);
+	void(*callback)(void* buffer, int len, void* context);
 	void*			context;
 	void*			buffer;
+	File*			file;
 } ReadContext;
 
 static File files[FILE_MAX_DESC]; 
@@ -26,6 +27,8 @@ static void* alloc_descriptor(void) {
 }
 
 static void free_descriptor(File* descriptor) {
+	descriptor->driver = NULL;
+	descriptor->priv = NULL;
 	descriptor->type = FILE_TYPE_NONE;
 }
 
@@ -35,33 +38,33 @@ static void free_descriptor(File* descriptor) {
 int open(const char* path, char* flags) {
 	// Name validation check
 	int len = strlen(path);
-	int result;
+	int ret;
 	
-	if(flags[0] != 'r') { // Reading is only available now
-		result = -1;
+	if(flags[0] != 'r' && flags[0] != 'w' && flags[0] != 'a') {
+		ret = -1;
 		goto failed;
 	}
 
 	if((len > FILE_MAX_NAME_LEN - 1) || (len == 0)) {
-		result = -2;
+		ret = -2;
 		goto failed;
 	}
 
 	File* file = alloc_descriptor();
 	if(!file) {
-		result = -3;
+		ret = -3;
 		goto failed;
 	}
 
 	// Check whether format of path is valid
 	if(path[0] != '/') {
-		result = -4;
+		ret = -4;
 		goto failed;
 	}
 
 	file->driver = fs_driver(path);
 	if(!file->driver) {
-		result = -5;
+		ret = -5;
 		goto failed;
 	}
 
@@ -70,10 +73,10 @@ int open(const char* path, char* flags) {
 		return base ? base + 1 : path;
 	}
 
-	if(file->driver->open(file->driver, file, get_file_name(path), flags) == NULL) {
-		result = -6;
+	ret = file->driver->open(file->driver, get_file_name(path), flags, &file->priv);
+
+	if(ret != FILE_OK)
 		goto failed;
-	}
 
 	// Return index of file descriptor
 	return file - files; 
@@ -82,34 +85,25 @@ failed:
 	if(file)
 		free_descriptor(file);
 
-	return result;
+	return ret;
 }
 
 int close(int fd) {
 	File* file = files + fd;
-	if((file == 0) || (file->type != FILE_TYPE_FILE)) 
-		return -1;
 
-	if(file->driver->close(file->driver, file) < 0)
+	if(fd < 0 || fd >= FILE_MAX_DESC || file == NULL)
+		return -FILE_ERR_BADFD;
+
+	if(file->type != FILE_TYPE_FILE)
+		return -FILE_ERR_FTYPE;
+
+	if(file->read_count > 0 || !file->driver->check_sync(file->priv))
+		return -FILE_ERR_BUSY;
+
+	if(file->driver->close(file->driver, file->priv) < 0)
 		return -2;
 
-	file->driver = NULL;
-
 	free_descriptor(file);
-
-	return 0;
-}
-
-static int file_check(File* file) {
-	// Check if file is NULL or file type is invaild
-	if(file == NULL || file->type != FILE_TYPE_FILE) {
-		return -FILE_ERR_FTYPE;
-	}
-
-	// Check if offset indicates end of file
-	if(file->offset >= file->size) {
-		return FILE_EOF;
-	}
 
 	return FILE_OK;
 }
@@ -117,27 +111,22 @@ static int file_check(File* file) {
 ssize_t write(int fd, const void* buffer, size_t size) {
 	File* file = files + fd;
 	
-	if(fd < 0 || fd >= FILE_MAX_DESC) {
-		return FILE_ERR_BADFD;
-	}
+	if(fd < 0 || fd >= FILE_MAX_DESC || file == NULL)
+		return -FILE_ERR_BADFD;
 
-	int err = file_check(file);
-	if(err != FILE_OK)
-		return err;
+	if(file->type != FILE_TYPE_FILE)
+		return -FILE_ERR_FTYPE;
 
 	return fs_write(file, (void*)buffer, size);
 }
 
 ssize_t read(int fd, void* buffer, size_t size) {
 	File* file = files + fd;
+	if(fd < 0 || fd >= FILE_MAX_DESC || file == NULL)
+		return -FILE_ERR_BADFD;
 
-	if(fd < 0 || fd >= FILE_MAX_DESC) {
-		return FILE_ERR_BADFD;
-	}
-
-	int err = file_check(file);
-	if(err != FILE_OK)
-		return err;
+	if(file->type != FILE_TYPE_FILE)
+		return -FILE_ERR_FTYPE;
 
 	return fs_read(file, buffer, size);
 }
@@ -159,97 +148,153 @@ static bool read_callback(List* blocks, int success, void* context) {
 	if(success < 0)
 		len = success;
 
+	read_context->file->read_count -= 1;
 	read_context->callback(read_context->buffer, len, read_context->context);
 	free(read_context);
 	
 	return true;
 }
 
-int read_async(int fd, void* buffer, size_t size, void(*callback)(void* buffer, size_t size, void* context), void* context) {
+int read_async(int fd, void* buffer, size_t size, void(*callback)(void* buffer, int size, void* context), void* context) {
+	int ret = FILE_OK;
 	File* file = files + fd;
 
-	if(fd < 0 || fd >= FILE_MAX_DESC) {
-		callback(buffer, FILE_ERR_BADFD, context);
-		return FILE_ERR_BADFD;
-	}
+	if(fd < 0 || fd >= FILE_MAX_DESC || file == NULL)
+		ret = -FILE_ERR_BADFD;
 
-	int err = file_check(file);
-	if(err != FILE_OK) {
-		callback(buffer, err, context);
-		return err;
-	}
+	if(file->type != FILE_TYPE_FILE)
+		ret = -FILE_ERR_FTYPE;
+
+	if(buffer == NULL)
+		ret = -FILE_ERR_BADBUF;
+
+	if(ret != FILE_OK)
+		goto exit;
 
 	ReadContext* read_context = malloc(sizeof(ReadContext));
 	read_context->callback = callback;
 	read_context->context = context;
 	read_context->buffer = buffer;
+	read_context->file = file;
 
-	if(fs_read_async(file, size, read_callback, read_context) < 0) {
+	file->read_count += 1;
+
+	ret = fs_read_async(file, size, read_callback, read_context);
+	if(ret < 1) {
 		// If no buffer space available
-		callback(buffer, -FILE_ERR_NOBUFS, context);
 		free(read_context);
-		return -FILE_ERR_NOBUFS;
+		file->read_count -= 1;
 	}
 
-	return 0;
+exit:
+	if(ret != FILE_OK) {
+		if(callback)
+			callback(buffer, ret, context);
+	}
+
+	return ret;
 }
 
-int write_async(int fd, void* buffer, size_t size, void(*callback)(void* buffer, size_t size, void* context), void* context, void(*sync_callback)(int errno, void* context2), void* context2) {
+typedef struct {
+	void(*callback)(void* buffer, int size, void* context);
+	void*		context;
+	File*		file;
+} WriteDone;
+
+void write_callback(void* buffer, int size, void* context) {
+	if(!context)
+		return;
+
+	WriteDone* write_done = context;
+	write_done->file->write_lock = 0;
+
+	if(write_done->callback)
+		write_done->callback(buffer, size, write_done->context);
+
+	free(write_done);
+
+}
+
+int write_async(int fd, void* buffer, size_t size, void(*callback)(void* buffer, int size, void* context), void* context, void(*sync_callback)(int errno, void* context2), void* context2) {
+	int ret = FILE_OK;
 	File* file = files + fd;
 
-	if(fd < 0 || fd >= FILE_MAX_DESC) {
-		callback(buffer, FILE_ERR_BADFD, context);
-		return FILE_ERR_BADFD;
-	}
+	if(fd < 0 || fd >= FILE_MAX_DESC || file == NULL)
+		ret = -FILE_ERR_BADFD;
 
-	int err = file_check(file);
-	if(err != FILE_OK) {
-		callback(buffer, err, context);
-		return err;
-	}
+	if(file->type != FILE_TYPE_FILE)
+		ret = -FILE_ERR_FTYPE;
 
-	fs_write_async(file, buffer, size, callback, context, sync_callback, context2);
+	if(buffer == NULL)
+		ret = -FILE_ERR_BADBUF;
 
-	return 0;
+	if(file->write_lock != 0)
+		ret = -FILE_ERR_BUSY;
+
+	WriteDone* write_done = malloc(sizeof(WriteDone));
+	if(!write_done)
+		ret = -FILE_ERR_NOSPC;
+
+	if(ret != FILE_OK)
+		goto exit;
+
+	write_done->file = file;
+	write_done->callback = callback;
+	write_done->context = context;
+
+	file->write_lock = 1;
+	ret = fs_write_async(file, buffer, size, write_callback, write_done, sync_callback, context2);
+
+exit:
+	if(ret < 1)
+		write_callback(buffer, ret, write_done);
+
+	return ret;
 }
 
 off_t lseek(int fd, off_t offset, int whence) {
 	File* file = files + fd;
 
-	if(file == 0 || file->type != FILE_TYPE_FILE) 
-		return 0;
+	if(fd < 0 || fd >= FILE_MAX_DESC || file == NULL)
+		return -FILE_ERR_BADFD;
 
-	return file->driver->lseek(file->driver, file, offset, whence);
+	if(file->type != FILE_TYPE_FILE)
+		return -FILE_ERR_FTYPE;
+
+	return file->driver->lseek(file->driver, file->priv, offset, whence);
 }
 
 int opendir(const char* dir_name) {
-	File* file = alloc_descriptor();
+	File* dir = alloc_descriptor();
 
-	if(file == NULL)
+	if(dir == NULL)
 		return -1;
 
-	file->driver = fs_driver(dir_name);
-	if(!file->driver) {
-		free_descriptor(file);
+	dir->driver = fs_driver(dir_name);
+	if(!dir->driver) {
+		free_descriptor(dir);
 		return -2;
 	}
 
-	if(file->driver->opendir(file->driver, file, dir_name))
-		return file - files;
+	dir->priv = dir->driver->opendir(dir->driver, dir_name);
+	if(!dir->priv) 
+		return -3;
 	
-	return -3;
+	dir->type = FILE_TYPE_DIR;
+
+	return dir - files;
 }
 
-Dirent* readdir(int fd) {
+int readdir(int fd, Dirent* dirent) {
 	File* dir = files + fd;
 
-	if((dir == NULL) || (dir->type != FILE_TYPE_DIR)) 
-		return NULL;
+	if(fd < 0 || fd >= FILE_MAX_DESC || dir == NULL)
+		return -FILE_ERR_BADFD;
 
-	if(dir->offset == dir->size) 
-		return NULL;
-	
-	return dir->driver->readdir(dir->driver, dir);
+	if(dir->type != FILE_TYPE_DIR)
+		return -FILE_ERR_FTYPE;
+
+	return dir->driver->readdir(dir->driver, dir->priv, dirent);
 }
 
 void rewinddir(File* dir) {
@@ -259,27 +304,28 @@ void rewinddir(File* dir) {
 int closedir(int fd) {
 	File* dir = files + fd;
 
-	if((dir == 0) || (dir->type != FILE_TYPE_DIR)) 
-		return -1;
+	if(fd < 0 || fd >= FILE_MAX_DESC || dir == NULL)
+		return -FILE_ERR_BADFD;
 
-	if(dir->driver->closedir(dir->driver, dir) < 0)
+	if(dir->type != FILE_TYPE_DIR)
+		return -FILE_ERR_FTYPE;
+
+	if(dir->driver->closedir(dir->driver, dir->priv) < 0)
 		return -2;
 
 	free_descriptor(dir);
 
-	return 0;
+	return FILE_OK;
 }
 
-int stat(int fd, Stat* stat) {
-	File* descriptor = files + fd;
+int file_size(int fd) {
+	File* file = files + fd;
 
-	if((descriptor == 0) || (descriptor->type != FILE_TYPE_FILE))
-		return -1;
+	if(fd < 0 || fd >= FILE_MAX_DESC || file == NULL)
+		return -FILE_ERR_BADFD;
 
-	stat->inode = descriptor->inode;
-	stat->size = descriptor->size;
-	stat->type = descriptor->type;
+	if(file->type != FILE_TYPE_FILE)
+		return -FILE_ERR_FTYPE;
 
-	return 0;
+	return file->driver->file_size(file->priv);
 }
-

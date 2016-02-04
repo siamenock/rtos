@@ -3,18 +3,32 @@
 
 #include <util/types.h>
 #include <util/fifo.h>
-#include <fio.h>
 
 #define FIO_INPUT_BUFFER_SIZE	1024
 #define FIO_OUTPUT_BUFFER_SIZE	1024
 #define FIO_MAX_REQUEST_ID	256
 #define FIO_MAX_NAME_LEN	256
 
+#define FIO_EOF			0
+#define FIO_OK			1
+#define FIO_ERR_NOSPC		4	/* No space left on device */
+#define FIO_ERR_IO		5      	/* I/O error */
+#define FIO_ERR_OPENMODE	7	/* Invalid open mode */
+#define FIO_ERR_FILENOTEXIST	8	/* File not exist */
+#define FIO_ERR_BADFD		9	/* Bad file descriptor */
+#define FIO_ERR_BADBUF		10	/* Bad buffer address */
+#define FIO_ERR_READONLY	11	/* Read only */
+#define FIO_ERR_BADSIZE		12	/* Negative size */
+#define FIO_ERR_BUSY		29	/* I/O Busy */
+#define FIO_ERR_FTYPE		79	/* Inappropriate file type */
+#define FIO_ERR_FIFOBUSY	90	/* Fifo is in use */
+#define FIO_ERR_NOBUFS		105	/* No buffer space available */
+#define FIO_ERR_FSDRIVER	106	/* Bad File system driver */
+
 /**
  * Directory data structure
  */
 typedef struct {
-	unsigned int		inode;
 	char			name[FIO_MAX_NAME_LEN];
 } Dirent;
 
@@ -29,6 +43,9 @@ typedef struct {
 
 	// Request ID
 	uint32_t		request_id;		///< Request id
+
+	// Event ID
+	uint64_t		event_id;		///< Polling event id
 } FIO;
 
 /**
