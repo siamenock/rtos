@@ -8,5 +8,6 @@ void* memcpy(void *,const void *,__kernel_size_t);
 size_t strlen(const char *);
 char* strcpy(char *, const char *);
 char* strncpy(char *, const char *, size_t);
+int strcmp(const char *s, const char *d);
 #endif /* __LINUX_STRING_H__ */
 
