@@ -628,6 +628,11 @@ char* __strchr(const char* s, int c) {
 
 char* __strrchr(const char* s, int c) {
 	char* ch = (char*)s;
+
+	while(*ch)
+		ch++;
+
+	ch--;
 	
 	while(*ch != c && *ch != '\0')
 		ch--;
