@@ -66,11 +66,11 @@ static int bfs_mount(FileSystemDriver* fs_driver, DiskDriver* disk_driver, uint3
 	// Size of loader is now about 60kB. Investigate til 200kB (50 Clusters)
 	BFSSuperBlock* sb;
 	void* temp = gmalloc(FS_BLOCK_SIZE);
-	if(disk_driver->read(disk_driver, lba, 8, temp) >= 0) {
+	if(disk_driver->read(disk_driver, lba, 8, temp) > 0) {
 		sb = (BFSSuperBlock*)temp;
 		if(sb->magic == BFS_MAGIC) {
 			// Read 1 more sector for 8th sector
-			if(disk_driver->read(disk_driver, lba + 1, 1, temp) != 0) {
+			if(disk_driver->read(disk_driver, lba + 1, 1, temp) > 0) {
 				// Create private data structure
 				fs_driver->priv = malloc(sizeof(BFSPriv));
 				BFSPriv* priv = fs_driver->priv;
@@ -285,7 +285,7 @@ static int bfs_read(FileSystemDriver* driver, void* _file, void* buffer, size_t 
 				return -1;
 			}
 
-			if(disk_driver->read(disk_driver, sector, FS_SECTOR_PER_BLOCK, read_buf) < 0) {
+			if(disk_driver->read(disk_driver, sector, FS_SECTOR_PER_BLOCK, read_buf) <= 0) {
 				printf("read error\n");
 				gfree(read_buf);
 				return -2;
@@ -378,9 +378,8 @@ static int bfs_read_async(FileSystemDriver* driver, void* _file, size_t size, bo
 	DiskDriver* disk_driver = driver->driver;
 
 	// If there is no space in the buffer
-	if(FS_NUMBER_OF_BLOCKS - list_size(read_buffers) <= 0) {
+	if(FS_NUMBER_OF_BLOCKS - list_size(read_buffers) <= 0)
 		return -FILE_ERR_NOBUFS;
-	}
 
 	// Optimize the size that we can handle
 	size = MIN(file->size - file->offset, size);

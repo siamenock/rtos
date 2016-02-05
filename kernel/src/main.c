@@ -328,21 +328,18 @@ static void icc_stop(ICC_Message* msg) {
 #define EXEC_END		0
 
 static int exec(char* name) {
-	static int fd = 0;
 	static char line[CMD_SIZE];
 	static int head = 0;
 	static int eod = 0;
 	static int seek = 0;
+	int ret;
 
-	if(fd == 0) {
-		fd = open(name, "r");
-	}
-
-	if(fd < 0) {
+	int fd = open(name, "r");
+	if(fd < 0)
 		return EXEC_NOT_FOUND_FILE;
-	}
 
-	while(eod += read(fd, &line[eod], CMD_SIZE - eod)) {
+	while((ret = read(fd, &line[eod], CMD_SIZE - eod)) > 0) {
+		eod += ret;
 		for(; seek < eod; seek++) {
 			if(line[seek] == '\n' || line[seek] == '\0') {
 				for(; head < seek; head++) {
@@ -358,7 +355,6 @@ static int exec(char* name) {
 				}
 
 				if(__stdin_tail >= __stdin_head) {
-					printf("%d %d\n", seek + 1 - head, __stdin_size - ( __stdin_tail - __stdin_head));
 					if((seek + 1 - head) > (__stdin_size - ( __stdin_tail - __stdin_head))) {
 						printf("Wrong2 %d %d\n", seek - head, __stdin_size - ( __stdin_tail - __stdin_head));
 						return EXEC_NOT_ENOUGH_BUFFER;
@@ -391,7 +387,6 @@ static int exec(char* name) {
 	}
 
 	close(fd);
-	fd = 0;
 
 	return EXEC_END;
 }
