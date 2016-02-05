@@ -5,6 +5,7 @@
 #include "module.h"
 #include "pci.h"
 #include "driver/pci.h"
+#include "driver/fs.h"
 
 #define MAX_DEVICE_COUNT	256
 
@@ -66,23 +67,28 @@ Device* device_get(DeviceType type, int idx) {
 	return NULL;
 }
 
-#include "driver/nic.h"
 int device_module_init() {
 	int count = 0;
 	for(int i = 0; i < module_count; i++) {
 		DeviceType* type = module_find(modules[i], "device_type", MODULE_TYPE_DATA);
 		if(!type)
 			continue;
-		
+
+		void* filesystem = module_find(modules[i], "filesystem_driver", MODULE_TYPE_DATA);
+		if(filesystem) {
+			fs_register(filesystem);
+			continue;
+		}
+
 		void* driver = module_find(modules[i], "device_driver", MODULE_TYPE_DATA);
 		if(!driver)
 			continue;
-		
+
 		PCI_DEVICE_PROBE probe = module_find(modules[i], "pci_device_probe", MODULE_TYPE_FUNC);
 		if(probe) {
 			count += pci_probe(*type, probe, driver);
 		}
 	}
-	
+
 	return count;
 }
