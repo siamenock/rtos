@@ -28,21 +28,21 @@ found:
 		return true;
 	}
 	
+	BootSector* boot_sector = (BootSector*)gmalloc(sizeof(BootSector));
+	if(driver->read(driver, 0, 1, (void*)boot_sector) < 0)
+		return false;
+
 	for(int i = 0; i < count; i++) {
 		// Key is 32bit type + number 
 		uint32_t key = (temp[i]->type << 16) | (temp[i]->number);
 		if(!map_put(disks, (void*)(uintptr_t)key, temp[i])) 
 			return false;
+
+		temp[i]->boot_sector = boot_sector;
 	}
 
 	if(driver->type == DISK_TYPE_USB)
 		return true;
-		
-	BootSector* boot_sector = (BootSector*)gmalloc(sizeof(BootSector));
-	if(driver->read(driver, 0, 1, (void*)boot_sector) < 0)
-		return false;
-
-	driver->boot_sector = boot_sector;
 
 	return true;
 }

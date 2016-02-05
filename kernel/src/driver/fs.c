@@ -10,7 +10,6 @@
 
 static FileSystemDriver* drivers[DISK_MAX_DRIVERS];
 static Map* mounts;	// Key: path string, Value: file system driver
-static BootSector* boot_sector;
 
 bool fs_init() {
 	// Mounting map initialization 
@@ -46,7 +45,7 @@ int fs_mount(uint32_t disk, uint8_t partition, int type, const char* path) {
 			break;
 		}
 	}
-	
+
 	if(driver == NULL) {
 		printf("Required file system not found\n");
 		return -2; // Required file system not found
@@ -66,7 +65,7 @@ int fs_mount(uint32_t disk, uint8_t partition, int type, const char* path) {
 		return -4; // Disk not found
 	}
 
-	PartEntry* part_entry = &boot_sector->part_entry[partition];
+	PartEntry* part_entry = &disk_driver->boot_sector->part_entry[partition];
 
 	// Check if a boot sector ends with 0x55aa
 	if(disk_driver->boot_sector->boot_signature[0] != 0x55 || disk_driver->boot_sector->boot_signature[1] != 0xaa) {
@@ -103,7 +102,7 @@ FileSystemDriver* fs_driver(const char* path) {
 
 	}
 
-	return map_get(mounts, path_prefix);
+	return map_get(mounts, (void*)path_prefix);
 }
 
 int fs_umount(const char* path) {

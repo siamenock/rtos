@@ -35,7 +35,7 @@ void module_init() {
 		return;
 	
 	// Open root directory
-	int fd = opendir("/");
+	int fd = opendir("/boot");
 	if(fd < 0) 
 		return;
 	
@@ -46,8 +46,8 @@ void module_init() {
 		if(strstr((const char*)dirent->name, ".ko") + 3 - (char*)dirent->name == strlen((const char*)dirent->name)) {
 			// Attach root directory for full path
 			char file_name[FILE_MAX_NAME_LEN];
-			file_name[0] = '/';
-			strcpy(&file_name[1], dirent->name);
+			strcpy(file_name, "/boot/");
+			strcpy(&file_name[6], dirent->name);
 			
 			int fd = open(file_name, "r");
 			if(fd < 0) {

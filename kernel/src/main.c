@@ -399,77 +399,77 @@ static int exec(char* name) {
 void main(void) {
 	mp_init();
 	uint8_t apic_id = mp_apic_id();
-	
+
 	uint64_t vga_buffer = PHYSICAL_TO_VIRTUAL(0x600000 - 0x70000);
 	stdio_init(apic_id, (void*)vga_buffer, 64 * 1024);
 	malloc_init(vga_buffer);
-	
+
 	mp_sync();	// Barrier #1
 	if(apic_id == 0) {
 		// Parse kernel arguments
 		uint32_t initrd_start = *(uint32_t*)(0x5c0000 - 0x400);
 		uint32_t initrd_end = *(uint32_t*)(0x5c0000 - 0x400 + 8);
-		
+
 		printf("\x1b""32mOK""\x1b""0m\n");
-		
+
 		printf("Copy RAM disk image from 0x%x to 0x%x (%d)\n", initrd_start, RAMDISK_ADDR, initrd_end - initrd_start);
 		memcpy((void*)RAMDISK_ADDR, (void*)(uintptr_t)initrd_start, initrd_end - initrd_start);
-		
+
 		printf("Analyze CPU information...\n");
 		cpu_init();
 		gmalloc_init(RAMDISK_ADDR, initrd_end - initrd_start);
 		timer_init(cpu_brand);
-		
+
 		gdt_init();
 		tss_init();
 		idt_init();
-		
+
 		mp_sync();	// Barrier #2
-		
+
 		printf("Loading GDT...\n");
 		gdt_load();
-		
+
 		printf("Loading TSS...\n");
 		tss_load();
-		
+
 		printf("Loading IDT...\n");
 		idt_load();
-		
+
 		printf("Initializing APICs...\n");
 		apic_activate();
-		
+
 		printf("Initializing PCI...\n");
 		pci_init();
-		
+
 		printf("Initailizing local APIC...\n");
 		apic_init();
-		
+
 		printf("Initializing I/O APIC...\n");
 		ioapic_init();
 		apic_enable();
 
 		printf("Initializing Multi-tasking...\n");
 		task_init();
-		
+
 		printf("Initializing events...\n");
 		event_init();
-		
+
 		printf("Initializing inter-core communications...\n");
 		icc_init();
-		
+
 		printf("Initializing kernel symbols...\n");
 		symbols_init();
-		
+
 		printf("Initializing USB controller driver...\n");
 		usb_initialize();
-		
+
 		printf("Initializing disk drivers...\n");
 		disk_init();
 		if(!disk_register(&pata_driver, NULL)) {
 			printf("\tPATA driver registration FAILED!\n");
 			while(1) asm("hlt");
 		}
-		
+
 		if(!disk_register(&usb_msc_driver, NULL)) {
 			printf("\tUSB MSC driver registration FAILED!\n");
 			while(1) asm("hlt");
@@ -479,7 +479,7 @@ void main(void) {
 			printf("\tVIRTIO BLOCK driver registration FAILED!\n");
 			while(1) asm("hlt");
 		}
-		
+
 		printf("Initializing RAM disk...\n");
 		char cmdline[32];
 		sprintf(cmdline, "-addr 0x%x -size 0x%x", RAMDISK_ADDR, initrd_end - initrd_start);
@@ -487,43 +487,43 @@ void main(void) {
 			printf("\tRAM disk driver registration FAILED!\n");
 			while(1) asm("hlt");
 		}
-		
+
 		printf("Initializing file system...\n");
 		fs_init();
 		fs_register(&bfs_driver);
-		fs_mount(DISK_TYPE_RAMDISK << 16 | 0x00, 0,  FS_TYPE_BFS, "/");
-		
+		fs_mount(DISK_TYPE_RAMDISK << 16 | 0x00, 0,  FS_TYPE_BFS, "/boot");
+
 		printf("Initializing modules...\n");
 		module_init();
-		
+
 		printf("Initializing device drivers...\n");
 		device_module_init();
-		
+
 		uint16_t nic_count = device_count(DEVICE_TYPE_NIC);
 		printf("Initializing NICs: %d\n", nic_count);
 		init_nics(nic_count);
-		
+
 		printf("Initializing VM manager...\n");
 		vm_init();
-		
+
 		printf("Initializing RPC manager...\n");
 		manager_init();
-		
+
 		printf("Initializing shell...\n");
 		shell_init();
-		
+
 		event_busy_add(idle0_event, NULL);
 	} else {
 		mp_sync();	// Barrier #2
 		ap_timer_init();
-		
+
 		gdt_load();
 		tss_load();
 		idt_load();
-		
+
 		apic_init();
 		apic_enable();
-		
+
 		task_init();
 		event_init();
 		icc_init();
@@ -531,12 +531,11 @@ void main(void) {
 		icc_register(ICC_TYPE_RESUME, icc_resume);
 		icc_register(ICC_TYPE_STOP, icc_stop);
 		apic_register(49, icc_pause);
-		
+
 		if(cpu_has_feature(CPU_FEATURE_MONITOR_MWAIT) && cpu_has_feature(CPU_FEATURE_MWAIT_INTERRUPT))
 			event_idle_add(idle_monitor_event, NULL);
 		else
 			event_idle_add(idle_hlt_event, NULL);
-
 	}
 
 	mp_sync();
