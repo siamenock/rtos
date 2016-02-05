@@ -541,7 +541,7 @@ void main(void) {
 	mp_sync();
 
 	if(apic_id == 0) {
-		while(exec("/init.psh") > 0)
+		while(exec("/boot/init.psh") > 0)
 			event_loop();
 	}
 

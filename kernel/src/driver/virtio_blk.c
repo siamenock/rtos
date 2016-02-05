@@ -470,21 +470,18 @@ static int virtio_blk_init(DiskDriver* driver, const char* cmdline, DiskDriver**
 
 	// Virtio device PCI probing 
 	err = virtio_pci_probe(priv->vq_blk->vdev);
-	if(err) {
-		printf("virtio_pci_probe failed: %d\n", err);
-	}
+	if(err)
+		return -1;
+
 	// Feature synchronizing with host OS
 	err = synchronize_features(priv->vq_blk->vdev);
-	if(err) {
-		printf("synchronize_features failed: %d\n", err);
-	}
+	if(err)
+		return -2;
 
 	// Initialize virtqueue & vring
 	err = init_vq(priv->vq_blk);
-	if(err) {
-		printf("init_vq err : %d\n", err);
-		return -1;
-	}
+	if(err)
+		return -3;
 
 	// Disk attachment
 	for(int i = 0; i < count; i++) {
