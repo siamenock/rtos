@@ -10,8 +10,9 @@
 #include "cache.h"
 
 static int fatfs_mount(FileSystemDriver* driver, DiskDriver* disk_driver, uint32_t lba, size_t size) {
+	printf("Mounting FAT filesystem...\n");
 	driver->driver = disk_driver;
-	int ret = TFFS_mount(driver, NULL);
+	int ret = TFFS_mount(driver, lba);
 
 	tffs_t* priv = driver->priv;
 	priv->read_buffers = list_create(NULL);
@@ -106,7 +107,7 @@ static bool fatfs_check_sync(void* _file) {
 	return true;
 }
 
-static FileSystemDriver fatfs_driver = {
+FileSystemDriver filesystem_driver= {
 	.type = FS_TYPE_FAT,
 	.mount = fatfs_mount,
 	
@@ -126,5 +127,5 @@ static FileSystemDriver fatfs_driver = {
 };
 
 bool fatfs_init() {
-	return fs_register(&fatfs_driver);
+	return fs_register(&filesystem_driver);
 }

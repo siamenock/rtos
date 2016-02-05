@@ -35,9 +35,6 @@ typedef struct {}* tfile_handle_t;
 #define DNAME_MAX			64
 #define DNAME_SHORT_MAX		13
 
-// TODO
-#define FAT_BASE_ADDRESS	41099
-
 typedef struct _tffs_time {
 	int32 year;
 	int32 month;
@@ -88,7 +85,8 @@ typedef struct _dirent {
 int32
 TFFS_mount(
 	IN	FileSystemDriver* driver,
-	OUT	tffs_handle_t * phtffs
+	//OUT	tffs_handle_t * phtffs
+	int first_lba
 );
 
 int32

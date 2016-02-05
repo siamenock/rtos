@@ -21,7 +21,10 @@
 #endif
 
 int32
+/* Start of GurumNetworks modification
 TFFS_mount( IN  FileSystemDriver* driver, OUT tffs_handle_t * phtffs)
+End of GurumNetworks modification*/
+TFFS_mount( IN  FileSystemDriver* driver, int first_lba)
 {
 	int32 ret;
 	tffs_t * tffs;
@@ -69,8 +72,9 @@ TFFS_mount( IN  FileSystemDriver* driver, OUT tffs_handle_t * phtffs)
 
 	End of GurumNetworks modification */
 	tffs->driver = driver;
+	tffs->first_lba = first_lba;
 
-	if(disk_driver->read(disk_driver, FAT_BASE_ADDRESS, 1, (void*)pbs) < 0)
+	if(disk_driver->read(disk_driver, tffs->first_lba, 1, (void*)pbs) < 0)
 		goto _release;
 
 	tffs->pbs = pbs;
@@ -259,7 +263,7 @@ _parse_boot_sector(
 		tffs->fat_type = FT_FAT32;
 	}
 
-	tffs->sec_fat = FAT_BASE_ADDRESS + pbs->resvd_sec_cnt;
+	tffs->sec_fat = tffs->first_lba + pbs->resvd_sec_cnt;
 	tffs->sec_root_dir = tffs->sec_fat + pbs->num_fats * tffs->fatsz;
 	tffs->sec_first_data = tffs->sec_root_dir + tffs->root_dir_sectors;
 }

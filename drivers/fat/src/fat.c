@@ -330,7 +330,7 @@ _read_fat_sector(
 
 	/* Start of GurumNetworks modification */
 	boot_sector_t* pbs = ptffs->pbs;
-	memcpy(pfat->secbuf, ptffs->fat + (fat_sec - FAT_BASE_ADDRESS - pbs->resvd_sec_cnt) * pbs->byts_per_sec, pbs->byts_per_sec);
+	memcpy(pfat->secbuf, ptffs->fat + (fat_sec - ptffs->first_lba - pbs->resvd_sec_cnt) * pbs->byts_per_sec, pbs->byts_per_sec);
 	pfat->cur_fat_sec = fat_sec;
 	/* End of GurumNetworks modification */
 
@@ -404,7 +404,7 @@ bool fat_sync(void* context) {
 			return true;
 		}
 
-		memcpy(buffer, tffs->fat + ((uint32_t)(uint64_t)data - FAT_BASE_ADDRESS - pbs->resvd_sec_cnt) * pbs->byts_per_sec, pbs->byts_per_sec);
+		memcpy(buffer, tffs->fat + ((uint32_t)(uint64_t)data - tffs->first_lba - pbs->resvd_sec_cnt) * pbs->byts_per_sec, pbs->byts_per_sec);
 
 		block->sector = (uint32_t)(uint64_t)data;
 		block->buffer = buffer;
@@ -429,7 +429,7 @@ _write_fat_sector(
 
 	/* Start of GurumNetworks modification */
 	boot_sector_t* pbs = ptffs->pbs;
-	memcpy(ptffs->fat + (fat_sec - FAT_BASE_ADDRESS - pbs->resvd_sec_cnt) * pbs->byts_per_sec, pfat->secbuf, pbs->byts_per_sec);
+	memcpy(ptffs->fat + (fat_sec - ptffs->first_lba - pbs->resvd_sec_cnt) * pbs->byts_per_sec, pfat->secbuf, pbs->byts_per_sec);
 
 	if(ptffs->event_id == 0)
 		ptffs->event_id = event_timer_add(fat_sync, ptffs, 100000, 100000);

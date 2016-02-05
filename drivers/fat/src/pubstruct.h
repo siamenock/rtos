@@ -88,6 +88,7 @@ typedef struct _tffs{
 	uint32			total_clusters;
 
 	/* Start of GurumNetworks modification */
+	int			first_lba;
 	void*			fat;
 	List*			read_buffers;
 	List*			write_buffers;
