@@ -29,7 +29,7 @@ found:
 	}
 	
 	BootSector* boot_sector = (BootSector*)gmalloc(sizeof(BootSector));
-	if(driver->read(driver, 0, 1, (void*)boot_sector) < 0)
+	if(driver->read(temp[0], 0, 1, (void*)boot_sector) < 0)
 		return false;
 
 	for(int i = 0; i < count; i++) {
