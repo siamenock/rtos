@@ -13,14 +13,14 @@
 
 static bool is_sse_support() {
 	uint32_t eax = 0x1;
-	uint32_t edx;
+	uint32_t edx = 0x0;
 	asm volatile("cpuid"
 		: "=d"(edx)
-		: "a"(eax));
+		: "a"(eax), "b"(0), "c"(0), "d"(0));
 
-	if(edx & (1 << 25)) //SSE support
+	if(edx & (1 << 25)) {//SSE support
 		return true;
-	else
+	} else
 		return false;
 }
 
