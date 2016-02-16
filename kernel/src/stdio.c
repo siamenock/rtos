@@ -54,7 +54,11 @@ void stdio_init(uint8_t apic_id, void* buffer, size_t size) {
 		device_stderr = device_stdout = device_register(vga_type, &vga_driver, NULL, &data);
 	} else {
 		// TODO: char in redirector
-		device_stderr = device_stdout = device_register(vga_type, &vga_driver, NULL, &data);
+		device_stdin = device_register(stdin_type, &stdin_driver, NULL, NULL);
+		device_stdout = device_register(stdout_type, &stdout_driver, NULL, "stdout");
+		device_stderr = device_register(stdout_type, &stdout_driver, NULL, "stderr");
+
+//		device_stderr = device_stdout = device_register(vga_type, &vga_driver, NULL, &data);
 	}
 }
 
@@ -221,9 +225,9 @@ void stdio_dump(int coreno, int fd, char* buffer, volatile size_t* head, volatil
 
 	h = dump_lines(h, e);
 	if(h) {
-		write1(header, header_len);
+		//write1(header, header_len);
 		write1(h, e - h);
-		write1("\n", 1);
+		//write1("\n", 1);
 	}
 
 	*head = *tail;

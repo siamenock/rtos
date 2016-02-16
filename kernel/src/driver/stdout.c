@@ -18,16 +18,6 @@ typedef struct {
 static Buffer buffers[2];
 
 static int init(void* device, void* data) {
-	extern char* __stdout;
-	extern volatile size_t __stdout_head;
-	extern volatile size_t __stdout_tail;
-	extern size_t __stdout_size;
-
-	extern char* __stderr;
-	extern volatile size_t __stderr_head;
-	extern volatile size_t __stderr_tail;
-	extern size_t __stderr_size;
-	
 	if(strcmp(data, "stdout") == 0) {
 		buffers[0].buffer = __stdout;
 		buffers[0].head = &__stdout_head;
