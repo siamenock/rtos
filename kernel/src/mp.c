@@ -42,14 +42,14 @@ void mp_init() {
 	// Get APIC address
 	uint32_t a, b, c = 0x1b, d;
 	asm volatile("rdmsr" : "=a"(a) : "c"(c));
-	
+
 	_apic_address = a & 0xfffff000;
-	
+
 	// Get APIC ID
 	a = 0x01;
 	cpuid(&a, &b, &c, &d);
 	apic_id = (b >> 24) & 0xff;
-	
+
 	// Analyze floating pointer structure
 	//   Get IO APIC address
 	//   Other core APIC IDs
@@ -57,15 +57,15 @@ void mp_init() {
 		.parse_iae = parse_iae,
 		.parse_pe = parse_pe
 	};
-	
+
 	mp_parse_fps(&parser, NULL);
-	
+
 	// Calculate core ID
 	for(int i = 0; i < apic_id; i++) {
 		if(cores[i])
 			core_id++;
 	}
-	
+
 	// Calculate core count
 	for(int i = 0; i <= MP_MAX_CORE_COUNT; i++) {
 		if(cores[i])
@@ -86,11 +86,11 @@ uint8_t mp_core_count() {
 }
 
 uint8_t mp_core_id_to_apic_id(uint8_t core_id) {
-	for(int i = 0; i <= apic_id; i++) {
-		if(cores[i] && --core_id == 0)
+	for(int i = 0; i <= MP_MAX_CORE_COUNT; i++) {
+		if(cores[i] && core_id-- == 0) 
 			return i;
 	}
-	
+
 	return -1;
 }
 

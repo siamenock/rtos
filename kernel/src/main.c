@@ -169,7 +169,6 @@ static bool idle0_event(void* data) {
 }
 
 static bool idle_monitor_event(void* data) {
-	while(1);
 	static uint8_t trigger;
 
 	monitor(&trigger);
@@ -179,7 +178,6 @@ static bool idle_monitor_event(void* data) {
 }
 
 static bool idle_hlt_event(void* data) {
-	while(1);
 	hlt();
 
 	return true;
