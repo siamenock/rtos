@@ -349,9 +349,14 @@ void copy_kernel(uint8_t core_id) {
 	if(core_id == 0) {
 		log("Copying kernel:\n");
 	}
-	
+
+	uint32_t multiboot_temp_addr = 0x2200000;	
+
 	// Clean
 	if(core_id == 0) {
+		// Temporarily copy multiboot info
+		copy((void*)multiboot_temp_addr, (void*)multiboot2_addr, *(uint32_t*)multiboot2_addr, 1);
+
 		print("    clean 0x00200000 (00400000): ");
 		clean((void*)0x200000, 0x200000, core_id);
 	}
@@ -400,13 +405,13 @@ void copy_kernel(uint8_t core_id) {
 	
 	// Write multiboot2 tags
 	if(core_id == 0) {
-		uint32_t size = *(uint32_t*)multiboot2_addr;
+		uint32_t size = *(uint32_t*)multiboot_temp_addr;
 		uint32_t addr = (0x200000 + pnkc->smap_offset + pnkc->smap_size + 7) & ~7;
 		//pos = (void*)(((uint32_t)pos + 7) & ~7);
 		
 		print("\n    multiboot2: 0x");
 		print_32(addr); print(" ("); print_32(size); print(") ");
-		copy((void*)addr, (void*)multiboot2_addr, size, core_id);
+		copy((void*)addr, (void*)multiboot_temp_addr, size, core_id);
 	}
 	
 	if(core_id == 0) {
