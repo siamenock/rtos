@@ -144,14 +144,14 @@ void gmalloc_init(uintptr_t ramdisk_addr, uint32_t ramdisk_size) {
 			
 			if(r->end <= b->start || r->start >= b->end) {		// Out of bounds
 				continue;
-			} else if(r->start <= b->start && r->end < b->end) {	// Head cut
-				b->start = r->end;
-			} else if(r->end >= b->end && r->start > b->start) {	// Tail cut
-				b->end = r->start;
-			} else if(r->start == b->start && r->end == b->end) {	// Exact matching
+			} else if(r->start <= b->start && r->end >= b->end) {	// Exact matching
 				list_remove(blocks, i);
 				i--;
 				break;
+			} else if(r->start <= b->start && r->end < b->end) {	// Head cut
+				b->start = r->end;
+			} else if(r->start < b->end && r->end >= b->end) {	// Tail cut
+				b->end = r->start;
 			} else {						// Body cut
 				Block* b2 = malloc(sizeof(Block));
 				b2->start = r->end;
