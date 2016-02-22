@@ -57,28 +57,28 @@ void time_init() {
 
 void time_swait(uint32_t s) {
 	uint64_t time = frequency();
-	time += TIMER_FREQUENCY_PER_SEC * s;
+	time += (uint64_t)TIMER_FREQUENCY_PER_SEC * s;
 	while(frequency() < time)
 		asm volatile("nop");
 }
 
 void time_mwait(uint32_t ms) {
 	uint64_t time = frequency();
-	time += cpu_ms * ms;
+	time += (uint64_t)cpu_ms * ms;
 	while(frequency() < time)
 		asm volatile("nop");
 }
 
 void time_uwait(uint32_t us) {
 	uint64_t time = frequency();
-	time += cpu_us * us;
+	time += (uint64_t)cpu_us * us;
 	while(frequency() < time)
 		asm volatile("nop");
 }
 
 void time_nwait(uint32_t ns) {
 	uint64_t time = frequency();
-	time += cpu_ns * ns;
+	time += (uint64_t)cpu_ns * ns;
 	while(frequency() < time)
 		asm volatile("nop");
 }
