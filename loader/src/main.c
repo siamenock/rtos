@@ -350,7 +350,7 @@ void copy_kernel(uint8_t core_id) {
 		log("Copying kernel:\n");
 	}
 
-	uint32_t multiboot_temp_addr = 0x2200000;	
+	uint32_t multiboot_temp_addr = 0x2200000;	// Behind the RAM disk area
 
 	// Clean
 	if(core_id == 0) {

@@ -310,13 +310,8 @@ static bool vm_loop(void* context) {
 		return -1;
 	}
 	
-	static int core_index;
-	
-	int core_count = mp_core_count();
-	for(int i = 0; i < core_count; i++) {
-		core_index = (core_index + 1) % MP_MAX_CORE_COUNT;
-		
-		Core* core = &cores[core_index];
+	for(int i = 1; i < MP_MAX_CORE_COUNT; i++) {
+		Core* core = &cores[i];
 		
 		if(core->status != VM_STATUS_PAUSE && core->status != VM_STATUS_START)
 			continue;
@@ -324,14 +319,14 @@ static bool vm_loop(void* context) {
 		int thread_id = -1;
 		
 		if(core->stdout != NULL && *core->stdout_head != *core->stdout_tail) {
-			thread_id = get_thread_id(core->vm, core_index);
+			thread_id = get_thread_id(core->vm, i);
 			
 			stdio_callback(core->vm->id, thread_id, 1, core->stdout, core->stdout_head, core->stdout_tail, core->stdout_size);
 		}
 		
 		if(core->stderr != NULL && *core->stderr_head != *core->stderr_tail) {
 			if(thread_id == -1)
-				thread_id = get_thread_id(core->vm, core_index);
+				thread_id = get_thread_id(core->vm, i);
 			
 			stdio_callback(core->vm->id, thread_id, 2, core->stderr, core->stderr_head, core->stderr_tail, core->stderr_size);
 		}
@@ -341,7 +336,7 @@ static bool vm_loop(void* context) {
 	
 	void stdio_dump(int coreno, int fd, char* buffer, volatile size_t* head, volatile size_t* tail, size_t size);
 	
-	for(int i = 1; i < core_count; i++) {
+	for(int i = 1; i < MP_MAX_CORE_COUNT; i++) {
 		if(cores[i].status == VM_STATUS_INVALID)
 			continue;
 		
@@ -377,13 +372,12 @@ void vm_init() {
 	
 	// Core 0 is occupied by RPC manager
 	cores[0].status = VM_STATUS_START;
-	
-	/*
+
+	uint8_t* core_map = mp_core_map();	
 	for(int i = 1; i < MP_MAX_CORE_COUNT; i++) {
-		if(!mp_apics[i])
+		if(!core_map[i])
 			cores[i].status = VM_STATUS_INVALID;	// Disable the core
 	}
-	*/
 
 	event_idle_add(vm_loop, NULL);
 }
@@ -411,8 +405,7 @@ uint32_t vm_create(VMSpec* vm_spec) {
 	vm->core_size = vm_spec->core_size;
 	
 	int j = 0;
-	int core_count = mp_core_count();
-	for(int i = 0; i < core_count; i++) {
+	for(int i = 1; i < MP_MAX_CORE_COUNT; i++) {
 		if(cores[i].status == VM_STATUS_STOP) {
 			vm->cores[j++] = i;
 			cores[i].status = VM_STATUS_PAUSE;
