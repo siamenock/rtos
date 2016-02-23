@@ -144,14 +144,14 @@ void gmalloc_init(uintptr_t ramdisk_addr, uint32_t ramdisk_size) {
 			
 			if(r->end <= b->start || r->start >= b->end) {		// Out of bounds
 				continue;
-			} else if(r->start <= b->start && r->end < b->end) {	// Head cut
-				b->start = r->end;
-			} else if(r->end >= b->end && r->start > b->start) {	// Tail cut
-				b->end = r->start;
-			} else if(r->start == b->start && r->end == b->end) {	// Exact matching
+			} else if(r->start <= b->start && r->end >= b->end) {	// Including exception
 				list_remove(blocks, i);
 				i--;
 				break;
+			} else if(r->start <= b->start && r->end < b->end) {	// Head cut
+				b->start = r->end;
+			} else if(r->start < b->end && r->end >= b->end) {	// Tail cut
+				b->end = r->start;
 			} else {						// Body cut
 				Block* b2 = malloc(sizeof(Block));
 				b2->start = r->end;
@@ -172,7 +172,7 @@ void gmalloc_init(uintptr_t ramdisk_addr, uint32_t ramdisk_size) {
 		uintptr_t end = b->end & ~((uintptr_t)0x200000 - 1);
 		
 		if(start >= end) {
-			add_new_area((void*)b->start, b->end, gmalloc_pool);
+			add_new_area((void*)b->start, b->end - b->start, gmalloc_pool);
 			b->start = b->end = 0;
 		} else {
 			if(start > b->start) {
@@ -193,7 +193,7 @@ void gmalloc_init(uintptr_t ramdisk_addr, uint32_t ramdisk_size) {
 			list_iterator_remove(&iter);
 		}
 	}
-	
+
 	// extend bmalloc pool
 	Block* pop() {
 		uintptr_t last_start = UINTPTR_MAX;
