@@ -67,7 +67,7 @@ void mp_init() {
 	}
 
 	// Calculate core count
-	for(int i = 0; i <= MP_MAX_CORE_COUNT; i++) {
+	for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
 		if(cores[i])
 			core_count++;
 	}
@@ -86,7 +86,7 @@ uint8_t mp_core_count() {
 }
 
 uint8_t mp_core_id_to_apic_id(uint8_t core_id) {
-	for(int i = 0; i <= MP_MAX_CORE_COUNT; i++) {
+	for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
 		if(cores[i] && core_id-- == 0) 
 			return i;
 	}
