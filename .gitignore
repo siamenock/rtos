@@ -7,6 +7,14 @@
 
 # Libraries
 *.a
+*.so
+*.lo
+*.la
+*.so.*
+
+# Configurations
+config.*
+*.pc
 
 # Disk images
 *.img
@@ -15,6 +23,7 @@
 kernel.dis
 kernel.smap
 *.swp
+*.tmp
 
 # SDK
 sdk/bin/console
@@ -24,3 +33,6 @@ sdk/sysmte.img
 
 # bin
 bin
+
+# Hidden file
+.*
