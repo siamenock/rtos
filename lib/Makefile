@@ -82,7 +82,7 @@ expat/libexpat.a:
 	cd expat; make
 	cd expat; make install
 
-libexpat.a: expat/libexpat.a
+libexpat.a: expat/lib/libexpat.a
 	cp expat/lib/libexpat.a .
 	mkdir -p ../sdk/include
 	cp -rL expat/include/* ../sdk/include
