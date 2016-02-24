@@ -80,22 +80,26 @@ protectedmode:
 	jmp	dword 0x18:start
 
 start:
-	; Lock
-	mov	ecx, 1
-	xchg	ecx, [locked]
-	test	ecx, ecx
-	jnz	start
-	
-	; increase core number
-	add	dword [stack], STACK_SIZE
-	
-	; Unlock
-	mov	ecx, 0
-	xchg	ecx, [locked]
-	
+	mov	[stack], eax
+	mov	[stack + 4], ebx
+
+	mov	eax, 0x01
+	cpuid
+	shrd	ebx, ebx, 24 ;cpuid
+	and	ebx, 0x000000ff
 	mov	esp, stack_top
-	sub	esp, [stack]
-	
+
+repeat:
+	sub	esp, STACK_SIZE
+	cmp	ebx, 0
+	je	next
+
+	sub	ebx, 1
+	jmp	repeat
+
+next:
+	mov	eax, [stack]
+	mov	ebx, [stack + 4]
 	push	ebx
 	push	eax
 	extern	main
@@ -111,6 +115,7 @@ locked:				; The lock variable. 1 = locked, 0 = unlocked.
 	dd      0
 
 stack:				; Stack position
+	dd	0
 	dd	0
 
 lgdt:
