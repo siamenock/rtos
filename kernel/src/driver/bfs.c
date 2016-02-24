@@ -2,7 +2,7 @@
 #include <util/event.h>
 #include "bfs.h"
 #include "string.h"
-#include "../gmalloc.h"
+#include "../malloc.h"
 #include "../cpu.h"
 
 typedef struct {
@@ -65,7 +65,7 @@ typedef struct {
 static int bfs_mount(FileSystemDriver* fs_driver, DiskDriver* disk_driver, uint32_t lba, size_t size) {
 	// Size of loader is now about 60kB. Investigate til 200kB (50 Clusters)
 	BFSSuperBlock* sb;
-	void* temp = gmalloc(FS_BLOCK_SIZE);
+	void* temp = malloc(FS_BLOCK_SIZE);
 	if(disk_driver->read(disk_driver, lba, 8, temp) > 0) {
 		sb = (BFSSuperBlock*)temp;
 		if(sb->magic == BFS_MAGIC) {
@@ -123,15 +123,15 @@ static BFSInode* get_inode_entry(FileSystemDriver* driver, uint32_t idx) {
 	// NOTE: Assume that inode table is smaller than one cluster
 	void* temp = cache_get(driver->cache, (void*)(uintptr_t)(priv->link_table_addr));
 	if(!temp) {
-		temp = gmalloc(FS_BLOCK_SIZE);
+		temp = malloc(FS_BLOCK_SIZE);
 		if(disk_driver->read(disk_driver, priv->link_table_addr, FS_SECTOR_PER_BLOCK, temp) <= 0) {
 			printf("Reading root directory failed\n");
-			gfree(temp);
+			free(temp);
 			return NULL;
 		}
 		if(!cache_set(driver->cache, (void*)(uintptr_t)(priv->link_table_addr), temp)) {
 			printf("cache setting error\n");
-			gfree(temp);
+			free(temp);
 			return NULL;
 		}
 	}
@@ -160,15 +160,15 @@ static int find_directory_entry(FileSystemDriver* driver, const char* name, BFSF
 	// NOTE: Assume that root directory is smaller than one cluster
 	void* temp = cache_get(driver->cache, (void*)(uintptr_t)(priv->data_addr));
 	if(!temp) {
-		temp = gmalloc(FS_BLOCK_SIZE);
+		temp = malloc(FS_BLOCK_SIZE);
 		if(disk_driver->read(disk_driver, priv->data_addr, FS_SECTOR_PER_BLOCK, temp) <= 0) {
 			printf("Reading root directory failed\n");
-			gfree(temp);
+			free(temp);
 			return -1;
 		}
 		if(!cache_set(driver->cache, (void*)(uintptr_t)(priv->data_addr), temp)) {
 			printf("cache setting error\n");
-			gfree(temp);
+			free(temp);
 			return -2;
 		}
 	}
@@ -287,13 +287,13 @@ static int bfs_read(FileSystemDriver* driver, void* _file, void* buffer, size_t 
 
 			if(disk_driver->read(disk_driver, sector, FS_SECTOR_PER_BLOCK, read_buf) <= 0) {
 				printf("read error\n");
-				gfree(read_buf);
+				free(read_buf);
 				return -2;
 			}
 
 			if(!cache_set(driver->cache, (void*)(uintptr_t)sector, read_buf)) {
 				printf("cache setting error\n");
-				gfree(read_buf);
+				free(read_buf);
 				return -3;
 			}
 		}
@@ -508,15 +508,15 @@ static void* bfs_opendir(FileSystemDriver* driver, const char* dir_name) {
 	// NOTE: Assume that root directory is smaller than one cluster
 	void* temp = cache_get(driver->cache, (void*)(uintptr_t)(priv->data_addr));
 	if(!temp) {
-		temp = gmalloc(FS_BLOCK_SIZE);
+		temp = malloc(FS_BLOCK_SIZE);
 		if(disk_driver->read(disk_driver, priv->data_addr, FS_SECTOR_PER_BLOCK, temp) <= 0) {
 			printf("Reading root directory failed\n");
-			gfree(temp);
+			free(temp);
 			return NULL;
 		}
 		if(!cache_set(driver->cache, (void*)(uintptr_t)(priv->data_addr), temp)) {
 			printf("cache setting error\n");
-			gfree(temp);
+			free(temp);
 			return NULL;
 		}
 	}
