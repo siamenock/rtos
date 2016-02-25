@@ -20,15 +20,15 @@ typedef void (*ICC_Handler)(ICC_Message*);
 static ICC_Handler icc_events[ICC_EVENTS_COUNT];
 
 static bool icc_event(void* context) {
-	uint8_t core_id = mp_core_id();
-	FIFO* icc_queue = shared->icc_queues[core_id].icc_queue;
+	uint8_t apic_id = mp_apic_id();
+	FIFO* icc_queue = shared->icc_queues[apic_id].icc_queue;
 
 	if(fifo_empty(icc_queue))
 		return true;
 
-	lock_lock(&shared->icc_queues[core_id].icc_queue_lock);
+	lock_lock(&shared->icc_queues[apic_id].icc_queue_lock);
 	ICC_Message* icc_msg = fifo_pop(icc_queue);
-	lock_unlock(&shared->icc_queues[core_id].icc_queue_lock);
+	lock_unlock(&shared->icc_queues[apic_id].icc_queue_lock);
 
 	if(icc_msg == NULL)
 		return true;
@@ -49,8 +49,8 @@ static bool icc_event(void* context) {
 }
 
 static void icc(uint64_t vector, uint64_t err) {
-	uint8_t core_id = mp_core_id();
-	FIFO* icc_queue = shared->icc_queues[core_id].icc_queue;
+	uint8_t apic_id = mp_apic_id();
+	FIFO* icc_queue = shared->icc_queues[apic_id].icc_queue;
 	ICC_Message* icc_msg = fifo_peek(icc_queue, 0);
 
 	apic_eoi();
@@ -78,7 +78,7 @@ void icc_init() {
 	uint8_t core_count = mp_core_count();
 
 	extern void* gmalloc_pool;
-	if(mp_core_id() == 0) {
+	if(mp_apic_id() == 0) {
 		int icc_max = core_count * core_count;
 		shared->icc_pool = fifo_create(icc_max, gmalloc_pool);
 
@@ -89,9 +89,12 @@ void icc_init() {
 
 		shared->icc_queues = malloc_ex(core_count * sizeof(Icc), gmalloc_pool);
 
-		for(int i = 0; i < core_count; i++) {
-			shared->icc_queues[i].icc_queue = fifo_create(core_count, gmalloc_pool);
-			lock_init(&shared->icc_queues[i].icc_queue_lock);
+		uint8_t* core_map = mp_core_map();
+		for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
+			if(core_map[i] != MP_CORE_INVALID) {
+				shared->icc_queues[i].icc_queue = fifo_create(core_count, gmalloc_pool);
+				lock_init(&shared->icc_queues[i].icc_queue_lock);
+			}
 		}
 	}
 	
@@ -107,7 +110,7 @@ ICC_Message* icc_alloc(uint8_t type) {
 	
 	icc_message->id = icc_id++;
 	icc_message->type = type;
-	icc_message->core_id = mp_core_id();
+	icc_message->apic_id = mp_apic_id();
 	icc_message->result = 0;
 
 	return icc_message;
@@ -119,14 +122,14 @@ void icc_free(ICC_Message* msg) {
 	lock_unlock(&shared->icc_lock_free);
 }
 
-uint32_t icc_send(ICC_Message* msg, uint8_t core_id) {
+uint32_t icc_send(ICC_Message* msg, uint8_t apic_id) {
 	uint32_t _icc_id = msg->id;
 
-	lock_lock(&shared->icc_queues[core_id].icc_queue_lock);
-	fifo_push(shared->icc_queues[core_id].icc_queue, msg);
-	lock_unlock(&shared->icc_queues[core_id].icc_queue_lock);
+	lock_lock(&shared->icc_queues[apic_id].icc_queue_lock);
+	fifo_push(shared->icc_queues[apic_id].icc_queue, msg);
+	lock_unlock(&shared->icc_queues[apic_id].icc_queue_lock);
 
-	apic_write64(APIC_REG_ICR, ((uint64_t)mp_core_id_to_apic_id(core_id) << 56) |
+	apic_write64(APIC_REG_ICR, ((uint64_t)apic_id << 56) |
 				APIC_DSH_NONE | 
 				APIC_TM_EDGE | 
 				APIC_LV_DEASSERT | 
