@@ -22,7 +22,7 @@ typedef enum {
 typedef struct _ICC_Message {
 	uint32_t	id;
 	uint8_t		type;
-	uint8_t		core_id;
+	uint8_t		apic_id;
 	int		result;
 	
 	union {
@@ -56,7 +56,7 @@ extern ICC_Message* icc_msg;	// Core's local message
 void icc_init();
 ICC_Message* icc_alloc(uint8_t type);
 void icc_free(ICC_Message* msg);
-uint32_t icc_send(ICC_Message* msg, uint8_t core_id);
+uint32_t icc_send(ICC_Message* msg, uint8_t apic_id);
 void icc_register(uint8_t type, void(*event)(ICC_Message*));
 
 #endif /* __ICC_H__ */

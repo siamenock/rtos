@@ -230,11 +230,11 @@ static uint16_t slp_typa;
 static uint16_t slp_typb;
 
 void acpi_init() {
-	uint8_t core_id = mp_core_id();
+	uint8_t apic_id = mp_apic_id();
 	
 	rsdp = find_RSDP();
 	if(!rsdp) {
-		if(core_id == 0) {
+		if(apic_id == 0) {
 			//printf("\tCannot find root system description pointer\n");
 			while(1) asm("hlt");
 		}

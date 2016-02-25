@@ -65,7 +65,9 @@ void mp_init() {
 	// Calculate core count
 	for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
 		if(mp_cores[i])
-			core_count++;
+			mp_cores[i] = core_count++;
+		else
+			mp_cores[i] = MP_CORE_INVALID;
 	}
 }
 
@@ -77,17 +79,12 @@ uint8_t mp_core_id() {
 	return core_id;
 }
 
-uint8_t mp_core_count() {
-	return core_count;
+uint8_t mp_apic_id_to_core_id(uint8_t apic_id) {
+	return mp_cores[apic_id];
 }
 
-uint8_t mp_core_id_to_apic_id(uint8_t core_id) {
-	for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
-		if(mp_cores[i] && core_id-- == 0)
-			return i;
-	}
-
-	return -1;
+uint8_t mp_core_count() {
+	return core_count;
 }
 
 void mp_sync() {
@@ -95,10 +92,10 @@ void mp_sync() {
 	
 	uint32_t full = 0;
 	for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
-		if(mp_cores[i])
+		if(mp_cores[i] != MP_CORE_INVALID)
 			full |= 1 << i;
 	}
-	
+
 	lock_lock(SYNC_LOCK);
 	if(SYNC_MAP == full) {	// The first one
 		SYNC_MAP = map;
@@ -106,7 +103,7 @@ void mp_sync() {
 		SYNC_MAP |= map;
 	}
 	lock_unlock(SYNC_LOCK);
-	
+
 	while(SYNC_MAP != full && SYNC_MAP & map)
 		asm volatile("nop");
 }

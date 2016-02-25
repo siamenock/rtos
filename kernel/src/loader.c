@@ -97,7 +97,7 @@ static bool check_header(void* addr) {
 static uint32_t load(VM* vm, void** malloc_pool, void** gmalloc_pool) {
 	int thread_id = 0;
 	for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
-		if(vm->cores[i] == mp_core_id()) {
+		if(vm->cores[i] == mp_apic_id()) {
 			thread_id = i;
 			break;
 		}
@@ -352,7 +352,7 @@ static void load_symbols(VM* vm, uint32_t task_id) {
 static bool relocate(VM* vm, void* malloc_pool, void* gmalloc_pool, uint32_t task_id) {
 	int thread_id = 0;
 	for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
-		if(vm->cores[i] == mp_core_id()) {
+		if(vm->cores[i] == mp_apic_id()) {
 			thread_id = i;
 			break;
 		}
