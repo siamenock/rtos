@@ -1,4 +1,5 @@
 #include <string.h>
+#include "acpi.h"
 #include "page.h"
 #include "lock.h"
 #include "mp.h"
@@ -10,7 +11,6 @@
 // Ref: http://www.singlix.com/trdos/UNIX_V1/xv6/lapic.c
 
 static uint8_t apic_id;		// APIC ID
-static uint8_t cores[MP_MAX_CORE_COUNT];
 static uint8_t core_id;
 static uint8_t core_count;
 
@@ -33,11 +33,6 @@ static bool parse_iae(MP_IOAPICEntry* entry, void* context) {
 	return true;
 }
 
-static bool parse_pe(MP_ProcessorEntry* entry, void* context) {
-	cores[entry->local_apic_id] = 1;
-	return true;
-}
-
 void mp_init() {
 	// Get APIC address
 	uint32_t a, b, c = 0x1b, d;
@@ -54,21 +49,22 @@ void mp_init() {
 	//   Get IO APIC address
 	//   Other core APIC IDs
 	MP_Parser parser = {
-		.parse_iae = parse_iae,
-		.parse_pe = parse_pe
+		.parse_iae = parse_iae
 	};
 
 	mp_parse_fps(&parser, NULL);
 
+	acpi_init();
+
 	// Calculate core ID
 	for(int i = 0; i < apic_id; i++) {
-		if(cores[i])
+		if(mp_cores[i])
 			core_id++;
 	}
 
 	// Calculate core count
 	for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
-		if(cores[i])
+		if(mp_cores[i])
 			core_count++;
 	}
 }
@@ -87,7 +83,7 @@ uint8_t mp_core_count() {
 
 uint8_t mp_core_id_to_apic_id(uint8_t core_id) {
 	for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
-		if(cores[i] && core_id-- == 0) 
+		if(mp_cores[i] && core_id-- == 0)
 			return i;
 	}
 
@@ -99,7 +95,7 @@ void mp_sync() {
 	
 	uint32_t full = 0;
 	for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
-		if(cores[i])
+		if(mp_cores[i])
 			full |= 1 << i;
 	}
 	
@@ -226,5 +222,5 @@ void mp_parse_fps(MP_Parser* parser, void* context) {
 }
 
 uint8_t* mp_core_map() {
-	return cores;
+	return mp_cores;
 }
