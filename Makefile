@@ -25,7 +25,7 @@ system.img:
 	sudo bin/smap kernel/kernel.elf kernel.smap
 	bin/pnkc kernel/kernel.elf kernel.smap kernel.bin
 	# Make init ram disk image
-	sudo tools/mkinitrd initrd.img 1 drivers/*.ko
+	sudo tools/mkinitrd initrd.img 1 drivers/*.ko firmware/*
 	# Make system.img
 	tools/mkimage system.img 64 3 12 fat32 fat32 ext2 loader/loader.bin kernel.bin initrd.img
 
