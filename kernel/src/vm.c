@@ -330,8 +330,6 @@ static bool vm_loop(void* context) {
 			
 			stdio_callback(core->vm->id, thread_id, 2, core->stderr, core->stderr_head, core->stderr_tail, core->stderr_size);
 		}
-		
-		break;
 	}
 	
 	void stdio_dump(int coreno, int fd, char* buffer, volatile size_t* head, volatile size_t* tail, size_t size);
