@@ -87,7 +87,7 @@ void icc_init() {
 			fifo_push(shared->icc_pool, icc_message);
 		}
 
-		shared->icc_queues = malloc_ex(core_count * sizeof(Icc), gmalloc_pool);
+		shared->icc_queues = malloc_ex(MP_MAX_CORE_COUNT * sizeof(Icc), gmalloc_pool);
 
 		uint8_t* core_map = mp_core_map();
 		for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
