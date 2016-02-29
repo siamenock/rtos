@@ -348,36 +348,39 @@ static Packet* manage(Packet* packet) {
 static void stdio_callback(uint32_t vmid, int thread_id, int fd, char* buffer, volatile size_t* head, volatile size_t* tail, size_t size) {
 	ListIterator iter;
 	list_iterator_init(&iter, clients);
+	size_t len0, len1, len2;
+	bool wrapped;
+
+	if(*head <= *tail) {
+		wrapped = false;
+
+		len0 = *tail - *head;
+	} else {
+		wrapped = true;
+
+		len1 = size - *head;
+		len2 = *tail;
+	}
+
 	while(list_iterator_has_next(&iter)) {
 		struct tcp_pcb* pcb = list_iterator_next(&iter);
 		RPC* rpc = pcb->callback_arg;
-		
-		if(*head <= *tail) {
-			size_t len0 = *tail - *head;
-			
-			// TODO: check missed data (via callback);
-			rpc_stdio(rpc, vmid, thread_id, fd, buffer + *head, len0, NULL, NULL);
-		} else {
-			size_t len1 = size - *head;
-			size_t len2 = *tail;
-			
-			// TODO: check missed data (via callback);
+	
+		if(wrapped) {
 			rpc_stdio(rpc, vmid, thread_id, fd, buffer + *head, len1, NULL, NULL);
 			rpc_stdio(rpc, vmid, thread_id, fd, buffer, len2, NULL, NULL);
-		}
+
+		} else {
+			rpc_stdio(rpc, vmid, thread_id, fd, buffer + *head, len0, NULL, NULL);
+		}	
 		
 		rpc_loop(rpc);
 	}
 	
-	if(*head <= *tail) {
-		size_t len0 = *tail - *head;
-		
-		*head += len0;
-	} else {
-		size_t len1 = size - *head;
-		size_t len2 = *tail;
-		
+	if(wrapped) {
 		*head = (*head + len1 + len2) % size;
+	} else {
+		*head += len0;
 	}
 }
 
