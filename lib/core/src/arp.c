@@ -20,8 +20,8 @@ typedef struct {
 uint32_t ARP_TIMEOUT = 14400;	// 4 hours
 
 bool arp_process(Packet* packet) {
-	extern uint64_t __tsc_ms;
-	if(!__tsc_ms)
+	extern uint64_t __timer_ms;
+	if(!__timer_ms)
 		return false;
 
 	Ether* ether = (Ether*)(packet->buffer + packet->start);

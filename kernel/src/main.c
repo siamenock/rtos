@@ -47,14 +47,14 @@
 
 static void ap_timer_init() {
 	extern const uint64_t __TIMER_FREQUENCY_PER_SEC;
-	extern uint64_t __tsc_ms;
-	extern uint64_t __tsc_us;
-	extern uint64_t __tsc_ns;
+	extern uint64_t __timer_ms;
+	extern uint64_t __timer_us;
+	extern uint64_t __timer_ns;
 
 	*(uint64_t*)&__TIMER_FREQUENCY_PER_SEC = *(uint64_t*)VIRTUAL_TO_PHYSICAL((uint64_t)&__TIMER_FREQUENCY_PER_SEC);
-	__tsc_ms = *(uint64_t*)VIRTUAL_TO_PHYSICAL((uint64_t)&__tsc_ms);
-	__tsc_us = *(uint64_t*)VIRTUAL_TO_PHYSICAL((uint64_t)&__tsc_us);
-	__tsc_ns = *(uint64_t*)VIRTUAL_TO_PHYSICAL((uint64_t)&__tsc_ns);
+	__timer_ms = *(uint64_t*)VIRTUAL_TO_PHYSICAL((uint64_t)&__timer_ms);
+	__timer_us = *(uint64_t*)VIRTUAL_TO_PHYSICAL((uint64_t)&__timer_us);
+	__timer_ns = *(uint64_t*)VIRTUAL_TO_PHYSICAL((uint64_t)&__timer_ns);
 }
 
 static void init_nics(int count) {
