@@ -3,7 +3,10 @@
 
 #include <stdint.h>
 
-extern const uint64_t TIMER_FREQUENCY_PER_SEC;
+extern const uint64_t __TIMER_FREQUENCY_PER_SEC;
+extern uint64_t __tsc_ms;
+extern uint64_t __tsc_us;
+extern uint64_t __tsc_ns;
 
 void timer_init(const char* cpu_brand);
 uint64_t timer_frequency();

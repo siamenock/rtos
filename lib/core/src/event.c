@@ -36,10 +36,9 @@ static List* triggers;
 static List* idle_events;
 
 void event_init() {
-	extern uint64_t tsc_ms;
-	if(!tsc_ms)
+	extern uint64_t __tsc_ms;
+	if(!__tsc_ms)
 		return;
-		//time_init();
 		
 	busy_events = list_create(NULL);
 	timer_events = list_create(NULL);
