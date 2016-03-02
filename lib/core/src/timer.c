@@ -4,9 +4,9 @@
 #include <time.h>
 
 uint64_t __TIMER_FREQUENCY_PER_SEC;
-uint64_t __tsc_ms;
-uint64_t __tsc_us;
-uint64_t __tsc_ns;
+uint64_t __timer_ms;
+uint64_t __timer_us;
+uint64_t __timer_ns;
 
 uint64_t timer_frequency() {
 	uint64_t time;
@@ -131,9 +131,9 @@ void timer_init(const char* cpu_brand) {
 		__TIMER_FREQUENCY_PER_SEC = last_tsc * 100;
 	}
 	
-	__tsc_ms = __TIMER_FREQUENCY_PER_SEC / 1000;
-	__tsc_us = __tsc_ms / 1000;
-	__tsc_ns = __tsc_us / 1000;
+	__timer_ms = __TIMER_FREQUENCY_PER_SEC / 1000;
+	__timer_us = __timer_ms / 1000;
+	__timer_ns = __timer_us / 1000;
 }
 
 void timer_swait(uint32_t s) {
@@ -145,21 +145,21 @@ void timer_swait(uint32_t s) {
 
 void timer_mwait(uint32_t ms) {
 	uint64_t time = timer_frequency();
-	time += __tsc_ms * ms;
+	time += __timer_ms * ms;
 	while(timer_frequency() < time)
 		asm volatile("nop");
 }
 
 void timer_uwait(uint32_t us) {
 	uint64_t time = timer_frequency();
-	time += __tsc_us * us;
+	time += __timer_us * us;
 	while(timer_frequency() < time)
 		asm volatile("nop");
 }
 
 void timer_nwait(uint32_t ns) {
 	uint64_t time = timer_frequency();
-	time += __tsc_ns * ns;
+	time += __timer_ns * ns;
 	while(timer_frequency() < time)
 		asm volatile("nop");
 }
@@ -174,7 +174,7 @@ uint64_t timer_ns() {
 
 #else /* LINUX */
 	/* (Current CPU Time Stamp Counter / CPU frequency per nano-seconds) */
-	return (uint64_t)(timer_frequency() / __tsc_ns); 
+	return (uint64_t)(timer_frequency() / __timer_ns); 
 #endif
 }
 
