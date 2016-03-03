@@ -46,12 +46,12 @@
 #define RAMDISK_ADDR	(0x400000 + 0x200000 * MP_MAX_CORE_COUNT)
 
 static void ap_timer_init() {
-	extern const uint64_t __TIMER_FREQUENCY_PER_SEC;
+	extern const uint64_t TIMER_FREQUENCY_PER_SEC;
 	extern uint64_t __timer_ms;
 	extern uint64_t __timer_us;
 	extern uint64_t __timer_ns;
 
-	*(uint64_t*)&__TIMER_FREQUENCY_PER_SEC = *(uint64_t*)VIRTUAL_TO_PHYSICAL((uint64_t)&__TIMER_FREQUENCY_PER_SEC);
+	*(uint64_t*)&TIMER_FREQUENCY_PER_SEC = *(uint64_t*)VIRTUAL_TO_PHYSICAL((uint64_t)&TIMER_FREQUENCY_PER_SEC);
 	__timer_ms = *(uint64_t*)VIRTUAL_TO_PHYSICAL((uint64_t)&__timer_ms);
 	__timer_us = *(uint64_t*)VIRTUAL_TO_PHYSICAL((uint64_t)&__timer_us);
 	__timer_ns = *(uint64_t*)VIRTUAL_TO_PHYSICAL((uint64_t)&__timer_ns);

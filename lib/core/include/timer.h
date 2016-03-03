@@ -1,9 +1,9 @@
-#ifndef ___TIMER_H__
-#define ___TIMER_H__
+#ifndef __TIMER_H__
+#define __TIMER_H__
 
 #include <stdint.h>
 
-extern const uint64_t __TIMER_FREQUENCY_PER_SEC;
+extern const uint64_t TIMER_FREQUENCY_PER_SEC;
 extern uint64_t __timer_ms;
 extern uint64_t __timer_us;
 extern uint64_t __timer_ns;
