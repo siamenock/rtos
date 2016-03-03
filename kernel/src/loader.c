@@ -446,7 +446,7 @@ static bool relocate(VM* vm, void* malloc_pool, void* gmalloc_pool, uint32_t tas
 	}
 	
 	if(task_addr(task_id, SYM_TIMER_FREQUENCY)) {
-		*(uint64_t*)task_addr(task_id, SYM_TIMER_FREQUENCY) = __TIMER_FREQUENCY_PER_SEC;
+		*(uint64_t*)task_addr(task_id, SYM_TIMER_FREQUENCY) = TIMER_FREQUENCY_PER_SEC;
 	}
 	
 	if(task_addr(task_id, SYM_TIMER_MS)) {
