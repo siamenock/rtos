@@ -62,15 +62,18 @@ int open(const char* path, char* flags) {
 		goto failed;
 	}
 
-	file->driver = fs_driver(path);
+	char* path_prefix;
+	file->driver = fs_driver(path, &path_prefix);
 	if(!file->driver) {
 		ret = -5;
 		goto failed;
 	}
 
+	path += strlen(path_prefix);
+
 	const char* get_file_name(const char* path) {
-		char* base = strchr(path + 1, '/');
-		return base ? base + 1 : "/";
+		char* base = strchr(path, '/');
+		return base ? base + 1 : path;
 	}
 
 	ret = file->driver->open(file->driver, get_file_name(path), flags, &file->priv);
@@ -272,19 +275,17 @@ int opendir(const char* dir_name) {
 	File* dir = alloc_descriptor();
 	if(dir == NULL)
 		return -2;
-	
-	dir->driver = fs_driver(dir_name);
+
+	char* path_prefix;	
+	dir->driver = fs_driver(dir_name, &path_prefix);
 	if(!dir->driver) {
 		free_descriptor(dir);
 		return -3;
 	}
 
-	const char* get_dir_name(const char* path) {
-		char* base = strchr(path + 1, '/');
-		return base ? base : "/";
-	}
+	dir_name += strlen(path_prefix);
 
-	dir->priv = dir->driver->opendir(dir->driver, get_dir_name(dir_name));
+	dir->priv = dir->driver->opendir(dir->driver, dir_name);
 	if(!dir->priv) 
 		return -4;
 	

@@ -80,7 +80,7 @@ int fs_write_async(File* file, void* buffer, size_t size, void(*callback)(void* 
 int fs_mount(uint32_t disk, uint8_t partition, int type, const char* path);
 int fs_umount(const char* path);
 bool fs_register(FileSystemDriver* driver);
-FileSystemDriver* fs_driver(const char* path);
+FileSystemDriver* fs_driver(const char* path, char** prefix);
 
 /**
  * High level disk I/O function which uses disk cache

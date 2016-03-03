@@ -83,7 +83,7 @@ int fs_mount(uint32_t disk, uint8_t partition, int type, const char* path) {
 	return 0;
 }
 
-FileSystemDriver* fs_driver(const char* path) {
+FileSystemDriver* fs_driver(const char* path, char** prefix) {
 	int len = 0;
 	char* path_prefix = "";
 	MapIterator iter;
@@ -101,11 +101,14 @@ FileSystemDriver* fs_driver(const char* path) {
 
 	}
 
+	*prefix = path_prefix;
+
 	return map_get(mounts, (void*)path_prefix);
 }
 
 int fs_umount(const char* path) {
-	FileSystemDriver* driver = fs_driver(path);
+	char* path_prefix;
+	FileSystemDriver* driver = fs_driver(path, &path_prefix);
 
 	if(!driver) 
 		return -2; // Reuqired file system not found
@@ -113,7 +116,7 @@ int fs_umount(const char* path) {
 	if(driver->umount(driver) < 0)
 		return -3; // Memory free error
 
-	map_remove(mounts, (void*)path);
+	map_remove(mounts, (void*)path_prefix);
 
 	return 0;
 }
