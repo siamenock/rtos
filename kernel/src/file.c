@@ -69,8 +69,8 @@ int open(const char* path, char* flags) {
 	}
 
 	const char* get_file_name(const char* path) {
-		char* base = strrchr(path, '/');
-		return base ? base + 1 : path;
+		char* base = strchr(path + 1, '/');
+		return base ? base + 1 : "/";
 	}
 
 	ret = file->driver->open(file->driver, get_file_name(path), flags, &file->priv);
