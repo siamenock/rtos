@@ -445,9 +445,21 @@ static bool relocate(VM* vm, void* malloc_pool, void* gmalloc_pool, uint32_t tas
 		*(void***)task_addr(task_id, SYM_SHARED) = &shared_block->shared;
 	}
 	
-	if(task_addr(task_id, SYM_CPU_FREQUENCY)) {
-		*(uint64_t*)task_addr(task_id, SYM_CPU_FREQUENCY) = TIMER_FREQUENCY_PER_SEC;
+	if(task_addr(task_id, SYM_TIMER_FREQUENCY)) {
+		*(uint64_t*)task_addr(task_id, SYM_TIMER_FREQUENCY) = __TIMER_FREQUENCY_PER_SEC;
 	}
 	
+	if(task_addr(task_id, SYM_TIMER_MS)) {
+		*(uint64_t*)task_addr(task_id, SYM_TIMER_MS) = __timer_ms;
+	}
+
+	if(task_addr(task_id, SYM_TIMER_US)) {
+		*(uint64_t*)task_addr(task_id, SYM_TIMER_US) = __timer_us;
+	}
+
+	if(task_addr(task_id, SYM_TIMER_NS)) {
+		*(uint64_t*)task_addr(task_id, SYM_TIMER_NS) = __timer_ns;
+	}
+
 	return true;
 } 

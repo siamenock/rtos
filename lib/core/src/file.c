@@ -160,7 +160,7 @@ out:
 	return ret;
 }
 
-int file_read(int fd, void* buffer, size_t size, void(*callback)(void* buffer, size_t size, void* context), void* context) {
+int file_read(int fd, void* buffer, size_t size, void(*callback)(void* buffer, int size, void* context), void* context) {
 	int ret = FIO_OK;
 	if(fd < 0) {
 		ret = -FIO_ERR_BADFD;

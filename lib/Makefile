@@ -77,7 +77,7 @@ libumpn.a: libtlsf.a libcore.a
 	cd obj; ar rcs ../$@ *.o
 	rm -r obj
 
-expat/libexpat.a:
+expat/lib/libexpat.a:
 	cd expat; ./configure --prefix=$(PACKETNGIN_BASE)/expat CFLAGS="-g -fno-stack-protector -O3 -m64"
 	cd expat; make
 	cd expat; make install

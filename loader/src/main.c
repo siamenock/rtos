@@ -60,7 +60,7 @@ static void cpuid(uint32_t* a, uint32_t* b, uint32_t* c, uint32_t* d) {
 		: "a"(*a), "c"(*c));
 }
 
-uint8_t get_core_id() {
+uint8_t get_apic_id() {
 	uint32_t a = 0x01, b, c, d;
 	cpuid(&a, &b, &c, &d);
 	
@@ -178,11 +178,11 @@ void check_longmode() {
 	}
 }
 
-void load_gdt(uint8_t core_id) {
+void load_gdt(uint8_t apic_id) {
 	extern uint32_t gdtr;
 	void lgdt(uint32_t addr);
 	
-	if(core_id == 0) {
+	if(apic_id == 0) {
 		log_32("Load global descriptor table: 0x", (uint32_t)&gdtr);
 	}
 	
@@ -199,14 +199,14 @@ void load_gdt(uint8_t core_id) {
 	void change_cs();
 	change_cs();
 	
-	if(core_id == 0) {
+	if(apic_id == 0) {
 		log_pass();
 	}
 }
 
 /**
  * TLB size: 256KB
- * TLB address: 6MB + core_id * 2MB - 256KB
+ * TLB address: 6MB + apic_id * 2MB - 256KB
  * TLB Blocks(4K blocks)
  * TLB[0] => l2
  * TLB[1] => l3u
@@ -214,9 +214,9 @@ void load_gdt(uint8_t core_id) {
  * TLB[3~61] => l4u
  * TLB[62~63] => l4k
  */
-void init_page_tables(uint8_t core_id) {
-	uint32_t base = 0x600000 + core_id * 0x200000 - 0x40000;
-	if(core_id == 0)
+void init_page_tables(uint8_t apic_id) {
+	uint32_t base = 0x600000 + apic_id * 0x200000 - 0x40000;
+	if(apic_id == 0)
 		log_32("Initializing page table: 0x", base);
 	
 	PageDirectory* l2 = (PageDirectory*)(base + PAGE_TABLE_SIZE * PAGE_L2_INDEX);
@@ -280,19 +280,19 @@ void init_page_tables(uint8_t core_id) {
 	l4k[1].exb = 0;
 	
 	// Kernel local area(malloc, TLB, TS, data, bss, stack)
-	l4k[2 + core_id] = l4k[2];
+	l4k[2 + apic_id] = l4k[2];
 	
-	l4k[2].base = 2 + core_id;	// 2 * (2 + core_id)MB
+	l4k[2].base = 2 + apic_id;	// 2 * (2 + apic_id)MB
 	l4k[2].p = 1;
 	l4k[2].us = 0;
 	l4k[2].rw = 1;
 	l4k[2].ps = 1;
 	
-	if(core_id == 0)
+	if(apic_id == 0)
 		log_pass();
 }
 
-static void clean(void* addr, uint32_t size, uint8_t core_id) {
+static void clean(void* addr, uint32_t size, uint8_t apic_id) {
 	uint32_t* d = (uint32_t*)addr;
 	
 	size = (size + 3) / 4;
@@ -309,12 +309,12 @@ static void clean(void* addr, uint32_t size, uint8_t core_id) {
 		*/
 		*d++ = 0;
 		
-		if(core_id == 0 && (i + 1) % unit == 0)
+		if(apic_id == 0 && (i + 1) % unit == 0)
 			print(".");
 	}
 }
 
-static void copy(void* destination, void* source, uint32_t size, uint8_t core_id) {
+static void copy(void* destination, void* source, uint32_t size, uint8_t apic_id) {
 	uint32_t* d = (uint32_t*)destination;
 	uint32_t* s = (uint32_t*)source;
 	
@@ -324,19 +324,19 @@ static void copy(void* destination, void* source, uint32_t size, uint8_t core_id
 	for(uint32_t i = 0; i < size; i++) {
 		*d++ = *s++;
 		
-		if(core_id == 0 && (i + 1) % unit == 0)
+		if(apic_id == 0 && (i + 1) % unit == 0)
 			print(".");
 	}
 }
 
-void copy_kernel(uint8_t core_id) {
+void copy_kernel(uint8_t apic_id) {
 	void* pos = (uint32_t*)kernel_start;
 	uint32_t size = (uint32_t)(kernel_end - kernel_start);
 	
 	PNKC* pnkc = (PNKC*)pos;
 	pos += sizeof(PNKC);
 	
-	if(core_id == 0) {
+	if(apic_id == 0) {
 		log_32("Check PacketNgin Kernel Container: ", pnkc->magic >> 32); print_32(pnkc->magic);
 		
 		if(size < sizeof(PNKC) && pnkc->magic != PNKC_MAGIC) {
@@ -346,80 +346,80 @@ void copy_kernel(uint8_t core_id) {
 		}
 	}
 	
-	if(core_id == 0) {
+	if(apic_id == 0) {
 		log("Copying kernel:\n");
 	}
 
 	uint32_t multiboot_temp_addr = 0x2200000;	// Behind the RAM disk area
 
 	// Clean
-	if(core_id == 0) {
+	if(apic_id == 0) {
 		// Temporarily copy multiboot info
 		copy((void*)multiboot_temp_addr, (void*)multiboot2_addr, *(uint32_t*)multiboot2_addr, 1);
 
 		print("    clean 0x00200000 (00400000): ");
-		clean((void*)0x200000, 0x200000, core_id);
+		clean((void*)0x200000, 0x200000, apic_id);
 	}
-	clean((void*)(0x200000 + 0x200000 * (core_id + 1)), core_id == 0 ? 0x400000 : 0x200000, core_id);
+	clean((void*)(0x200000 + 0x200000 * (apic_id + 1)), apic_id == 0 ? 0x400000 : 0x200000, apic_id);
 	
 	// Copy .text
-	if(core_id == 0) {
+	if(apic_id == 0) {
 		print("\n    .text 0x");
 		print_32(0x200000 + pnkc->text_offset); print(" ("); print_32(pnkc->text_size); print(") ");
-		copy((void*)0x200000 + pnkc->text_offset, pos, pnkc->text_size, core_id);
+		copy((void*)0x200000 + pnkc->text_offset, pos, pnkc->text_size, apic_id);
 	}
 	pos += pnkc->text_size;
 	
 	// Copy .rodata
-	if(core_id == 0) {
+	if(apic_id == 0) {
 		print("\n    .rodata: 0x");
 		print_32(0x200000 + pnkc->rodata_offset); print(" ("); print_32(pnkc->rodata_size); print(") ");
-		copy((void*)0x200000 + pnkc->rodata_offset, pos, pnkc->rodata_size, core_id);
+		copy((void*)0x200000 + pnkc->rodata_offset, pos, pnkc->rodata_size, apic_id);
 	}
 	pos += pnkc->rodata_size;
 	
 	// Copy smap
-	if(core_id == 0) {
+	if(apic_id == 0) {
 		print("\n    smap: 0x");
 		print_32(0x200000 + pnkc->smap_offset); print(" ("); print_32(pnkc->smap_size); print(") ");
-		copy((void*)0x200000 + pnkc->smap_offset, pos, pnkc->smap_size, core_id);
+		copy((void*)0x200000 + pnkc->smap_offset, pos, pnkc->smap_size, apic_id);
 	}
 	pos += pnkc->smap_size;
 	
 	// Copy .data
-	if(core_id == 0) {
+	if(apic_id == 0) {
 		print("\n    .data: 0x");
 		print_32(0x400000 + pnkc->data_offset); print(" ("); print_32(pnkc->data_size); print(") ");
 	}
-	copy((void*)(0x200000 + 0x200000 * (core_id + 1)) + pnkc->data_offset, pos, pnkc->data_size, core_id);
+	copy((void*)(0x200000 + 0x200000 * (apic_id + 1)) + pnkc->data_offset, pos, pnkc->data_size, apic_id);
 	pos += pnkc->data_size;
 	
 	// .bss is already inited
 	
 	// Write PNKC
-	if(core_id == 0) {
+	if(apic_id == 0) {
 		print("\n    PNKC: 0x");
 		print_32(0x200200 - sizeof(PNKC)); print(" ("); print_32(sizeof(PNKC)); print(") ");
-		copy((void*)(0x200200 /* Kernel entry end */ - sizeof(PNKC)), pnkc, sizeof(PNKC), core_id);
+		copy((void*)(0x200200 /* Kernel entry end */ - sizeof(PNKC)), pnkc, sizeof(PNKC), apic_id);
 	}
 	
 	// Write multiboot2 tags
-	if(core_id == 0) {
+	if(apic_id == 0) {
 		uint32_t size = *(uint32_t*)multiboot_temp_addr;
 		uint32_t addr = (0x200000 + pnkc->smap_offset + pnkc->smap_size + 7) & ~7;
 		//pos = (void*)(((uint32_t)pos + 7) & ~7);
 		
 		print("\n    multiboot2: 0x");
 		print_32(addr); print(" ("); print_32(size); print(") ");
-		copy((void*)addr, (void*)multiboot_temp_addr, size, core_id);
+		copy((void*)addr, (void*)multiboot_temp_addr, size, apic_id);
 	}
 	
-	if(core_id == 0) {
+	if(apic_id == 0) {
 		log_pass();
 	}
 }
 
-void activate_pae(uint8_t core_id) {
+void activate_pae(uint8_t apic_id) {
 	#define PAE 0x620	// OSXMMEXCPT=1, OSFXSR=1, PAE=1
 	
 	uint32_t cr4;
@@ -428,23 +428,23 @@ void activate_pae(uint8_t core_id) {
 	cr4 |= PAE;
 	asm volatile("movl %0, %%cr4" : : "r"(cr4));
 	
-	if(core_id == 0) {
+	if(apic_id == 0) {
 		log_32("Activate physical address extension: 0x", cr4);
 		log_pass();
 	}
 }
 
-void activate_pml4(uint8_t core_id) {
-	uint32_t pml4 = 0x5c0000 + 0x200000 * core_id;
+void activate_pml4(uint8_t apic_id) {
+	uint32_t pml4 = 0x5c0000 + 0x200000 * apic_id;
 	asm volatile("movl %0, %%cr3" : : "r"(pml4));
 	
-	if(core_id == 0) {
+	if(apic_id == 0) {
 		log_32("Activate PML4 table: 0x", pml4);
 		log_pass();
 	}
 }
 
-void activate_longmode(uint8_t core_id) {
+void activate_longmode(uint8_t apic_id) {
 	#define LONGMODE	0x0901	// NXE=1, LME=1, SCE=1
 	
 	uint32_t msr;
@@ -460,13 +460,13 @@ void activate_longmode(uint8_t core_id) {
 		"wrmsr"
 		: : "r"(msr));
 	
-	if(core_id == 0) {
+	if(apic_id == 0) {
 		log_32("Activate long-mode: 0x", msr);
 		log_pass();
 	}
 }
 
-void activate_paging(uint8_t core_id) {
+void activate_paging(uint8_t apic_id) {
 	#define ADD	0xe000003e	// PG=1, CD=1, NW=1, NE=1, TS=1, EM=1, MP=1
 	#define REMOVE	0x60000004	//       CD=1, NW=1,             EM=1
 	
@@ -475,13 +475,13 @@ void activate_paging(uint8_t core_id) {
 	cr0 |= ADD;
 	cr0 ^= REMOVE;
 	
-	if(core_id == 0) {
+	if(apic_id == 0) {
 		log_32("Activate caching and paging: 0x", cr0);
 	}
 	
 	asm volatile("movl %0, %%cr0" : : "r"(cr0));
 	
-	if(core_id == 0) {
+	if(apic_id == 0) {
 		log_pass();
 	}
 }
@@ -535,20 +535,20 @@ void activate_aps() {
 }
 
 void main(uint32_t magic, uint32_t addr) {
-	uint8_t core_id = get_core_id();
-	if(core_id == 0) {
+	uint8_t apic_id = get_apic_id();
+	if(apic_id == 0) {
 		print_init();
 		
 		check_multiboot2(magic, addr);
 		check_cpuid();
 		check_longmode();
-		copy_kernel(core_id);
-		init_page_tables(core_id);
-		load_gdt(core_id);
-		activate_pae(core_id);
-		activate_pml4(core_id);
-		activate_longmode(core_id);
-		activate_paging(core_id);
+		copy_kernel(apic_id);
+		init_page_tables(apic_id);
+		load_gdt(apic_id);
+		activate_pae(apic_id);
+		activate_pml4(apic_id);
+		activate_longmode(apic_id);
+		activate_paging(apic_id);
 		
 		time_init();
 		apic_init();
@@ -561,12 +561,12 @@ void main(uint32_t magic, uint32_t addr) {
 		print("Jump to 64bit kernel: 0x00200000");
 		tab(75);
 	} else {
-		copy_kernel(core_id);
-		init_page_tables(core_id);
-		load_gdt(core_id);
-		activate_pae(core_id);
-		activate_pml4(core_id);
-		activate_longmode(core_id);
-		activate_paging(core_id);
+		copy_kernel(apic_id);
+		init_page_tables(apic_id);
+		load_gdt(apic_id);
+		activate_pae(apic_id);
+		activate_pml4(apic_id);
+		activate_longmode(apic_id);
+		activate_paging(apic_id);
 	}
 }
