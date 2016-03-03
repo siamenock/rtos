@@ -265,20 +265,28 @@ off_t lseek(int fd, off_t offset, int whence) {
 }
 
 int opendir(const char* dir_name) {
-	File* dir = alloc_descriptor();
-
-	if(dir == NULL)
+	// Check whether format of the path is valid
+	if(dir_name[0] != '/')
 		return -1;
 
+	File* dir = alloc_descriptor();
+	if(dir == NULL)
+		return -2;
+	
 	dir->driver = fs_driver(dir_name);
 	if(!dir->driver) {
 		free_descriptor(dir);
-		return -2;
+		return -3;
 	}
 
-	dir->priv = dir->driver->opendir(dir->driver, dir_name);
+	const char* get_dir_name(const char* path) {
+		char* base = strchr(path + 1, '/');
+		return base ? base : "/";
+	}
+
+	dir->priv = dir->driver->opendir(dir->driver, get_dir_name(dir_name));
 	if(!dir->priv) 
-		return -3;
+		return -4;
 	
 	dir->type = FILE_TYPE_DIR;
 
