@@ -179,14 +179,44 @@ uint64_t timer_ns() {
 }
 
 uint64_t timer_us() {
-	return timer_ns() / 1000;
+#ifdef LINUX
+	struct timespec ts;
+	if(clock_gettime(CLOCK_MONOTONIC, &ts) != 0)
+		return (uint64_t)-1;
+
+	return (uint64_t)(ts.tv_sec * 1000000);
+
+#else /* LINUX */
+	/* (Current CPU Time Stamp Counter / CPU frequency per nano-seconds) */
+	return (uint64_t)(timer_frequency() / tsc_us);
+#endif
 }
 
 uint64_t timer_ms() {
-	return timer_ns() / 1000000;
+#ifdef LINUX
+	struct timespec ts;
+	if(clock_gettime(CLOCK_MONOTONIC, &ts) != 0)
+		return (uint64_t)-1;
+
+	return (uint64_t)(ts.tv_sec * 1000);
+
+#else /* LINUX */
+	/* (Current CPU Time Stamp Counter / CPU frequency per nano-seconds) */
+	return (uint64_t)(timer_frequency() / tsc_ms);
+#endif
 }
 
 uint64_t timer_s() {
-	return timer_ns() / 1000000000;
+#ifdef LINUX
+	struct timespec ts;
+	if(clock_gettime(CLOCK_MONOTONIC, &ts) != 0)
+		return (uint64_t)-1;
+
+	return (uint64_t)(ts.tv_sec);
+
+#else /* LINUX */
+	/* (Current CPU Time Stamp Counter / CPU frequency per nano-seconds) */
+	return (uint64_t)(timer_frequency() / TIMER_FREQUENCY_PER_SEC);
+#endif
 }
 
