@@ -47,14 +47,14 @@
 
 static void ap_timer_init() {
 	extern const uint64_t TIMER_FREQUENCY_PER_SEC;
-	extern uint64_t tsc_ms;
-	extern uint64_t tsc_us;
-	extern uint64_t tsc_ns;
+	extern uint64_t __timer_ms;
+	extern uint64_t __timer_us;
+	extern uint64_t __timer_ns;
 
 	*(uint64_t*)&TIMER_FREQUENCY_PER_SEC = *(uint64_t*)VIRTUAL_TO_PHYSICAL((uint64_t)&TIMER_FREQUENCY_PER_SEC);
-	tsc_ms = *(uint64_t*)VIRTUAL_TO_PHYSICAL((uint64_t)&tsc_ms);
-	tsc_us = *(uint64_t*)VIRTUAL_TO_PHYSICAL((uint64_t)&tsc_us);
-	tsc_ns = *(uint64_t*)VIRTUAL_TO_PHYSICAL((uint64_t)&tsc_ns);
+	__timer_ms = *(uint64_t*)VIRTUAL_TO_PHYSICAL((uint64_t)&__timer_ms);
+	__timer_us = *(uint64_t*)VIRTUAL_TO_PHYSICAL((uint64_t)&__timer_us);
+	__timer_ns = *(uint64_t*)VIRTUAL_TO_PHYSICAL((uint64_t)&__timer_ns);
 }
 
 static void init_nics(int count) {
@@ -246,7 +246,7 @@ static void icc_start(ICC_Message* msg) {
 		ICC_Message* msg2 = icc_alloc(ICC_TYPE_STARTED);
 
 		msg2->result = errno;	// errno from loader_load
-		icc_send(msg2, msg->core_id);
+		icc_send(msg2, msg->apic_id);
 		icc_free(msg);
 		printf("Execution FAILED: %x\n", errno);
 		return;
@@ -275,7 +275,7 @@ static void icc_start(ICC_Message* msg) {
 	msg2->data.started.stderr_tail = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)task_addr(id, SYM_STDERR_TAIL));
 	msg2->data.started.stderr_size = *(int*)task_addr(id, SYM_STDERR_SIZE);
 	
-	icc_send(msg2, msg->core_id);
+	icc_send(msg2, msg->apic_id);
 
 	icc_free(msg);
 	
@@ -286,7 +286,7 @@ static void icc_resume(ICC_Message* msg) {
 	if(msg->result < 0) {
 		ICC_Message* msg2 = icc_alloc(ICC_TYPE_RESUMED);
 		msg2->result = msg->result;
-		icc_send(msg2, msg->core_id);
+		icc_send(msg2, msg->apic_id);
 
 		icc_free(msg);
 		return;
@@ -295,7 +295,7 @@ static void icc_resume(ICC_Message* msg) {
 	printf("Resuming VM...\n");
 	ICC_Message* msg2 = icc_alloc(ICC_TYPE_RESUMED);
 
-	icc_send(msg2, msg->core_id);
+	icc_send(msg2, msg->apic_id);
 	icc_free(msg);
 	context_switch();
 }
@@ -310,7 +310,7 @@ static void icc_stop(ICC_Message* msg) {
 	if(msg->result < 0) { //Not yet core is started.
 		ICC_Message* msg2 = icc_alloc(ICC_TYPE_STOPPED);
 		msg2->result = msg->result;
-		icc_send(msg2, msg->core_id);
+		icc_send(msg2, msg->apic_id);
 
 		icc_free(msg);
 		return;

@@ -85,7 +85,7 @@ void gmalloc_init(uintptr_t ramdisk_addr, uint32_t ramdisk_size) {
 	
 	uint8_t* core_map = mp_core_map();
 	for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
-		if(!core_map[i])
+		if(core_map[i] == MP_CORE_INVALID)
 			continue;
 		
 		reserved[reserved_count].start = 0x400000 + 0x200000 * i;

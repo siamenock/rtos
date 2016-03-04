@@ -5,6 +5,8 @@
 #include <stdbool.h>
 
 #define MP_MAX_CORE_COUNT	16
+#define MP_CORE_INVALID		255
+
 #define MP_CORE(ptr, id)        (void*)((uint64_t)(ptr) + id * 0x200000)
 
 typedef struct {
@@ -115,11 +117,13 @@ typedef struct {
 	bool(*parse_cbasme)(MP_CompatabilityBusAddressSpaceModifierEntry*, void*);
 } MP_Parser;
 
+uint8_t mp_cores[MP_MAX_CORE_COUNT];
+
 void mp_init();
 uint8_t mp_apic_id();
 uint8_t mp_core_id();
+uint8_t mp_apic_id_to_core_id(uint8_t apic_id);
 uint8_t mp_core_count();
-uint8_t mp_core_id_to_apic_id(uint8_t core_id);
 void mp_sync();
 void mp_parse_fps(MP_Parser* parser, void* context);
 uint8_t* mp_core_map();

@@ -4,9 +4,9 @@
 #include <time.h>
 
 uint64_t TIMER_FREQUENCY_PER_SEC;
-uint64_t tsc_ms;
-uint64_t tsc_us;
-uint64_t tsc_ns;
+uint64_t __timer_ms;
+uint64_t __timer_us;
+uint64_t __timer_ns;
 
 uint64_t timer_frequency() {
 	uint64_t time;
@@ -131,9 +131,9 @@ void timer_init(const char* cpu_brand) {
 		TIMER_FREQUENCY_PER_SEC = last_tsc * 100;
 	}
 	
-	tsc_ms = TIMER_FREQUENCY_PER_SEC / 1000;
-	tsc_us = tsc_ms / 1000;
-	tsc_ns = tsc_us / 1000;
+	__timer_ms = TIMER_FREQUENCY_PER_SEC / 1000;
+	__timer_us = __timer_ms / 1000;
+	__timer_ns = __timer_us / 1000;
 }
 
 void timer_swait(uint32_t s) {
@@ -145,21 +145,21 @@ void timer_swait(uint32_t s) {
 
 void timer_mwait(uint32_t ms) {
 	uint64_t time = timer_frequency();
-	time += tsc_ms * ms;
+	time += __timer_ms * ms;
 	while(timer_frequency() < time)
 		asm volatile("nop");
 }
 
 void timer_uwait(uint32_t us) {
 	uint64_t time = timer_frequency();
-	time += tsc_us * us;
+	time += __timer_us * us;
 	while(timer_frequency() < time)
 		asm volatile("nop");
 }
 
 void timer_nwait(uint32_t ns) {
 	uint64_t time = timer_frequency();
-	time += tsc_ns * ns;
+	time += __timer_ns * ns;
 	while(timer_frequency() < time)
 		asm volatile("nop");
 }
@@ -174,19 +174,49 @@ uint64_t timer_ns() {
 
 #else /* LINUX */
 	/* (Current CPU Time Stamp Counter / CPU frequency per nano-seconds) */
-	return (uint64_t)(timer_frequency() / tsc_ns); 
+	return (uint64_t)(timer_frequency() / __timer_ns); 
 #endif
 }
 
 uint64_t timer_us() {
-	return timer_ns() / 1000;
+#ifdef LINUX
+	struct timespec ts;
+	if(clock_gettime(CLOCK_MONOTONIC, &ts) != 0)
+		return (uint64_t)-1;
+
+	return (uint64_t)(ts.tv_sec * 1000000);
+
+#else /* LINUX */
+	/* (Current CPU Time Stamp Counter / CPU frequency per nano-seconds) */
+	return (uint64_t)(timer_frequency() / __timer_us);
+#endif
 }
 
 uint64_t timer_ms() {
-	return timer_ns() / 1000000;
+#ifdef LINUX
+	struct timespec ts;
+	if(clock_gettime(CLOCK_MONOTONIC, &ts) != 0)
+		return (uint64_t)-1;
+
+	return (uint64_t)(ts.tv_sec * 1000);
+
+#else /* LINUX */
+	/* (Current CPU Time Stamp Counter / CPU frequency per nano-seconds) */
+	return (uint64_t)(timer_frequency() / __timer_ms);
+#endif
 }
 
 uint64_t timer_s() {
-	return timer_ns() / 1000000000;
+#ifdef LINUX
+	struct timespec ts;
+	if(clock_gettime(CLOCK_MONOTONIC, &ts) != 0)
+		return (uint64_t)-1;
+
+	return (uint64_t)(ts.tv_sec);
+
+#else /* LINUX */
+	/* (Current CPU Time Stamp Counter / CPU frequency per nano-seconds) */
+	return (uint64_t)(timer_frequency() / TIMER_FREQUENCY_PER_SEC);
+#endif
 }
 

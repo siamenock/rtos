@@ -20,10 +20,9 @@ typedef struct {
 uint32_t ARP_TIMEOUT = 14400;	// 4 hours
 
 bool arp_process(Packet* packet) {
-	extern uint64_t tsc_ms;
-	if(!tsc_ms) 
+	extern uint64_t __timer_ms;
+	if(!__timer_ms)
 		return false;
-	//	timer_init();
 
 	Ether* ether = (Ether*)(packet->buffer + packet->start);
 	if(endian16(ether->type) != ETHER_TYPE_ARP)

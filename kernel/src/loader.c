@@ -97,7 +97,7 @@ static bool check_header(void* addr) {
 static uint32_t load(VM* vm, void** malloc_pool, void** gmalloc_pool) {
 	int thread_id = 0;
 	for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
-		if(vm->cores[i] == mp_core_id()) {
+		if(vm->cores[i] == mp_apic_id()) {
 			thread_id = i;
 			break;
 		}
@@ -352,7 +352,7 @@ static void load_symbols(VM* vm, uint32_t task_id) {
 static bool relocate(VM* vm, void* malloc_pool, void* gmalloc_pool, uint32_t task_id) {
 	int thread_id = 0;
 	for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
-		if(vm->cores[i] == mp_core_id()) {
+		if(vm->cores[i] == mp_apic_id()) {
 			thread_id = i;
 			break;
 		}
@@ -445,9 +445,21 @@ static bool relocate(VM* vm, void* malloc_pool, void* gmalloc_pool, uint32_t tas
 		*(void***)task_addr(task_id, SYM_SHARED) = &shared_block->shared;
 	}
 	
-	if(task_addr(task_id, SYM_CPU_FREQUENCY)) {
-		*(uint64_t*)task_addr(task_id, SYM_CPU_FREQUENCY) = TIMER_FREQUENCY_PER_SEC;
+	if(task_addr(task_id, SYM_TIMER_FREQUENCY)) {
+		*(uint64_t*)task_addr(task_id, SYM_TIMER_FREQUENCY) = TIMER_FREQUENCY_PER_SEC;
 	}
 	
+	if(task_addr(task_id, SYM_TIMER_MS)) {
+		*(uint64_t*)task_addr(task_id, SYM_TIMER_MS) = __timer_ms;
+	}
+
+	if(task_addr(task_id, SYM_TIMER_US)) {
+		*(uint64_t*)task_addr(task_id, SYM_TIMER_US) = __timer_us;
+	}
+
+	if(task_addr(task_id, SYM_TIMER_NS)) {
+		*(uint64_t*)task_addr(task_id, SYM_TIMER_NS) = __timer_ns;
+	}
+
 	return true;
 } 

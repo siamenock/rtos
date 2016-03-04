@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
 #include <timer.h>
@@ -8,6 +7,9 @@
 #include "pci.h"
 #include "acpi.h"
 
+#define PROCESSOR_LOCAL_APIC		0
+#define IO_APIC				1
+#define INTERRUPT_SOURCE_OVERRIDE	2
 // Ref: http://www.acpi.info/DOWNLOADS/ACPIspec50.pdf
 
 // Root system description pointer
@@ -150,6 +152,52 @@ typedef struct {
 	uint64_t	reserved;
 	MMapConfigSpace	mmaps[0];
 } __attribute__((packed)) MCFG;
+
+// Multiple APIC Description Table
+// Entry Type 0: Processor Local APIC
+typedef struct {
+	uint8_t		entry_type;
+	uint8_t		record_length;
+	uint8_t		acpi_processor_id;
+	uint8_t		apic_id;
+	uint32_t	flags;
+} __attribute__((packed)) ProcessorLocalAPIC;
+
+// Entry Type 1: I/O APIC
+typedef struct {
+	uint8_t		entry_type;
+	uint8_t		record_length;
+	uint8_t		io_apic_id;
+	uint8_t		reserved;
+	uint32_t	io_apic_address;
+	uint32_t	global_system_interrupt_base;
+} __attribute__((packed)) IOAPIC;
+
+// Entry Type 2: Interrupt Source Override
+typedef struct {
+	uint8_t		entry_type;
+	uint8_t		record_length;
+	uint8_t		bus_source;
+	uint8_t		irq_source;
+	uint32_t	global_system_interrupt;
+	uint16_t	flags;
+} __attribute__((packed)) InterruptSourceOverride;
+
+typedef struct {
+	uint8_t		signature[4];
+	uint32_t	length;
+	uint8_t		revision;
+	uint8_t		checksum;
+	uint8_t		oem_id[6];
+	uint8_t		oem_table_id[8];
+	uint32_t	oem_revision;
+	uint32_t	creator_id;
+	uint32_t	creator_revision;
+
+	uint32_t	local_controller_address;
+	uint32_t	flags;
+	uint8_t		entry[0];
+} __attribute__((packed)) MADT;
 	
 static RSDP* find_RSDP() {
 	bool is_RSDP(uint8_t* p) {
@@ -177,16 +225,17 @@ static RSDP* find_RSDP() {
 static RSDP* rsdp;
 static FADT* fadt;
 static MCFG* mcfg;
+static MADT* madt;
 static uint16_t slp_typa;
 static uint16_t slp_typb;
 
 void acpi_init() {
-	uint8_t core_id = mp_core_id();
+	uint8_t apic_id = mp_apic_id();
 	
 	rsdp = find_RSDP();
 	if(!rsdp) {
-		if(core_id == 0) {
-			printf("\tCannot find root system description pointer\n");
+		if(apic_id == 0) {
+			//printf("\tCannot find root system description pointer\n");
 			while(1) asm("hlt");
 		}
 	}
@@ -201,7 +250,9 @@ void acpi_init() {
 			fadt = p;
 		} else if(mcfg == NULL && memcmp(p, "MCFG", 4) == 0) {
 			mcfg = p;
-		} else if(fadt != NULL && mcfg != NULL) {
+		} else if(madt == NULL && memcmp(p, "APIC", 4) == 0) { //fix here
+			madt = p;
+		} else if(fadt != NULL && mcfg != NULL && madt != NULL) {
 			break;
 		}
 	}
@@ -228,6 +279,38 @@ void acpi_init() {
 				break;
 			}
 			p++;
+		}
+	}
+
+	// APIC
+	if(madt) {
+		int length = madt->length - sizeof(MADT);
+		uint8_t* entry = madt->entry;
+
+		for(int i = 0; i < length;) {
+			switch(*(entry + i)) {
+				case PROCESSOR_LOCAL_APIC:
+					;
+					ProcessorLocalAPIC* local_apic = (ProcessorLocalAPIC*)(entry + i);
+					i += local_apic->record_length;
+					if(local_apic->flags) {
+						mp_cores[local_apic->apic_id] = 1;
+					}
+					break;
+				case IO_APIC:
+					;
+					IOAPIC* io_apic = (IOAPIC*)(entry + i);
+					i += io_apic->record_length;
+					break;
+				case INTERRUPT_SOURCE_OVERRIDE:
+					;
+					InterruptSourceOverride* interrupt_src_over = (InterruptSourceOverride*)(entry + i);
+					i += interrupt_src_over->record_length;
+					break;
+				default://unknown type
+					i += *(entry + i + 1);
+					break;
+			}
 		}
 	}
 	

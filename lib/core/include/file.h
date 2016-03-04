@@ -35,7 +35,7 @@ int file_close(int fd, void(*callback)(int ret, void* context), void* context);
  * Asynchronous read from a file descriptor
  */
 int file_read(int fd, void* buffer, size_t size,
-	     void(*callback)(void* buffer, size_t size, void* context),
+	     void(*callback)(void* buffer, int size, void* context),
 	     void* context);
 
 /**

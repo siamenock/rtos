@@ -10,22 +10,47 @@ char cmd_result[CMD_RESULT_SIZE];
 
 int cmd_help(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
         int command_len = 0;
-        for(int i = 0; commands[i].name != NULL; i++) {
-                int len = strlen(commands[i].name);
-                command_len = len > command_len ? len : command_len;
-        }
+	if(argc == 1) {
+		for(int i = 0; commands[i].name != NULL; i++) {
+			int len = strlen(commands[i].name);
+			command_len = len > command_len ? len : command_len;
+		}
 
-        for(int i = 0; commands[i].name != NULL; i++) {
-                printf("%s", commands[i].name);
-                int len = strlen(commands[i].name);
-                len = command_len - len + 2;
-                for(int j = 0; j < len; j++)
-                       putchar(' ');
-		if(commands[i].args != NULL) {
-                	printf("%s  %s\n", commands[i].desc, commands[i].args);
-		} else
-			printf("%s\n", commands[i].desc);
-        }
+		for(int i = 0; commands[i].name != NULL; i++) {
+			printf("%s", commands[i].name);
+			int len = strlen(commands[i].name);
+			len = command_len - len + 2;
+			for(int j = 0; j < len; j++)
+			       putchar(' ');
+			if(commands[i].args != NULL) {
+				printf("%s  %s\n", commands[i].desc, commands[i].args);
+			} else
+				printf("%s\n", commands[i].desc);
+		}
+	} else if(argc == 2) {
+		for(int i = 0; commands[i].name != NULL; i++) {
+			if(!strcmp(commands[i].name, argv[1])) {
+				printf("%s", commands[i].name);
+				int len = strlen(commands[i].name);
+				len = len + 2;
+				for(int j = 0; j < len; j++)
+				       putchar(' ');
+				if(commands[i].args != NULL) {
+					printf("%s  %s\n", commands[i].desc, commands[i].args);
+				} else
+					printf("%s\n", commands[i].desc);
+
+				goto end;
+			}
+		}
+		printf("no help topics match '%s'\n", argv[1]);
+		if(callback != NULL)
+			callback("false", 0);
+
+		return 0;
+	}
+
+end:
 	if(callback != NULL)
 		callback("true", 0);
 
