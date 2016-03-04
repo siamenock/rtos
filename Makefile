@@ -1,94 +1,101 @@
-.PHONY: all run deploy clean cleanall system.img mount umount
+# Main GNU Makefile for PacketNgin RTOS
+.PHONY: all build clean run stop ver deploy sdk gdb dis help 
 
-# QEMU can select boot device - USB MSC, HDD
-USB = -drive if=none,id=usbstick,file=./system.img -usb -device usb-ehci,id=ehci -device usb-storage,bus=ehci.0,drive=usbstick
+all: build 
 
-VIRTIO = -drive file=./system.img,if=virtio 
+build:
+	@echo "Build PacketNgin RTOS image"
+	make -f Build.make
 
-HDD = -hda system.img
+ifndef option
+option	:= qemu
+endif
 
-NIC = virtio #rtl8139
+# QEMU related options 
+USB	:= -drive if=none,id=usbstick,file=./system.img -usb -device usb-ehci,id=ehci -device usb-storage,bus=ehci.0,drive=usbstick
+VIRTIO	:= -drive file=./system.img,if=virtio 
+HDD	:= -hda system.img
+NIC	:= virtio #rtl8139
+QEMU	:= qemu-system-x86_64 $(shell tools/qemu-params) -m 1024 -M pc -smp 8 -d cpu_reset -net nic,model=$(NIC) -net tap,script=tools/qemu-ifup -net nic,model=$(NIC) -net tap,script=tools/qemu-ifup $(VIRTIO) $(USB) --no-shutdown --no-reboot  #$(HDD)
 
-QEMU = qemu-system-x86_64 $(shell tools/qemu-params) -m 1024 -M pc -smp 8 -d cpu_reset -net nic,model=$(NIC) -net tap,script=tools/qemu-ifup -net nic,model=$(NIC) -net tap,script=tools/qemu-ifup $(VIRTIO) $(USB) --no-shutdown --no-reboot  #$(HDD)
-
-all: system.img
-
-system.img: 
-	make -C lib
-	mkdir -p bin
-	make -C tools
-	make -C boot
-	make -C loader
-	make -C kernel
-	make -C drivers
-	# Make system map and kernel
-	sudo bin/smap kernel/kernel.elf kernel.smap
-	bin/pnkc kernel/kernel.elf kernel.smap kernel.bin
-	# Make init ram disk image
-	sudo tools/mkinitrd initrd.img 1 drivers/*.ko
-	# Make system.img
-	tools/mkimage system.img 64 3 12 fat32 fat32 ext2 loader/loader.bin kernel.bin initrd.img
-
-mount:
-	mkdir mnt
-	sudo losetup /dev/loop0 root.img
-	sudo mount /dev/loop0 mnt
-
-umount:
-	sudo umount mnt
-	sudo losetup -d /dev/loop0
-	rmdir mnt
-
-ver:
-	@echo $(shell git tag).$(shell git rev-list HEAD --count)
-
-sdk: system.img
-	cp $^ sdk/
-	tar cfz packetngin_sdk-$(shell git tag).$(shell git rev-list HEAD --count).tgz sdk
-
-virtualbox: system.img 
+run: system.img
+ifeq ($(option),qemu)
+	sudo $(QEMU) -monitor stdio
+endif
+ifeq ($(option),cli)
+	sudo $(QEMU) -curses
+endif
+ifeq ($(option),vnc)
+	sudo $(QEMU) -monitor stdio -vnc :0
+endif
+ifeq ($(option),debug)
+	sudo $(QEMU) -monitor stdio -S -s 
+endif
+ifeq ($(option),vb)
 	$(eval UUID = $(shell VBoxManage showhdinfo system.vdi | grep UUID | awk '{print $$2}' | head -n1))
 	rm -f system.vdi
 	VBoxManage convertfromraw system.img system.vdi --format VDI --uuid $(UUID)
 	VBoxManage startvm PacketNgin
+endif
 
-run: system.img
-	sudo $(QEMU) -monitor stdio
-
-cli: system.img
+stop:
+ifeq ($(option),qemu)
+	sudo killall -9 qemu-system-x86_64
+endif
+ifeq ($(option),cli)
 	sudo $(QEMU) -curses
+endif
 
-vnc: system.img
-	sudo $(QEMU) -monitor stdio -vnc :0
+ver:
+	@echo "Current PacketNgin RTOS version"
+	@echo $(shell git tag).$(shell git rev-list HEAD --count)
 
-debug: system.img
-	sudo $(QEMU) -monitor stdio -S -s 
+deploy: system.img
+	@echo "Deploy PacketNgin RTOS image to USB"
+	tools/deploy
+
+sdk: system.img
+	@echo "Create PacketNgin SDK(Software Development Kit)"
+	cp $^ sdk/
+	tar cfz packetngin_sdk-$(shell git tag).$(shell git rev-list HEAD --count).tgz sdk
 
 gdb:
+	@echo "Run GDB session connected to PacketNgin RTOS"
 	# target remote localhost:1234
 	# set architecture i386:x86-64
 	# file kernel/kernel.elf
 	gdb --eval-command="target remote localhost:1234; set architecture i386:x86-64; file kernel/kernel.elf"
 
 dis: kernel/kernel.elf
+	@echo "Dissable PacketNgin kernel image"
 	objdump -d kernel/kernel.elf > kernel.dis && vi kernel.dis
 
-stop:
-	sudo killall -9 qemu-system-x86_64
-
-deploy: system.img
-	tools/deploy
-
 clean:
-	rm -f system.img root.img kernel.smap kernel.bin kernel.dis packetngin_sdk-*.tgz
-	make -C kernel clean 
-	make -C drivers clean
+	@${MAKE} --no-print-directory -C . -f Build.make clean
 
-cleanall: clean
-	rm -rf bin
-	make -C boot clean
-	make -C loader clean
-	make -C kernel clean
-	make -C drivers clean
-	make -C lib cleanall
-	make -C tools clean
+help:
+	@echo "Usage: make [config=name] [target] [option=name]"
+	@echo ""
+	@echo "CONFIGURATIONS:"
+	@echo "  debug"
+	@echo "  release"
+	@echo ""
+	@echo "TARGETS:"
+	@echo "   all (default)	- build"
+	@echo "   build		- Build PacketNgin RTOS image"
+	@echo "   clean		- Clean PacketNgin RTOS image"
+	@echo "   run [option]		- Run PacketNgin RTOS by emulator"
+	@echo "   stop			- Stop PacketNgin RTOS"
+	@echo "   ver			- Echo PacketNgin RTOS version"
+	@echo "   deploy		- Deploy PacketNgin RTOS image to USB"
+	@echo "   sdk			- Create PacketNgin SDK(Software Development Kit)"
+	@echo "   gdb			- Run GDB session connected to PacketNgin RTOS"
+	@echo "   dis			- Dissable PacketNgin kernel image"
+	@echo ""
+	@echo "OPTION:"
+	@echo "   qemu (default)	- Run by QEMU"
+	@echo "   cli			- Run CLI mode (QEMU)"
+	@echo "   vnc			- Run VNC mode (QEMU)"
+	@echo "   debug		- Run GDB mode (QEMU)"
+	@echo "   vb			- Run by VirtualBox"
+	@echo ""

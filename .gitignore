@@ -1,9 +1,10 @@
 # Object files
 *.o
 *.ko
-*.obj
 *.elf
 *.bin
+*.obj
+obj
 
 # Libraries
 *.a
@@ -36,3 +37,12 @@ bin
 
 # Hidden file
 .*
+
+# Tag
+tags
+cscope.out
+csope.files
+
+# Generated makefile
+*.make
+
