@@ -11,6 +11,7 @@
 #include "../port.h"
 #include "../cpu.h"
 #include "../pci.h"
+#include "../page.h"
 
 // Virtio driver header
 #include "virtio_ring.h"
@@ -130,7 +131,7 @@ static VirtIOBlkReq* buf_to_req(void* buffer, uint32_t type, uint32_t sector, in
 	VirtIOBlkReq* req = gmalloc(sizeof(VirtIOBlkReq));
 	req->type = type;
 	req->status = 0xff;
-	req->data = buffer;
+	req->data = (void*)VIRTUAL_TO_PHYSICAL((uintptr_t)buffer);
 	req->sector = sector;
 	req->sector_count = sector_count;
 	return req;

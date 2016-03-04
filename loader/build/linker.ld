@@ -1,5 +1,7 @@
 ENTRY(start)
 
+STARTUP(obj/entry.o)
+
 SECTIONS {
 	.entry 0x10000 :
 	{

@@ -4,7 +4,6 @@
 #include "disk.h"
 #include "../cpu.h"
 #include <malloc.h>
-#include <gmalloc.h>
 #include <util/cache.h>
 #include <util/event.h>
 
@@ -52,7 +51,7 @@ int fs_mount(uint32_t disk, uint8_t partition, int type, const char* path) {
 	}
 
 	// Cache size is (FS_CACHE_BLOCK * FS_BLOCK_SIZE(normally 4K))
-	Cache* cache = cache_create(FS_CACHE_BLOCK, gfree, NULL); 
+	Cache* cache = cache_create(FS_CACHE_BLOCK, free, NULL); 
 	if(!cache) {
 		printf("Create cache fail\n");
 		return -3;

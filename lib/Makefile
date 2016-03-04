@@ -1,43 +1,7 @@
-.PHONY: all clean cleanall core newlib
+# This makefile is for external libraries which need to be configured.
+.PHONY: all clean cleanall newlib
 
-all: libtlsf.a libtlsf_32.a libjsmn.a libcore.a libcore_32.a libcore_linux.a libc.a libm.a libexpat.a libz.a libssl.a liblwip.a libxdr.a libpacketngin.a libumpn.a
-
-libtlsf.a: 
-	make -C TLSF/src
-	ar rcs $@ TLSF/src/tlsf.o
-
-libtlsf_32.a:
-	make -C TLSF/src
-	ar rcs $@ TLSF/src/tlsf_32.o
-
-jsmn/libjsmn.a:
-	make -C jsmn
-
-libjsmn.a: jsmn/libjsmn.a
-	cp jsmn/libjsmn.a .
-
-core/libcore.a:
-	make -C core
-
-core/libcore_32.a:
-	make -C core
-
-core/libcore_linux.a:
-	make -C core
-
-libcore.a: libjsmn.a libtlsf.a core/libcore.a
-	cp core/libcore.a .
-
-libcore_32.a: libtlsf_32.a core/libcore_32.a
-	cp core/libcore_32.a .
-
-libcore_linux.a: core/libcore_linux.a
-	cp core/libcore_linux.a .
-
-core: libjsmn.a libtlsf.a
-	make -C core
-	cp core/libcore.a .
-	cp core/libcore_linux.a .
+all: libc.a libm.a libexpat.a libz.a libssl.a libxdr.a
 
 newlib/Makefile: 
 	cd newlib; CFLAGS="-fno-stack-protector -D__SSE_4_1__ -msse4.1" ./configure --target=x86_64-pc-packetngin --disable-multilib --enable-newlib-elix-level=4
@@ -56,26 +20,6 @@ libm.a: libc.a
 newlib: newlib/Makefile
 	PATH=$$PATH:$(PACKETNGIN_BASE)/bin make -C newlib
 	cp newlib/x86_64-pc-packetngin/newlib/libc.a .
-
-libpacketngin.a: libc.a libm.a libtlsf.a libcore.a
-	mkdir -p obj
-	cd obj; ar x ../libc.a
-	cd obj; ar x ../libm.a
-	cd obj; ar x ../libtlsf.a
-	cd obj; ar x ../libcore.a
-	cd obj; ar x ../libexpat.a
-	cd obj; ar rcs ../$@ *.o
-	rm -r obj
-	mkdir -p ../sdk/include
-	cp -rL core/include/* ../sdk/include/
-	cp libpacketngin.a ../sdk/lib/
-
-libumpn.a: libtlsf.a libcore.a
-	mkdir -p obj
-	cd obj; ar x ../libtlsf.a
-	cd obj; ar x ../libcore_linux.a
-	cd obj; ar rcs ../$@ *.o
-	rm -r obj
 
 expat/lib/ibexpat.a:
 	cd expat; ./configure --prefix=$(PACKETNGIN_BASE)/expat CFLAGS="-g -fno-stack-protector -O3 -m64"
@@ -108,12 +52,6 @@ libssl.a: openssl/libssl.a
 	cp libssl.a ../sdk/lib/
 	cp libcrypto.a ../sdk/lib/
 
-lwip/liblwip.a:
-	make -C lwip
-
-liblwip.a: lwip/liblwip.a
-	cp lwip/liblwip.a .
-	
 xdr/linux/libxdr.a:
 	make -C xdr -f Makefile.unix linux/libxdr.a
 
@@ -121,15 +59,11 @@ libxdr.a: xdr/linux/libxdr.a
 	cp xdr/linux/libxdr.a .
 
 clean: 
-	rm -f libtlsf.a libtlsf_32.a libjsmn.a libcore.a libcore_32.a libcore_linux.a libc.a libm.a libz.a libssl.a libcrypto.a liblwip.a libpacketngin.a libexpat.a
+	rm -f libc.a libm.a libz.a libssl.a libcrypto.a libexpat.a libxdr.a
 
 cleanall: clean
-	-make -C TLSF/src clean
-	-make -C jsmn clean
-	-make -C core clean
 	-make -C newlib distclean
 	-make -C zlib distclean
-	-make -C lwip clean
 	-make -C openssl clean
 	-make -C expat clean
 	-make -C xdr -f Makefile.unix realclean
