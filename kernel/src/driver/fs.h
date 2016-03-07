@@ -69,6 +69,7 @@ typedef struct _FileSystemDriver {
 	/* Mount information */
 	DiskDriver* 	driver;
 	Cache*		cache;
+	char*		path;		// Mounting point
 	void*		priv;
 } FileSystemDriver;	// BFSDriver, EXT2Driver, ...
 
@@ -80,7 +81,7 @@ int fs_write_async(File* file, void* buffer, size_t size, void(*callback)(void* 
 int fs_mount(uint32_t disk, uint8_t partition, int type, const char* path);
 int fs_umount(const char* path);
 bool fs_register(FileSystemDriver* driver);
-FileSystemDriver* fs_driver(const char* path, char** prefix);
+FileSystemDriver* fs_driver(const char* path);
 
 /**
  * High level disk I/O function which uses disk cache

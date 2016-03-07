@@ -62,14 +62,13 @@ int open(const char* path, char* flags) {
 		goto failed;
 	}
 
-	char* path_prefix;
-	file->driver = fs_driver(path, &path_prefix);
+	file->driver = fs_driver(path);
 	if(!file->driver) {
 		ret = -5;
 		goto failed;
 	}
 
-	path += strlen(path_prefix);
+	path += strlen(file->driver->path);
 
 	const char* get_file_name(const char* path) {
 		char* base = strchr(path, '/');
@@ -276,14 +275,13 @@ int opendir(const char* dir_name) {
 	if(dir == NULL)
 		return -2;
 
-	char* path_prefix;	
-	dir->driver = fs_driver(dir_name, &path_prefix);
+	dir->driver = fs_driver(dir_name);
 	if(!dir->driver) {
 		free_descriptor(dir);
 		return -3;
 	}
 
-	dir_name += strlen(path_prefix);
+	dir_name += strlen(dir->driver->path);
 
 	dir->priv = dir->driver->opendir(dir->driver, dir_name);
 	if(!dir->priv) 
