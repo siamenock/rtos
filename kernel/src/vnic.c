@@ -259,13 +259,13 @@ VNIC* vnic_create(uint64_t* attrs) {
 				break;
 			case NI_INPUT_BANDWIDTH:
 				vnic->ni->input_bandwidth = vnic->input_bandwidth = attrs[i * 2 + 1];
-				vnic->input_wait = __TIMER_FREQUENCY_PER_SEC * 8 / vnic->input_bandwidth;
-				vnic->input_wait_grace = __TIMER_FREQUENCY_PER_SEC / 100;
+				vnic->input_wait = TIMER_FREQUENCY_PER_SEC * 8 / vnic->input_bandwidth;
+				vnic->input_wait_grace = TIMER_FREQUENCY_PER_SEC / 100;
 				break;
 			case NI_OUTPUT_BANDWIDTH:
 				vnic->ni->output_bandwidth = vnic->output_bandwidth = attrs[i * 2 + 1];
-				vnic->output_wait = __TIMER_FREQUENCY_PER_SEC * 8 / vnic->output_bandwidth;
-				vnic->output_wait_grace = __TIMER_FREQUENCY_PER_SEC / 1000;
+				vnic->output_wait = TIMER_FREQUENCY_PER_SEC * 8 / vnic->output_bandwidth;
+				vnic->output_wait_grace = TIMER_FREQUENCY_PER_SEC / 1000;
 				break;
 			case NI_PADDING_HEAD:
 				vnic->ni->padding_head = vnic->padding_head = attrs[i * 2 + 1];
@@ -680,13 +680,13 @@ succeed:
 				break;
 			case NI_INPUT_BANDWIDTH:
 				vnic->ni->input_bandwidth = vnic->input_bandwidth = attrs[i * 2 + 1];
-				vnic->input_wait = __TIMER_FREQUENCY_PER_SEC * 8 / vnic->input_bandwidth;
-				vnic->input_wait_grace = __TIMER_FREQUENCY_PER_SEC / 100;
+				vnic->input_wait = TIMER_FREQUENCY_PER_SEC * 8 / vnic->input_bandwidth;
+				vnic->input_wait_grace = TIMER_FREQUENCY_PER_SEC / 100;
 				break;
 			case NI_OUTPUT_BANDWIDTH:
 				vnic->ni->output_bandwidth = vnic->output_bandwidth = attrs[i * 2 + 1];
-				vnic->output_wait = __TIMER_FREQUENCY_PER_SEC * 8 / vnic->output_bandwidth;
-				vnic->output_wait_grace = __TIMER_FREQUENCY_PER_SEC / 1000;
+				vnic->output_wait = TIMER_FREQUENCY_PER_SEC * 8 / vnic->output_bandwidth;
+				vnic->output_wait_grace = TIMER_FREQUENCY_PER_SEC / 1000;
 				break;
 			case NI_PADDING_HEAD:
 				vnic->padding_head = attrs[i * 2 + 1];

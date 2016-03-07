@@ -9,6 +9,8 @@
   * libc6-dev-i386 
   * doxygen 
   * kpartx
+  * bison
+  * flex
 
 * Disable automount-open
 gsettings set org.gnome.desktop.media-handling automount-open false
