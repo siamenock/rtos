@@ -34,34 +34,39 @@ int fs_mount(uint32_t disk, uint8_t partition, int type, const char* path) {
 	}
 
 	// Find file system driver 
-	FileSystemDriver* driver = NULL;
+	FileSystemDriver* driver = malloc(sizeof(FileSystemDriver));
+	if(!driver) {
+		printf("malloc error\n");
+		return -2;
+	}
+
 	for(int i = 0; i < DISK_MAX_DRIVERS; i++) {
 		if(drivers[i] == NULL)
 			break;
 			
 		if(drivers[i]->type == type) {
-			driver = drivers[i];
+			memcpy(driver, drivers[i], sizeof(FileSystemDriver));
 			break;
 		}
 	}
 
 	if(driver == NULL) {
 		printf("Required file system not found\n");
-		return -2; // Required file system not found
+		return -3; // Required file system not found
 	}
 
 	// Cache size is (FS_CACHE_BLOCK * FS_BLOCK_SIZE(normally 4K))
 	Cache* cache = cache_create(FS_CACHE_BLOCK, free, NULL); 
 	if(!cache) {
 		printf("Create cache fail\n");
-		return -3;
+		return -4;
 	}
 	driver->cache = cache;
 
 	DiskDriver* disk_driver = disk_get(disk);
 	if(!disk_driver) {
 		printf("Disk not found\n");
-		return -4; // Disk not found
+		return -5; // Disk not found
 	}
 
 	PartEntry* part_entry = &disk_driver->boot_sector->part_entry[partition];
@@ -74,11 +79,14 @@ int fs_mount(uint32_t disk, uint8_t partition, int type, const char* path) {
 
 	if(driver->mount(driver, disk_driver, part_entry->first_lba, part_entry->num_of_sec) < 0) {
 		printf("Bad superblock\n");
-		return -5; // Bad superblock
+		return -6; // Bad superblock
 	}
 
+	driver->path = malloc(strlen(path));
+	strcpy(driver->path, path);
+
 	// Success - mounting information is filled from now
-	map_put(mounts, (void*)path, driver);
+	map_put(mounts, (void*)driver->path, driver);
 
 	return 0;
 }
@@ -113,7 +121,10 @@ int fs_umount(const char* path) {
 	if(driver->umount(driver) < 0)
 		return -3; // Memory free error
 
-	map_remove(mounts, (void*)path);
+	map_remove(mounts, (void*)driver->path);
+
+	free(driver->path);
+	free(driver);
 
 	return 0;
 }

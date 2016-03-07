@@ -69,6 +69,7 @@ typedef struct _FileSystemDriver {
 	/* Mount information */
 	DiskDriver* 	driver;
 	Cache*		cache;
+	char*		path;		// Mounting point
 	void*		priv;
 } FileSystemDriver;	// BFSDriver, EXT2Driver, ...
 
