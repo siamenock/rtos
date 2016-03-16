@@ -120,10 +120,16 @@ static int usb_msc_read(DiskDriver* driver, uint32_t lba, int sector_count, unsi
 	return result;
 }
 
+static int usb_msc_write(DiskDriver* driver, uint32_t lba, int sector_count, unsigned char* buf) {
+	// It's not been implemented yet
+	return -1;
+}
+
 DiskDriver usb_msc_driver = {
 	.type = DISK_TYPE_USB,
 	.init = usb_client_init,
 	.read = usb_msc_read,
+	.write = usb_msc_write,
 };
 
 #endif
