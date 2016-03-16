@@ -7,7 +7,7 @@
 #include <timer.h>
 #include <fio.h>
 #include <file.h>
-#include "../../loader/src/page.h"
+#include "page.h"
 #include "vfio.h"
 #include "task.h"
 #include "mp.h"
@@ -401,22 +401,22 @@ static bool relocate(VM* vm, void* malloc_pool, void* gmalloc_pool, uint32_t tas
 			vm->fio->input_buffer = malloc_ex(sizeof(FIFO), gmalloc_pool);
 			vm->fio->output_buffer = malloc_ex(sizeof(FIFO), gmalloc_pool);
 
-			vm->fio = (VFIO*)TRANSLATE_TO_PHYSICAL((uint64_t)vm->fio);
-			vm->fio->user_fio = (FIO*)TRANSLATE_TO_PHYSICAL((uint64_t)user_fio);
-			vm->fio->input_buffer = (FIFO*)TRANSLATE_TO_PHYSICAL((uint64_t)vm->fio->input_buffer);
-			vm->fio->output_buffer = (FIFO*)TRANSLATE_TO_PHYSICAL((uint64_t)vm->fio->output_buffer);
-			vm->fio->input_addr = (FIFO*)TRANSLATE_TO_PHYSICAL((uint64_t)vm->fio->user_fio->input_buffer);
-			vm->fio->output_addr = (FIFO*)TRANSLATE_TO_PHYSICAL((uint64_t)vm->fio->user_fio->output_buffer);
-
 			vm->fio->input_buffer->head = 0;
 			vm->fio->input_buffer->tail = 0;
 			vm->fio->input_buffer->size = FIO_INPUT_BUFFER_SIZE;
-			vm->fio->input_buffer->array = (void**)TRANSLATE_TO_PHYSICAL((uint64_t)vm->fio->input_addr->array);
+			vm->fio->input_buffer->array = (void**)TRANSLATE_TO_PHYSICAL((uint64_t)user_fio->input_buffer->array);
 
 			vm->fio->output_buffer->head = 0;
 			vm->fio->output_buffer->tail = 0;
 			vm->fio->output_buffer->size = FIO_OUTPUT_BUFFER_SIZE;
-			vm->fio->output_buffer->array = (void**)TRANSLATE_TO_PHYSICAL((uint64_t)vm->fio->output_addr->array);
+			vm->fio->output_buffer->array = (void**)TRANSLATE_TO_PHYSICAL((uint64_t)user_fio->output_buffer->array);
+
+			vm->fio->input_addr = (FIFO*)TRANSLATE_TO_PHYSICAL((uint64_t)user_fio->input_buffer);
+			vm->fio->output_addr = (FIFO*)TRANSLATE_TO_PHYSICAL((uint64_t)user_fio->output_buffer);
+			vm->fio->input_buffer = (FIFO*)TRANSLATE_TO_PHYSICAL((uint64_t)vm->fio->input_buffer);
+			vm->fio->output_buffer = (FIFO*)TRANSLATE_TO_PHYSICAL((uint64_t)vm->fio->output_buffer);
+			vm->fio->user_fio = (FIO*)TRANSLATE_TO_PHYSICAL((uint64_t)user_fio);
+			vm->fio = (VFIO*)TRANSLATE_TO_PHYSICAL((uint64_t)vm->fio);
 		}
 
 		if(user_fio) {
