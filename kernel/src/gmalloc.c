@@ -69,7 +69,7 @@ void gmalloc_init(uintptr_t ramdisk_addr, uint32_t ramdisk_size) {
 		uintptr_t end;
 	} Block;
 	
-	Block reserved[2 + MP_MAX_CORE_COUNT];
+	Block reserved[3 + MP_MAX_CORE_COUNT];
 	int reserved_count = 0;
 	reserved[reserved_count].start = 0x100000;	// Description table
 	reserved[reserved_count].end = 0x200000;
@@ -132,7 +132,7 @@ void gmalloc_init(uintptr_t ramdisk_addr, uint32_t ramdisk_size) {
 				type = "Unknown";
 		}
 		
-		printf("\t0x%016x - 0x%016x: %s(%d)\n", entry->addr, entry->addr + entry->len, type, entry->type);
+		printf("\t0x%016lx - 0x%016lx: %s(%d)\n", entry->addr, entry->addr + entry->len, type, entry->type);
 	}
 	
 	// Remove reserved blocks
