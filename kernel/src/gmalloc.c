@@ -132,7 +132,7 @@ void gmalloc_init(uintptr_t ramdisk_addr, uint32_t ramdisk_size) {
 				type = "Unknown";
 		}
 		
-		printf("\t0x%016x - 0x%016x: %s(%d)\n", entry->addr, entry->addr + entry->len, type, entry->type);
+		printf("\t0x%016lx - 0x%016lx: %s(%d)\n", entry->addr, entry->addr + entry->len, type, entry->type);
 	}
 	
 	// Remove reserved blocks
