@@ -350,7 +350,7 @@ void copy_kernel(uint8_t apic_id) {
 		log("Copying kernel:\n");
 	}
 
-	uint32_t multiboot_temp_addr = 0x2200000;	// Behind the RAM disk area
+	uint32_t multiboot_temp_addr = 0x2400000;	// Behind the RAM disk area
 
 	// Clean
 	if(apic_id == 0) {
