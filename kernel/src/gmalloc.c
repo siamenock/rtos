@@ -69,7 +69,7 @@ void gmalloc_init(uintptr_t ramdisk_addr, uint32_t ramdisk_size) {
 		uintptr_t end;
 	} Block;
 	
-	Block reserved[2 + MP_MAX_CORE_COUNT];
+	Block reserved[3 + MP_MAX_CORE_COUNT];
 	int reserved_count = 0;
 	reserved[reserved_count].start = 0x100000;	// Description table
 	reserved[reserved_count].end = 0x200000;
