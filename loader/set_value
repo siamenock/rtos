@@ -1,9 +1,0 @@
-cp src/entry.asm obj/entry.asm
-
-LINE=`readelf -s loader.tmp | grep gdtr`
-VALUE=`echo $LINE | awk '{print substr($2, 5) }'`
-sed -i -- 's/\$GDTR\$/'$VALUE'/g' obj/entry.asm
-
-LINE=`readelf -s loader.tmp | grep protectedmode`
-VALUE=`echo $LINE | awk '{print $2 }'`
-sed -i -- 's/\$PROTECTMODE\$/'$VALUE'/g' obj/entry.asm

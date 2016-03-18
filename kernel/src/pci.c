@@ -175,7 +175,7 @@ void pci_init() {
 #endif
 	
 	// Probe PCIe port
-	pci_probe(port_device_type, port_device_probe, &port_device_driver);
+	//pci_probe(port_device_type, port_device_probe, &port_device_driver);
 }
 
 uint32_t pci_device_size(uint16_t vendor_id, uint16_t device_id) {
