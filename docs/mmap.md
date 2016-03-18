@@ -143,5 +143,5 @@ Signature        : 7f
 	64KB	: Kernel stack
 	256KB	: TLB
 
-2MB + 2MB * 16	: RAM disk
+4MB + 2MB * 16	: RAM disk
 
