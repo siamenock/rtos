@@ -21,7 +21,7 @@ newlib: newlib/Makefile
 	PATH=$$PATH:$(PACKETNGIN_BASE)/bin make -C newlib
 	cp newlib/x86_64-pc-packetngin/newlib/libc.a .
 
-expat/lib/ibexpat.a:
+expat/lib/libexpat.a:
 	cd expat; ./configure --prefix=$(PACKETNGIN_BASE)/expat CFLAGS="-g -fno-stack-protector -O3 -m64"
 	cd expat; make
 	cd expat; make install
