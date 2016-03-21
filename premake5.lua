@@ -21,6 +21,8 @@ workspace "Build"
             "make -f Loader.make",
             "make -f Kernel.make",
 
+            "mkdir -p bin",
+
             "make -C tools",
 
             'bin/smap kernel/build/kernel.elf kernel.smap',
@@ -30,7 +32,8 @@ workspace "Build"
         }
 
         cleancommands {
-            "make -C tools",
+            "rm -rf bin",
+            "make clean -C tools",
 
             "make clean -f Loader.make",
             "make clean -f Kernel.make"

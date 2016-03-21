@@ -99,5 +99,5 @@ workspace "Kernel"
 
         cleancommands {
             "rm *.o -rf",
-            "rm ../*.a"
+            "rm ../*.a -rf"
         }
