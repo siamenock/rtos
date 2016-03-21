@@ -3,10 +3,15 @@
 
 all: build 
 
-build:
+Build.make:
+	@echo "Create all Makefiles by premake"
+	tools/premake5 gmake
+
+build: Build.make
 	@echo "Build PacketNgin RTOS image"
 	make -f Build.make
 
+# Default running option is QEMU
 ifndef option
 option	:= qemu
 endif
@@ -19,6 +24,7 @@ NIC	:= virtio #rtl8139
 QEMU	:= qemu-system-x86_64 $(shell tools/qemu-params) -m 1024 -M pc -smp 8 -d cpu_reset -net nic,model=$(NIC) -net tap,script=tools/qemu-ifup -net nic,model=$(NIC) -net tap,script=tools/qemu-ifup $(VIRTIO) $(USB) --no-shutdown --no-reboot  #$(HDD)
 
 run: system.img
+# Run by QEMU 
 ifeq ($(option),qemu)
 	sudo $(QEMU) -monitor stdio
 endif
@@ -31,6 +37,7 @@ endif
 ifeq ($(option),debug)
 	sudo $(QEMU) -monitor stdio -S -s 
 endif
+# Run by VirtualBox
 ifeq ($(option),vb)
 	$(eval UUID = $(shell VBoxManage showhdinfo system.vdi | grep UUID | awk '{print $$2}' | head -n1))
 	rm -f system.vdi
@@ -39,9 +46,11 @@ ifeq ($(option),vb)
 endif
 
 stop:
+# Stop by QEMU 
 ifeq ($(option),qemu)
 	sudo killall -9 qemu-system-x86_64
 endif
+# Stop by VirtualBox 
 ifeq ($(option),cli)
 	sudo $(QEMU) -curses
 endif

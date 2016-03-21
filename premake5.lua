@@ -18,10 +18,10 @@ workspace "Build"
         kind "Makefile"
 
         buildcommands {
-            "make -C tools",
-
             "make -f Loader.make",
             "make -f Kernel.make",
+
+            "make -C tools",
 
             'bin/smap kernel/build/kernel.elf kernel.smap',
             'bin/pnkc kernel/build/kernel.elf kernel.smap kernel.bin',

@@ -32,7 +32,7 @@ sdk/include/*
 sdk/lib/*.a
 sdk/sysmte.img
 
-# bin
+# Binary
 bin
 
 # Hidden file
@@ -41,7 +41,7 @@ bin
 # Tag
 tags
 cscope.out
-csope.files
+cscope.files
 
 # Generated makefile
 *.make
