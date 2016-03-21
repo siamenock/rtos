@@ -20,6 +20,8 @@
 
 #define DEBUG			0
 
+//extern int printf (const char *__restrict __format, ...);
+
 typedef struct {
 	/* Common structure */
 	uint64_t features;
@@ -156,7 +158,7 @@ static void get_config(uint32_t ioaddr, uint32_t offset, void *buf, uint32_t len
 	void* ioaddr_offset = (void*)(uint64_t)(ioaddr + 20 + offset);
 
 	uint8_t *ptr = buf;
-	for (int i = 0; i < len; i++) 
+	for (uint32_t i = 0; i < len; i++) 
 		ptr[i] = port_in8((uint16_t)(uint64_t)ioaddr_offset + i);
 }
 
@@ -210,7 +212,7 @@ static void add_status(VirtIODevice* vdev, uint8_t status) {
 static int prepare_send_buf(VirtQueue* vq, uint32_t num) {
 	// Add virtio_net_hdr - virtio_net_hdr is always 0, so we just use pseudo header
 	Vring* vr = &vq->vring;
-	for(int i = 0; i < num / 2; i++) {
+	for(uint32_t i = 0; i < num / 2; i++) {
 		vr->desc[2 * i].addr = (uint64_t)pseudo_vnet_hdr;
 		vr->desc[2 * i].flags = VRING_DESC_F_NEXT;
 		vr->desc[2 * i].len = VNET_HDR_LEN;
@@ -225,7 +227,7 @@ static int prepare_recv_buf(VirtQueue* vq, uint32_t num) {
 	//int size = PAGE_ALIGN(vring_size(num, VIRTIO_PCI_VRING_ALIGN)); // check
 	int size = (vring_size(num, VIRTIO_PCI_VRING_ALIGN) + PAGE_SIZE) & ~PAGE_SIZE;
 
-	for(int i = 0; i < num; i++) {
+	for(uint32_t i = 0; i < num; i++) {
 		buffer[i] = (void*)((uint64_t)vq->vring.desc + size + PAGE_SIZE * i);
 		if(!buffer[i]) {
 			return -1;

@@ -45,7 +45,7 @@ typedef struct _FileSystemDriver {
 	/**
 	 * @return 0: OK, -1: I/O error, -2: Illegal file system
 	 */
-	int		(*mount)(FileSystemDriver* driver, DiskDriver* disk_driver, uint32_t lba, size_t size);
+	int		(*mount)(FileSystemDriver* driver, DiskDriver* disk_driver, uint32_t lba);
 	int		(*umount)(FileSystemDriver* driver);
 	
 	int 		(*open)(FileSystemDriver* driver, const char* file_name, char* flags, void** priv);

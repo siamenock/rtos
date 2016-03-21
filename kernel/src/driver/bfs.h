@@ -17,7 +17,7 @@ typedef struct {
 	uint32_t		inode;
 	uint32_t		sector;			///< LBA - sector offset in file system
 	size_t			size;			///< Entire file size (byte)
-	size_t			offset;			///< Byte offset in a file
+	off_t           offset;			///< Byte offset in a file
 	char			name[BFS_MAX_NAME_LEN];
 	void*			buf;
 	Dirent			dirent;			///< Temporary directory entry (internal use only)

@@ -136,7 +136,7 @@ void gmalloc_init(uintptr_t ramdisk_addr, uint32_t ramdisk_size) {
 	}
 	
 	// Remove reserved blocks
-	for(int i = 0; i < list_size(blocks); i++) {
+	for(size_t i = 0; i < list_size(blocks); i++) {
 		Block* b = list_get(blocks, i);
 		
 		for(int j = 0; j < reserved_count; j++) {
@@ -290,7 +290,7 @@ inline void* gcalloc(uint32_t nmemb, size_t size) {
 }
 
 void* bmalloc() {
-	for(int i = 0; i < bmalloc_count; i++) {
+	for(size_t i = 0; i < bmalloc_count; i++) {
 		if(!(bmalloc_pool[i] & 0x01)) {
 			void* ptr = (void*)bmalloc_pool[i];
 			bmalloc_pool[i] |= 0x01;
@@ -308,7 +308,7 @@ void bfree(void* ptr) {
 	uint64_t addr = (uint64_t)ptr;
 	addr |= 0x01;
 	
-	for(int i = 0; i < bmalloc_count; i++) {
+	for(size_t i = 0; i < bmalloc_count; i++) {
 		if(bmalloc_pool[i] == addr) {
 			bmalloc_pool[i] ^= 0x01;
 			break;
@@ -322,7 +322,7 @@ size_t bmalloc_total() {
 
 size_t bmalloc_used() {
 	size_t size = 0;
-	for(int i = 0; i < bmalloc_count; i++) {
+	for(size_t i = 0; i < bmalloc_count; i++) {
 		if(bmalloc_pool[i] & 0x01) {
 			size += 0x200000;
 		}

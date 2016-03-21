@@ -165,9 +165,6 @@ int file_read(int fd, void* buffer, size_t size, void(*callback)(void* buffer, i
 	if(fd < 0) {
 		ret = -FIO_ERR_BADFD;
 		goto out;
-	} else if(size < 0) {
-		ret = -FIO_ERR_BADSIZE;
-		goto out;
 	} else if(!buffer) {
 		ret = -FIO_ERR_BADBUF;
 		goto out;
@@ -209,9 +206,6 @@ int file_write(int fd, const void* buffer, size_t size, void(*callback)(void* bu
 	int ret = FIO_OK;
 	if(fd < 0) {
 		ret = -FIO_ERR_BADFD;
-		goto out;
-	} else if(size < 0) {
-		ret = -FIO_ERR_BADSIZE;
 		goto out;
 	} else if(!buffer) {
 		ret = -FIO_ERR_BADBUF;

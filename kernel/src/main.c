@@ -4,7 +4,7 @@
 #include <errno.h>
 
 // Core
-#include <util/event.h>
+#include "util/event.h"
 
 // Kernel
 #include "asm.h"
@@ -327,9 +327,9 @@ static void icc_stop(ICC_Message* msg) {
 
 static int exec(char* name) {
 	static char line[CMD_SIZE];
-	static int head = 0;
-	static int eod = 0;
-	static int seek = 0;
+	static size_t head = 0;
+	static size_t eod = 0;
+	static size_t seek = 0;
 	int ret;
 
 	int fd = open(name, "r");

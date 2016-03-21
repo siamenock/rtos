@@ -43,7 +43,8 @@ void module_init() {
 	Dirent* dirent = gmalloc(sizeof(Dirent));
 
 	while(readdir(fd, dirent) > 0) {
-		if(strstr((const char*)dirent->name, ".ko") + 3 - (char*)dirent->name == strlen((const char*)dirent->name)) {
+		if((size_t)(strstr((const char*)dirent->name, ".ko") + 3 - (char*)dirent->name) 
+				== strlen((const char*)dirent->name)) {
 			// Attach root directory for full path
 			char file_name[FILE_MAX_NAME_LEN];
 			strcpy(file_name, "/boot/");

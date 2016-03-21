@@ -15,7 +15,7 @@ int request_firmware(const struct firmware **fw, const char *name, PCI_Device *d
 		return -1;
 	}
 
-	uint32_t size = file_size(fd);
+	int size = file_size(fd);
 	if(size < 0) {
 		printf("\tCannot get state of file: %s\n", file_name);
 		return -2;

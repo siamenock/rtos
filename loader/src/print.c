@@ -97,7 +97,7 @@ void print_64(uint64_t v) {
 	cursor();
 }
 
-void tab(int col) {
+void tab(uint32_t col) {
 	if(!video)
 		return;
 	

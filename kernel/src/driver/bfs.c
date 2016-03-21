@@ -62,7 +62,7 @@ typedef struct {
  */
 
 // TODO: Checking superblock only, not investigate whole disks
-static int bfs_mount(FileSystemDriver* fs_driver, DiskDriver* disk_driver, uint32_t lba, size_t size) {
+static int bfs_mount(FileSystemDriver* fs_driver, DiskDriver* disk_driver, uint32_t lba) {
 	// Size of loader is now about 60kB. Investigate til 200kB (50 Clusters)
 	BFSSuperBlock* sb;
 	void* temp = malloc(FS_BLOCK_SIZE);
@@ -227,7 +227,7 @@ static int bfs_close(FileSystemDriver* driver, void* file) {
 static int bfs_write(FileSystemDriver* driver, void* _file, void* buffer, size_t size) {
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 	BFSFile* file = (BFSFile*)_file;
-	if(file->offset >= file->size)
+	if((size_t)file->offset >= file->size)
 		return FILE_EOF;
 
 	DiskDriver* disk_driver = driver->driver;
@@ -262,7 +262,7 @@ static int bfs_write(FileSystemDriver* driver, void* _file, void* buffer, size_t
 static int bfs_read(FileSystemDriver* driver, void* _file, void* buffer, size_t size) {
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 	BFSFile* file = (BFSFile*)_file;
-	if(file->offset >= file->size)
+	if((size_t)file->offset >= file->size)
 		return FILE_EOF;
 
 	DiskDriver* disk_driver = driver->driver;
@@ -370,7 +370,7 @@ static bool read_tick(void* context) {
 static int bfs_read_async(FileSystemDriver* driver, void* _file, size_t size, bool(*callback)(List* blocks, int success, void* context), void* context) {
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 	BFSFile* file = (BFSFile*)_file;
-	if(file->offset >= file->size)
+	if((size_t)file->offset >= file->size)
 		return FILE_EOF;
 
 	BFSPriv* priv = (BFSPriv*)driver->priv;
@@ -449,7 +449,7 @@ static off_t bfs_lseek(FileSystemDriver* driver, void* _file, off_t offset, int 
 		case FS_SEEK_SET :
 			if(offset < 0) 
 				offset = 0;
-			else if(offset > file->size)
+			else if((size_t)offset > file->size)
 				offset = file->size;
 
 			break;
@@ -458,7 +458,7 @@ static off_t bfs_lseek(FileSystemDriver* driver, void* _file, off_t offset, int 
 		case FS_SEEK_CUR :
 			if(offset < 0 && file->offset + offset < 0) 
 				offset = 0;
-			else if(offset + file->offset > file->size)
+			else if((size_t)(offset + file->offset) > file->size)
 				offset = file->size;
 			
 			break;
@@ -467,7 +467,7 @@ static off_t bfs_lseek(FileSystemDriver* driver, void* _file, off_t offset, int 
 		case FS_SEEK_END :
 			if(offset > 0)
 				offset = file->size;
-			else if(-offset > file->size) 
+			else if((size_t)-offset > file->size) 
 				offset = 0;
 
 			break;
@@ -541,14 +541,14 @@ static void* bfs_opendir(FileSystemDriver* driver, const char* dir_name) {
 
 static int bfs_readdir(FileSystemDriver* driver, void* _dir, Dirent* dirent) {
 	BFSFile* dir = (BFSFile*)_dir;
-	if(dir->offset == dir->size) 
+	if((size_t)dir->offset == dir->size) 
 		return FILE_EOF;
 
 	int index = dir->offset / sizeof(BFSDir);
 
 	Dirent* kdirent = (Dirent*)(dir->buf + index * sizeof(Dirent));
 
-	while(dir->offset != dir->size) { 
+	while((size_t)dir->offset != dir->size) { 
 		if(kdirent->name != NULL) {
 			dir->offset += sizeof(BFSDir);
 			strcpy(dirent->name, kdirent->name);

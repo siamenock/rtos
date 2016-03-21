@@ -200,9 +200,9 @@ static void storage_download_handler(RPC* rpc, uint32_t vmid, uint64_t download_
 	} else {
 		void* buf;
 		if(download_size)
-			size = vm_storage_read(vmid, &buf, offset, (offset + size > download_size) ? (download_size - offset) : size);
+			size = vm_storage_read(vmid, &buf, offset, (offset + size > download_size) ? (download_size - offset) : (uint32_t)size);
 		else
-			size = vm_storage_read(vmid, &buf, offset, size);
+			size = vm_storage_read(vmid, &buf, offset, (uint32_t)size);
 
 		callback(rpc, buf, size);
 	}

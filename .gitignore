@@ -1,9 +1,10 @@
 # Object files
 *.o
 *.ko
-*.obj
 *.elf
 *.bin
+*.obj
+obj
 
 # Libraries
 *.a
@@ -31,8 +32,17 @@ sdk/include/*
 sdk/lib/*.a
 sdk/sysmte.img
 
-# bin
+# Binary
 bin
 
 # Hidden file
 .*
+
+# Tag
+tags
+cscope.out
+cscope.files
+
+# Generated makefile
+*.make
+

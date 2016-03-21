@@ -11,11 +11,11 @@ smap/smap:
 console/console:
 	make -C console
 
+#TODO : UMPN should be moved
 umpn/packetngin:
 	make -C umpn
 
 clean:
-	make -C rewrite clean
 	make -C pnkc clean
 	make -C smap clean
 	make -C console clean

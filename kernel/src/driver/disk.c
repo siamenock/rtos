@@ -63,7 +63,7 @@ int disk_ids(uint32_t* ids, int size) {
 	if(count == 0)
 		return -1; // No disks
 
-	if(size < count) 
+	if((size_t)size < count) 
 		return -2; // ID buffer too small
 
 	MapIterator iter;

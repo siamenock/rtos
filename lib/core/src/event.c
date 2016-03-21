@@ -77,7 +77,7 @@ static bool get_first_bigger(void* time, void* node) {
 	return (clock_t)time < ((TimerNode*)node)->delay;
 }
 
-static clock_t next_timer = INT64_MAX;
+static uint64_t next_timer = UINT64_MAX;
 
 int event_loop() {
 	int count = 0;

@@ -69,7 +69,7 @@ bool list_add(List* list, void* data);
  * @param data an element to add
  * @return true if the element is added
  */
-bool list_add_at(List* list, int index, void* data);
+bool list_add_at(List* list, size_t index, void* data);
 
 /**
  * Get an element from the LinkedList.
@@ -78,7 +78,7 @@ bool list_add_at(List* list, int index, void* data);
  * @param index element index
  * @return an element or NULL if index is out of bounds
  */
-void* list_get(List* list, int index);
+void* list_get(List* list, size_t index);
 
 /**
  * Get the first element from the LinkedList.
@@ -113,7 +113,7 @@ int list_index_of(List* list, void* data, bool(*comp_fn)(void*,void*));
  * @param index index of the element
  * @return removed element or NULL if nothing is removed
  */
-void* list_remove(List* list, int index);
+void* list_remove(List* list, size_t index);
 
 /**
  * Remove an element which has same pointer of data from the LinkedList.

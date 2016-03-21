@@ -64,7 +64,7 @@ bool list_add(List* list, void* data) {
 	return true;
 }
 
-bool list_add_at(List* list, int index, void* data) {
+bool list_add_at(List* list, size_t index, void* data) {
 	ListNode* node2 = __malloc(sizeof(ListNode), list->pool);
 	if(!node2)
 		return false;
@@ -102,7 +102,7 @@ bool list_add_at(List* list, int index, void* data) {
 	return true;
 }
 
-void* list_get(List* list, int index) {
+void* list_get(List* list, size_t index) {
 	ListNode* node = list->head;
 	while(index > 0) {
 		if(!node->next)
@@ -175,7 +175,7 @@ static void* _remove(List* list, ListNode* node) {
 	return data;
 }
 
-void* list_remove(List* list, int index) {
+void* list_remove(List* list, size_t index) {
 	ListNode* node = list->head;
 
 	while(index && node) {

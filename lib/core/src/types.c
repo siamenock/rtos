@@ -43,7 +43,7 @@ bool is_uint32(const char* val) {
 	if(end == NULL || *end != '\0')
 		return false;
 	
-	if(v < 0 || v > UINT32_MAX)
+	if(v < 0 || v > INT32_MAX)
 		return false;
 	
 	return true;
@@ -60,7 +60,7 @@ bool is_uint64(const char* val) {
 	if(end == NULL || *end != '\0')
 		return false;
 	
-	if(v < 0 || v > UINT64_MAX)
+	if(v < 0 || v > INT64_MAX)
 		return false;
 	
 	return true;
