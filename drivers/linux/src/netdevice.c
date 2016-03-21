@@ -242,7 +242,7 @@ void napi_disable(struct napi_struct* n) {
 
 void napi_gro_receive(struct napi_struct* n, struct sk_buff* buf) {
 	printf("napi: gro receive: %d\n", buf->len);
-	for(int i = 0; i < buf->len; i++)
+	for(unsigned int i = 0; i < buf->len; i++)
 		printf("%02x", buf->data[i]);
 	// TODO: Received
 }

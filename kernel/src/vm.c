@@ -243,13 +243,13 @@ static bool vm_destroy(VM* vm, int core) {
 	bool is_destroy = true;
 	
 	if(core == -1) {
-		for(uint32_t i = 0; i < vm->core_size; i++) {
+		for(int i = 0; i < vm->core_size; i++) {
 			if(vm->cores[i]) {
 				cores[vm->cores[i]].status = VM_STATUS_STOP;
 			}
 		}
 	} else {
-		for(uint32_t i = 0; i < vm->core_size; i++) {
+		for(int i = 0; i < vm->core_size; i++) {
 			if(vm->cores[i] == core) {
 				cores[vm->cores[i]].status = VM_STATUS_STOP;
 			}
@@ -261,7 +261,7 @@ static bool vm_destroy(VM* vm, int core) {
 	
 	if(is_destroy) {
 		if(vm->memory.blocks) {
-			for(int i = 0; i < vm->memory.count; i++) {
+			for(uint32_t i = 0; i < vm->memory.count; i++) {
 				if(vm->memory.blocks[i]) {
 					bfree(vm->memory.blocks[i]);
 				}
@@ -271,7 +271,7 @@ static bool vm_destroy(VM* vm, int core) {
 		}
 		
 		if(vm->storage.blocks) {
-			for(int i = 0; i < vm->storage.count; i++) {
+			for(uint32_t i = 0; i < vm->storage.count; i++) {
 				if(vm->storage.blocks[i]) {
 					bfree(vm->storage.blocks[i]);
 				}
@@ -426,7 +426,7 @@ uint32_t vm_create(VMSpec* vm_spec) {
 	vm->memory.count = memory_size / VM_MEMORY_SIZE_ALIGN;
 	vm->memory.blocks = gmalloc(vm->memory.count * sizeof(void*));
 	bzero(vm->memory.blocks, vm->memory.count * sizeof(void*));
-	for(int i = 0; i < vm->memory.count; i++) {
+	for(uint32_t i = 0; i < vm->memory.count; i++) {
 		vm->memory.blocks[i] = bmalloc();
 		if(!vm->memory.blocks[i]) {
 			printf("Manager: Not enough memory to allocate.\n");
@@ -441,7 +441,7 @@ uint32_t vm_create(VMSpec* vm_spec) {
 	vm->storage.count = storage_size / VM_STORAGE_SIZE_ALIGN;
 	vm->storage.blocks = gmalloc(vm->storage.count * sizeof(void*));
 	bzero(vm->storage.blocks, vm->storage.count * sizeof(void*));
-	for(int i = 0; i < vm->storage.count; i++) {
+	for(uint32_t i = 0; i < vm->storage.count; i++) {
 		vm->storage.blocks[i] = bmalloc();
 		if(!vm->storage.blocks[i]) {
 			printf("Manager: Not enough storage to allocate.\n");
@@ -670,7 +670,7 @@ void vm_status_set(uint32_t vmid, int status, VM_STATUS_CALLBACK callback, void*
 	
 	// Lazy clean up
 	if(status == VM_STATUS_START) {
-		for(int i = 0; i < vm->memory.count; i++) {
+		for(size_t i = 0; i < vm->memory.count; i++) {
 			bzero(vm->memory.blocks[i], 0x200000);
 		}
 	}
@@ -748,7 +748,7 @@ ssize_t vm_storage_write(uint32_t vmid, void* buf, size_t offset, size_t size) {
 	if((uint64_t)offset + size > (uint64_t)vm->storage.count * VM_STORAGE_SIZE_ALIGN)
 		return -1;
 	
-	int index = offset / VM_STORAGE_SIZE_ALIGN;
+	uint32_t index = offset / VM_STORAGE_SIZE_ALIGN;
 	if(index >= vm->storage.count)
 		return -1;
 
@@ -781,7 +781,7 @@ ssize_t vm_storage_clear(uint32_t vmid) {
 		return -1;
 	
 	ssize_t size = 0;
-	for(int i = 0; i < vm->storage.count; i++) {
+	for(uint32_t i = 0; i < vm->storage.count; i++) {
 		bzero(vm->storage.blocks[i], VM_STORAGE_SIZE_ALIGN);
 		size += VM_STORAGE_SIZE_ALIGN;
 	}
@@ -794,7 +794,7 @@ bool vm_storage_md5(uint32_t vmid, uint32_t size, uint32_t digest[4]) {
 	if(!vm)
 		return false;
 	
-	int block_count = size / VM_MEMORY_SIZE_ALIGN;
+	uint32_t block_count = size / VM_MEMORY_SIZE_ALIGN;
 	if(vm->storage.count < block_count)
 		return false;
 

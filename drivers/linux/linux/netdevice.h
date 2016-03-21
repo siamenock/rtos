@@ -414,7 +414,5 @@ static inline void netdev_tx_completed_queue(struct netdev_queue *dev_queue, uns
 		return;
 
 	smp_mb();
-
-	if (test_and_clear_bit(__QUEUE_STATE_STACK_XOFF, &dev_queue->state));
 }
 #endif /* __LINUX_NETDEVICE_H__ */

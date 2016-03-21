@@ -72,7 +72,7 @@ int fs_mount(uint32_t disk, uint8_t partition, int type, const char* path) {
 		part_entry->first_lba = 0;
 	}
 
-	if(driver->mount(driver, disk_driver, part_entry->first_lba, part_entry->num_of_sec) < 0) {
+	if(driver->mount(driver, disk_driver, part_entry->first_lba) < 0) {
 		printf("Bad superblock\n");
 		return -5; // Bad superblock
 	}

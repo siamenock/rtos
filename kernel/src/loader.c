@@ -110,9 +110,9 @@ static uint32_t load(VM* vm, void** malloc_pool, void** gmalloc_pool) {
 	Elf64_Ehdr* ehdr = (Elf64_Ehdr*)vm->storage.blocks[0];
 	Elf64_Phdr* phdr = (Elf64_Phdr*)(vm->storage.blocks[0] + ehdr->e_phoff);
 	
-	int code_blocks = 0;
-	int data_blocks = 0;
-	int stack_blocks = 1;	// TODO: make it configurable
+	uint32_t code_blocks = 0;
+	uint32_t data_blocks = 0;
+	uint32_t stack_blocks = 1;	// TODO: make it configurable
 	
 	// Analyze
 	for(uint16_t i = 0; i < ehdr->e_phnum; i++) {
@@ -254,7 +254,7 @@ static bool load_args(VM* vm, void* malloc_pool, uint32_t task_id) {
 	Elf64_Ehdr* ehdr = (Elf64_Ehdr*)vm->storage.blocks[0];
 	Elf64_Phdr* phdr = (Elf64_Phdr*)(vm->storage.blocks[0] + ehdr->e_phoff);
 	
-	int len = sizeof(char*) * vm->argc;
+	size_t len = sizeof(char*) * vm->argc;
 	for(int i = 0; i < vm->argc; i++) {
 		len += strlen(vm->argv[i]) + 1;
 	}

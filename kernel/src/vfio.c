@@ -73,8 +73,8 @@ static void vfio_do_request(VFIO* fio, FIORequest* vaddr, FIORequest* paddr, voi
 			break;
 		case FILE_T_READDIR:;
 			Dirent* dir = (Dirent*)malloc(sizeof(Dirent));
-			if(readdir(paddr->fd, dir) < 0);
-			memcpy(pdir, dir, sizeof(Dirent));
+			if(readdir(paddr->fd, dir) < 0)
+				memcpy(pdir, dir, sizeof(Dirent));
 			free(dir);
 			break;
 	}
@@ -130,7 +130,7 @@ void vfio_poll(VM* _vm) {
 		pbuffer = (void*)TRANSLATE_TO_PHYSICAL_BASE((uint64_t)paddr->op.file_io.buffer, vm->cores[0]);
 
 		// Check if it's user area memory
-		for(int i = 0; i < vm->memory.count; i++) {
+		for(size_t i = 0; i < vm->memory.count; i++) {
 			if(pbuffer >= vm->memory.blocks[i] && pbuffer < vm->memory.blocks[i] + 0x200000) {
 				goto out;
 			}

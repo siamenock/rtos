@@ -343,7 +343,7 @@ static int synchronize_features(VirtIODevice* vdev) {
 	uint32_t fbit;
 	driver_features = 0;
 
-	for(int i = 0; i < sizeof(features)/sizeof(int); i++) {
+	for(size_t i = 0; i < sizeof(features)/sizeof(int); i++) {
 		fbit = features[i];
 		if(fbit > 32) {
 			printf("We only support 32 feature bits\n");

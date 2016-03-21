@@ -5,7 +5,7 @@
     -- Maximum warning level
     warnings "Extra"
     -- We follows GNU99 standard. Do not use standard libary
-    buildoptions { "-std=gnu99 -ffreestanding" }
+    buildoptions { "-std=gnu99 -ffreestanding -Wno-unused-parameter" }
     -- Do not link standard libary
     linkoptions { "-nostdlib" }
 

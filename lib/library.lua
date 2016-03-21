@@ -57,6 +57,8 @@ workspace "Kernel"
         kind "StaticLib"
         location "jsmn/build"
         files { "jsmn/**.h", "jsmn/**.c" }
+        -- Disable extra waring flag
+        buildoptions { "-Wno-sign-compare -Wno-unused-variable" }
 
     -- [[ X. External Makefile libraries ]]
     project "external"
@@ -86,13 +88,13 @@ workspace "Kernel"
             "ar rcs ../libpacketngin.a *.o",
 
             "cp ../libpacketngin.a ../../sdk/lib/",
-            "rm ./*.o -r",
+            "rm ./*.o -rf",
 
             -- Linux Application library
             "ar x ../libtlsf.a",
             "ar x ../libcore_linux.a",
             "ar rcs ../libumpn.a *.o",
-            "rm ./*.o -r"
+            "rm ./*.o -rf"
         }
 
         cleancommands {

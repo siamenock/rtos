@@ -151,11 +151,11 @@ static int read_bytes(RPC* rpc, void** v, int32_t* len) {
 	return len1;
 }
 
-#define INIT()					\
-	int _len = 0;				\
-	int _size = 0;				\
-	int _rbuf_read = rpc->rbuf_read;	\
-	int _wbuf_index = rpc->wbuf_index;
+#define INIT()								\
+	__attribute__((__unused__)) int _len = 0;			\
+	__attribute__((__unused__)) int _size = 0;			\
+	__attribute__((__unused__)) int _rbuf_read = rpc->rbuf_read;	\
+	__attribute__((__unused__)) int _wbuf_index = rpc->wbuf_index;
 
 #define ROLLBACK()			\
 	rpc->rbuf_read = _rbuf_read;	\
@@ -189,7 +189,6 @@ if((_len = (VALUE)) <= 0) {		\
 #define RETURN()	return _size;
 
 #define INIT2()					\
-	int _len = 0;				\
 	int _wbuf_index = rpc->wbuf_index;
 
 #define WRITE2(VALUE)			\

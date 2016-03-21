@@ -15,7 +15,7 @@ void print_init();
 void print(const char* str);
 void print_32(uint32_t v);
 void print_64(uint64_t v);
-void tab(int col);
+void tab(uint32_t col);
 void cursor();
 void dump(char* title, uint32_t addr, int size);
 

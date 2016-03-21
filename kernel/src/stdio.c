@@ -204,7 +204,7 @@ void stdio_dump(int coreno, int fd, char* buffer, volatile size_t* head, volatil
 			write1(header, header_len);
 			write1(h, len1);
 
-			int len2 = body_len - len1;
+			size_t len2 = body_len - len1;
 			if(len2 > *tail)
 				len2 = *tail;
 
@@ -480,8 +480,6 @@ void stdio_scancode(int code) {
 		if(ctrl > 0) {
 			if(ch >= 0x40 && ch < 0x60)
 				ch -= 0x40;
-			else if(ch >= 0x60 && ch < 0x80)
-				ch -= 0x60;
 		}
 
 		PUT();

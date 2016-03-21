@@ -203,7 +203,7 @@ static RSDP* find_RSDP() {
 	bool is_RSDP(uint8_t* p) {
 		if(memcmp(p, "RSD PTR", 7) == 0) {
 			uint8_t checksum = 0;
-			for(int i = 0; i < sizeof(RSDP); i++)
+			for(size_t i = 0; i < sizeof(RSDP); i++)
 				checksum += p[i];
 			
 			if(checksum == 0) {
@@ -243,7 +243,7 @@ void acpi_init() {
 	RSDT* rsdt = (void*)(uint64_t)rsdp->address;
 	
 	// Find FADT and MCFG
-	for(int i = 0; i < rsdt->length / 4; i++) {
+	for(size_t i = 0; i < rsdt->length / 4; i++) {
 		void* p = (void*)(uint64_t)rsdt->table[i];
 		
 		if(fadt == NULL && memcmp(p, "FACP", 4) == 0) {

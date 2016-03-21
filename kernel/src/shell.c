@@ -1053,13 +1053,13 @@ static int cmd_mount(int argc, char** argv, void(*callback)(char* result, int ex
 	}
 
 	number = argv[3][2] - 'a';
-	if(number < 0 || number > 8) {
+	if(number > 8) {
 		printf("Disk number cannot exceed %d\n", DISK_AVAIL_DEVICES);
 		return -4;
 	}
 
 	partition = argv[3][3] - '1';
-	if(partition < 0 || partition > 3) {
+	if(partition > 3) {
 		printf("Partition number cannot exceed 4\n");
 		return -5;
 	}

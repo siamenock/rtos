@@ -107,7 +107,7 @@ bool map_put(Map* map, void* key, void* data) {
 			return false;
 	} else {
 		size_t size = list_size(map->table[index]);
-		for(int i = 0; i < size; i++) {
+		for(size_t i = 0; i < size; i++) {
 			MapEntry* entry = list_get(map->table[index], i);
 			if(map->equals(entry->key, key))
 				return false;
@@ -147,7 +147,7 @@ bool map_update(Map* map, void* key, void* data) {
 	}
 	
 	size_t size = list_size(map->table[index]);
-	for(int i = 0; i < size; i++) {
+	for(size_t i = 0; i < size; i++) {
 		MapEntry* entry = list_get(map->table[index], i);
 		if(map->equals(entry->key, key)) {
 			entry->data = data;
@@ -165,7 +165,7 @@ void* map_get(Map* map, void* key) {
 	}
 	
 	size_t size = list_size(map->table[index]);
-	for(int i = 0; i < size; i++) {
+	for(size_t i = 0; i < size; i++) {
 		MapEntry* entry = list_get(map->table[index], i);
 		if(map->equals(entry->key, key))
 			return entry->data;
@@ -181,7 +181,7 @@ void* map_get_key(Map* map, void* key) {
 	}
 	
 	size_t size = list_size(map->table[index]);
-	for(int i = 0; i < size; i++) {
+	for(size_t i = 0; i < size; i++) {
 		MapEntry* entry = list_get(map->table[index], i);
 		if(map->equals(entry->key, key))
 			return entry->key;
@@ -197,7 +197,7 @@ bool map_contains(Map* map, void* key) {
 	}
 	
 	size_t size = list_size(map->table[index]);
-	for(int i = 0; i < size; i++) {
+	for(size_t i = 0; i < size; i++) {
 		MapEntry* entry = list_get(map->table[index], i);
 		if(map->equals(entry->key, key))
 			return true;
@@ -213,7 +213,7 @@ void* map_remove(Map* map, void* key) {
 	}
 	
 	size_t size = list_size(map->table[index]);
-	for(int i = 0; i < size; i++) {
+	for(size_t i = 0; i < size; i++) {
 		MapEntry* entry = list_get(map->table[index], i);
 		if(map->equals(entry->key, key)) {
 			void* data = entry->data;

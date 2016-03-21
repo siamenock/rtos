@@ -466,7 +466,7 @@ uint32_t vnic_update(VNIC* vnic, uint64_t* attrs) {
 					goto failed;
 				}
 
-				for(uint32_t i = 0; i < pools_count; i++) {
+				for(uint32_t i = 0; i < (uint32_t)pools_count; i++) {
 					void* ptr = bmalloc();
 					if(ptr == NULL) {
 						result = 6;

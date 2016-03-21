@@ -107,7 +107,7 @@ bool set_put(Set* set, void* data) {
 			return false;
 	} else {
 		size_t size = list_size(set->table[index]);
-		for(int i = 0; i < size; i++) {
+		for(size_t i = 0; i < size; i++) {
 			SetEntry* entry = list_get(set->table[index], i);
 			if(set->equals(entry->data, data))
 				return false;
@@ -147,7 +147,7 @@ void* set_get(Set* set, void* data) {
 	}
 	
 	size_t size = list_size(set->table[index]);
-	for(int i = 0; i < size; i++) {
+	for(size_t i = 0; i < size; i++) {
 		SetEntry* entry = list_get(set->table[index], i);
 		if(set->equals(entry->data, data))
 			return entry->data;
@@ -163,7 +163,7 @@ void* set_get_data(Set* set, void* data) {
 	}
 	
 	size_t size = list_size(set->table[index]);
-	for(int i = 0; i < size; i++) {
+	for(size_t i = 0; i < size; i++) {
 		SetEntry* entry = list_get(set->table[index], i);
 		if(set->equals(entry->data, data))
 			return entry->data;
@@ -179,7 +179,7 @@ bool set_contains(Set* set, void* data) {
 	}
 	
 	size_t size = list_size(set->table[index]);
-	for(int i = 0; i < size; i++) {
+	for(size_t i = 0; i < size; i++) {
 		SetEntry* entry = list_get(set->table[index], i);
 		if(set->equals(entry->data, data))
 			return true;
@@ -195,7 +195,7 @@ void* set_remove(Set* set, void* data) {
 	}
 	
 	size_t size = list_size(set->table[index]);
-	for(int i = 0; i < size; i++) {
+	for(size_t i = 0; i < size; i++) {
 		SetEntry* entry = list_get(set->table[index], i);
 		if(set->equals(entry->data, data)) {
 			void* data = entry->data;

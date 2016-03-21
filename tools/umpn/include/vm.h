@@ -16,23 +16,23 @@
 #define VM_STORAGE_SIZE_ALIGN	0x200000
 
 typedef struct {
-	int		count;
+	uint32_t    count;
 	void**		blocks;	// gmalloc(array), bmalloc(content)
 } Block;
 
 typedef struct {
 	uint32_t	id;
-	int		process_size;
+	int		    process_size;
 	uint32_t	pids[MAX_PROCESS_COUNT];
 	Block		memory;
 	Block		storage;
-	int		nic_count;
+	int		    nic_count;
 	NI**		nics;	// gmalloc, ni_create
 	
-	int		argc;
+	int		    argc;
 	char**		argv;	// gmalloc
 	
-	int		status;
+	int		    status;
 } VM;
 
 void vm_init();

@@ -305,7 +305,7 @@ void task_destroy(uint32_t id) {
 	}
 }
 
-uint32_t inline task_id() {
+inline uint32_t task_id() {
 	return current_task;
 }
 
