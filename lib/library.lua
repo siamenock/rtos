@@ -86,11 +86,16 @@ workspace "Kernel"
             "ar x ../libexpat.a",
             "ar rcs ../libpacketngin.a *.o",
 
+	    "cp -rL ../core/include/* ../../sdk/include",
+	    "cp -rL ../expat/include/* ../../sdk/include",
+	    "cp -rL ../openssl/include/* ../../sdk/include",
+	    "cp -rL ../zlib/*.h ../../sdk/include",
+
             "cp ../libpacketngin.a ../../sdk/lib/",
             "rm ./*.o -rf",
 
             -- Linux Application library
-            "ar x ../libtlsf.a",
+            "ar x ../libtlsf.a ",		-- Blank is added at the end on purpose
             "ar x ../libcore_linux.a",
             "ar rcs ../libumpn.a *.o",
             "rm ./*.o -rf"
