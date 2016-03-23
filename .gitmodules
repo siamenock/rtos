@@ -1,6 +1,6 @@
 [submodule "drivers/rtos_commercial"]
 	path = drivers/rtos_commercial
-	url = https://github.com/gurumnet/rtos-commercial.git
+	url = git@github.com:gurumnet/rtos-commercial.git
 	ignore = dirty
 
 [submodule "tools/grub"]
