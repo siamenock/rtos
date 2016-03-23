@@ -32,7 +32,7 @@ workspace "Kernel"
         -- Startup file is linked by linker script
         removefiles { "src/entry.asm" }
         -- Find headers in there 
-        includedirs { "../lib/core/include", "../lib/TLSF/src", "../lib/lwip/src/**" }
+        includedirs { "../lib/core/include", "../lib/TLSF/src", "../lib/lwip/src/include", "../lib/lwip/src/include/ipv4" }
         -- Link directory
         libdirs { "../lib" }
         -- Link external libaries named 

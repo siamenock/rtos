@@ -39,8 +39,7 @@ workspace "Kernel"
         files { "TLSF/**.h", "TLSF/**.c" }
         removefiles { "TLSF/examples/*" }
         -- Enable extra waring flag
-        buildoptions { "-Wextra -Wwrite-strings -Wstrict-prototypes \
-            -Wmissing-prototypes -Wno-long-long -Wstrict-aliasing=1"}
+        buildoptions { "-Wextra -Wwrite-strings -Wstrict-prototypes -Wmissing-prototypes -Wno-long-long -Wstrict-aliasing=1"}
         -- Define flags related TLSF
         defines { "USE_MMAP=0", "US_SBRK=0", "USE_PRINTF=0", "TLSF_STATISTIC=1", "TLSF_USE_LOCKS=1" }
 
@@ -48,7 +47,7 @@ workspace "Kernel"
     project "lwip"
         kind "StaticLib"
         location "lwip/build"
-        includedirs { "core/include", "lwip/src/**" }
+        includedirs { "core/include", "lwip/src/include", "lwip/src/include/ipv4" }
         files { "lwip/src/**.h", "lwip/src/**.c" }
         removefiles { "lwip/src/core/ipv6/**", "lwip/src/include/ipv6/**" }
 
