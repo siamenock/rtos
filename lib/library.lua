@@ -98,7 +98,7 @@ workspace "Kernel"
             "ar x ../libtlsf.a ",		-- Blank is added at the end on purpose
             "ar x ../libcore_linux.a",
             "ar rcs ../libumpn.a *.o",
-            "rm ./*.o -rf"
+            "rm ./*.o -rf ",			-- Blank is added at the end on purpose
         }
 
         cleancommands {
