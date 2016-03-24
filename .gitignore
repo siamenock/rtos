@@ -43,6 +43,7 @@ tags
 cscope.out
 cscope.files
 
-# Generated makefile
+# Build related 
 *.make
+build
 

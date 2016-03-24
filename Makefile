@@ -1,5 +1,5 @@
 # Main GNU Makefile for PacketNgin RTOS
-.PHONY: all build clean run stop ver deploy sdk gdb dis help 
+.PHONY: all build test clean run stop ver deploy sdk gdb dis help 
 
 all: build 
 
@@ -7,9 +7,17 @@ Build.make:
 	@echo "Create all Makefiles by premake"
 	tools/premake5 gmake
 
-build: Build.make
+build: Build.make 
 	@echo "Build PacketNgin RTOS image"
 	make -f Build.make
+
+Test.make: 
+	@echo "Create all Makefiles by premake"
+	tools/premake5 gmake
+
+test: Test.make
+	@echo "Build & Run PacketNgin RTOS tests"
+	make -f Test.make
 
 # Default running option is QEMU
 ifndef option
