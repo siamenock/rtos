@@ -4,10 +4,8 @@
     language "C"
     -- Maximum warning level
     warnings "Extra"
-    -- We follows GNU99 standard. Do not use standard libary
-    buildoptions { "-std=gnu99 -ffreestanding -Wno-unused-parameter" }
-    -- Do not link standard libary
-    linkoptions { "-nostdlib" }
+    -- We follows GNU99 standard. 
+    buildoptions { "-std=gnu99 -Wno-unused-parameter" }
 
 -- [[ Workspace 1. Build ]]
 workspace "Build"
@@ -47,8 +45,10 @@ workspace "Loader"
     architecture "x86"
     -- Define 32bit mode flag
     defines { "__MODE_32_BIT__" }
-    -- Designate linker script. Beginning exection starts with 'start'
-    linkoptions { "-T linker.ld -e start" }
+    -- Do not link standard library. Designate linker script. Beginning exection starts with 'start'
+    linkoptions { "-nostdlib -T linker.ld -e start" }
+    -- Do not use standard libary
+    buildoptions { "-ffreestanding" }
 
     include "loader/loader.lua"
 
@@ -60,8 +60,10 @@ workspace "Kernel"
     architecture "x86_64"
     -- Define kernel flag
     defines { "_KERNEL_" }
-    -- Memory model is for kernel
-    buildoptions { "-mcmodel=kernel" }
+    -- Do not use standard libary. Memory model is for kernel
+    buildoptions { "-ffreestanding -mcmodel=kernel" }
+    -- Do not link standard library.
+    linkoptions { "-nostdlib" }
 
     -- Library
     include "lib/library.lua"
@@ -69,3 +71,14 @@ workspace "Kernel"
     include "kernel/kernel.lua"
     -- Drivers
     include "drivers/drivers.lua"
+
+-- [[ Workspace 4. Unit Test ]]
+workspace "Test"
+    -- Test workspace configurations 
+    configurations { "Debug" }
+    -- Test is for 64bit architecture source
+    architecture "x86_64"
+
+    -- Library test
+    include "lib/library_test.lua"
+
