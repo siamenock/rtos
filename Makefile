@@ -17,6 +17,7 @@ Test.make:
 
 test: Test.make
 	@echo "Build & Run PacketNgin RTOS tests"
+	make clean -f Test.make
 	make -f Test.make
 
 # Default running option is QEMU
@@ -100,6 +101,7 @@ help:
 	@echo "TARGETS:"
 	@echo "   all (default)	- build"
 	@echo "   build		- Build PacketNgin RTOS image"
+	@echo "   test		- Test & run PacketNgin RTOS"
 	@echo "   clean		- Clean PacketNgin RTOS image"
 	@echo "   run [option]		- Run PacketNgin RTOS by emulator"
 	@echo "   stop			- Stop PacketNgin RTOS"
