@@ -7,3 +7,8 @@
 	path = tools/grub 
 	url = git://git.savannah.gnu.org/grub.git 
 	ignore = dirty
+
+[submodule "cmocka"]
+	path = cmocka
+	url = git://git.cryptomilk.org/projects/cmocka.git
+	ignore = dirty
