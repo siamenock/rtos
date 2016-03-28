@@ -16,7 +16,7 @@ workspace "Kernel"
     project "core"
         kind "StaticLib"
         location "core/build"
-        includedirs { "core/include", "TLSF/src", "jsmn/" }
+        includedirs { "core/include", "TLSF/src", "jsmn/", "../cmocka/include" }
         files { "core/**.asm", "core/**.S", "core/**.h", "core/**.c" }
         -- Enable exntension instruction for SSE. Do not need stack protector 
         buildoptions { "-msse4.1 -fno-stack-protector" }
@@ -25,7 +25,7 @@ workspace "Kernel"
     project "core_linux"
         kind "StaticLib"
         location "core/build"
-        includedirs { "core/include", "TLSF/src", "jsmn/" }
+        includedirs { "core/include", "TLSF/src", "jsmn/", "../cmocka/include" }
         files { "core/**.asm", "core/**.S", "core/**.h", "core/**.c" }
         buildoptions { "-msse4.1 -fno-stack-protector" }
         -- Define "LINUX" to make core library for Linux OS
