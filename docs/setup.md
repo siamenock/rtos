@@ -38,7 +38,7 @@ iface br0 inet manual
  - Cmocka
 	cd rtos/tools/cmocka
 	mkdir ./build
-	mv build && cmake -DMKAE_INSTALL_PREFIX=/usr
+	cd build && cmake ../ -DMAKE_INSTALL_PREFIX=/usr
 	make & sudo make install
 
 
