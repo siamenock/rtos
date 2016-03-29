@@ -11,6 +11,7 @@
   * kpartx
   * bison
   * flex
+  * cmake
 
 * Disable automount-open
 gsettings set org.gnome.desktop.media-handling automount-open false
@@ -25,3 +26,23 @@ iface br0 inet manual
 	bridge_hello 2
 	bridge_maxage 12
 	bridge_stp off
+
+# Install submodules
+
+ - GNU Grub 
+	cd rtos/tools/grub
+	./autogen.sh
+	./configure
+	./make
+
+ - Cmocka
+	cd rtos/tools/cmocka
+	mkdir ./build
+	mv build && cmake -DMKAE_INSTALL_PREFIX=/usr
+	make & sudo make install
+
+
+ 
+ 
+
+
