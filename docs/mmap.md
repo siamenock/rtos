@@ -1,12 +1,12 @@
 # Step 1: Grub to BSP booting
 0x07c00 ~ +512B	: boot.img(grub)
-0x070000 	: core.img(grub)
+0x070000	: core.img(grub)
 64KB		: loader.bin (entry, loader, GDT, stacks for 16 cores)
 1MB		: modules (kernel.bin, initrd.img)
 
 # Step 2: BSP to AP booting
 0x07c00 ~ +512B	: boot.img(grub)
-0x070000 	: core.img(grub)
+0x070000	: core.img(grub)
 64KB		: loader.bin (entry, loader, GDT, stacks for 16 cores)
 1MB		:
 	+315K?	: kernel.bin (grub module)
@@ -27,7 +27,11 @@
 
 # Step 3: 64bit kernel booting
 -1MB ~ -2MB	: Description table, mapped to 1MB ~ 2MB
+<<<<<<< HEAD
  		: GDT (1976B)
+=======
+		: GDT (1976B)
+>>>>>>> f19623dcdd8acf76853e60edc7453cdf6350fc04
 	16B	: GDTR
 	40B	: Segment Descriptor
 	256B	: TSS Descriptor (16 cores)
