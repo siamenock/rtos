@@ -27,11 +27,7 @@
 
 # Step 3: 64bit kernel booting
 -1MB ~ -2MB	: Description table, mapped to 1MB ~ 2MB
-<<<<<<< HEAD
- 		: GDT (1976B)
-=======
 		: GDT (1976B)
->>>>>>> f19623dcdd8acf76853e60edc7453cdf6350fc04
 	16B	: GDTR
 	40B	: Segment Descriptor
 	256B	: TSS Descriptor (16 cores)
