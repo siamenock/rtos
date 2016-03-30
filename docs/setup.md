@@ -29,17 +29,23 @@ iface br0 inet manual
 
 # Install submodules
 
- - GNU Grub 
+* Initilize submodules 
+	git submodule init	
+	git submodule update 
+
+* Build GNU grub 
 	cd rtos/tools/grub
 	./autogen.sh
 	./configure
 	./make
 
- - Cmocka
+* Build cmocka
 	cd rtos/tools/cmocka
 	mkdir ./build
-	cd build && cmake ../ -DMAKE_INSTALL_PREFIX=/usr
-	make & sudo make install
+	cd build 
+	cmake ../ -DMAKE_INSTALL_PREFIX=/usr
+	make 
+	sudo make install
 
 
  
