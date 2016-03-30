@@ -7,8 +7,7 @@
 #include "port.h"
 #include "device.h"
 #include "string.h"
-#include "driver/vga.h"
-#include "driver/keyboard.h"
+#include "driver/console.h"
 #include "driver/stdin.h"
 #include "driver/stdout.h"
 
@@ -50,8 +49,8 @@ void stdio_init(uint8_t apic_id, void* buffer, size_t size) {
 	CharOutInit data = { .buf = buffer, .len = size, .is_capture = apic_id == 0, .is_render = apic_id == 0 };
 	
 	if(apic_id == 0) {
-		device_stdin = device_register(keyboard_type, &keyboard_driver, NULL, NULL);
-		device_stderr = device_stdout = device_register(vga_type, &vga_driver, NULL, &data);
+		device_stdin = device_register(console_in_type, &console_in_driver, NULL, NULL);
+		device_stderr = device_stdout = device_register(console_out_type, &console_out_driver, NULL, &data);
 	} else {
 		// TODO: char in redirector
 		device_stdin = device_register(stdin_type, &stdin_driver, NULL, NULL);
