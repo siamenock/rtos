@@ -12,6 +12,7 @@
   * bison
   * flex
   * cmake
+  * autoconf
 
 * Disable automount-open
 gsettings set org.gnome.desktop.media-handling automount-open false
