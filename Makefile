@@ -84,9 +84,9 @@ gdb:
 	# file kernel/kernel.elf
 	gdb --eval-command="target remote localhost:1234; set architecture i386:x86-64; file kernel/kernel.elf"
 
-dis: kernel/kernel.elf
+dis: kernel/build/kernel.elf
 	@echo "Dissable PacketNgin kernel image"
-	objdump -d kernel/kernel.elf > kernel.dis && vi kernel.dis
+	objdump -d kernel/build/kernel.elf > kernel.dis && vi kernel.dis
 
 clean:
 	@${MAKE} --no-print-directory -C . -f Build.make clean
