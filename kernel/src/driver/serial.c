@@ -98,11 +98,11 @@ CharOut serial_out_driver = {
 };
 
 /* Functions related to serial console input device driver */
-static int serial_havechar(void) {
+static int serial_havechar() {
 	return port_in8(SERIAL_IO_ADDR + 0x05) & 0x01;
 }
 
-static int serial_getchar(void) {
+static int serial_getchar() {
 	return port_in8(SERIAL_IO_ADDR);
 }
 
@@ -111,7 +111,15 @@ static bool event(void* data) {
 	if(serial_enabled) {
 		while(serial_havechar()) {
 			ch = serial_getchar();
-			stdio_putchar((const char)ch);
+			// TODO: process other special keys
+			if(ch == '\r') {
+				// Serial mode of QEMU is cooked mode. 
+				// Line feed('\r') expected for new line('\n') 
+				stdio_putchar((const char)'\n');
+			} else {
+				stdio_putchar((const char)ch);
+			}
+
 		}
 	}
 
