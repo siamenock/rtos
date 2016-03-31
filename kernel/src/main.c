@@ -412,6 +412,7 @@ void main(void) {
 
 		printf("Analyze CPU information...\n");
 		cpu_init();
+		shared_init();
 		gmalloc_init(RAMDISK_ADDR, initrd_end - initrd_start);
 		timer_init(cpu_brand);
 
