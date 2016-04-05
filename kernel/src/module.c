@@ -69,6 +69,7 @@ void module_init() {
 				}
 			}
 
+			close(fd);
 		}
 	}
 

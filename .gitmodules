@@ -12,3 +12,8 @@
 	path = tools/cmocka
 	url = git://git.cryptomilk.org/projects/cmocka.git
 	ignore = dirty
+
+[submodule "tools/aceunit"]
+	path = tools/aceunit
+	url = git@github.com:christianhujer/aceunit.git
+	ignore = dirty
