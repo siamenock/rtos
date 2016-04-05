@@ -39,7 +39,8 @@ int open(const char* path, char* flags) {
 	// Name validation check
 	int len = strlen(path);
 	int ret;
-	
+	File* file = NULL;
+
 	if(flags[0] != 'r' && flags[0] != 'w' && flags[0] != 'a') {
 		ret = -1;
 		goto failed;
@@ -50,7 +51,7 @@ int open(const char* path, char* flags) {
 		goto failed;
 	}
 
-	File* file = alloc_descriptor();
+	file = alloc_descriptor();
 	if(!file) {
 		ret = -3;
 		goto failed;
@@ -84,7 +85,7 @@ int open(const char* path, char* flags) {
 	return file - files; 
 
 failed:
-	if(file)
+	if(file) 
 		free_descriptor(file);
 
 	return ret;
