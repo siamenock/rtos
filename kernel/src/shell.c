@@ -41,6 +41,20 @@
 
 bool cmd_async;
 
+#ifdef TEST
+static int cmd_test(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	printf("Running PacketNgin RTOS runtime tests...\n");
+
+	extern int run_tests();
+	if(run_tests() < 0)
+		printf("Some of tests are failed\n");
+	else 
+		printf("All tests are passed\n");
+
+	return 0;
+}
+#endif
+
 static int cmd_clear(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	printf("\f");
 
@@ -1075,6 +1089,13 @@ Command commands[] = {
 		.desc = "Show this message.", 
 		.func = cmd_help 
 	},
+#ifdef TEST
+	{
+		.name = "test",
+		.desc = "Run run-time tests.", 
+		.func = cmd_test
+	},
+#endif
 	{ 
 		.name = "version", 
 		.desc = "Print the kernel version.", 
