@@ -1,9 +1,11 @@
 #include <stdio.h>
+// Kernel header
 #include "../file.h" 
-#include "file_test.h"
+// Generated header
+#include "file.h"
 
 A_Test void test_open() {
-	// File descriptor index check 
+	// File descriptor index check
 	int fd[256];
 	for(int i = 0; i < FILE_MAX_DESC; i++) {
 		fd[i] = open("/boot/init.psh", "r");
@@ -25,11 +27,13 @@ A_Test void test_open() {
 	}
 }
 
+bool testing = false;
 A_Test void test_close() {
+	testing = true;
 	// Open & close repetition
 	int fd;
-	for(int i = 0; i < 100000; i++) {
-		fd = open("/boot/init.psh", "r");	
+	for(int i = 0; i < 1000; i++) {
+		fd = open("/boot/init.psh", "a");	
 		assertEqualsM("File close should return FILE_OK (1)", FILE_OK, close(fd));
 		close(fd);
 	}

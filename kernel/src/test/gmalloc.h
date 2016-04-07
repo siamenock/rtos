@@ -1,36 +1,36 @@
-/** AceUnit test header file for fixture lock_test.
+/** AceUnit test header file for fixture gmalloc.
  *
  * You may wonder why this is a header file and yet generates program elements.
  * This allows you to declare test methods as static.
  *
  * @warning This is a generated file. Do not edit. Your changes will be lost.
- * @file lock_test.h
+ * @file gmalloc.h
  */
 
-#ifndef _LOCK_TEST_H
+#ifndef _GMALLOC_H
 /** Include shield to protect this header file from being included more than once. */
-#define _LOCK_TEST_H
+#define _GMALLOC_H
 
 /** The id of this fixture. */
-#define A_FIXTURE_ID 8
+#define A_FIXTURE_ID 5
 
 #include "AceUnit.h"
 
 /* The prototypes are here to be able to include this header file at the beginning of the test file instead of at the end. */
-A_Test void test_lock_lock(void);
-A_Test void test_lock_unlock(void);
+A_Test void test_gmalloc_repeat(void);
+A_Test void test_gmalloc_max(void);
 
 /** The test case ids of this fixture. */
 static const TestCaseId_t testIds[] = {
-    9, /* test_lock_lock */
-    10, /* test_lock_unlock */
+    6, /* test_gmalloc_repeat */
+    7, /* test_gmalloc_max */
 };
 
 #ifndef ACEUNIT_EMBEDDED
 /** The test names of this fixture. */
 static const char *const testNames[] = {
-    "test_lock_lock",
-    "test_lock_unlock",
+    "test_gmalloc_repeat",
+    "test_gmalloc_max",
 };
 #endif
 
@@ -52,8 +52,8 @@ static const AceGroupId_t groups[] = {
 
 /** The test cases of this fixture. */
 static const testMethod_t testCases[] = {
-    test_lock_lock,
-    test_lock_unlock,
+    test_gmalloc_repeat,
+    test_gmalloc_max,
     NULL
 };
 
@@ -81,10 +81,10 @@ static const testMethod_t afterClass[] = {
 #if defined __cplusplus
 extern
 #endif
-const TestFixture_t lock_testFixture = {
-    8,
+const TestFixture_t gmallocFixture = {
+    5,
 #ifndef ACEUNIT_EMBEDDED
-    "lock_test",
+    "gmalloc",
 #endif
 #ifdef ACEUNIT_SUITES
     NULL,
@@ -106,4 +106,4 @@ const TestFixture_t lock_testFixture = {
     afterClass
 };
 
-#endif /* _LOCK_TEST_H */
+#endif /* _GMALLOC_H */

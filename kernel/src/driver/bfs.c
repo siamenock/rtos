@@ -199,14 +199,17 @@ static int find_directory_entry(FileSystemDriver* driver, const char* name, BFSF
 /* High level function */
 static int bfs_open(FileSystemDriver* driver, const char* file_name, char* flags, void** priv) {
 	BFSFile* file = malloc(sizeof(BFSFile));
+	if(!file)
+		return -1;
+
 	int inode = find_directory_entry(driver, file_name, file);
 
 	if(inode < 0)  
-		return -1;
+		return -2;
 
 	int len = strlen(file_name);
 	if(len > BFS_NAME_LEN - 1) 
-		return -2;
+		return -3;
 
 	memcpy(file->name, file_name, len + 1);
 	file->inode = inode;
@@ -220,7 +223,9 @@ static int bfs_open(FileSystemDriver* driver, const char* file_name, char* flags
 }
 
 static int bfs_close(FileSystemDriver* driver, void* file) { 
-	// Nothing to do. Left for comfortability 
+	if(file)
+		free(file);
+
 	return 0;
 }
 

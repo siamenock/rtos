@@ -1,6 +1,8 @@
 #include <stdio.h>
+// Kernel header
 #include "../gmalloc.h"
-#include "gmalloc_test.h"
+// Generated header
+#include "gmalloc.h"
 
 A_Test void test_gmalloc_repeat() {
 	// Malloc & free repetition
@@ -14,7 +16,7 @@ A_Test void test_gmalloc_repeat() {
 }
 
 A_Test void test_gmalloc_max() {
-	// Maxmim size allocation 
+	// Maxmim size allocation
 	void* ptr = gmalloc(gmalloc_total() - gmalloc_used());
 	assertNotNullM("gmalloc should be return valid pointer "
 			"when available maxmimum size requested", ptr);
