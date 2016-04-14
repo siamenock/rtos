@@ -12,6 +12,7 @@
   * bison
   * flex
   * cmake
+  * node.js
 
 * Disable automount-open
 gsettings set org.gnome.desktop.media-handling automount-open false
