@@ -7,9 +7,6 @@
 #include "pci.h"
 #include "acpi.h"
 
-#define PROCESSOR_LOCAL_APIC		0
-#define IO_APIC				1
-#define INTERRUPT_SOURCE_OVERRIDE	2
 // Ref: http://www.acpi.info/DOWNLOADS/ACPIspec50.pdf
 
 // Root system description pointer
@@ -90,6 +87,14 @@ void acpi_parse_rsdt(ACPI_Parser* parser, void* context) {
 						return;
 
 					i += interrupt_src_over->record_length;
+					break;
+				case NONMASKABLE_INTERRUPT_SOURCE:
+					;
+					NonMaskableInterruptSource* nonmask_intr_src = (NonMaskableInterruptSource*)(entry + i);
+					if(parser->parse_apic_nmis && !parser->parse_apic_nmis(nonmask_intr_src, context))
+						return;
+
+					i += nonmask_intr_src->record_length;
 					break;
 				default://unknown type
 					i += *(entry + i + 1);

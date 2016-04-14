@@ -45,7 +45,7 @@ static bool parse_iie(MP_IOInterruptEntry* entry, void* context) {
 }
 	
 static bool parse_iso(InterruptSourceOverride* entry, void* context) {
-	uint8_t destination_io_apic_intin = (uint8_t)context;
+	uint8_t destination_io_apic_intin = (uint8_t)(uint64_t)context;
 
 	if(entry->global_system_interrupt == destination_io_apic_intin) {
 		uint64_t redirection = 	((uint64_t)32 + entry->irq_source) |
@@ -100,8 +100,23 @@ void ioapic_init() {
 	ACPI_Parser acpi_parser = { .parse_apic_iso = parse_iso };
 	for(int i = 0; i < 24; i++) {
 		if(redirection_map[i] == 0xff) {
-			acpi_parse_rsdt(&acpi_parser, (void*)i);
+			acpi_parse_rsdt(&acpi_parser, (void*)(uint64_t)i);
 		}
+	}
+
+	//TODO Unknown bug in Celeron
+	if(redirection_map[1] == 0xff) {
+		uint64_t redirection = 	((uint64_t)32 + 1) |
+					APIC_DM_PHYSICAL |
+					APIC_DMODE_FIXED |
+					APIC_PP_ACTIVEHIGH |
+					APIC_TM_EDGE |
+					APIC_IM_ENABLED |
+					((uint64_t)(1 == 0 ? 0xff : 0x00) << 56);
+
+		ioapic_write64(IOAPIC_IDX_REDIRECTION_TABLE + 1 * 2, redirection);
+		redirection_map[1] = 1;
+		printf("\tISA IRQ remap[%d]: %d -> %d to %s\n", 1, 1, 32 + 1, 1 == 0 ? "all" : "core 0");
 	}
 }
 

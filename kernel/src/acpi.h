@@ -4,6 +4,11 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#define PROCESSOR_LOCAL_APIC		0
+#define IO_APIC				1
+#define INTERRUPT_SOURCE_OVERRIDE	2
+#define NONMASKABLE_INTERRUPT_SOURCE	3
+
 typedef struct {
 	uint8_t		signature[8];
 	uint8_t		checksum;
@@ -174,6 +179,14 @@ typedef struct {
 	uint16_t	flags;
 } __attribute__((packed)) InterruptSourceOverride;
 
+//Entry Type 3: NonMaskable INterrupt Source
+typedef struct {
+	uint8_t		entry_type;
+	uint8_t		record_length;
+	uint16_t	flags;
+	uint32_t	global_system_interrupt;
+} __attribute__((packed)) NonMaskableInterruptSource;
+
 typedef struct {
 	uint8_t		signature[4];
 	uint32_t	length;
@@ -192,13 +205,14 @@ typedef struct {
 
 typedef struct {
 	bool(*parse_rsdp)(RSDP*, void*);
-	bool(*parse_rsdt)(RSDP*, void*);
+	bool(*parse_rsdt)(RSDT*, void*);
 	bool(*parse_fadt)(FADT*, void*);
 	bool(*parse_mcfg)(MCFG*, void*);
 	bool(*parse_madt)(MADT*, void*);
-	bool(*parse_apic_pla)(MADT*, void*);
-	bool(*parse_apic_ia)(MADT*, void*);
-	bool(*parse_apic_iso)(MADT*, void*);
+	bool(*parse_apic_pla)(ProcessorLocalAPIC*, void*);
+	bool(*parse_apic_ia)(IOAPIC*, void*);
+	bool(*parse_apic_iso)(InterruptSourceOverride*, void*);
+	bool(*parse_apic_nmis)(NonMaskableInterruptSource*, void*);
 } ACPI_Parser;
 
 void acpi_init();
