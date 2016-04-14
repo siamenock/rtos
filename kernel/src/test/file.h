@@ -1,18 +1,18 @@
-/** AceUnit test header file for fixture file_test.
+/** AceUnit test header file for fixture file.
  *
  * You may wonder why this is a header file and yet generates program elements.
  * This allows you to declare test methods as static.
  *
  * @warning This is a generated file. Do not edit. Your changes will be lost.
- * @file file_test.h
+ * @file file.h
  */
 
-#ifndef _FILE_TEST_H
+#ifndef _FILE_H
 /** Include shield to protect this header file from being included more than once. */
-#define _FILE_TEST_H
+#define _FILE_H
 
 /** The id of this fixture. */
-#define A_FIXTURE_ID 5
+#define A_FIXTURE_ID 2
 
 #include "AceUnit.h"
 
@@ -22,8 +22,8 @@ A_Test void test_close(void);
 
 /** The test case ids of this fixture. */
 static const TestCaseId_t testIds[] = {
-    6, /* test_open */
-    7, /* test_close */
+    3, /* test_open */
+    4, /* test_close */
 };
 
 #ifndef ACEUNIT_EMBEDDED
@@ -81,10 +81,10 @@ static const testMethod_t afterClass[] = {
 #if defined __cplusplus
 extern
 #endif
-const TestFixture_t file_testFixture = {
-    5,
+const TestFixture_t fileFixture = {
+    2,
 #ifndef ACEUNIT_EMBEDDED
-    "file_test",
+    "file",
 #endif
 #ifdef ACEUNIT_SUITES
     NULL,
@@ -106,4 +106,4 @@ const TestFixture_t file_testFixture = {
     afterClass
 };
 
-#endif /* _FILE_TEST_H */
+#endif /* _FILE_H */

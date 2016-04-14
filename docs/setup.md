@@ -12,6 +12,7 @@
   * bison
   * flex
   * cmake
+  * node.js
   * autoconf
 
 * Disable automount-open
