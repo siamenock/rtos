@@ -11,8 +11,6 @@ static void map_test(void **state) {
 }
 
 int main(void) {
-	cmocka_set_message_output(CM_OUTPUT_XML);
-
 	const struct CMUnitTest tests[] = {
 		cmocka_unit_test(map_test),
 	};
