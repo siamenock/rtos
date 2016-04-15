@@ -7,197 +7,9 @@
 #include "pci.h"
 #include "acpi.h"
 
-#define PROCESSOR_LOCAL_APIC		0
-#define IO_APIC				1
-#define INTERRUPT_SOURCE_OVERRIDE	2
 // Ref: http://www.acpi.info/DOWNLOADS/ACPIspec50.pdf
 
 // Root system description pointer
-typedef struct {
-	uint8_t		signature[8];
-	uint8_t		checksum;
-	uint8_t		oem_id[6];
-	uint8_t		revision;
-	uint32_t	address;
-} __attribute__((packed)) RSDP;
-
-typedef struct {
-	uint8_t		signature[4];
-	uint32_t	length;
-	uint8_t		revision;
-	uint8_t		checksum;
-	uint8_t		oem_id[6];
-	uint8_t		oem_table_id[8];
-	uint32_t	oem_revision;
-	uint32_t	creator_id;
-	uint32_t	creator_revision;
-} __attribute__((packed)) ACPIHeader;
-
-// Root system description table
-typedef struct {
-	uint8_t		signature[4];
-	uint32_t	length;
-	uint8_t		revision;
-	uint8_t		checksum;
-	uint8_t		oem_id[6];
-	uint8_t		oem_table_id[8];
-	uint32_t	oem_revision;
-	uint32_t	creator_id;
-	uint32_t	creator_revision;
-	
-	uint32_t	table[0];
-} __attribute__((packed)) RSDT;
-
-// Fixed ACPI Description Table
-typedef struct {
-	uint8_t		address_space;
-	uint8_t		bit_width;
-	uint8_t		bit_offset;
-	uint8_t		address_size;
-	uint64_t	address;
-} GenericAddressStructure;
-
-typedef struct {
-	uint8_t		signature[4];
-	uint32_t	length;
-	uint8_t		revision;
-	uint8_t		checksum;
-	uint8_t		oem_id[6];
-	uint8_t		oem_table_id[8];
-	uint32_t	oem_revision;
-	uint32_t	creator_id;
-	uint32_t	creator_revision;
-	
-	uint32_t	firmware_ctrl;
-	uint32_t	dsdt;
-	
-	// APIC 1.0
-	uint8_t		reserved;
-	
-	uint8_t		preferred_power_management_profile;
-	uint16_t	sci_interrupt;
-	uint32_t	smi_command_port;
-	uint8_t		acpi_enable;
-	uint8_t		acpi_disable;
-	uint8_t		s4bios_req;
-	uint8_t		pstate_control;
-	uint32_t	pm1a_event_block;
-	uint32_t	pm1b_event_block;
-	uint32_t	pm1a_control_block;
-	uint32_t	pm1b_control_block;
-	uint32_t	pm2_control_block;
-	uint32_t	pm_timer_block;
-	uint32_t	gpe0_block;
-	uint32_t	gpe1_block;
-	uint8_t		pm1_event_length;
-	uint8_t		pm1_control_length;
-	uint8_t		pm2_control_length;
-	uint8_t		pm_timer_length;
-	uint8_t		gpe0_length;
-	uint8_t		gpe1_length;
-	uint8_t		gpe1_base;
-	uint8_t		c_state_control;
-	uint16_t	worst_c2_latency;
-	uint16_t	worst_c3_latency;
-	uint16_t	flush_size;
-	uint16_t	flush_stride;
-	uint8_t		duty_offset;
-	uint8_t		duty_width;
-	uint8_t		day_alarm;
-	uint8_t		month_alarm;
-	uint8_t		century;
-	
-	uint16_t	boot_architecture_flags;
-
-	uint8_t		reserved2;
-	uint32_t	flags;
-	
-	GenericAddressStructure	reset_reg;
-
-	uint8_t		reset_value;
-	uint8_t		reserved3[3];
-	
-	uint64_t	x_firmware_control;
-	uint64_t	x_dsdt;
-	
-	GenericAddressStructure	x_pm1a_event_block;
-	GenericAddressStructure	x_pm1b_event_block;
-	GenericAddressStructure	x_pm1a_control_block;
-	GenericAddressStructure	x_pm1b_control_block;
-	GenericAddressStructure	x_pm2_control_block;
-	GenericAddressStructure	x_pm_timer_block;
-	GenericAddressStructure	x_gpe0_block;
-	GenericAddressStructure	x_gpe1_block;
-} __attribute__((packed)) FADT;
-
-typedef struct {
-	uint64_t	address;
-	uint16_t	group;
-	uint8_t		start;
-	uint8_t		end;
-	uint32_t	reserved;
-} __attribute__((packed)) MMapConfigSpace;
-
-typedef struct {
-	uint8_t		signature[4];
-	uint32_t	length;
-	uint8_t		revision;
-	uint8_t		checksum;
-	uint8_t		oem_id[6];
-	uint8_t		oem_table_id[8];
-	uint32_t	oem_revision;
-	uint32_t	creator_id;
-	uint32_t	creator_revision;
-	
-	uint64_t	reserved;
-	MMapConfigSpace	mmaps[0];
-} __attribute__((packed)) MCFG;
-
-// Multiple APIC Description Table
-// Entry Type 0: Processor Local APIC
-typedef struct {
-	uint8_t		entry_type;
-	uint8_t		record_length;
-	uint8_t		acpi_processor_id;
-	uint8_t		apic_id;
-	uint32_t	flags;
-} __attribute__((packed)) ProcessorLocalAPIC;
-
-// Entry Type 1: I/O APIC
-typedef struct {
-	uint8_t		entry_type;
-	uint8_t		record_length;
-	uint8_t		io_apic_id;
-	uint8_t		reserved;
-	uint32_t	io_apic_address;
-	uint32_t	global_system_interrupt_base;
-} __attribute__((packed)) IOAPIC;
-
-// Entry Type 2: Interrupt Source Override
-typedef struct {
-	uint8_t		entry_type;
-	uint8_t		record_length;
-	uint8_t		bus_source;
-	uint8_t		irq_source;
-	uint32_t	global_system_interrupt;
-	uint16_t	flags;
-} __attribute__((packed)) InterruptSourceOverride;
-
-typedef struct {
-	uint8_t		signature[4];
-	uint32_t	length;
-	uint8_t		revision;
-	uint8_t		checksum;
-	uint8_t		oem_id[6];
-	uint8_t		oem_table_id[8];
-	uint32_t	oem_revision;
-	uint32_t	creator_id;
-	uint32_t	creator_revision;
-
-	uint32_t	local_controller_address;
-	uint32_t	flags;
-	uint8_t		entry[0];
-} __attribute__((packed)) MADT;
 	
 static RSDP* find_RSDP() {
 	bool is_RSDP(uint8_t* p) {
@@ -223,11 +35,74 @@ static RSDP* find_RSDP() {
 }
 
 static RSDP* rsdp;
+static RSDT* rsdt;
 static FADT* fadt;
 static MCFG* mcfg;
 static MADT* madt;
 static uint16_t slp_typa;
 static uint16_t slp_typb;
+
+void acpi_parse_rsdt(ACPI_Parser* parser, void* context) {
+	if(rsdp && parser->parse_rsdp && !parser->parse_rsdp(rsdp, context))
+		return;
+
+	if(rsdt && parser->parse_rsdt && !parser->parse_rsdt(rsdt, context))
+		return;
+
+	if(mcfg && parser->parse_mcfg && !parser->parse_mcfg(mcfg, context))
+		return;
+
+	if(fadt && parser->parse_fadt && !parser->parse_fadt(fadt, context))
+		return;
+
+	if(madt && parser->parse_madt && !parser->parse_madt(madt, context))
+		return;
+
+	if(madt) {
+		int length = madt->length - sizeof(MADT);
+		uint8_t* entry = madt->entry;
+
+		for(int i = 0; i < length;) {
+			switch(*(entry + i)) {
+				case PROCESSOR_LOCAL_APIC:
+					;
+					ProcessorLocalAPIC* local_apic = (ProcessorLocalAPIC*)(entry + i);
+					if(parser->parse_apic_pla && !parser->parse_apic_pla(local_apic, context))
+						return;
+
+					i += local_apic->record_length;
+					break;
+				case IO_APIC:
+					;
+					IOAPIC* io_apic = (IOAPIC*)(entry + i);
+					if(parser->parse_apic_ia && !parser->parse_apic_ia(io_apic, context))
+						return;
+
+					i += io_apic->record_length;
+					break;
+				case INTERRUPT_SOURCE_OVERRIDE:
+					;
+					InterruptSourceOverride* interrupt_src_over = (InterruptSourceOverride*)(entry + i);
+					if(parser->parse_apic_iso && !parser->parse_apic_iso(interrupt_src_over, context))
+						return;
+
+					i += interrupt_src_over->record_length;
+					break;
+				case NONMASKABLE_INTERRUPT_SOURCE:
+					;
+					NonMaskableInterruptSource* nonmask_intr_src = (NonMaskableInterruptSource*)(entry + i);
+					if(parser->parse_apic_nmis && !parser->parse_apic_nmis(nonmask_intr_src, context))
+						return;
+
+					i += nonmask_intr_src->record_length;
+					break;
+				default://unknown type
+					i += *(entry + i + 1);
+					break;
+			}
+		}
+	}
+}
 
 void acpi_init() {
 	uint8_t apic_id = mp_apic_id();
@@ -240,7 +115,7 @@ void acpi_init() {
 		}
 	}
 	
-	RSDT* rsdt = (void*)(uint64_t)rsdp->address;
+	rsdt = (void*)(uint64_t)rsdp->address;
 	
 	// Find FADT and MCFG
 	for(size_t i = 0; i < rsdt->length / 4; i++) {

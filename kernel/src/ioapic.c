@@ -3,15 +3,15 @@
 #include "mp.h"
 #include "port.h"
 #include "apic.h"
+#include "acpi.h"
 #include "ioapic.h"
 
 uint64_t _ioapic_address;
-
 static uint8_t redirection_map[24];
 
 static bool parse_fps(MP_FloatingPointerStructure* entry, void* context) {
 	*(uint8_t*)context = entry->feature[1];
-	
+
 	return false;
 }
 
@@ -38,12 +38,33 @@ static bool parse_iie(MP_IOInterruptEntry* entry, void* context) {
 					((uint64_t)(entry->source_bus_irq == 0 ? 0xff : 0x00) << 56);
 		
 		ioapic_write64(IOAPIC_IDX_REDIRECTION_TABLE + entry->destination_io_apic_intin * 2, redirection);
-		redirection_map[entry->source_bus_irq] = entry->destination_io_apic_intin;
-		printf("\tISA IRQ remap: %d -> %d to %s\n", entry->destination_io_apic_intin, 32 + entry->source_bus_irq, entry->source_bus_irq == 0 ? "all" : "core 0");
+		redirection_map[entry->destination_io_apic_intin] = entry->source_bus_irq;
+		printf("\tISA IRQ remap[%d]: %d -> %d to %s\n", entry->destination_io_apic_intin, entry->source_bus_irq, 32 + entry->source_bus_irq, entry->source_bus_irq == 0 ? "all" : "core 0");
 	}
 	return true;
 }
 	
+static bool parse_iso(InterruptSourceOverride* entry, void* context) {
+	uint8_t destination_io_apic_intin = (uint8_t)(uint64_t)context;
+
+	if(entry->global_system_interrupt == destination_io_apic_intin) {
+		uint64_t redirection = 	((uint64_t)32 + entry->irq_source) |
+					APIC_DM_PHYSICAL |
+					APIC_DMODE_FIXED |
+					APIC_PP_ACTIVEHIGH |
+					APIC_TM_EDGE |
+					APIC_IM_ENABLED |
+					((uint64_t)(entry->irq_source == 0 ? 0xff : 0x00) << 56);
+
+		ioapic_write64(IOAPIC_IDX_REDIRECTION_TABLE + entry->global_system_interrupt * 2, redirection);
+		redirection_map[entry->global_system_interrupt] = entry->irq_source;
+		printf("\tISA IRQ remap[%d]: %d -> %d to %s\n", entry->global_system_interrupt, entry->irq_source, 32 + entry->irq_source, entry->irq_source == 0 ? "all" : "core 0");
+
+		return false;
+	}
+
+	return true;
+}
 
 void ioapic_init() {
 	// Disable PIC mode
@@ -61,22 +82,42 @@ void ioapic_init() {
 	// Mask all interrupt first
 	for(int i = 0; i < 24; i++) {
 		redirection_map[i] = 0xff;
-		
 		uint64_t redirection = ioapic_read64(IOAPIC_IDX_REDIRECTION_TABLE + i * 2);
 		redirection |= APIC_IM_DISABLED;
 		ioapic_write64(IOAPIC_IDX_REDIRECTION_TABLE + i * 2, redirection);
 	}
 	
-	// Parse ISA/PCI bus ID
+//	// Parse ISA/PCI bus ID
 	uint8_t bus_isa_id = (uint8_t)-1;
 	bzero(&parser, sizeof(MP_Parser));
 	parser.parse_be = parse_be;
 	mp_parse_fps(&parser, &bus_isa_id);
 	
-	// Redirect interrupt next
 	bzero(&parser, sizeof(MP_Parser));
 	parser.parse_iie = parse_iie;
 	mp_parse_fps(&parser, &bus_isa_id);
+
+	ACPI_Parser acpi_parser = { .parse_apic_iso = parse_iso };
+	for(int i = 0; i < 24; i++) {
+		if(redirection_map[i] == 0xff) {
+			acpi_parse_rsdt(&acpi_parser, (void*)(uint64_t)i);
+		}
+	}
+
+	//TODO Unknown bug in Celeron
+	if(redirection_map[1] == 0xff) {
+		uint64_t redirection = 	((uint64_t)32 + 1) |
+					APIC_DM_PHYSICAL |
+					APIC_DMODE_FIXED |
+					APIC_PP_ACTIVEHIGH |
+					APIC_TM_EDGE |
+					APIC_IM_ENABLED |
+					((uint64_t)(1 == 0 ? 0xff : 0x00) << 56);
+
+		ioapic_write64(IOAPIC_IDX_REDIRECTION_TABLE + 1 * 2, redirection);
+		redirection_map[1] = 1;
+		printf("\tISA IRQ remap[%d]: %d -> %d to %s\n", 1, 1, 32 + 1, 1 == 0 ? "all" : "core 0");
+	}
 }
 
 inline uint32_t ioapic_read32(int idx) {
