@@ -57,7 +57,6 @@ read.on('line', function(line) {
     }
 })
 
-// Command argument counter
 var regEx = function(exp, cmd, str) {
     var result;
     if(typeof(exp) != 'string') {

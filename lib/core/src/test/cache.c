@@ -18,13 +18,11 @@ static void cache_set_malloc_buffer(void **state) {
 	Cache* cache = cache_create(1000, free, NULL);
 	for(int i = 0; i < 4001; i++) {
 		char* buf = malloc(10000);
-		assert_false(cache_set(cache, (void*)(uintptr_t)i, buf));
+		assert_true(cache_set(cache, (void*)(uintptr_t)i, buf));
 	}
 }
 
 int main(void) {
-	cmocka_set_message_output(CM_OUTPUT_XML);
-
 	const struct CMUnitTest tests[] = {
 		cmocka_unit_test(cache_set_constant_buffer),
 		cmocka_unit_test(cache_set_malloc_buffer),
