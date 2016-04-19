@@ -42,7 +42,8 @@ Device* nic_parse_index(char* _argv, uint16_t* port) {
 		return NULL;
 
 	Device* dev = NULL;
-	for(int i = 0; i < NIC_MAX_DEVICE_COUNT; i++) {
+	uint16_t nic_count = device_count(DEVICE_TYPE_NIC);
+	for(int i = 0; i < nic_count; i++) {
 		if(*port < ((NICInfo*)nic_devices[i]->priv)->port_count) { 
 			dev = nic_devices[i];
 			break;

@@ -97,21 +97,23 @@ int console_remove_output_driver(void *function)
 	return 0;
 }
 
-void console_init(void)
-{
-#ifdef CONFIG_LP_VIDEO_CONSOLE
-	video_console_init();
-#endif
-#ifdef CONFIG_LP_SERIAL_CONSOLE
-	serial_console_init();
-#endif
-#ifdef CONFIG_LP_PC_KEYBOARD
-	keyboard_init();
-#endif
-#ifdef CONFIG_LP_CBMEM_CONSOLE
-	cbmem_console_init();
-#endif
-}
+/*
+ *void console_init(void)
+ *{
+ *#ifdef CONFIG_LP_VIDEO_CONSOLE
+ *        video_console_init();
+ *#endif
+ *#ifdef CONFIG_LP_SERIAL_CONSOLE
+ *        serial_console_init();
+ *#endif
+ *#ifdef CONFIG_LP_PC_KEYBOARD
+ *        keyboard_init();
+ *#endif
+ *#ifdef CONFIG_LP_CBMEM_CONSOLE
+ *        cbmem_console_init();
+ *#endif
+ *}
+ */
 
 void console_write(const void *buffer, size_t count)
 {

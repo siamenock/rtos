@@ -28,9 +28,12 @@ workspace "Kernel"
         -- Designate linker script. Beginning exection starts with 'main'
         linkoptions { "-T elf_x86_64.ld -e main" }
         -- We cares about files below
-        files { "src/**.asm", "src/**.h", "src/**.c" }
+        files { "src/**.asm", "src/**.h", "src/**.c"}
         -- Startup file is linked by linker script
         removefiles { "src/entry.asm" }
+        -- Exclude test files
+        removefiles { "src/test.c", "src/test/**.c", "src/test/**.h" }
+       
         -- Find headers in there 
         includedirs { "../lib/core/include", "../lib/TLSF/src", "../lib/lwip/src/include", "../lib/lwip/src/include/ipv4" }
         -- Link directory
@@ -43,3 +46,17 @@ workspace "Kernel"
             './mkver.sh > ../src/version.h',
             "nasm -f elf64 -o obj/entry.o ../src/entry.asm"
         }
+
+        -- Compile test sources when configured
+        filter "configurations:Debug"
+            prebuildcommands {
+                "java -jar ../../tools/AceUnit-0.12.0.jar ../src/test"
+            }
+
+            files {
+                "src/test.c", "src/test/**.c", "src/test/**.h",
+                "../tools/aceunit/src/AceUnit.c", "../tools/aceunit/src/AceUnitData.c", 
+                "../tools/aceunit/src/loggers/FullPlainLogger.c", "../tools/aceunit/include/**.h"}
+
+            defines { "TEST", "ACEUNIT_ASSERTION_STYLE=ACEUNIT_ASSERTION_STYLE_RETURN", "ACEUNIT_SUITES" }
+            includedirs { "../tools/aceunit/include" }

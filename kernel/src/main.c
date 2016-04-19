@@ -34,7 +34,7 @@
 #include "loader.h"
 #include "vfio.h"
 
-// Disk
+// Drivers
 #include "driver/pata.h"
 #include "driver/usb/usb.h"
 #include "driver/ramdisk.h"
@@ -42,6 +42,7 @@
 #include "driver/virtio_blk.h"
 #include "driver/fs.h"
 #include "driver/bfs.h"
+#include "driver/console.h"
 
 #define RAMDISK_ADDR	(0x400000 + 0x200000 * MP_MAX_CORE_COUNT)
 
@@ -393,6 +394,7 @@ void main(void) {
 	mp_init();
 	uint8_t apic_id = mp_apic_id();
 
+	console_init();
 	uint64_t vga_buffer = PHYSICAL_TO_VIRTUAL(0x600000 - 0x70000);
 	stdio_init(apic_id, (void*)vga_buffer, 64 * 1024);
 	malloc_init(vga_buffer);
@@ -410,6 +412,7 @@ void main(void) {
 
 		printf("Analyze CPU information...\n");
 		cpu_init();
+		shared_init();
 		gmalloc_init(RAMDISK_ADDR, initrd_end - initrd_start);
 		timer_init(cpu_brand);
 
@@ -427,7 +430,7 @@ void main(void) {
 
 		printf("Loading IDT...\n");
 		idt_load();
-
+		
 		printf("Initializing APICs...\n");
 		apic_activate();
 

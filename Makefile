@@ -16,9 +16,10 @@ Test.make:
 	tools/premake5 gmake
 
 test: Test.make
-	@echo "Build & Run PacketNgin RTOS tests"
+	@echo "Build & Run PacketNgin RTOS unit tests"
 	make clean -f Test.make
 	make -f Test.make
+
 
 # Default running option is QEMU
 ifndef option
@@ -45,6 +46,9 @@ ifeq ($(option),vnc)
 endif
 ifeq ($(option),debug)
 	sudo $(QEMU) -monitor stdio -S -s 
+endif
+ifeq ($(option),test)
+	sudo $(QEMU) -serial stdio | node test/test.js
 endif
 # Run by VirtualBox
 ifeq ($(option),vb)
@@ -84,9 +88,9 @@ gdb:
 	# file kernel/kernel.elf
 	gdb --eval-command="target remote localhost:1234; set architecture i386:x86-64; file kernel/kernel.elf"
 
-dis: kernel/kernel.elf
+dis: kernel/build/kernel.elf
 	@echo "Dissable PacketNgin kernel image"
-	objdump -d kernel/kernel.elf > kernel.dis && vi kernel.dis
+	objdump -d kernel/build/kernel.elf > kernel.dis && vi kernel.dis
 
 clean:
 	@${MAKE} --no-print-directory -C . -f Build.make clean
@@ -116,5 +120,6 @@ help:
 	@echo "   cli			- Run CLI mode (QEMU)"
 	@echo "   vnc			- Run VNC mode (QEMU)"
 	@echo "   debug		- Run GDB mode (QEMU)"
+	@echo "   test			- Execute runtime-tests (QEMU)"
 	@echo "   vb			- Run by VirtualBox"
 	@echo ""

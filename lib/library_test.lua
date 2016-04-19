@@ -14,9 +14,9 @@ workspace "Test"
             files { "core/src/test/cache.c", "core/src/**.h" }
             -- Link testing target library
             linkoptions { "../../../libumpn.a" }
-            -- Execute test. "|| true" needed to ignore shell fail status
             postbuildcommands {
-                '%{cfg.buildtarget.abspath} > %{cfg.buildtarget.abspath}.xml || true' 
+                '@export CMOCKA_XML_FILE=\'%{cfg.buildtarget.abspath}.xml\'; export CMOCKA_MESSAGE_OUTPUT=xml; %{cfg.buildtarget.abspath} 2>/dev/null',
+                '@export CMOCKA_MESSAGE_OUTPUT=stdout; %{cfg.buildtarget.abspath}'
             }
             
         -- [[ 1.2. List test ]]
@@ -30,7 +30,8 @@ workspace "Test"
             -- Link testing target library
             linkoptions { "../../../libumpn.a" }
             postbuildcommands {
-                '%{cfg.buildtarget.abspath} > %{cfg.buildtarget.abspath}.xml || true' 
+                '@export CMOCKA_XML_FILE=\'%{cfg.buildtarget.abspath}.xml\'; export CMOCKA_MESSAGE_OUTPUT=xml; %{cfg.buildtarget.abspath} 2>/dev/null',
+                '@export CMOCKA_MESSAGE_OUTPUT=stdout; %{cfg.buildtarget.abspath}'
             }
 
         -- [[ 1.3. Map test ]]
@@ -44,9 +45,10 @@ workspace "Test"
             -- Link testing target library
             linkoptions { "../../../libumpn.a" }
             postbuildcommands {
-                '%{cfg.buildtarget.abspath} > %{cfg.buildtarget.abspath}.xml || true' 
+                '@export CMOCKA_XML_FILE=\'%{cfg.buildtarget.abspath}.xml\'; export CMOCKA_MESSAGE_OUTPUT=xml; %{cfg.buildtarget.abspath} 2>/dev/null',
+                '@export CMOCKA_MESSAGE_OUTPUT=stdout; %{cfg.buildtarget.abspath}'
             }
-           
+            
     -- Templete other library below
     -- [[ 2. Others ]] 
         -- [[ 2.1 ... ]] 

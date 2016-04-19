@@ -36,10 +36,38 @@
 
 #include "shell.h"
 
+
 #define MAX_VM_COUNT	128
 #define MAX_VNIC_COUNT	32
 
 bool cmd_async;
+
+#ifdef TEST
+#include "test.h"
+static int cmd_test(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	// Run all tests 
+	if(argc == 1) {
+		printf("Running PacketNgin RTOS all runtime tests...\n");
+		if(run_test(NULL) < 0)
+			return -1;
+
+		return 0;
+	}
+
+	// List up test cases
+	if(!strcmp("list", argv[1])) {
+		list_tests();
+
+		return 0;
+	}
+
+	// Run specific test case
+	if(run_test(argv[1]) < 0)
+		return -1;
+
+	return 0;
+}
+#endif
 
 static int cmd_clear(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	printf("\f");
@@ -1075,6 +1103,13 @@ Command commands[] = {
 		.desc = "Show this message.", 
 		.func = cmd_help 
 	},
+#ifdef TEST
+	{
+		.name = "test",
+		.desc = "Run run-time tests.", 
+		.func = cmd_test
+	},
+#endif
 	{ 
 		.name = "version", 
 		.desc = "Print the kernel version.", 
