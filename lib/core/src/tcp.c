@@ -6,10 +6,10 @@
 #include <net/checksum.h>
 #include <util/map.h>
 
-bool tcp_port_alloc0(NetworkInterface* ni, uint32_t addr, uint16_t port) {
-	IPv4Interface* interface = ni_ip_get(ni, addr);
+bool tcp_port_alloc0(NIC* nic, uint32_t addr, uint16_t port) {
+	IPv4Interface* interface = nic_ip_get(nic, addr);
 	if(!interface->tcp_ports) {
-		interface->tcp_ports = set_create(64, set_uint64_hash, set_uint64_equals, ni->pool);
+		interface->tcp_ports = set_create(64, set_uint64_hash, set_uint64_equals, nic->pool);
 		if(!interface->tcp_ports)
 			return false;
 	}
@@ -20,10 +20,10 @@ bool tcp_port_alloc0(NetworkInterface* ni, uint32_t addr, uint16_t port) {
 	return set_put(interface->tcp_ports, (void*)(uintptr_t)port);
 }
 
-uint16_t tcp_port_alloc(NetworkInterface* ni, uint32_t addr) {
-	IPv4Interface* interface = ni_ip_get(ni, addr);
+uint16_t tcp_port_alloc(NIC* nic, uint32_t addr) {
+	IPv4Interface* interface = nic_ip_get(nic, addr);
 	if(!interface->tcp_ports) {
-		interface->tcp_ports = set_create(64, set_uint64_hash, set_uint64_equals, ni->pool);
+		interface->tcp_ports = set_create(64, set_uint64_hash, set_uint64_equals, nic->pool);
 		if(!interface->tcp_ports)
 			return 0;
 	}
@@ -45,8 +45,8 @@ uint16_t tcp_port_alloc(NetworkInterface* ni, uint32_t addr) {
 	return port;
 }
 
-void tcp_port_free(NetworkInterface* ni, uint32_t addr, uint16_t port) {
-	IPv4Interface* interface = ni_ip_get(ni, addr);
+void tcp_port_free(NIC* nic, uint32_t addr, uint16_t port) {
+	IPv4Interface* interface = nic_ip_get(nic, addr);
 	if(interface == NULL)
 		return;
 	

@@ -115,7 +115,7 @@ static bool idle0_event(void* data) {
 	
 	if(time > tick) {
 		tick = time + cpu_frequency;
-		ni_statistics(time);
+		nic_statistics(time);
 		printf("\033[0;68HLoad: %3d%%", (cpu_frequency - idle_time) * 100 / cpu_frequency);
 		idle_time = 0;
 		return;
@@ -253,10 +253,10 @@ static void icc_start(ICC_Message* msg) {
 	}
 
 	*(uint32_t*)task_addr(id, SYM_NIS_COUNT) = vm->nic_count;
-	NetworkInterface** nis = (NetworkInterface**)task_addr(id, SYM_NIS);
+	NIC** nics = (NIC**)task_addr(id, SYM_NIS);
 	for(int i = 0; i < vm->nic_count; i++) {
 		task_resource(id, RESOURCE_NI, vm->nics[i]);
-		nis[i] = vm->nics[i]->ni;
+		nics[i] = vm->nics[i]->nic;
 	}
 		
 	printf("Starting VM...\n");

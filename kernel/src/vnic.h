@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include <util/fifo.h>
 #include <util/list.h>
-#include <net/ni.h>
+#include <net/nic.h>
 
 #include "device.h"
 
@@ -15,7 +15,7 @@ Device* nic_devices[NIC_MAX_DEVICE_COUNT];
 
 typedef struct {
 	// Management
-	NetworkInterface*	ni;
+	NIC*		nic;
 	List*		pools;
 	void*		pool;
 
@@ -51,7 +51,7 @@ void vnic_init0();
 Device* nic_parse_index(char* _argv, uint16_t* port);
 VNIC* vnic_create(uint64_t* attrs);
 void vnic_destroy(VNIC* nic);
-bool vnic_contains(char* ni_dev, uint64_t mac);
+bool vnic_contains(char* nic_dev, uint64_t mac);
 
 /**
  * Return
@@ -63,7 +63,7 @@ bool vnic_contains(char* ni_dev, uint64_t mac);
  * 5: not enough space
  * 6: no resource to allocate
  */
-uint32_t vnic_update(VNIC* ni, uint64_t* attrs);
+uint32_t vnic_update(VNIC* nic, uint64_t* attrs);
 void nic_process_input(uint8_t local_port, uint8_t* buf1, uint32_t size1, uint8_t* buf2, uint32_t size2);
 Packet* nic_process_output(uint8_t local_port);
 void nic_statistics(uint64_t time);

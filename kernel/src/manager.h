@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include "vnic.h"
 
-VNIC*	manager_ni;
+VNIC*	manager_nic;
 
 void manager_init();
 uint32_t manager_get_ip();

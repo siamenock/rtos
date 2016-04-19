@@ -1,7 +1,7 @@
 #include <_string.h>
 #include <malloc.h>
 #include <time.h>
-#include <net/ni.h>
+#include <net/nic.h>
 #include <net/interface.h>
 #include <net/ether.h>
 #include <net/ip.h>
@@ -10,7 +10,7 @@
 #include <util/map.h>
 
 typedef struct {
-	NetworkInterface*	ni;
+	NIC*		nic;
 	uint16_t	saddr;
 	uint16_t	sport;
 	
@@ -35,7 +35,7 @@ uint32_t TFTP_SESSION_TTL = (10 * 1000000);	// 10 secs
 static Map* sessions;
 
 static void delete(Session* session) {
-	udp_port_free(session->ni, session->saddr, session->sport);
+	udp_port_free(session->nic, session->saddr, session->sport);
 	free(session->filename);
 	free(session->mode);
 	free(session);
@@ -51,9 +51,9 @@ static Session* create(Packet* packet, IP* ip, UDP* udp, TFTPCallback* callback)
 	
 	Session* session = malloc(sizeof(Session));
 	bzero(session, sizeof(Session));
-	session->ni = packet->ni;
+	session->nic = packet->nic;
 	session->saddr = endian32(ip->destination);
-	session->sport = udp_port_alloc(session->ni, session->saddr);
+	session->sport = udp_port_alloc(session->nic, session->saddr);
 	session->daddr = endian32(ip->source);
 	session->dport = endian16(udp->source);
 	int len = strlen(filename) + 1;
@@ -103,7 +103,7 @@ static void ack(Packet* packet, Session* session) {
 	
 	udp_pack(packet, index);
 	
-	ni_output(packet->ni, packet);
+	nic_output(packet->nic, packet);
 }
 
 static void nack(Packet* packet, uint16_t error_number, char* error_message) {
@@ -123,7 +123,7 @@ static void nack(Packet* packet, uint16_t error_number, char* error_message) {
 	
 	udp_pack(packet, index);
 	
-	ni_output(packet->ni, packet);
+	nic_output(packet->nic, packet);
 }
 
 bool tftp_process(Packet* packet) {
@@ -144,7 +144,7 @@ bool tftp_process(Packet* packet) {
 		next_gc = time + TFTP_SESSION_GC;
 	} 
 	
-	TFTPCallback* callback = ni_config_get(packet->ni, TFTP_CALLBACK); 
+	TFTPCallback* callback = nic_config_get(packet->nic, TFTP_CALLBACK); 
 	if(!callback)
 		return false;
 	
@@ -158,11 +158,11 @@ bool tftp_process(Packet* packet) {
 		return false;
 
 	uint32_t addr = endian32(ip->destination);
-	IPv4Interface* interface = ni_ip_get(packet->ni, addr);
+	IPv4Interface* interface = nic_ip_get(packet->nic, addr);
 	if(!interface)
 		return false;
 
-	udp_port_alloc0(packet->ni, addr, 69);
+	udp_port_alloc0(packet->nic, addr, 69);
 	uint16_t port = 69;
 	
 	UDP* udp = (UDP*)ip->body;
@@ -182,7 +182,7 @@ bool tftp_process(Packet* packet) {
 				}
 				return true;
 			default:
-				ni_free(packet);
+				nic_free(packet);
 				printf("Unsupported opcode: %d\n", opcode);
 				return true;
 		}
@@ -217,7 +217,7 @@ bool tftp_process(Packet* packet) {
 			case 5: // Error (ERROR)
 			default:
 				close(session);
-				ni_free(packet);
+				nic_free(packet);
 				printf("Unsupported opcode: %d\n", opcode);
 				return true;
 		}

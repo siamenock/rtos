@@ -452,7 +452,7 @@ static int virtnet_send(int id, Packet* packet) {
 #if DEBUG
 		printf("No more free descriptor in send queue\n");
 #endif
-		ni_free(packet);
+		nic_free(packet);
 
 		return -1;
 	}
@@ -555,7 +555,7 @@ int poll(int id) {
 	// Free used buffer
 	void* buf;
 	while((buf = get_buf(priv[id]->svq, NULL))) {
-		ni_free(buf);
+		nic_free(buf);
 	}
 
 	// TX

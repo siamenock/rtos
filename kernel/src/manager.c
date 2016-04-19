@@ -434,7 +434,7 @@ static bool manager_server_close() {
 	return true;
 }
 static bool manager_loop(void* context) {
-	ni_poll();
+	nic_poll();
 	
 	if(!list_is_empty(actives)) {
 		ListIterator iter;
@@ -453,51 +453,51 @@ static bool manager_loop(void* context) {
 }
 
 static bool manager_timer(void* context) {
-	ni_timer();
+	nic_timer();
 	
 	return true;
 }
 
 void manager_init() {
 	uint64_t attrs[] = { 
-		NI_MAC, manager_mac, // Physical MAC
-		NI_DEV, (uint64_t)"eth0",
-		NI_POOL_SIZE, 0x400000,
-		NI_INPUT_BANDWIDTH, 1000000000L,
-		NI_OUTPUT_BANDWIDTH, 1000000000L,
-		NI_INPUT_BUFFER_SIZE, 1024,
-		NI_OUTPUT_BUFFER_SIZE, 1024,
-		NI_PADDING_HEAD, 32,
-		NI_PADDING_TAIL, 32,
-		NI_INPUT_ACCEPT_ALL, 1,
-		NI_OUTPUT_ACCEPT_ALL, 1,
-		NI_NONE
+		NIC_MAC, manager_mac, // Physical MAC
+		NIC_DEV, (uint64_t)"eth0",
+		NIC_POOL_SIZE, 0x400000,
+		NIC_INPUT_BANDWIDTH, 1000000000L,
+		NIC_OUTPUT_BANDWIDTH, 1000000000L,
+		NIC_INPUT_BUFFER_SIZE, 1024,
+		NIC_OUTPUT_BUFFER_SIZE, 1024,
+		NIC_PADDING_HEAD, 32,
+		NIC_PADDING_TAIL, 32,
+		NIC_INPUT_ACCEPT_ALL, 1,
+		NIC_OUTPUT_ACCEPT_ALL, 1,
+		NIC_NONE
 	};
 	
-	manager_ni = vnic_create(attrs);
-	if(!manager_ni) {
+	manager_nic = vnic_create(attrs);
+	if(!manager_nic) {
 		printf("\tCannot create manager\n");
 		return;
 	}
 
 	manager_ip = DEFAULT_MANAGER_IP;
-	if(!ni_ip_add(manager_ni->ni, DEFAULT_MANAGER_IP)) {
+	if(!nic_ip_add(manager_nic->nic, DEFAULT_MANAGER_IP)) {
 		printf("\tCan'nt allocate manager ip\n");
 		return;
 	}
 
-	IPv4Interface* interface = ni_ip_get(manager_ni->ni, DEFAULT_MANAGER_IP);
+	IPv4Interface* interface = nic_ip_get(manager_nic->nic, DEFAULT_MANAGER_IP);
 	interface->gateway = DEFAULT_MANAGER_GW;
 	interface->netmask = DEFAULT_MANAGER_NETMASK;
 	interface->_default = true;
 
-	if(!udp_port_alloc0(manager_ni->ni, DEFAULT_MANAGER_IP, manager_port)) {
+	if(!udp_port_alloc0(manager_nic->nic, DEFAULT_MANAGER_IP, manager_port)) {
 		printf("\tCan'nt allocate manager port\n");
 		return;
 	}
 	manager_port = DEFAULT_MANAGER_PORT;
 	
-	manager_netif = ni_init(manager_ni->ni, manage, NULL);
+	manager_netif = nic_init(manager_nic->nic, manage, NULL);
 	
 	manager_server_open();
 	
@@ -512,22 +512,22 @@ uint32_t manager_get_ip() {
 }
 
 void manager_set_ip(uint32_t ip) {
-	if(manager_ni == NULL)
+	if(manager_nic == NULL)
 		return;
 
-	IPv4Interface* interface = ni_ip_get(manager_ni->ni, manager_ip);
+	IPv4Interface* interface = nic_ip_get(manager_nic->nic, manager_ip);
 	if(!interface)
 		return;
 
-	if(!ni_ip_add(manager_ni->ni, ip))
+	if(!nic_ip_add(manager_nic->nic, ip))
 		return;
 
-	IPv4Interface* _interface = ni_ip_get(manager_ni->ni, ip);
+	IPv4Interface* _interface = nic_ip_get(manager_nic->nic, ip);
 	_interface->gateway = interface->gateway;
 	_interface->netmask = interface->netmask;
 	_interface->_default = interface->_default;
 
-	ni_ip_remove(manager_ni->ni, manager_ip);
+	nic_ip_remove(manager_nic->nic, manager_ip);
 	manager_ip = ip;
 
 	struct ip_addr ip2;
@@ -543,13 +543,13 @@ uint16_t manager_get_port() {
 }
 
 void manager_set_port(uint16_t port) {
-	if(manager_ni == NULL)
+	if(manager_nic == NULL)
 		return;
 
-	if(!udp_port_alloc0(manager_ni->ni, manager_ip, port))
+	if(!udp_port_alloc0(manager_nic->nic, manager_ip, port))
 		return;
 
-	udp_port_free(manager_ni->ni, manager_ip, manager_port);
+	udp_port_free(manager_nic->nic, manager_ip, manager_port);
 	manager_port = port;
 
 	manager_server_close();
@@ -557,10 +557,10 @@ void manager_set_port(uint16_t port) {
 }
 
 uint32_t manager_get_gateway() {
-	if(manager_ni == NULL)
+	if(manager_nic == NULL)
 		return 0;
 
-	IPv4Interface* interface = ni_ip_get(manager_ni->ni, manager_ip);
+	IPv4Interface* interface = nic_ip_get(manager_nic->nic, manager_ip);
 	if(!interface)
 		return 0;
 
@@ -568,10 +568,10 @@ uint32_t manager_get_gateway() {
 }
 
 void manager_set_gateway(uint32_t gw) {
-	if(manager_ni == NULL)
+	if(manager_nic == NULL)
 		return;
 
-	IPv4Interface* interface = ni_ip_get(manager_ni->ni, manager_ip);
+	IPv4Interface* interface = nic_ip_get(manager_nic->nic, manager_ip);
 	if(!interface)
 		return;
 
@@ -583,10 +583,10 @@ void manager_set_gateway(uint32_t gw) {
 }
 
 uint32_t manager_get_netmask() {
-	if(manager_ni == NULL)
+	if(manager_nic == NULL)
 		return 0;
 
-	IPv4Interface* interface = ni_ip_get(manager_ni->ni, manager_ip);
+	IPv4Interface* interface = nic_ip_get(manager_nic->nic, manager_ip);
 	if(!interface)
 		return 0;
 
@@ -594,10 +594,10 @@ uint32_t manager_get_netmask() {
 }
 
 void manager_set_netmask(uint32_t nm) {
-	if(manager_ni == NULL)
+	if(manager_nic == NULL)
 		return;
 
-	IPv4Interface* interface = ni_ip_get(manager_ni->ni, manager_ip);
+	IPv4Interface* interface = nic_ip_get(manager_nic->nic, manager_ip);
 	if(!interface)
 		return;
 
@@ -609,11 +609,11 @@ void manager_set_netmask(uint32_t nm) {
 }
 
 void manager_set_interface() {
-	if(manager_ni == NULL)
+	if(manager_nic == NULL)
 		return;
 
 	manager_server_close();
-	ni_remove(manager_netif);
-	manager_netif = ni_init(manager_ni->ni, manage, NULL);
+	nic_remove(manager_netif);
+	manager_netif = nic_init(manager_nic->nic, manage, NULL);
 	manager_server_open();
 }

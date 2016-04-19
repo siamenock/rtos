@@ -5,8 +5,8 @@
 #include <stdbool.h>
 #include <util/set.h>
 
-#define NI_ADDR_IPv4	"net.addr.ipv4"
-#define NI_ADDR_IPv6	"net.addr.ipv6"
+#define NIC_ADDR_IPv4	"net.addr.ipv4"
+#define NIC_ADDR_IPv6	"net.addr.ipv6"
 
 typedef struct _IPv4Interface {
 	uint32_t	gateway;

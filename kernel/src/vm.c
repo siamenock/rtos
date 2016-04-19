@@ -483,19 +483,19 @@ uint32_t vm_create(VMSpec* vm_spec) {
 		}
 		
 		uint64_t attrs[] = { 
-			NI_MAC, mac,
-			NI_DEV,	(uint64_t)nics[i].dev,
-			NI_INPUT_BUFFER_SIZE, nics[i].input_buffer_size,
-			NI_OUTPUT_BUFFER_SIZE, nics[i].output_buffer_size,
-			NI_INPUT_BANDWIDTH, nics[i].input_bandwidth,
-			NI_OUTPUT_BANDWIDTH, nics[i].output_bandwidth,
-			NI_PADDING_HEAD, nics[i].padding_head ? nics[i].padding_head : 32,
-			NI_PADDING_TAIL, nics[i].padding_tail ? nics[i].padding_tail : 32,
-			NI_POOL_SIZE, nics[i].pool_size,
-			NI_INPUT_ACCEPT_ALL, 1,
-			NI_OUTPUT_ACCEPT_ALL, 1,
-			NI_INPUT_FUNC, 0,
-			NI_NONE
+			NIC_MAC, mac,
+			NIC_DEV,	(uint64_t)nics[i].dev,
+			NIC_INPUT_BUFFER_SIZE, nics[i].input_buffer_size,
+			NIC_OUTPUT_BUFFER_SIZE, nics[i].output_buffer_size,
+			NIC_INPUT_BANDWIDTH, nics[i].input_bandwidth,
+			NIC_OUTPUT_BANDWIDTH, nics[i].output_bandwidth,
+			NIC_PADDING_HEAD, nics[i].padding_head ? nics[i].padding_head : 32,
+			NIC_PADDING_TAIL, nics[i].padding_tail ? nics[i].padding_tail : 32,
+			NIC_POOL_SIZE, nics[i].pool_size,
+			NIC_INPUT_ACCEPT_ALL, 1,
+			NIC_OUTPUT_ACCEPT_ALL, 1,
+			NIC_INPUT_FUNC, 0,
+			NIC_NONE
 		};
 		
 		vm->nics[i] = vnic_create(attrs);
@@ -528,7 +528,7 @@ uint32_t vm_create(VMSpec* vm_spec) {
 			else
 				printf(" ");
 		}
-		printf("%dMbps/%d, %dMbps/%d, %dMBs\n", nic->input_bandwidth / 1000000, fifo_capacity(nic->ni->input_buffer) + 1, nic->output_bandwidth / 1000000, fifo_capacity(nic->ni->output_buffer) + 1, list_size(nic->pools) * 2); }
+		printf("%dMbps/%d, %dMbps/%d, %dMBs\n", nic->input_bandwidth / 1000000, fifo_capacity(nic->nic->input_buffer) + 1, nic->output_bandwidth / 1000000, fifo_capacity(nic->nic->output_buffer) + 1, list_size(nic->pools) * 2); }
 	
 	printf("\targs(%d): ", vm->argc);
 	for(int i = 0; i < vm->argc; i++) {

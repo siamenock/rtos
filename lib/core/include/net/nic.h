@@ -1,5 +1,5 @@
-#ifndef __NET_NETWORK_INTERFACE_H__
-#define __NET_NETWORK_INTERFACE_H__
+#ifndef __NET_NIC_H__
+#define __NET_NIC_H__
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -10,34 +10,34 @@
 
 /**
  * @file
- * Network Interface (NI) management
+ * Network Interface Controller (NIC) management
  */
 
 /**
- * NI attributes to create or update NI.
+ * NIC attributes to create or update NIC.
  */
 typedef enum {
-	NI_NONE,		///< End of attributes
-	NI_MAC,			///< MAC address
-	//NI_PORT,		///< Physical port mapping
-	NI_DEV,			///< Device of Network Interface
-	NI_POOL_SIZE,		///< NI's total memory size
-	NI_INPUT_BANDWIDTH,	///< Input bandwidth in bps
-	NI_OUTPUT_BANDWIDTH,	///< Output bandwidth in bps
-	NI_PADDING_HEAD,	///< Minimum padding head of packet payload buffer
-	NI_PADDING_TAIL,	///< Minimum padding tail of packet payload buffer
-	NI_INPUT_BUFFER_SIZE,	///< Number of input buffer size, the packet count
-	NI_OUTPUT_BUFFER_SIZE,	///< Number of output buffer size, the packet count
-	NI_MIN_BUFFER_SIZE,	///< Minimum packet payload buffer size which includes padding
-	NI_MAX_BUFFER_SIZE,	///< Maximum packet payload buffer size which includes padding
-	NI_INPUT_ACCEPT_ALL,	///< To accept all packets to receive
-	NI_INPUT_ACCEPT,	///< List of accept MAC addresses to receive
-	NI_OUTPUT_ACCEPT_ALL,	///< To accept all packets to send
-	NI_OUTPUT_ACCEPT,	///< List of accept MAC addresses to send
-	NI_INPUT_FUNC,		///< Deprecated
-} NI_ATTRIBUTES;
+	NIC_NONE,		///< End of attributes
+	NIC_MAC,		///< MAC address
+	//NIC_PORT,		///< Physical port mapping
+	NIC_DEV,		///< Device of Network Interface
+	NIC_POOL_SIZE,		///< NI's total memory size
+	NIC_INPUT_BANDWIDTH,	///< Input bandwidth in bps
+	NIC_OUTPUT_BANDWIDTH,	///< Output bandwidth in bps
+	NIC_PADDING_HEAD,	///< Minimum padding head of packet payload buffer
+	NIC_PADDING_TAIL,	///< Minimum padding tail of packet payload buffer
+	NIC_INPUT_BUFFER_SIZE,	///< Number of input buffer size, the packet count
+	NIC_OUTPUT_BUFFER_SIZE,	///< Number of output buffer size, the packet count
+	NIC_MIN_BUFFER_SIZE,	///< Minimum packet payload buffer size which includes padding
+	NIC_MAX_BUFFER_SIZE,	///< Maximum packet payload buffer size which includes padding
+	NIC_INPUT_ACCEPT_ALL,	///< To accept all packets to receive
+	NIC_INPUT_ACCEPT,	///< List of accept MAC addresses to receive
+	NIC_OUTPUT_ACCEPT_ALL,	///< To accept all packets to send
+	NIC_OUTPUT_ACCEPT,	///< List of accept MAC addresses to send
+	NIC_INPUT_FUNC,		///< Deprecated
+} NIC_ATTRIBUTES;
 
-#define NIS_SIZE			256		///< VM's maximum number of NIs
+#define NIC_SIZE			256		///< VM's maximum number of NICs
 
 #define PACKET_STATUS_IP		(1 >> 0)	///< Is IP(v4, v6) packet? (deprecated)
 #define PACKET_STATUS_IPv6		(1 >> 1)	///< Is IPv6 packet? (deprectated)
@@ -47,9 +47,9 @@ typedef enum {
 #define PACKET_STATUS_L3_CHECKSUM	(1 >> 5)	///< Is level 3(TCP, UDP) RX checksum OK or TX checksum already calculated (deprectated)
 
 /** 
- * Network interface or just NI.
+ * Network interface or just NIC.
  */
-typedef struct _NetworkInterface {
+typedef struct _NIC {
 	// Management
 	uint64_t	pool_size;		///< Memory pool size (read only)
 	void*		pool;			///< Base pool address (read only)
@@ -93,223 +93,223 @@ typedef struct _NetworkInterface {
 	
 	// Configuration
 	Map*		config;			///< Configuration collection (DO NOT USE IT DIRECTLY)
-} NetworkInterface;
+} NIC;
 
 /**
  * Pre/post processor of LwIP network protocol stack
  */
-typedef Packet*(*NI_DPI)(Packet*);
+typedef Packet*(*NIC_DPI)(Packet*);
 
 /**
  * Initialize LwIP network protocol stack if needed
  */
 struct netif;
-struct netif* ni_init(NetworkInterface* ni, NI_DPI preprocessor, NI_DPI postprocessor);
+struct netif* nic_init(NIC* nic, NIC_DPI preprocessor, NIC_DPI postprocessor);
 
 /**
  * Remove LwIP network protocol stack if needed
  */
-bool ni_remove(struct netif* netif);
+bool nic_remove(struct netif* netif);
 
 /**
- * Poll NI to receive and send packets.
+ * Poll NIC to receive and send packets.
  *
  * @return Packet is processed
  */
-bool ni_poll();
+bool nic_poll();
 
 /**
  * Process time based events of LwIP network protocol stack. It must be called every 100ms,
  * when using LwIP
  */
-void ni_timer();
+void nic_timer();
 
 /**
- * Get number of NIs of VM.
+ * Get number of NICs of VM.
  *
- * @return number of NIs of VM
+ * @return number of NICs of VM
  */
-int ni_count();
+int nic_count();
 
 /**
- * Get idx'th NI of VM.
+ * Get idx'th NIC of VM.
  *
- * @param idx index number of NIs which is zero based.
- * @return reference of NI.
+ * @param idx index number of NICs which is zero based.
+ * @return reference of NIC.
  */
-NetworkInterface* ni_get(int idx);
+NIC* nic_get(int idx);
 
 /**
- * Allocate a Packet from NI.
+ * Allocate a Packet from NIC.
  *
- * @param ni NI reference
+ * @param nic NIC reference
  * @param size packet payload buffer size without padding
- * @return allocated Packet or NULL if there is no memory in NI
+ * @return allocated Packet or NULL if there is no memory in NIC
  */
-Packet* ni_alloc(NetworkInterface* ni, uint16_t size);
+Packet* nic_alloc(NIC* nic, uint16_t size);
 
 /**
- * Drop and free packet explicitly. ni_output frees packet automatically, 
- * so it must not be freed again when ni_output is succeed.
+ * Drop and free packet explicitly. nic_output frees packet automatically, 
+ * so it must not be freed again when nic_output is succeed.
  *
  * @param packet packet reference
  */
-void ni_free(Packet* packet);
+void nic_free(Packet* packet);
 
 /**
- * Check there is any packet in NI's input buffer.
+ * Check there is any packet in NIC's input buffer.
  *
- * @param ni NI reference
- * @return true if there is one or more packets in NI's input buffer
+ * @param nic NIC reference
+ * @return true if there is one or more packets in NIC's input buffer
  */
-bool ni_has_input(NetworkInterface* ni);
+bool nic_has_input(NIC* nic);
 
 /**
- * Receive a packet from NI's input buffer. This functions waits when input buffer is locked.
+ * Receive a packet from NIC's input buffer. This functions waits when input buffer is locked.
  *
- * @param ni NI reference
+ * @param nic NIC reference
  * @return packet reference or NULL if there is no available packet
  */
-Packet* ni_input(NetworkInterface* ni);
+Packet* nic_input(NIC* nic);
 
 /**
- * Receive a packet from NI's input buffer. This functions DOES NOT waits when input buffer is locked.
+ * Receive a packet from NIC's input buffer. This functions DOES NOT waits when input buffer is locked.
  *
- * @param ni NI reference
+ * @param nic NIC reference
  * @return packet reference or NULL if there is no available packet or input buffer is locked
  */
-Packet* ni_tryinput(NetworkInterface* ni);
+Packet* nic_tryinput(NIC* nic);
 
 /**
- * Check NI's output buffer is available.
+ * Check NIC's output buffer is available.
  *
- * @param ni NI reference
+ * @param nic NIC reference
  * @return true if there is available buffer
  */
-bool ni_output_available(NetworkInterface* ni);
+bool nic_output_available(NIC* nic);
 
 /**
- * Check there is any packet in NI's output buffer.
+ * Check there is any packet in NIC's output buffer.
  *
- * @param ni NI reference
- * @return true if there is one or more packets in NI's output buffer
+ * @param nic NIC reference
+ * @return true if there is one or more packets in NIC's output buffer
  */
-bool ni_has_output(NetworkInterface* ni);
+bool nic_has_output(NIC* nic);
 
 /**
- * Send a packet to NI's output buffer. This functions waits when output buffer is locked.
+ * Send a packet to NIC's output buffer. This functions waits when output buffer is locked.
  * When it returns false, the packet must be retried to send or explicitly dropped.
  *
- * @param ni NI reference
+ * @param nic NIC reference
  * @param packet packet reference to send
  * @return true if output is succeed or false if output buffer is full 
  * packet must be explicitly treated(drop or resend)
  */
-bool ni_output(NetworkInterface* ni, Packet* packet);
+bool nic_output(NIC* nic, Packet* packet);
 
 /**
- * Send a packet to NI's output buffer. This functions waits when output buffer is locked.
+ * Send a packet to NIC's output buffer. This functions waits when output buffer is locked.
  * The packet must be explicitly treated (drop or send) regardless the return value.
  *
- * @param ni NI reference
+ * @param nic NIC reference
  * @param packet packet reference to send
  * @return true if output is succeed or false if output buffer is full 
  */
-bool ni_output_dup(NetworkInterface* ni, Packet* packet);
+bool nic_output_dup(NIC* nic, Packet* packet);
 
 /**
- * Send a packet to NI's output buffer. This functions DOES NOT waits when output buffer is locked.
+ * Send a packet to NIC's output buffer. This functions DOES NOT waits when output buffer is locked.
  * When it returns false, the packet must be retried to send or explicitly dropped.
  *
- * @param ni NI reference
+ * @param nic NIC reference
  * @param packet packet reference to send
  * @return true if output is succeed or false if output buffer is full or locked
  * packet must be explicitly treated
  */
-bool ni_tryoutput(NetworkInterface* ni, Packet* packet);
+bool nic_tryoutput(NIC* nic, Packet* packet);
 
 /**
- * Get the used memory size of NI
+ * Get the used memory size of NIC
  *
- * @return size of used memory of NI in bytes
+ * @return size of used memory of NIC in bytes
  */
-size_t ni_pool_used(NetworkInterface* ni);
+size_t nic_pool_used(NIC* nic);
 
 /**
- * Get the free memory size of NI
+ * Get the free memory size of NIC
  *
- * @return size of free memory of NI in bytes
+ * @return size of free memory of NIC in bytes
  */
-size_t ni_pool_free(NetworkInterface* ni);
+size_t nic_pool_free(NIC* nic);
 
 /**
- * Get the total memory size of NI
+ * Get the total memory size of NIC
  *
- * @return size of total memory of NI in bytes
+ * @return size of total memory of NIC in bytes
  */
-size_t ni_pool_total(NetworkInterface* ni);
+size_t nic_pool_total(NIC* nic);
 
 /**
- * Put NI's configuration data. It's safe to put data in multiple times with same key.
+ * Put NIC's configuration data. It's safe to put data in multiple times with same key.
  *
- * @param ni NI reference
+ * @param nic NIC reference
  * @param key configuration key
  * @param data configuration data
  */
-bool ni_config_put(NetworkInterface* ni, char* key, void* data);
+bool nic_config_put(NIC* nic, char* key, void* data);
 
 /**
  * Check configuration data is setted with the key.
  *
- * @param ni NI reference
+ * @param nic NIC reference
  * @param key configuration key
  * @return true if configuration data is setted
  */
-bool ni_config_contains(NetworkInterface* ni, char* key);
+bool nic_config_contains(NIC* nic, char* key);
 
 /**
- * Remove NI's configuration data with the key.
+ * Remove NIC's configuration data with the key.
  *
- * @param ni NI reference
+ * @param nic NIC reference
  * @param key configuration key
  * @return configuration data reviously putted or NULL if not putted
  */
-void* ni_config_remove(NetworkInterface* ni, char* key);
+void* nic_config_remove(NIC* nic, char* key);
 
 /**
- * Get NI's configuration data with the key.
+ * Get NIC's configuration data with the key.
  *
- * @param ni NI reference
+ * @param nic NIC reference
  * @param key configuration key
  * @return configuration data reviously putted or NULL if not putted
  */
-void* ni_config_get(NetworkInterface* ni, char* key);
+void* nic_config_get(NIC* nic, char* key);
 
 /**
  * Add IP with the interface.
  *
- * @param ni NI reference
+ * @param nic NIC reference
  * @param addr
  * @return true if success
  */
-bool ni_ip_add(NetworkInterface* ni, uint32_t addr);
+bool nic_ip_add(NIC* nic, uint32_t addr);
 
 /**
  * Get ipv4 interface.
  *
- * @param ni NI reference
+ * @param nic NIC reference
  * @param addr
  * @return interface of ipv4
  */
-IPv4Interface* ni_ip_get(NetworkInterface* ni, uint32_t addr);
+IPv4Interface* nic_ip_get(NIC* nic, uint32_t addr);
 
 /**
  * Remove IP with the interface.
  *
- * @param ni NI reference
+ * @param nic NIC reference
  * @param addr
  * @return interface of ipv4
  */
-bool ni_ip_remove(NetworkInterface* ni, uint32_t addr);
+bool nic_ip_remove(NIC* nic, uint32_t addr);
 
-#endif /* __NET_NETWORK_INTERFACE_H__ */
+#endif /* __NET_NIC_H__ */
