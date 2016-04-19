@@ -29,6 +29,9 @@ iface br0 inet manual
 	bridge_maxage 12
 	bridge_stp off
 
+# Register SSH key to github account
+	https://help.github.com/articles/generating-an-ssh-key/
+
 # Install submodules
 
 * Initilize submodules 
