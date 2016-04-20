@@ -15,7 +15,11 @@ workspace "Test"
             -- Link testing target library
             linkoptions { "../../../libumpn.a" }
             postbuildcommands {
+                -- Remove old result
+                '{DELETE} %{cfg.buildtarget.abspath}.xml',
+                -- Genrate XML format result 
                 '@export CMOCKA_XML_FILE=\'%{cfg.buildtarget.abspath}.xml\'; export CMOCKA_MESSAGE_OUTPUT=xml; %{cfg.buildtarget.abspath} 2>/dev/null',
+                -- Genrate stdout format result 
                 '@export CMOCKA_MESSAGE_OUTPUT=stdout; %{cfg.buildtarget.abspath}'
             }
             
@@ -30,6 +34,7 @@ workspace "Test"
             -- Link testing target library
             linkoptions { "../../../libumpn.a" }
             postbuildcommands {
+                '{DELETE} %{cfg.buildtarget.abspath}.xml',
                 '@export CMOCKA_XML_FILE=\'%{cfg.buildtarget.abspath}.xml\'; export CMOCKA_MESSAGE_OUTPUT=xml; %{cfg.buildtarget.abspath} 2>/dev/null',
                 '@export CMOCKA_MESSAGE_OUTPUT=stdout; %{cfg.buildtarget.abspath}'
             }
@@ -45,6 +50,7 @@ workspace "Test"
             -- Link testing target library
             linkoptions { "../../../libumpn.a" }
             postbuildcommands {
+                '{DELETE} %{cfg.buildtarget.abspath}.xml',
                 '@export CMOCKA_XML_FILE=\'%{cfg.buildtarget.abspath}.xml\'; export CMOCKA_MESSAGE_OUTPUT=xml; %{cfg.buildtarget.abspath} 2>/dev/null',
                 '@export CMOCKA_MESSAGE_OUTPUT=stdout; %{cfg.buildtarget.abspath}'
             }
