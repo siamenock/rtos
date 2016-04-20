@@ -1,5 +1,5 @@
 # This makefile is for external libraries which need to be configured.
-.PHONY: all clean cleanall newlib
+.PHONY: all clean cleanall newlib doc
 
 all: libc.a libm.a libexpat.a libz.a libssl.a libxdr.a
 
@@ -57,6 +57,9 @@ xdr/linux/libxdr.a:
 
 libxdr.a: xdr/linux/libxdr.a
 	cp xdr/linux/libxdr.a .
+
+doc:
+	doxygen core/doxyfiles/Doxyfile
 
 clean: 
 	rm -f libc.a libm.a libz.a libssl.a libcrypto.a libexpat.a libxdr.a
