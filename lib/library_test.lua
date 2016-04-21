@@ -17,10 +17,10 @@ workspace "Test"
             postbuildcommands {
                 -- Remove old result
                 '{DELETE} %{cfg.buildtarget.abspath}.xml',
-                -- Genrate XML format result 
-                '@export CMOCKA_XML_FILE=\'%{cfg.buildtarget.abspath}.xml\'; export CMOCKA_MESSAGE_OUTPUT=xml; %{cfg.buildtarget.abspath} 2>/dev/null',
+                -- Genrate XML format result . ||:(or true) is for error suppressing
+                '@export CMOCKA_XML_FILE=\'%{cfg.buildtarget.abspath}.xml\'; export CMOCKA_MESSAGE_OUTPUT=xml; %{cfg.buildtarget.abspath} ||:',
                 -- Genrate stdout format result 
-                '@export CMOCKA_MESSAGE_OUTPUT=stdout; %{cfg.buildtarget.abspath}'
+                '@export CMOCKA_MESSAGE_OUTPUT=stdout; %{cfg.buildtarget.abspath} ||:'
             }
             
         -- [[ 1.2. List test ]]
@@ -35,8 +35,8 @@ workspace "Test"
             linkoptions { "../../../libumpn.a" }
             postbuildcommands {
                 '{DELETE} %{cfg.buildtarget.abspath}.xml',
-                '@export CMOCKA_XML_FILE=\'%{cfg.buildtarget.abspath}.xml\'; export CMOCKA_MESSAGE_OUTPUT=xml; %{cfg.buildtarget.abspath} 2>/dev/null',
-                '@export CMOCKA_MESSAGE_OUTPUT=stdout; %{cfg.buildtarget.abspath}'
+                '@export CMOCKA_XML_FILE=\'%{cfg.buildtarget.abspath}.xml\'; export CMOCKA_MESSAGE_OUTPUT=xml; %{cfg.buildtarget.abspath} ||:',
+                '@export CMOCKA_MESSAGE_OUTPUT=stdout; %{cfg.buildtarget.abspath} ||:'
             }
 
         -- [[ 1.3. Map test ]]

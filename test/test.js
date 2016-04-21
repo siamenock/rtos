@@ -1,5 +1,32 @@
 // Test cases set
 var cases = require('./case.js');
+var jUnitWriter = require('junitwriter');
+var writer = new jUnitWriter();
+
+// Write commands of test cases to PacketNgin shell file
+var fs = require('fs');
+
+// Remove existed file 
+if(fs.existsSync('test/test.psh'))
+    fs.unlinkSync('test/test.psh');
+if(fs.existsSync('test/result.xml'))
+    fs.unlinkSync('test/result.xml');
+
+function writeCommand(exp, cmd) {
+    if(typeof(exp[cmd]) != 'string') {
+        for(var params in exp[cmd]) {
+            fs.appendFileSync('test/test.psh', cmd + ' ');
+            writeCommand(exp[cmd], params);
+        }
+    } else {
+        fs.appendFileSync('test/test.psh', cmd + '\n');
+    }
+}
+
+for(var command in cases.shell) {
+    writeCommand(cases.shell, command);
+}
+
 // Readline interface
 var readline = require('readline');
 var read = readline.createInterface({
@@ -7,6 +34,11 @@ var read = readline.createInterface({
       output: process.stdout,
       terminal: false
 });
+
+// Append kernel runtime test command 
+fs.appendFileSync('test/test.psh', 'test\n');
+// Append shutdown command to end of the commands 
+fs.appendFileSync('test/test.psh', 'shutdown\n');
 
 // Command string list
 function Command(list) {
@@ -48,6 +80,12 @@ read.on('line', function(line) {
         if(index > 0) 
             command = new Command(line.substring(index).split(" "));
         
+        // End parsing by shutdown command 
+        if(command.current() == 'shutdown') {
+            // Generate XML format result
+            fs.appendFileSync('test/result.xml', writer.toString());
+            process.exit();        
+        }            
     } else {
         if(started == false)
             return;
@@ -57,15 +95,63 @@ read.on('line', function(line) {
     }
 })
 
-var regEx = function(exp, cmd, str) {
+// Kernel test output parsing function
+var kernelSuite = writer.addTestsuite('Kernel');
+
+var parse = function(exp, str) {
+    var delimiter = /\[=*\]/;
+    var testCases = str.split(delimiter);
+
+    for(i = 0; i < testCases.length; i++) {
+        var nameRegExp = new RegExp(exp['name'], ['g']);
+        var passRegExp = new RegExp(exp['pass'], ['g']);
+        var failRegExp = new RegExp(exp['fail'], ['g']);
+
+        var name = nameRegExp.exec(testCases[i]);
+        if(name == null)
+            continue;
+
+        // Index 1 of exec function is first captured item 
+        name = name[1];
+        var testCase = kernelSuite.addTestcase(name, 'Default class'); 
+
+        var pass = testCases[i].match(passRegExp);
+        if(pass == null) {
+            var fail = failRegExp.exec(testCases[i])[1];
+            testCase.addFailure(fail, 'Default type'); 
+        } 
+    }
+
+    var casesRegExp = new RegExp(exp['cases'], ['g']);
+    var successRegExp = new RegExp(exp['success'], ['g']);
+    var errorRegExp = new RegExp(exp['errors'], ['g']);
+
+    var cases = casesRegExp.exec(str)[1];
+    var success = successRegExp.exec(str)[1];
+    var error = errorRegExp.exec(str)[1];
+
+    var result;
+    if (cases == success) {
+        result = 'PASS';
+    } else {
+        result = 'FAIL';
+    }
+
+    return result;
+}
+
+var verify = function(exp, cmd, str) {
     var result;
     if(typeof(exp) != 'string') {
         // Parse inner command recursively
+        if(cmd == null)
+            return 'ERROR';
+
         var nextCommand = cmd.next();
         if(nextCommand == undefined)
-            return 'ERROR : Command parsing error. Regular expression should be String formatted';
+            return 'ERROR';
 
-        return regEx(exp[nextCommand], cmd, str);
+        return verify(exp[nextCommand], cmd, str);
     } else {
         var regExp = new RegExp(exp, ['gi']);
         // Expect console output
@@ -83,24 +169,41 @@ var regEx = function(exp, cmd, str) {
 
 // Test case count
 var count = 0;
+var shellSuite = writer.addTestsuite('Shell');
+
 var test = function(cmd, str) {
     count++;
     console.log('-------------------- TEST CASE ' + count + ' --------------------'); 
 
     // Input command
-    console.log('[ COMMAND ] ', cmd.current());
+    console.log('[ COMMAND ] ', cmd.list.join(' '));
     // Console output
     console.log('[ OUTPUTS ] ');
     console.log(str);
 
-    var exp = cases[cmd.current()];
+    var testCase = shellSuite.addTestcase(cmd.list.join(' '), 'Default class');
     var result;
-    if(exp == undefined) 
-        result = 'ERROR : Command "' + cmd.current() + '" not found';
-    else 
-        result = regEx(exp, cmd, str);
+    // Kernel runtime test
+    if(cmd.current() == 'test') {
+        result = parse(cases.kernel[cmd.current()], str);
+    } else {
+    // Shell command test
+        var exp = cases.shell[cmd.current()];
+        if(exp == undefined) {
+            result = 'ERROR'; 
+        } else {
+            result = verify(exp, cmd, str);
+        }
+    }
 
-    // Test result
     console.log('[ RESULTS ] ', result);
+
+    if(result == 'FAIL') {
+        testCase.addFailure('Mismatch to expected output', 'Default type'); 
+    } else if(result == 'ERROR') {
+        testCase.addError('Failed to parse command', 'Default type'); 
+    }
+
     console.log('\n');
 }
+
