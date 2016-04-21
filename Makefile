@@ -48,7 +48,16 @@ ifeq ($(option),debug)
 	sudo $(QEMU) -monitor stdio -S -s 
 endif
 ifeq ($(option),test)
-	sudo $(QEMU) -serial stdio | node test/test.js
+	# Make named FIFO for input command 
+	mkfifo /tmp/cmdline	
+	# Avoid application to receive a EOF
+	cat > /tmp/cmdline &
+	# Connect pipe to QEMU which also redirects ouputs to Node.js application
+	sudo cat /tmp/cmdline | sudo $(QEMU) -serial stdio | node test/test.js &
+	# Input commands for testing to FIFO
+	cat test/test.psh > /tmp/cmdline
+	# Destroy FIFO 
+	rm /tmp/cmdline
 endif
 # Run by VirtualBox
 ifeq ($(option),vb)
@@ -61,7 +70,7 @@ endif
 stop:
 # Stop by QEMU 
 ifeq ($(option),qemu)
-	sudo killall -9 qemu-system-x86_64
+	sudo killall -v -9 qemu-system-x86_64
 endif
 # Stop by VirtualBox 
 ifeq ($(option),cli)
