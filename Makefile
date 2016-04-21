@@ -48,16 +48,19 @@ ifeq ($(option),debug)
 	sudo $(QEMU) -monitor stdio -S -s 
 endif
 ifeq ($(option),test)
+	# Destroy old FIFO if existed
+	rm -f ./test/cmdline.in
+	rm -f ./test/cmdline.out
 	# Make named FIFO for input command 
 	mkfifo ./test/cmdline.in
 	mkfifo ./test/cmdline.out
 	# Connect pipe to QEMU which also redirects ouputs to Node.js application
-	sudo $(QEMU) -serial pipe:./test/cmdline &
+	sudo $(QEMU) -nographic -serial pipe:./test/cmdline &
 	# node test/test.js [ FIFO file ] [ Result file ]
 	node test/test.js ./test/cmdline ./test/result.xml
 	# Destroy FIFO 
-	rm ./test/cmdline.in
-	rm ./test/cmdline.out
+	rm -f ./test/cmdline.in
+	rm -f ./test/cmdline.out
 endif
 # Run by VirtualBox
 ifeq ($(option),vb)
