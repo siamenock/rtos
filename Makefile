@@ -49,15 +49,15 @@ ifeq ($(option),debug)
 endif
 ifeq ($(option),test)
 	# Make named FIFO for input command 
-	mkfifo /tmp/cmdline	
-	# Avoid application to receive a EOF
-	cat > /tmp/cmdline &
+	mkfifo ./test/cmdline.in
+	mkfifo ./test/cmdline.out
 	# Connect pipe to QEMU which also redirects ouputs to Node.js application
-	sudo cat /tmp/cmdline | sudo $(QEMU) -serial stdio | node test/test.js &
-	# Input commands for testing to FIFO
-	cat test/test.psh > /tmp/cmdline
+	sudo $(QEMU) -serial pipe:./test/cmdline &
+	# node test/test.js [ FIFO file ] [ Result file ]
+	node test/test.js ./test/cmdline ./test/result.xml
 	# Destroy FIFO 
-	rm /tmp/cmdline
+	rm ./test/cmdline.in
+	rm ./test/cmdline.out
 endif
 # Run by VirtualBox
 ifeq ($(option),vb)

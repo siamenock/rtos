@@ -6,40 +6,51 @@ var writer = new jUnitWriter();
 // Write commands of test cases to PacketNgin shell file
 var fs = require('fs');
 
-// Remove existed file 
-if(fs.existsSync('test/test.psh'))
-    fs.unlinkSync('test/test.psh');
-if(fs.existsSync('test/result.xml'))
-    fs.unlinkSync('test/result.xml');
+if(process.argv.length < 4) {
+    consoole.log("Usage : node test.js [fifo file] [result file]");
+    process.exit(-1);
+}
+
+var fifoFile = process.argv[2];
+var resultFile = process.argv[3];
+
+// "In" and "out" sematics of fifo file are relative to the PacketNgin console
+var fifoInput = fifoFile + '.out';
+var fifoOutput = fifoFile + '.in';
+
+console.log(fifoInput, fifoOutput, resultFile);
+
+// Remove old file 
+if(fs.existsSync(resultFile))
+    fs.unlinkSync(resultFile);
 
 function writeCommand(exp, cmd) {
     if(typeof(exp[cmd]) != 'string') {
         for(var params in exp[cmd]) {
-            fs.appendFileSync('test/test.psh', cmd + ' ');
+            fs.appendFileSync(fifoOutput, cmd + ' ');
             writeCommand(exp[cmd], params);
         }
     } else {
-        fs.appendFileSync('test/test.psh', cmd + '\n');
+        fs.appendFileSync(fifoOutput, cmd + '\n');
     }
 }
 
 for(var command in cases.shell) {
     writeCommand(cases.shell, command);
 }
+// Append kernel runtime test command 
+fs.appendFileSync(fifoOutput, 'test\n');
+// Append shutdown command to end of the commands 
+fs.appendFileSync(fifoOutput, 'shutdown\n');
 
 // Readline interface
+var readStream = fs.createReadStream(fifoInput);
 var readline = require('readline');
 var read = readline.createInterface({
-      input: process.stdin,
+      input: readStream,
       output: process.stdout,
       terminal: false
 });
-
-// Append kernel runtime test command 
-fs.appendFileSync('test/test.psh', 'test\n');
-// Append shutdown command to end of the commands 
-fs.appendFileSync('test/test.psh', 'shutdown\n');
-
 // Command string list
 function Command(list) {
     // Index of current command
@@ -76,14 +87,14 @@ read.on('line', function(line) {
             output = [];
         }
 
-        var index = line.search(/[A-Za-z]/);
+        var index = parseInt(line.search(/[A-Za-z]/));
         if(index > 0) 
             command = new Command(line.substring(index).split(" "));
         
         // End parsing by shutdown command 
         if(command.current() == 'shutdown') {
             // Generate XML format result
-            fs.appendFileSync('test/result.xml', writer.toString());
+            fs.appendFileSync(resultFile, writer.toString());
             process.exit();        
         }            
     } else {
