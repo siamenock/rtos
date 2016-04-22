@@ -51,7 +51,7 @@ check_number "root size" $ROOT
 # Make disk image
 $BASE/grub-mkimage -v -O i386-pc -d$BASE/grub-core -p\(hd0,msdos1\)/boot/grub biosdisk part_msdos fat exfat bfs multiboot2 -o core.img
 
-parted -s $IMAGE --			\
+sudo parted -s $IMAGE --			\
 	mklabel msdos			\
 	mkpart primary $BOOT_TYPE 1MiB $(($BOOT + 1))MiB	\
 	mkpart primary $ROOT_TYPE $(($BOOT + 1))MiB $(($BOOT + 1 + $ROOT))MiB	\

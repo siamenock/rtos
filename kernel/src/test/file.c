@@ -8,7 +8,7 @@ A_Test void test_open() {
 	// File descriptor index check
 	int fd[256];
 	for(int i = 0; i < FILE_MAX_DESC; i++) {
-		fd[i] = open("/boot/init.psh", "r");
+		fd[i] = open("/boot/linux.ko", "r");
 		assertTrueM("File descriptor index should not be negative number", fd[i] >= 0);
 	}
 	for(int i = 0; i < FILE_MAX_DESC; i++) {
@@ -21,7 +21,7 @@ A_Test void test_open() {
 		// Skip right flags
 		if(c == 'r' || c == 'w' || c == 'a')
 			continue;	
-		fd[0] = open("/boot/init.psh", &c);
+		fd[0] = open("/boot/linux.ko", &c);
 		assertFalseM("File open flags should be one of them : 'r', 'w', 'a' ", fd[0] >= 0);
 		close(fd[0]);
 	}
@@ -33,7 +33,7 @@ A_Test void test_close() {
 	// Open & close repetition
 	int fd;
 	for(int i = 0; i < 1000; i++) {
-		fd = open("/boot/init.psh", "a");	
+		fd = open("/boot/linux.ko", "a");	
 		assertEqualsM("File close should return FILE_OK (1)", FILE_OK, close(fd));
 		close(fd);
 	}

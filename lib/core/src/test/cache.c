@@ -23,11 +23,11 @@ static void cache_set_malloc_buffer(void **state) {
 }
 
 int main(void) {
-	const struct CMUnitTest tests[] = {
+	const struct CMUnitTest UnitTest[] = {
 		cmocka_unit_test(cache_set_constant_buffer),
 		cmocka_unit_test(cache_set_malloc_buffer),
 	};
-	return cmocka_run_group_tests(tests, NULL, NULL);
+	return cmocka_run_group_tests(UnitTest, NULL, NULL);
 }
 #if 0
 

@@ -11,8 +11,8 @@ static void map_test(void **state) {
 }
 
 int main(void) {
-	const struct CMUnitTest tests[] = {
+	const struct CMUnitTest UnitTest[] = {
 		cmocka_unit_test(map_test),
 	};
-	return cmocka_run_group_tests(tests, NULL, NULL);
+	return cmocka_run_group_tests(UnitTest, NULL, NULL);
 }
