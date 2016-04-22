@@ -5,7 +5,7 @@
 #include <util/cmd.h>
 #include <util/types.h>
 #include <readline.h>
-#include <net/ni.h>
+#include <net/nic.h>
 #include <net/packet.h>
 #include <net/ether.h>
 #include <net/arp.h>
@@ -17,7 +17,7 @@
 void ginit(int argc, char** argv) {
 }
 
-NetworkInterface** ni;
+NIC** ni;
 uint32_t count;
 bool is_continue;
 
@@ -25,13 +25,13 @@ int8_t * port_map;
 
 int init(int argc, char** argv) {
 	cmd_init();
-	count = ni_count();
+	count = nic_count();
 	if(count < 4)
 		return -1;
 
-	ni = (NetworkInterface**)malloc(sizeof(NetworkInterface*) * count);
+	ni = (NIC**)malloc(sizeof(NIC*) * count);
 	for(int i = 0; i < count; i++) {
-		ni[i] = ni_get(i);
+		ni[i] = nic_get(i);
 	}
 
 	port_map = (int8_t*)malloc(sizeof(int8_t) * count);
@@ -152,24 +152,24 @@ int main(int argc, char** argv) {
 	
 	thread_barrior();
 	
-	uint32_t count = ni_count();
+	uint32_t count = nic_count();
 	printf("nic count : %d\n", count);
 	while(is_continue) {
 		for(int i = 0; i < count; i++) {
-			if(ni_has_input(ni[i])) {
+			if(nic_has_input(ni[i])) {
 				printf("in first if\n");
-				Packet* packet = ni_input(ni[i]);
+				Packet* packet = nic_input(ni[i]);
 				if(packet == NULL)
 					continue;
 
 				if(port_map[i] != -1) {
 					printf("packet here!\n");
-					ni_output(ni[port_map[i]], packet);
+					nic_output(ni[port_map[i]], packet);
 					packet = NULL;
 				}
 
 				if(packet)
-					ni_free(packet);
+					nic_free(packet);
 			}
 		}
 

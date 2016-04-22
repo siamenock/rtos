@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <malloc.h>
 #include <thread.h>
-#include <net/ni.h>
+#include <net/nic.h>
 #include <net/ether.h>
 #include <net/arp.h>
 #include <net/ip.h>
@@ -43,15 +43,15 @@ static void rip_add(uint32_t addr, uint16_t port) {
 	endpoint->addr = addr;
 	endpoint->port = port;
 	
-	NetworkInterface* ni_intra = ni_get(1);
-	List* rips = ni_config_get(ni_intra, "pn.lb.rips");
+	NIC* ni_intra = nic_get(1);
+	List* rips = nic_config_get(ni_intra, "pn.lb.rips");
 	list_add(rips, endpoint);
 }
 
-static Endpoint* rip_alloc(NetworkInterface* ni) {
+static Endpoint* rip_alloc(NIC* ni) {
 	static int robin;
 	
-	List* rips = ni_config_get(ni, "pn.lb.rips");
+	List* rips = nic_config_get(ni, "pn.lb.rips");
 	int idx = (robin++) % list_size(rips);
 	
 	return list_get(rips, idx);
@@ -77,17 +77,17 @@ static int cmd_niconfig(int argc, char** argv) {
 
 	if(argc == 1) {
 		int pos = 0;
-		NetworkInterface* ni_inter = ni_get(0);
-		uint32_t inter_ip = (uint32_t)(uint64_t)ni_config_get(ni_inter, "ip");
-		uint32_t inter_gateway = (uint32_t)(uint64_t)ni_config_get(ni_inter, "gw");
-		uint32_t inter_netmask = (uint32_t)(uint64_t)ni_config_get(ni_inter, "mask");
-		uint16_t inter_port = (uint16_t)(uint64_t)ni_config_get(ni_inter, "pn.lb.port");
+		NIC* ni_inter = nic_get(0);
+		uint32_t inter_ip = (uint32_t)(uint64_t)nic_config_get(ni_inter, "ip");
+		uint32_t inter_gateway = (uint32_t)(uint64_t)nic_config_get(ni_inter, "gw");
+		uint32_t inter_netmask = (uint32_t)(uint64_t)nic_config_get(ni_inter, "mask");
+		uint16_t inter_port = (uint16_t)(uint64_t)nic_config_get(ni_inter, "pn.lb.port");
 		
-		NetworkInterface* ni_intra = ni_get(1);
-		uint32_t intra_ip = (uint32_t)(uint64_t)ni_config_get(ni_intra, "ip");
-		uint32_t intra_gateway = (uint32_t)(uint64_t)ni_config_get(ni_intra, "gw");
-		uint32_t intra_netmask = (uint32_t)(uint64_t)ni_config_get(ni_intra, "mask");
-		uint16_t intra_port = (uint16_t)(uint64_t)ni_config_get(ni_intra, "pn.lb.config.port");
+		NIC* ni_intra = nic_get(1);
+		uint32_t intra_ip = (uint32_t)(uint64_t)nic_config_get(ni_intra, "ip");
+		uint32_t intra_gateway = (uint32_t)(uint64_t)nic_config_get(ni_intra, "gw");
+		uint32_t intra_netmask = (uint32_t)(uint64_t)nic_config_get(ni_intra, "mask");
+		uint16_t intra_port = (uint16_t)(uint64_t)nic_config_get(ni_intra, "pn.lb.config.port");
 		pos += sprintf(cmd_result, "inter IP:%d.%d.%d.%d Gateway:%d.%d.%d.%d Mask:%d.%d.%d.%d Port:%d\n", (inter_ip >> 24) & 0xff, (inter_ip >> 16) & 0xff, (inter_ip >> 8) & 0xff, inter_ip & 0xff,
 		(inter_gateway >> 24) & 0xff, (inter_gateway >> 16) & 0xff, (inter_gateway >> 8) & 0xff, inter_gateway & 0xff, 
 		(inter_netmask >> 24) & 0xff, (inter_netmask >> 16) & 0xff, (inter_netmask >> 8) & 0xff, inter_netmask & 0xff, 
@@ -100,13 +100,13 @@ static int cmd_niconfig(int argc, char** argv) {
 
 	} else if(argc > 3) {
 		if(!strcmp(argv[1], "-set")) {
-			NetworkInterface* ni;
+			NIC* ni;
 			if(!strcmp(argv[2], "inter"))
-				ni = ni_get(0);
+				ni = nic_get(0);
 			else if(!strcmp(argv[2], "intra"))
-				ni = ni_get(1);
+				ni = nic_get(1);
 			else {
-				sprintf(cmd_result, "Check NetworkInterface number");
+				sprintf(cmd_result, "Check NIC number");
 				return 1;
 			}
 			uint32_t ip;
@@ -137,16 +137,16 @@ static int cmd_niconfig(int argc, char** argv) {
 				}
 			}
 			if(ip_change)
-				ni_config_put(ni, "ip", (void*)(uint64_t)ip);
+				nic_config_put(ni, "ip", (void*)(uint64_t)ip);
 			if(gw_change)
-				ni_config_put(ni, "gw", (void*)(uint64_t)gw);
+				nic_config_put(ni, "gw", (void*)(uint64_t)gw);
 			if(mask_change)
-				ni_config_put(ni, "mask", (void*)(uint64_t)mask);
+				nic_config_put(ni, "mask", (void*)(uint64_t)mask);
 			if(port_change) {
 				if(!strcmp(argv[2], "inter"))
-					ni_config_put(ni, "pn.lb.port", (void*)(uint64_t)port);
+					nic_config_put(ni, "pn.lb.port", (void*)(uint64_t)port);
 				else
-					ni_config_put(ni, "pn.lb.config.port", (void*)(uint64_t)port);
+					nic_config_put(ni, "pn.lb.config.port", (void*)(uint64_t)port);
 			}
 			cmd_niconfig(1, NULL);
 			return 0;
@@ -203,8 +203,8 @@ static int cmd_ripconfig(int argc, char** argv) {
 	}
 	
 	if(argc == 1) {
-		NetworkInterface* ni_intra = ni_get(1);
-		List* rips = ni_config_get(ni_intra, "pn.lb.rips");
+		NIC* ni_intra = nic_get(1);
+		List* rips = nic_config_get(ni_intra, "pn.lb.rips");
 		int rips_size = list_size(rips);
 
 		if(rips_size == 0) {
@@ -220,8 +220,8 @@ static int cmd_ripconfig(int argc, char** argv) {
 	}
 	
 	if(!strcmp(argv[1], "-add")) {
-		NetworkInterface* ni_intra = ni_get(1);
-		List* rips = ni_config_get(ni_intra, "pn.lb.rips");
+		NIC* ni_intra = nic_get(1);
+		List* rips = nic_config_get(ni_intra, "pn.lb.rips");
 
 		uint32_t ip;
 		uint16_t port;
@@ -252,8 +252,8 @@ static int cmd_ripconfig(int argc, char** argv) {
 		return 0;
 
 	} else if(!strcmp(argv[1], "-del")) {
-		NetworkInterface* ni_intra = ni_get(1);
-		List* rips = ni_config_get(ni_intra, "pn.lb.rips");
+		NIC* ni_intra = nic_get(1);
+		List* rips = nic_config_get(ni_intra, "pn.lb.rips");
 
 		int32_t ip;
 		uint16_t port;
@@ -368,24 +368,24 @@ Command commands[] = {
 };
 
 int ginit(int argc, char** argv) {
-	uint32_t count = ni_count();
+	uint32_t count = nic_count();
 	mode = NAT;
 
 	if(count != 2)
 		return 1;
 	
-	NetworkInterface* ni_inter = ni_get(0);
-	ni_config_put(ni_inter, "ip", (void*)(uint64_t)0xc0a8640a);	// 192.168.100.10
-	ni_config_put(ni_inter, "pn.lb.port", (void*)(uint64_t)80);
+	NIC* ni_inter = nic_get(0);
+	nic_config_put(ni_inter, "ip", (void*)(uint64_t)0xc0a8640a);	// 192.168.100.10
+	nic_config_put(ni_inter, "pn.lb.port", (void*)(uint64_t)80);
 	arp_announce(ni_inter, 0);
 	
-	NetworkInterface* ni_intra = ni_get(1);
-	ni_config_put(ni_intra, "ip", (void*)(uint64_t)0xc0a86414);	// 192.168.100.20
+	NIC* ni_intra = nic_get(1);
+	nic_config_put(ni_intra, "ip", (void*)(uint64_t)0xc0a86414);	// 192.168.100.20
 	arp_announce(ni_intra, 0);
 	
 	List* rips = list_create(NULL);
-	ni_config_put(ni_intra, "pn.lb.rips", rips);
-	ni_config_put(ni_intra, "pn.lb.config.port", (void*)(uint64_t)CONFIG_PORT);
+	nic_config_put(ni_intra, "pn.lb.rips", rips);
+	nic_config_put(ni_intra, "pn.lb.config.port", (void*)(uint64_t)CONFIG_PORT);
 	//rip_add(0xc0a864c8, 8080);	//192.168.100.200
 	//rip_add(0xc0a864c8, 8081);
 	//rip_add(0xc0a864c8, 8082);
@@ -401,8 +401,8 @@ void init(int argc, char** argv) {
 	sessions = map_create(4096, NULL, NULL, NULL);
 }
 
-static NetworkInterface* ni_inter;
-static NetworkInterface* ni_intra;
+static NIC* ni_inter;
+static NIC* ni_intra;
 
 static void process_config(Packet** packet) {
 	Ether* ether = (Ether*)((*packet)->buffer + (*packet)->start);
@@ -421,9 +421,9 @@ static void process_config(Packet** packet) {
 
 	uint16_t size = (*packet)->size + cmd_len - strlen((char*)udp->body) + 1;
 	uint16_t end = (*packet)->end + cmd_len - strlen((char*)udp->body) + 1;
-	Packet* packet_ = ni_alloc((*packet)->ni, size);
+	Packet* packet_ = nic_alloc((*packet)->ni, size);
 	memcpy(packet_, *packet, (*packet)->size);
-	ni_free(*packet);
+	nic_free(*packet);
 	*packet = packet_;
 
 	ether = (Ether*)((*packet)->buffer + (*packet)->start);
@@ -451,7 +451,7 @@ static void process_config(Packet** packet) {
 	(*packet)->end = end;
 
 	udp_pack((*packet), cmd_len);
-	ni_output(ni_intra, (*packet));
+	nic_output(ni_intra, (*packet));
 	*packet = NULL;
 }
 
@@ -497,9 +497,9 @@ static void session_free(Session* session) {
 }
 
 void process_inter() {
-	NetworkInterface* ni = ni_inter;
+	NIC* ni = ni_inter;
 	
-	Packet* packet = ni_input(ni);
+	Packet* packet = nic_input(ni);
 	if(!packet)
 		return;
 	
@@ -509,8 +509,8 @@ void process_inter() {
 	if(icmp_process(packet))
 		return;
 	
-	uint32_t addr = (uint32_t)(uint64_t)ni_config_get(ni, "ip");
-	uint16_t port = (uint16_t)(uint64_t)ni_config_get(ni, "pn.lb.port");
+	uint32_t addr = (uint32_t)(uint64_t)nic_config_get(ni, "ip");
+	uint16_t port = (uint16_t)(uint64_t)nic_config_get(ni, "pn.lb.port");
 	
 	Ether* ether = (Ether*)(packet->buffer + packet->start);
 	if(endian16(ether->type) == ETHER_TYPE_IPv4) {
@@ -522,7 +522,7 @@ void process_inter() {
 			if(endian32(ip->destination) == addr && endian16(tcp->destination) == port) {
 				uint32_t saddr = endian32(ip->source);
 				uint16_t sport = endian16(tcp->source);
-				uint32_t raddr = (uint32_t)(uint64_t)ni_config_get(ni_intra, "ip");
+				uint32_t raddr = (uint32_t)(uint64_t)nic_config_get(ni_intra, "ip");
 				uint64_t key = (uint64_t)saddr << 32 | (uint64_t)sport;
 				
 				Session* session = map_get(sessions, (void*)key);
@@ -576,7 +576,7 @@ void process_inter() {
 					session_free(session);
 				}
 				
-				ni_output(ni_intra, packet);
+				nic_output(ni_intra, packet);
 				
 				packet = NULL;
 			}
@@ -584,13 +584,13 @@ void process_inter() {
 	}
 	
 	if(packet)
-		ni_free(packet);
+		nic_free(packet);
 }
 
 void process_intra() {
-	NetworkInterface* ni = ni_intra;
+	NIC* ni = ni_intra;
 	
-	Packet* packet = ni_input(ni);
+	Packet* packet = nic_input(ni);
 	if(!packet)
 		return;
 	
@@ -631,8 +631,8 @@ void process_intra() {
 				break;
 			}
 			if(session) {
-				uint32_t addr = (uint32_t)(uint64_t)ni_config_get(ni_inter, "ip");
-				uint16_t port = (uint16_t)(uint64_t)ni_config_get(ni_inter, "pn.lb.port");
+				uint32_t addr = (uint32_t)(uint64_t)nic_config_get(ni_inter, "ip");
+				uint16_t port = (uint16_t)(uint64_t)nic_config_get(ni_inter, "pn.lb.port");
 				
 				switch(mode) {
 					case NAT:
@@ -686,20 +686,20 @@ void process_intra() {
 					session->fin = event_timer_add(gc, session, 3000, 3000);
 				}
 				
-				ni_output(ni_inter, packet);
+				nic_output(ni_inter, packet);
 				
 				packet = NULL;
 			}
 		} else if(ip->protocol == IP_PROTOCOL_UDP) {
 			UDP* udp = (UDP*)ip->body;
-			if(endian16(udp->destination) == (uint16_t)(uint64_t)ni_config_get(ni_intra, "pn.lb.config.port")) {
+			if(endian16(udp->destination) == (uint16_t)(uint64_t)nic_config_get(ni_intra, "pn.lb.config.port")) {
 				process_config(&packet);
 			}
 		}
 	}
 	
 	if(packet)
-		ni_free(packet);
+		nic_free(packet);
 }
 
 void destroy() {
@@ -724,16 +724,16 @@ int main(int argc, char** argv) {
 	
 	cmd_init();
 
-	ni_inter = ni_get(0);
-	ni_intra = ni_get(1);
+	ni_inter = nic_get(0);
+	ni_intra = nic_get(1);
 	event_init();
 	
 	while(1) {
-		if(ni_has_input(ni_inter)) {
+		if(nic_has_input(ni_inter)) {
 			process_inter();
 		}
 		
-		if(ni_has_input(ni_intra)) {
+		if(nic_has_input(ni_intra)) {
 			process_intra();
 		}
 		

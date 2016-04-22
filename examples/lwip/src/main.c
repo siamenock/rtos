@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <malloc.h>
 #include <thread.h>
-#include <net/ni.h>
+#include <net/nic.h>
 #include <net/ether.h>
 #include <net/ip.h>
 #include <net/icmp.h>
@@ -18,15 +18,15 @@ Packet* process(Packet* packet) {
 }
 
 void ginit(int argc, char** argv) {
-	ni_init(0, 0xc0a86464, 0xffffff00, 0xc0a864c8, true, process);
+	nic_init(0, 0xc0a86464, 0xffffff00, 0xc0a864c8, true, process);
 }
 
 void init(int argc, char** argv) {
 }
 
 /*
-void process(NetworkInterface* ni) {
-	Packet* packet = ni_input(ni);
+void process(NIC* ni) {
+	Packet* packet = nic_input(ni);
 	if(!packet)
 		return;
 	
@@ -44,7 +44,7 @@ void process(NetworkInterface* ni) {
 			arp->sha = ether->smac;
 			arp->spa = endian32(vip.ip);
 			
-			ni_output(ni, packet);
+			nic_output(ni, packet);
 			packet = NULL;
 		}
 	} else if(endian16(ether->type) == ETHER_TYPE_IPv4) {
@@ -67,7 +67,7 @@ void process(NetworkInterface* ni) {
 			ether->dmac = ether->smac;
 			ether->smac = endian48(ni->mac);
 			
-			ni_output(ni, packet);
+			nic_output(ni, packet);
 			packet = NULL;
 		} else if(ip->protocol == IP_PROTOCOL_TCP) {
 			TCP* tcp = (TCP*)ip->body;
@@ -133,12 +133,12 @@ void process(NetworkInterface* ni) {
 					ip->checksum = 0;
 					ip->checksum = endian16(checksum(ip, ip->ihl * 4));
 					
-					ni_output(ni, packet);
+					nic_output(ni, packet);
 					
 					packet = NULL;
 				} else {
 					if(!is_from_rip(sip, sport)) {
-						ni_free(packet);
+						nic_free(packet);
 						return;
 					}
 					
@@ -163,7 +163,7 @@ void process(NetworkInterface* ni) {
 					
 					if(!session) {
 						printf("Cannot find session from %x:%d to %x:%d\n", sip, sport, endian32(ip->destination), dport);
-						ni_free(packet);
+						nic_free(packet);
 						return;
 					}
 					
@@ -192,7 +192,7 @@ void process(NetworkInterface* ni) {
 					ip->checksum = 0;
 					ip->checksum = endian16(checksum(ip, ip->ihl * 4));
 					
-					ni_output(ni, packet);
+					nic_output(ni, packet);
 					
 					packet = NULL;
 				}
@@ -201,7 +201,7 @@ void process(NetworkInterface* ni) {
 	}
 	
 	if(packet)
-		ni_free(packet);
+		nic_free(packet);
 }
 */
 
@@ -224,7 +224,7 @@ int main(int argc, char** argv) {
 	thread_barrior();
 	
 	while(1) {
-		ni_poll();
+		nic_poll();
 	}
 	
 	thread_barrior();
