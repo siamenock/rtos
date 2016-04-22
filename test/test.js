@@ -106,8 +106,8 @@ read.on('line', function(line) {
     }
 })
 
-// Kernel test output parsing function
-var kernelSuite = writer.addTestsuite('Kernel');
+// KernelTest test output parsing function
+var kernelSuite = writer.addTestsuite('KernelTest');
 
 var parse = function(exp, str) {
     var delimiter = /\[=*\]/;
@@ -124,12 +124,12 @@ var parse = function(exp, str) {
 
         // Index 1 of exec function is first captured item 
         name = name[1];
-        var testCase = kernelSuite.addTestcase(name, 'Default class'); 
+        var testCase = kernelSuite.addTestcase(name, 'KernelTest'); 
 
         var pass = testCases[i].match(passRegExp);
         if(pass == null) {
             var fail = failRegExp.exec(testCases[i])[1];
-            testCase.addFailure(fail, 'Default type'); 
+            testCase.addFailure(fail, 'KernelTest'); 
         } 
     }
 
@@ -180,7 +180,7 @@ var verify = function(exp, cmd, str) {
 
 // Test case count
 var count = 0;
-var shellSuite = writer.addTestsuite('Shell');
+var shellSuite = writer.addTestsuite('ShellTest');
 
 var test = function(cmd, str) {
     count++;
@@ -192,9 +192,9 @@ var test = function(cmd, str) {
     console.log('[ OUTPUTS ] ');
     console.log(str);
 
-    var testCase = shellSuite.addTestcase(cmd.list.join(' '), 'Default class');
+    var testCase = shellSuite.addTestcase(cmd.list.join(' '), 'ShellTest');
     var result;
-    // Kernel runtime test
+    // KernelTest runtime test
     if(cmd.current() == 'test') {
         result = parse(cases.kernel[cmd.current()], str);
     } else {
