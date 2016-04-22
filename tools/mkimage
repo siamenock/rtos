@@ -24,26 +24,24 @@ function check_number() {
 }
 
 if [ $# -lt 8 ]; then
-	echo "tools/mkimage [image name] [image size] [boot part size] [boot part type] [root part size] [root part type] [user part type] [boot files]"
+	echo "tools/mkimage [image name] [boot part size] [boot part type] [root part size] [root part type] [user part type] [boot files]"
 	exit
 fi
 
 IMAGE=$1		# system.img
-SIZE=$2			# 64
-BOOT=$3			# 3
-ROOT=$4			# 12
+BOOT=$2			# 3
+ROOT=$3			# 12
 			# Rest of space will be user parition
-BOOT_TYPE=$5		# fat32
-ROOT_TYPE=$6		# fat32
-USER_TYPE=$7		# ext2
+BOOT_TYPE=$4		# fat32
+ROOT_TYPE=$5		# fat32
+USER_TYPE=$6		# ext2
 
 BOOT_FS=$(part_to_fs $BOOT_TYPE)
 ROOT_FS=$(part_to_fs $ROOT_TYPE)
 USER_FS=$(part_to_fs $USER_TYPE)
 
-FILES=${@:8}
+FILES=${@:7}
 
-check_number "image size" $SIZE
 check_number "boot size" $BOOT
 check_number "root size" $ROOT
 
@@ -51,8 +49,6 @@ check_number "root size" $ROOT
 pushd tools/grub/grub-core 2> /dev/null
 ../grub-mkimage -v -O i386-pc -d. -p\(hd0,msdos1\)/boot/grub biosdisk part_msdos fat exfat bfs multiboot2 -o core.img
 popd 2> /dev/null
-
-dd if=/dev/zero of=$IMAGE bs=512 count=$(($SIZE * 2048))
 
 parted -s $IMAGE --			\
 	mklabel msdos			\
@@ -78,11 +74,7 @@ mkdir -p mnt
 sudo mount /dev/mapper/$HDD1 mnt
 sudo mkdir -p mnt/boot/grub/i386-pc
 sudo cp $FILES mnt/boot/
-#sudo cp loader/loader.bin mnt/boot
-#sudo cp kernel.bin mnt/boot
-#sudo cp initrd.img mnt/boot
 sudo cp tools/grub.cfg mnt/boot/grub
-#sudo cp tools/grub/grub-core/*.mod mnt/boot/grub/i386-pc
 pushd tools/grub/grub-core > /dev/null ; sudo cp $MODULES ../../../mnt/boot/grub/i386-pc/; popd > /dev/null
 
 sudo umount mnt
