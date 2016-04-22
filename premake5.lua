@@ -19,19 +19,16 @@ workspace "Build"
             "make -f Loader.make",
             "make -f Kernel.make",
 
-            "mkdir -p bin",
-
             "make -C tools",
 
             'bin/smap kernel/build/kernel.elf kernel.smap',
             'bin/pnkc kernel/build/kernel.elf kernel.smap kernel.bin',
-            'sudo tools/mkinitrd initrd.img 1 drivers/*.ko firmware/*',
+            'sudo bin/mkinitrd initrd.img 1 drivers/*.ko firmware/*',
             'dd if=/dev/zero of=system.img bs=512 count=131072',	-- 64MB
-            'tools/mkimage system.img 3 12 fat32 fat32 ext2 loader/build/loader.bin kernel.bin initrd.img',
+            'bin/mkimage system.img 3 12 fat32 fat32 ext2 loader/build/loader.bin kernel.bin initrd.img',
         }
 
         cleancommands {
-            "rm -rf bin",
             "make clean -C tools",
 
             "make clean -f Loader.make",
