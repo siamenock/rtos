@@ -1,9 +1,11 @@
 #!/bin/bash
 
 if [ $# -lt 3 ]; then
-	echo "tools/mkinitrd [image name] [image size in MB] [files...]"
+	echo "mkinitrd [image name] [image size in MB] [files...]"
 	exit
 fi
+
+BASE=$(dirname $0)
 
 INITRD=$1		# initrd.img
 INITRD_SIZE=$2		# 1
@@ -21,7 +23,7 @@ dd if=/dev/zero of=$INITRD bs=512 count=$(($INITRD_SIZE * 2048))
 
 sudo losetup -f $INITRD
 DEVICE=`losetup -j $INITRD | awk '{ split($1, a, ":"); print a[1] }'`
-sudo tools/mkfs.bfs $DEVICE
+sudo $BASE/mkfs.bfs $DEVICE
 mkdir -p mnt
 sudo mount $DEVICE mnt
 echo $FILES

@@ -24,9 +24,11 @@ function check_number() {
 }
 
 if [ $# -lt 8 ]; then
-	echo "tools/mkimage [image name] [boot part size] [boot part type] [root part size] [root part type] [user part type] [boot files]"
+	echo "mkimage [image name] [boot part size] [boot part type] [root part size] [root part type] [user part type] [boot files]"
 	exit
 fi
+
+BASE=$(dirname $0)
 
 IMAGE=$1		# system.img
 BOOT=$2			# 3
@@ -46,7 +48,7 @@ check_number "boot size" $BOOT
 check_number "root size" $ROOT
 
 # Make disk image
-pushd tools/grub/grub-core 2> /dev/null
+pushd $BASE/grub/grub-core 2> /dev/null
 ../grub-mkimage -v -O i386-pc -d. -p\(hd0,msdos1\)/boot/grub biosdisk part_msdos fat exfat bfs multiboot2 -o core.img
 popd 2> /dev/null
 
@@ -68,14 +70,14 @@ sudo mkfs.$ROOT_FS -F32 /dev/mapper/$HDD1
 sudo mkfs.$BOOT_FS -F32 /dev/mapper/$HDD2
 sudo mkfs.$USER_FS /dev/mapper/$HDD3
 
-sudo tools/grub/grub-bios-setup -d tools/grub/grub-core -b boot.img -c core.img $HDD
+sudo $BASE/grub/grub-bios-setup -d $BASE/grub/grub-core -b boot.img -c core.img $HDD
 
 mkdir -p mnt
 sudo mount /dev/mapper/$HDD1 mnt
 sudo mkdir -p mnt/boot/grub/i386-pc
 sudo cp $FILES mnt/boot/
-sudo cp tools/grub.cfg mnt/boot/grub
-pushd tools/grub/grub-core > /dev/null ; sudo cp $MODULES ../../../mnt/boot/grub/i386-pc/; popd > /dev/null
+sudo cp $BASE/grub.cfg mnt/boot/grub
+pushd $BASE/grub/grub-core > /dev/null ; sudo cp $MODULES ../../../mnt/boot/grub/i386-pc/; popd > /dev/null
 
 sudo umount mnt
 rmdir mnt
