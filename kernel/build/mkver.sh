@@ -1,7 +1,7 @@
 #!/bin/bash
 
 BASE=$(dirname $0)
-VERSION=`$BASE/../../tools/ver.sh`
+VERSION=`$BASE/../../bin/ver.sh`
 MAJOR=`echo $VERSION | awk -F'[.-]' '{ print $1 }'`
 MINOR=`echo $VERSION | awk -F'[.-]' '{ print $2 }'`
 MICRO=`echo $VERSION | awk -F'[.-]' '{ print $3 }'`

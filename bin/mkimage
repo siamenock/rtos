@@ -69,7 +69,7 @@ sudo mkfs.$ROOT_FS -F32 /dev/mapper/$HDD1
 sudo mkfs.$BOOT_FS -F32 /dev/mapper/$HDD2
 sudo mkfs.$USER_FS /dev/mapper/$HDD3
 
-sudo $BASE/grub/grub-bios-setup -d $BASE/grub/grub-core -b boot.img -c core.img $HDD
+sudo $BASE/grub-bios-setup -d $BASE/grub-core -b boot.img -c core.img $HDD
 
 mkdir -p mnt
 sudo mount /dev/mapper/$HDD1 mnt
