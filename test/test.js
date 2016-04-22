@@ -74,6 +74,8 @@ var started = false;
 // Output string array 
 var output = [];
 
+console.log("Test server application started...\n");
+
 var command;
 read.on('line', function(line) {
     if(line.indexOf('#') >= 0) {
@@ -95,6 +97,9 @@ read.on('line', function(line) {
         if(command.current() == 'shutdown') {
             // Generate XML format result
             fs.appendFileSync(resultFile, writer.toString());
+            // Close readStream
+            readStream.close();
+
             process.exit();        
         }            
     } else {
