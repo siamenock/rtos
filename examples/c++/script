@@ -1,0 +1,8 @@
+#create -core 1 -memory 16MB -storage 2MB -nic 00:00:00:00:00:00 1024 1024 100Mbps 100Mbps 2MB -args -ip 192.168.100.2
+#send app
+#start
+connect
+$vmid = create core: 1 memory: 0x1000000 storage: 0x200000 nic: mac: 0 dev: eth0 ibuf: 1024 obuf: 1024 iband: 1000000000 oband: 1000000000 pool: 0x400000 nic: mac: 0 dev: eth0 ibuf: 1024 obuf: 1024 iband: 1000000000 oband: 1000000000 pool: 0x400000
+upload $vmid app
+start $vmid
+
