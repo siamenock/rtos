@@ -5,7 +5,7 @@ all: build
 
 Build.make:
 	@echo "Create all Makefiles by premake"
-	tools/premake5 gmake
+	bin/premake5 gmake
 
 build: Build.make 
 	@echo "Build PacketNgin RTOS image"
@@ -13,7 +13,7 @@ build: Build.make
 
 Test.make: 
 	@echo "Create all Makefiles by premake"
-	tools/premake5 gmake
+	bin/premake5 gmake
 
 test: Test.make
 	@echo "Build & Run PacketNgin RTOS unit tests"
@@ -31,7 +31,7 @@ USB	:= -drive if=none,id=usbstick,file=./system.img -usb -device usb-ehci,id=ehc
 VIRTIO	:= -drive file=./system.img,if=virtio 
 HDD	:= -hda system.img
 NIC	:= virtio #rtl8139
-QEMU	:= qemu-system-x86_64 $(shell tools/qemu-params) -m 1024 -M pc -smp 8 -d cpu_reset -net nic,model=$(NIC) -net tap,script=tools/qemu-ifup -net nic,model=$(NIC) -net tap,script=tools/qemu-ifup $(VIRTIO) $(USB) --no-shutdown --no-reboot  #$(HDD)
+QEMU	:= qemu-system-x86_64 $(shell bin/qemu-params) -m 1024 -M pc -smp 8 -d cpu_reset -net nic,model=$(NIC) -net tap,script=bin/qemu-ifup -net nic,model=$(NIC) -net tap,script=bin/qemu-ifup $(VIRTIO) $(USB) --no-shutdown --no-reboot  #$(HDD)
 
 run: system.img
 # Run by QEMU 
@@ -82,16 +82,57 @@ endif
 
 ver:
 	@echo "Current PacketNgin RTOS version"
-	@echo $(shell git tag).$(shell git rev-list HEAD --count)
+	@echo $(shell bin/ver.sh)
 
 deploy: system.img
 	@echo "Deploy PacketNgin RTOS image to USB"
-	tools/deploy
+	bin/deploy
 
-sdk: system.img
-	@echo "Create PacketNgin SDK(Software Development Kit)"
-	cp $^ sdk/
-	tar cfz packetngin_sdk-$(shell git tag).$(shell git rev-list HEAD --count).tgz sdk
+SDK := packetngin_sdk-$(shell bin/ver.sh)
+
+sdk: loader/build/loader.bin kernel.bin initrd.img system.img
+	@echo "* Create PacketNgin SDK(Software Development Kit)"
+	@echo "* Make PacketNgin SDK directory: $(SDK)"
+	mkdir -p $(SDK)
+	
+	@echo "* Copy SDK examples"
+	cp -r examples $(SDK)/examples
+	
+	@echo "* Copy system images"
+	mkdir -p $(SDK)/bin
+	cp $^ $(SDK)/bin
+	
+	@echo "* Copy library: core"
+	mkdir -p $(SDK)/include
+	mkdir -p $(SDK)/lib
+	cp -r lib/core/include/* $(SDK)/include
+	cp lib/libpacketngin.a $(SDK)/lib
+	
+	@echo "* Copy library: OpenSSL"
+	cp -r lib/openssl/include/* $(SDK)/include
+	cp lib/libcrypto.a lib/libssl.a $(SDK)/lib
+	
+	@echo "* Copy library: LwIP"
+	cp -r lib/lwip/src/include/lwipopts.h lib/lwip/src/include/lwip lib/lwip/src/include/ipv4/* $(SDK)/include
+	cp lib/liblwip.a $(SDK)/lib
+	
+	@echo "* Copy library: zlib"
+	cp -r lib/zlib/zconf.h lib/zlib/zlib.h $(SDK)/include
+	cp lib/libz.a $(SDK)/lib
+	
+	@echo "* Copy library: expat"
+	cp -r lib/expat/include/* $(SDK)/include
+	cp lib/libexpat.a $(SDK)/lib
+	
+	@echo "* Copy library: JSMN"
+	cp -r lib/jsmn/*.h $(SDK)/include
+	cp lib/libjsmn.a $(SDK)/lib
+	
+	@echo "* Copy utilities"
+	cp -rL bin/* $(SDK)/bin/
+	
+	@echo "* Archiving to $(SDK).tgz"
+	tar cfz $(SDK).tgz $(SDK)
 
 gdb:
 	@echo "Run GDB session connected to PacketNgin RTOS"
