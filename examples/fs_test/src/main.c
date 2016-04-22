@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <thread.h>
-#include <net/ni.h>
+#include <net/nic.h>
 #include <net/packet.h>
 #include <net/ether.h>
 #include <net/arp.h>
@@ -21,7 +21,7 @@ void ginit(int argc, char** argv) {
 void init(int argc, char** argv) {
 }
 
-void process(NetworkInterface* ni) {
+void process(NIC* ni) {
 }
 
 void destroy() {

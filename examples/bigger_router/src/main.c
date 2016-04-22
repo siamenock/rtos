@@ -6,7 +6,7 @@
 #include <net/icmp.h>//#include "pn/icmp.h"
 #include <net/checksum.h>//#include "pn/checksum.h"
 #include <net/udp.h>//#include "pn/udp.h"
-#include <net/ni.h>//#include "pn/ni.h"
+#include <net/nic.h>//#include "pn/ni.h"
 #include <net/arp.h>
 
 typedef struct {
@@ -41,10 +41,10 @@ static uint64_t newID(char* collection) {
 void init(int argc, char** argv) {
 }
 
-void process(NetworkInterface* ni) {
+void process(NIC* ni) {
 	static uint32_t myip = 0xc0a86402;	// 192.168.100.2
 	
-	Packet* packet = ni_input(ni);
+	Packet* packet = nic_input(ni);
 	if(!packet)
 		return;
 	
@@ -61,7 +61,7 @@ void process(NetworkInterface* ni) {
 			arp->sha = ether->smac;
 			arp->spa = endian32(myip);
 			
-			ni_output(ni, packet);
+			nic_output(ni, packet);
 			packet = NULL;
 		}
 	} else if(endian16(ether->type) == ETHER_TYPE_IPv4) {
@@ -84,7 +84,7 @@ void process(NetworkInterface* ni) {
 			ether->dmac = ether->smac;
 			ether->smac = endian48(ni->mac);
 			
-			ni_output(ni, packet);
+			nic_output(ni, packet);
 			packet = NULL;
 		} else if(ip->protocol == IP_PROTOCOL_UDP) {
 			UDP* udp = (UDP*)ip->body;
@@ -147,17 +147,17 @@ void process(NetworkInterface* ni) {
 				ether->dmac = ether->smac;
 				ether->smac = endian48(ni->mac);
 				
-				ni_output_dup(ni, packet);
+				nic_output_dup(ni, packet);
 				
 				udp->destination = endian16(9002);
 				ip->checksum = 0;
 				ip->checksum = endian16(checksum(ip, ip->ihl * 4));
-				ni_output_dup(ni, packet);
+				nic_output_dup(ni, packet);
 				
 				udp->destination = endian16(9003);
 				ip->checksum = 0;
 				ip->checksum = endian16(checksum(ip, ip->ihl * 4));
-				ni_output(ni, packet);
+				nic_output(ni, packet);
 				packet = NULL;
 			} else if(endian16(udp->destination) == 9999) {
 				uint32_t idx = 0;
@@ -176,7 +176,7 @@ void process(NetworkInterface* ni) {
 					ether->dmac = endian48(user_mac);
 					ether->smac = endian48(ni->mac);
 					
-					ni_output(ni, packet);
+					nic_output(ni, packet);
 					packet = NULL;
 				}
 			}
@@ -184,7 +184,7 @@ void process(NetworkInterface* ni) {
 	}
 	
 	if(packet)
-		ni_free(packet);
+		nic_free(packet);
 }
 
 void destroy() {
@@ -196,12 +196,12 @@ int main(int argc, char** argv) {
 	uint32_t i = 0;
 //	while(_app_status == APP_STATUS_STARTED) {
 	while(1){
-		uint32_t count = ni_count();
+		uint32_t count = nic_count();
 		if(count > 0) {
 			i = (i + 1) % count;
 			
-			NetworkInterface* ni = ni_get(i);
-			if(ni_has_input(ni)) {
+			NIC* ni = nic_get(i);
+			if(nic_has_input(ni)) {
 				process(ni);
 			}
 		}

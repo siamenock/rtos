@@ -1,4 +1,4 @@
-#include <net/ni.h>
+#include <net/nic.h>
 /*
 typedef struct TCB {
 };

@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <thread.h>
-#include <net/ni.h>
+#include <net/nic.h>
 #include <net/ether.h>
 #include <net/ip.h>
 #include <net/icmp.h>
@@ -19,8 +19,8 @@ void init(int argc, char** argv) {
 
 static uint32_t address = 0xc0a8640a;	// 192.168.100.10
 
-void process(NetworkInterface* ni) {
-	Packet* packet = ni_input(ni);
+void process(NIC* ni) {
+	Packet* packet = nic_input(ni);
 	if(!packet)
 		return;
 	Ether* ether = (Ether*)(packet->buffer + packet->start);
@@ -36,7 +36,7 @@ void process(NetworkInterface* ni) {
 			arp->sha = ether->smac;
 			arp->spa = endian32(address);
 			
-			ni_output(ni, packet);
+			nic_output(ni, packet);
 			packet = NULL;
 		}
 	} else if(endian16(ether->type) == ETHER_TYPE_IPv4) {
@@ -59,7 +59,7 @@ void process(NetworkInterface* ni) {
 			ether->dmac = ether->smac;
 			ether->smac = endian48(ni->mac);
 			
-			ni_output(ni, packet);
+			nic_output(ni, packet);
 			packet = NULL;
 		} else if(ip->protocol == IP_PROTOCOL_UDP) {
 			UDP* udp = (UDP*)ip->body;
@@ -81,7 +81,7 @@ void process(NetworkInterface* ni) {
 				ether->dmac = ether->smac;
 				ether->smac = t3;
 				
-				ni_output(ni, packet);
+				nic_output(ni, packet);
 				packet = NULL;
 			}
 		} else if(ip->protocol == IP_PROTOCOL_TCP) {
@@ -96,7 +96,7 @@ void process(NetworkInterface* ni) {
 	}
 	
 	if(packet)
-		ni_free(packet);
+		nic_free(packet);
 }
 
 void destroy() {
@@ -120,12 +120,12 @@ int main(int argc, char** argv) {
 	
 	uint32_t i = 0;
 	while(1) {
-		uint32_t count = ni_count();
+		uint32_t count = nic_count();
 		if(count > 0) {
 			i = (i + 1) % count;
 			
-			NetworkInterface* ni = ni_get(i);
-			if(ni_has_input(ni)) {
+			NIC* ni = nic_get(i);
+			if(nic_has_input(ni)) {
 				process(ni);
 			}
 		}

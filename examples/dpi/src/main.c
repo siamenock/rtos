@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <thread.h>
-#include <net/ni.h>
+#include <net/nic.h>
 #include <net/packet.h>
 #include <net/ether.h>
 #include <net/arp.h>
@@ -47,8 +47,8 @@ char *strstr_t(const char *str1, const char *str2, int len) {
 	return NULL;
 }
 
-void process(NetworkInterface* ni) {
-	Packet* packet = ni_input(ni);
+void process(NIC* ni) {
+	Packet* packet = nic_input(ni);
 	static uint32_t source, destination;
 
 	if(!packet)
@@ -80,7 +80,7 @@ void process(NetworkInterface* ni) {
 
 	
 
-	ni_output(ni, packet);
+	nic_output(ni, packet);
 
 	packet = NULL;
 }
@@ -146,14 +146,14 @@ int main(int argc, char** argv) {
 	
 	while(1) {
 
-		uint32_t count = ni_count();
+		uint32_t count = nic_count();
 
 		if(count > 0) {
 			i = (i + 1) % count;
 
-			NetworkInterface* ni = ni_get(i);
+			NIC* ni = nic_get(i);
 
-			if(ni_has_input(ni)) {
+			if(nic_has_input(ni)) {
 				process(ni);
 			}
 		}

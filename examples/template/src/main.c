@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <thread.h>
-#include <net/ni.h>
+#include <net/nic.h>
 
 void ginit(int argc, char** argv) {
 }
@@ -8,13 +8,13 @@ void ginit(int argc, char** argv) {
 void init(int argc, char** argv) {
 }
 
-void process(NetworkInterface* ni) {
-	Packet* packet = ni_input(ni);
+void process(NIC* ni) {
+	Packet* packet = nic_input(ni);
 	if(!packet)
 		return;
 	
 	if(packet)
-		ni_free(packet);
+		nic_free(packet);
 }
 
 void destroy() {
@@ -36,12 +36,12 @@ int main(int argc, char** argv) {
 	
 	uint32_t i = 0;
 	while(1) {
-		uint32_t count = ni_count();
+		uint32_t count = nic_count();
 		if(count > 0) {
 			i = (i + 1) % count;
 			
-			NetworkInterface* ni = ni_get(i);
-			if(ni_has_input(ni)) {
+			NIC* ni = nic_get(i);
+			if(nic_has_input(ni)) {
 				process(ni);
 			}
 		}
