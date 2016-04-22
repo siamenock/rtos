@@ -188,19 +188,19 @@ static bool parse_addr(char* argv, uint32_t* address) {
 }
 
 static int cmd_manager(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
-	if(manager_ni == NULL) {
+	if(manager_nic == NULL) {
 		printf("Can'nt found manager\n");
 		return -1;
 	}
 
 	if(argc == 1) {
 		printf("HWaddr %02x:%02x:%02x:%02x:%02x:%02x\n",
-			(manager_ni->mac >> 40) & 0xff,
-			(manager_ni->mac >> 32) & 0xff,
-			(manager_ni->mac >> 24) & 0xff,
-			(manager_ni->mac >> 16) & 0xff,
-			(manager_ni->mac >> 8) & 0xff,
-			(manager_ni->mac >> 0) & 0xff);
+			(manager_nic->mac >> 40) & 0xff,
+			(manager_nic->mac >> 32) & 0xff,
+			(manager_nic->mac >> 24) & 0xff,
+			(manager_nic->mac >> 16) & 0xff,
+			(manager_nic->mac >> 8) & 0xff,
+			(manager_nic->mac >> 0) & 0xff);
 		uint32_t ip = manager_get_ip();
 		printf("%10sinet addr:%d.%d.%d.%d  ", "", (ip >> 24) & 0xff, (ip >> 16) & 0xff, (ip >> 8) & 0xff, (ip >> 0) & 0xff);
 		uint16_t port = manager_get_port();
@@ -213,7 +213,7 @@ static int cmd_manager(int argc, char** argv, void(*callback)(char* result, int 
 		return 0;
 	}
 
-	if(!manager_ni) {
+	if(!manager_nic) {
 		printf("Can'nt found manager\n");
 		return -1;
 	}
@@ -301,12 +301,12 @@ static int cmd_manager(int argc, char** argv, void(*callback)(char* result, int 
 			return -2;
 
 		uint64_t attrs[] = {
-			NI_MAC, ((NICPriv*)dev->priv)->mac[port >> 12],
-			NI_DEV, (uint64_t)argv[2],
-			NI_NONE
+			NIC_MAC, ((NICPriv*)dev->priv)->mac[port >> 12],
+			NIC_DEV, (uint64_t)argv[2],
+			NIC_NONE
 		};
 
-		if(vnic_update(manager_ni, attrs)) {
+		if(vnic_update(manager_nic, attrs)) {
 			printf("Can'nt found device\n");
 			return -3;
 		}
@@ -409,9 +409,9 @@ static int cmd_vnic(int argc, char** argv, void(*callback)(char* result, int exi
 		void print_vnic(VNIC* vnic, uint16_t vmid, uint16_t nic_index) {
 			char name_buf[32];
 			if(vmid)
-				sprintf(name_buf, "veth%d.%d%c", vmid, nic_index, vnic == manager_ni ? '*' : ' ');
+				sprintf(name_buf, "veth%d.%d%c", vmid, nic_index, vnic == manager_nic ? '*' : ' ');
 			else
-				sprintf(name_buf, "veth%d%c", vmid, vnic == manager_ni ? '*' : ' ');
+				sprintf(name_buf, "veth%d%c", vmid, vnic == manager_nic ? '*' : ' ');
 
 			printf("%12s", name_buf);
 			printf("HWaddr %02x:%02x:%02x:%02x:%02x:%02x  ",
@@ -430,20 +430,20 @@ static int cmd_vnic(int argc, char** argv, void(*callback)(char* result, int exi
 				sprintf(name_buf, "eth%d.%d\t", get_ni_index(vnic->device) + port_num, vlan_id);
 			}
 			printf("Parent %s\n", name_buf);
-			printf("%12sRX packets:%d dropped:%d\n", "", vnic->ni->input_packets, vnic->ni->input_drop_packets);
-			printf("%12sTX packets:%d dropped:%d\n", "", vnic->ni->output_packets, vnic->ni->output_drop_packets);
-			printf("%12srxqueuelen:%d txqueuelen:%d\n", "", fifo_capacity(vnic->ni->input_buffer), fifo_capacity(vnic->ni->output_buffer));
+			printf("%12sRX packets:%d dropped:%d\n", "", vnic->nic->input_packets, vnic->nic->input_drop_packets);
+			printf("%12sTX packets:%d dropped:%d\n", "", vnic->nic->output_packets, vnic->nic->output_drop_packets);
+			printf("%12srxqueuelen:%d txqueuelen:%d\n", "", fifo_capacity(vnic->nic->input_buffer), fifo_capacity(vnic->nic->output_buffer));
 
-			printf("%12sRX bytes:%lu ", "", vnic->ni->input_bytes);
-			print_byte_size(vnic->ni->input_bytes);
-			printf("  TX bytes:%lu ", vnic->ni->output_bytes);
-			print_byte_size(vnic->ni->output_bytes);
+			printf("%12sRX bytes:%lu ", "", vnic->nic->input_bytes);
+			print_byte_size(vnic->nic->input_bytes);
+			printf("  TX bytes:%lu ", vnic->nic->output_bytes);
+			print_byte_size(vnic->nic->output_bytes);
 			printf("\n");
 			printf("%12sHead Padding:%d Tail Padding:%d", "",vnic->padding_head, vnic->padding_tail);
 			printf("\n\n");
 		}
 
-		print_vnic(manager_ni, 0, 0);
+		print_vnic(manager_nic, 0, 0);
 
 		extern Map* vms;
 		MapIterator iter;
@@ -669,7 +669,7 @@ static int cmd_arping(int argc, char** argv, void(*callback)(char* result, int e
 		}
 	}
 	
-	if(arp_request(manager_ni->ni, arping_addr, 0)) {
+	if(arp_request(manager_nic->nic, arping_addr, 0)) {
 		arping_event = event_timer_add(arping_timeout, NULL, 1000000, 1000000);
 	} else {
 		arping_count = 0;
@@ -1386,7 +1386,7 @@ bool shell_process(Packet* packet) {
 				if(arping_count > 0) {
 					bool arping(void* context) {
 						arping_time = timer_ns();
-						if(arp_request(manager_ni->ni, arping_addr, 0)) {
+						if(arp_request(manager_nic->nic, arping_addr, 0)) {
 							arping_event = event_timer_add(arping_timeout, NULL, 1000000, 1000000);
 						} else {
 							arping_count = 0;

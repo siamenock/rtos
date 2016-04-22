@@ -56,7 +56,7 @@
 #include <string.h>
 #include <lwip/init.h>
 #include <netif/etharp.h>
-#include <net/ni.h>
+#include <net/nic.h>
 #include <net/interface.h>
 #include <util/list.h>
 #include <lwip/timers.h>
@@ -67,9 +67,9 @@
 #define IFNAME1 'n'
 
 struct netif_private {
-	NetworkInterface*	ni;
-	NI_DPI			preprocessor;
-	NI_DPI			postprocessor;
+	NIC*	nic;
+	NIC_DPI	preprocessor;
+	NIC_DPI	postprocessor;
 };
 
 /**
@@ -82,18 +82,18 @@ struct netif_private {
 static void
 low_level_init(struct netif *netif)
 {
-  NetworkInterface* ni = ((struct netif_private*)netif->state)->ni;
+  NIC* nic = ((struct netif_private*)netif->state)->nic;
   
   /* set MAC hardware address length */
   netif->hwaddr_len = ETHARP_HWADDR_LEN;
 
   /* set MAC hardware address */
-  netif->hwaddr[0] = (ni->mac >> 40) & 0xff;
-  netif->hwaddr[1] = (ni->mac >> 32) & 0xff;
-  netif->hwaddr[2] = (ni->mac >> 24) & 0xff;
-  netif->hwaddr[3] = (ni->mac >> 16) & 0xff;
-  netif->hwaddr[4] = (ni->mac >> 8) & 0xff;
-  netif->hwaddr[5] = (ni->mac >> 0) & 0xff;
+  netif->hwaddr[0] = (nic->mac >> 40) & 0xff;
+  netif->hwaddr[1] = (nic->mac >> 32) & 0xff;
+  netif->hwaddr[2] = (nic->mac >> 24) & 0xff;
+  netif->hwaddr[3] = (nic->mac >> 16) & 0xff;
+  netif->hwaddr[4] = (nic->mac >> 8) & 0xff;
+  netif->hwaddr[5] = (nic->mac >> 0) & 0xff;
 
   /* maximum transfer unit */
   netif->mtu = 1500;
@@ -124,7 +124,7 @@ low_level_init(struct netif *netif)
 static err_t
 low_level_output(struct netif *netif, struct pbuf *p)
 {
-  NetworkInterface* ni = ((struct netif_private*)netif->state)->ni;
+  NIC* nic = ((struct netif_private*)netif->state)->nic;
   struct pbuf *q;
 
 #if ETH_PAD_SIZE
@@ -132,7 +132,7 @@ low_level_output(struct netif *netif, struct pbuf *p)
 #endif
 
   u16_t tot_len = p->tot_len;
-  Packet* packet = ni_alloc(ni, tot_len);
+  Packet* packet = nic_alloc(nic, tot_len);
   packet->end = packet->start + tot_len;
   int idx = 0;
   for(q = p; q != NULL; q = q->next) {
@@ -140,12 +140,12 @@ low_level_output(struct netif *netif, struct pbuf *p)
     idx += q->len;
   }
 
-  NI_DPI postprocessor = ((struct netif_private*)netif->state)->postprocessor;
+  NIC_DPI postprocessor = ((struct netif_private*)netif->state)->postprocessor;
   if(postprocessor)
     packet = postprocessor(packet);
   
   if(packet)
-    ni_output(ni, packet);
+    nic_output(nic, packet);
 
 #if ETH_PAD_SIZE
   pbuf_header(p, ETH_PAD_SIZE); /* reclaim the padding word */
@@ -192,7 +192,7 @@ low_level_input(struct netif *netif, Packet* packet)
       memcpy(q->payload, packet->buffer + packet->start + idx, q->len);
       idx += q->len;
     }
-    ni_free(packet);
+    nic_free(packet);
 
 #if ETH_PAD_SIZE
     pbuf_header(p, ETH_PAD_SIZE); /* reclaim the padding word */
@@ -200,7 +200,7 @@ low_level_input(struct netif *netif, Packet* packet)
 
     LINK_STATS_INC(link.recv);
   } else {
-    ni_free(packet);
+    nic_free(packet);
     LINK_STATS_INC(link.memerr);
     LINK_STATS_INC(link.drop);
   }
@@ -299,14 +299,14 @@ driver_init(struct netif *netif)
 }
 
 static bool is_lwip_inited;
- //static struct netif* netifs[NIS_SIZE];
- //static struct netif_private* privates[NIS_SIZE];
+ //static struct netif* netifs[NIC_SIZE];
+ //static struct netif_private* privates[NIC_SIZE];
  //static int netif_count;
 static List* netifs = NULL;
 static ListIterator iter;
 //static List* privates;
 
-struct netif* ni_init(NetworkInterface* ni, NI_DPI preprocessor, NI_DPI postprocessor) {
+struct netif* nic_init(NIC* nic, NIC_DPI preprocessor, NIC_DPI postprocessor) {
 	if(!netifs) {
 		netifs = list_create(NULL);
 		if(!netifs) {
@@ -323,13 +323,13 @@ struct netif* ni_init(NetworkInterface* ni, NI_DPI preprocessor, NI_DPI postproc
  //		}
  //	}
 
-	if(list_size(netifs) >= NIS_SIZE)
+	if(list_size(netifs) >= NIC_SIZE)
 		return NULL;
 
 	uint32_t ip;
 	IPv4Interface* interface = NULL;
 
-	Map* interfaces = ni_config_get(ni, NI_ADDR_IPv4);
+	Map* interfaces = nic_config_get(nic, NIC_ADDR_IPv4);
 	if(!interfaces)
 		return NULL;
 
@@ -362,7 +362,7 @@ struct netif* ni_init(NetworkInterface* ni, NI_DPI preprocessor, NI_DPI postproc
 	//privates[netif_count] = private;
 	//netif_count++;
 
-	private->ni = ni;
+	private->nic = nic;
 	private->preprocessor = preprocessor;
 	private->postprocessor = postprocessor;
 	
@@ -379,7 +379,7 @@ struct netif* ni_init(NetworkInterface* ni, NI_DPI preprocessor, NI_DPI postproc
 	return netif;
 }
 
-bool ni_remove(struct netif* netif) {
+bool nic_remove(struct netif* netif) {
  	netif_set_down(netif);
  	netif_remove(netif);
 	list_remove_data(netifs, netif);
@@ -389,7 +389,7 @@ bool ni_remove(struct netif* netif) {
 	return true;
 }
 
-bool ni_poll() {
+bool nic_poll() {
 	bool result = false;
 	
 	if(list_size(netifs) == 0)
@@ -406,12 +406,12 @@ check_has_next:
 process_packet:
 ;
 		struct netif* netif = list_iterator_next(&iter);
-		NetworkInterface* ni = ((struct netif_private*)netif->state)->ni;
-		if(!ni_has_input(ni))
+		NIC* nic = ((struct netif_private*)netif->state)->nic;
+		if(!nic_has_input(nic))
 			goto done;
 		
-		Packet* packet = ni_input(ni);
-		NI_DPI preprocessor = ((struct netif_private*)netif->state)->preprocessor;
+		Packet* packet = nic_input(nic);
+		NIC_DPI preprocessor = ((struct netif_private*)netif->state)->preprocessor;
 		if(preprocessor)
 			packet = preprocessor(packet);
 		
@@ -427,6 +427,6 @@ done:
 	return result;
 }
 
-void ni_timer() {
+void nic_timer() {
 	sys_check_timeouts();
 }

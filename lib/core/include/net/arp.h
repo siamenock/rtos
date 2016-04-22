@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <net/packet.h>
-#include <net/ni.h>
+#include <net/nic.h>
 
 /**
  * @file
@@ -41,21 +41,21 @@ bool arp_process(Packet* packet);
 /**
  * Broadcast ARP request (MAC address resolving).
  *
- * @param ni NI reference to send ARP request
+ * @param nic NIC reference to send ARP request
  * @param destination IP address to resolve MAC address
  * @param source IP address of interface
  * @return true if ARP request is sent
  */
-bool arp_request(NetworkInterface* ni, uint32_t destination, uint32_t source);
+bool arp_request(NIC* nic, uint32_t destination, uint32_t source);
 
 /**
  * Announce IP and MAC address to hosts in the LAN.
  *
- * @param ni NI reference to send ARP announce
+ * @param nic NIC reference to send ARP announce
  * @param ip IP address to announce
  * @return true if ARP announance is sent
  */
-bool arp_announce(NetworkInterface* ni, uint32_t ip);
+bool arp_announce(NIC* nic, uint32_t ip);
 
 /**
  * Get MAC address associated with IP address from local ARP table.
@@ -63,21 +63,21 @@ bool arp_announce(NetworkInterface* ni, uint32_t ip);
  * it will return 0xffffffffffff if there is no entity in ARP table.
  * If there is no entity, ARP request is will be sent.
  *
- * @param ni NI reference which manages ARP table
+ * @param nic NIC reference which manages ARP table
  * @param destination IP address
  * @param source IP address of interface
  * @return MAC address if there is entry in ARP table, if not 0xffffffffffff will be returned
  */
-uint64_t arp_get_mac(NetworkInterface* ni, uint32_t destination, uint32_t source);
+uint64_t arp_get_mac(NIC* nic, uint32_t destination, uint32_t source);
 
 /**
  * Get IP address associated with MAC address from local ARP table.
  * 
- * @param ni NI reference which manages ARP table
+ * @param nic NIC reference which manages ARP table
  * @param mac MAC address
  * @return IP address if there is entry in ARP table, if not 0.0.0.0 will be returned
  */
-uint32_t arp_get_ip(NetworkInterface* ni, uint64_t mac);
+uint32_t arp_get_ip(NIC* nic, uint64_t mac);
 
 /**
  * Set the packet->end index to end of ARP payload

@@ -8,6 +8,7 @@
   * bridge-utils
   * libc6-dev-i386 
   * doxygen 
+  * graphviz
   * kpartx
   * bison
   * flex

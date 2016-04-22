@@ -1,4 +1,4 @@
-#include <net/ni.h>
+#include <net/nic.h>
 #include <net/ether.h>
 #include <net/ip.h>
 #include <net/icmp.h>
@@ -13,7 +13,7 @@ bool icmp_process(Packet* packet) {
 	IP* ip = (IP*)ether->payload;
 	uint32_t addr = endian32(ip->destination);
 
-	if(!ni_ip_get(packet->ni, addr))
+	if(!nic_ip_get(packet->nic, addr))
 		return false;
 	
 	if(ip->protocol == IP_PROTOCOL_ICMP) {
@@ -30,7 +30,7 @@ bool icmp_process(Packet* packet) {
 		
 		swap48(ether->smac, ether->dmac);
 		
-		ni_output(packet->ni, packet);
+		nic_output(packet->nic, packet);
 		
 		return true;
 	}

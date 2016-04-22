@@ -59,7 +59,7 @@ libxdr.a: xdr/linux/libxdr.a
 	cp xdr/linux/libxdr.a .
 
 doc:
-	doxygen core/doxyfiles/Doxyfile
+	make -C core
 
 clean: 
 	rm -f libc.a libm.a libz.a libssl.a libcrypto.a libexpat.a libxdr.a

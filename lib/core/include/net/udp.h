@@ -2,7 +2,7 @@
 #define __NET_UDP_H__
 
 #include <net/packet.h>
-#include <net/ni.h>
+#include <net/nic.h>
 
 /**
  * @file
@@ -26,30 +26,30 @@ typedef struct _UDP {
 /**
  * Allocate UDP port number which associated with NI.
  *
- * @param ni NI reference
+ * @param nic NIC reference
  * @param addr
  * @param port
  * @return true if port alloc success
  */
-bool udp_port_alloc0(NetworkInterface* ni, uint32_t addr, uint16_t port);
+bool udp_port_alloc0(NIC* nic, uint32_t addr, uint16_t port);
 
 /**
  * Allocate UDP port number which associated with NI.
  *
- * @param ni NI reference
+ * @param nic NIC reference
  * @param addr
  * @return port number
  */
-uint16_t udp_port_alloc(NetworkInterface* ni, uint32_t addr);
+uint16_t udp_port_alloc(NIC* nic, uint32_t addr);
 
 /**
  * Free UDP port number.
  *
- * @param ni NI reference
+ * @param nic NIC reference
  * @param addr
  * @param port port number to free
  */
-void udp_port_free(NetworkInterface* ni, uint32_t addr, uint16_t port);
+void udp_port_free(NIC* nic, uint32_t addr, uint16_t port);
 
 /**
  * Set UDP length, checksum, and do IP packing.

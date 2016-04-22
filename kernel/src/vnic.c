@@ -119,7 +119,7 @@ void vnic_init0() {
 VNIC* vnic_create(uint64_t* attrs) {
 	bool has_key(uint64_t key) {
 		int i = 0;
-		while(attrs[i * 2] != NI_NONE) {
+		while(attrs[i * 2] != NIC_NONE) {
 			if(attrs[i * 2] == key)
 				return true;
 
@@ -131,7 +131,7 @@ VNIC* vnic_create(uint64_t* attrs) {
 
 	uint64_t get_value(uint64_t key) {
 		int i = 0;
-		while(attrs[i * 2] != NI_NONE) {
+		while(attrs[i * 2] != NIC_NONE) {
 			if(attrs[i * 2] == key)
 				return attrs[i * 2 + 1];
 
@@ -143,15 +143,15 @@ VNIC* vnic_create(uint64_t* attrs) {
 
 	errno = 0;
 
-	if(!has_key(NI_DEV) || !has_key(NI_MAC) || !has_key(NI_POOL_SIZE) || 
-			!has_key(NI_INPUT_BANDWIDTH) || !has_key(NI_OUTPUT_BANDWIDTH) ||
-			!has_key(NI_INPUT_BUFFER_SIZE) || !has_key(NI_OUTPUT_BUFFER_SIZE)) {
+	if(!has_key(NIC_DEV) || !has_key(NIC_MAC) || !has_key(NIC_POOL_SIZE) || 
+			!has_key(NIC_INPUT_BANDWIDTH) || !has_key(NIC_OUTPUT_BANDWIDTH) ||
+			!has_key(NIC_INPUT_BUFFER_SIZE) || !has_key(NIC_OUTPUT_BUFFER_SIZE)) {
 		errno = 1;
 		return NULL;
 	}
 
-	if((has_key(NI_INPUT_ACCEPT_ALL) && has_key(NI_INPUT_ACCEPT)) ||
-			(has_key(NI_OUTPUT_ACCEPT_ALL) && has_key(NI_OUTPUT_ACCEPT))) {
+	if((has_key(NIC_INPUT_ACCEPT_ALL) && has_key(NIC_INPUT_ACCEPT)) ||
+			(has_key(NIC_OUTPUT_ACCEPT_ALL) && has_key(NIC_OUTPUT_ACCEPT))) {
 		errno = 2;
 		return NULL;
 	}
@@ -159,7 +159,7 @@ VNIC* vnic_create(uint64_t* attrs) {
 	Device* dev = NULL;
 	uint16_t port = 0;
 	Map* vnics;
-	char* name = (char*)get_value(NI_DEV);
+	char* name = (char*)get_value(NIC_DEV);
 	if(name) {
 		dev = nic_parse_index(name, &port);
 		if(!dev) {
@@ -173,7 +173,7 @@ VNIC* vnic_create(uint64_t* attrs) {
 			return NULL;
 		}
 
-		uint64_t mac = get_value(NI_MAC);
+		uint64_t mac = get_value(NIC_MAC);
 		if(map_contains(vnics, (void*)mac)) {
 			errno = 1;
 			return NULL;
@@ -189,7 +189,7 @@ VNIC* vnic_create(uint64_t* attrs) {
 		return NULL;
 	bzero(vnic, sizeof(VNIC));
 	// Allocate initial pool
-	uint64_t pool_size = get_value(NI_POOL_SIZE);
+	uint64_t pool_size = get_value(NIC_POOL_SIZE);
 	if(pool_size == 0 || (pool_size & ~(0x200000 - 1)) != pool_size) {
 		gfree(vnic);
 		errno = 4;
@@ -233,70 +233,70 @@ VNIC* vnic_create(uint64_t* attrs) {
 		add_new_area(ptr, 0x200000, pool);
 	}
 
-	// Allocate NetworkInterface
+	// Allocate NIC
 	vnic->device = dev;
 	vnic->port = port;
 
-	vnic->ni = malloc_ex(sizeof(NetworkInterface), vnic->pool);
-	bzero(vnic->ni, sizeof(NetworkInterface));
+	vnic->nic = malloc_ex(sizeof(NIC), vnic->pool);
+	bzero(vnic->nic, sizeof(NIC));
 
-	vnic->ni->min_buffer_size = vnic->min_buffer_size = 128;
-	vnic->ni->max_buffer_size = vnic->max_buffer_size = 2048;
-	if(!has_key(NI_INPUT_ACCEPT_ALL))
+	vnic->nic->min_buffer_size = vnic->min_buffer_size = 128;
+	vnic->nic->max_buffer_size = vnic->max_buffer_size = 2048;
+	if(!has_key(NIC_INPUT_ACCEPT_ALL))
 		vnic->input_accept = list_create(vnic->pool);
-	if(!has_key(NI_OUTPUT_ACCEPT_ALL))
+	if(!has_key(NIC_OUTPUT_ACCEPT_ALL))
 		vnic->output_accept = list_create(vnic->pool);
 
 	vnic->input_closed = vnic->output_closed = timer_frequency();
 
 	// Extra attributes
 	int i = 0;
-	while(attrs[i * 2] != NI_NONE) {
+	while(attrs[i * 2] != NIC_NONE) {
 		switch(attrs[i * 2]) {
-			case NI_MAC:
-				vnic->ni->mac = vnic->mac = attrs[i * 2 + 1];
+			case NIC_MAC:
+				vnic->nic->mac = vnic->mac = attrs[i * 2 + 1];
 				break;
-			case NI_POOL_SIZE:
+			case NIC_POOL_SIZE:
 				break;
-			case NI_INPUT_BANDWIDTH:
-				vnic->ni->input_bandwidth = vnic->input_bandwidth = attrs[i * 2 + 1];
+			case NIC_INPUT_BANDWIDTH:
+				vnic->nic->input_bandwidth = vnic->input_bandwidth = attrs[i * 2 + 1];
 				vnic->input_wait = TIMER_FREQUENCY_PER_SEC * 8 / vnic->input_bandwidth;
 				vnic->input_wait_grace = TIMER_FREQUENCY_PER_SEC / 100;
 				break;
-			case NI_OUTPUT_BANDWIDTH:
-				vnic->ni->output_bandwidth = vnic->output_bandwidth = attrs[i * 2 + 1];
+			case NIC_OUTPUT_BANDWIDTH:
+				vnic->nic->output_bandwidth = vnic->output_bandwidth = attrs[i * 2 + 1];
 				vnic->output_wait = TIMER_FREQUENCY_PER_SEC * 8 / vnic->output_bandwidth;
 				vnic->output_wait_grace = TIMER_FREQUENCY_PER_SEC / 1000;
 				break;
-			case NI_PADDING_HEAD:
-				vnic->ni->padding_head = vnic->padding_head = attrs[i * 2 + 1];
+			case NIC_PADDING_HEAD:
+				vnic->nic->padding_head = vnic->padding_head = attrs[i * 2 + 1];
 				break;
-			case NI_PADDING_TAIL:
-				vnic->ni->padding_tail = vnic->padding_tail = attrs[i * 2 + 1];
+			case NIC_PADDING_TAIL:
+				vnic->nic->padding_tail = vnic->padding_tail = attrs[i * 2 + 1];
 				break;
-			case NI_INPUT_BUFFER_SIZE:
-				vnic->ni->input_buffer = fifo_create(attrs[i * 2 + 1], vnic->pool);
-				if(!vnic->ni->input_buffer) {
+			case NIC_INPUT_BUFFER_SIZE:
+				vnic->nic->input_buffer = fifo_create(attrs[i * 2 + 1], vnic->pool);
+				if(!vnic->nic->input_buffer) {
 					errno = 5;
 					gfree(vnic);
 					return NULL;
 				}
 				break;
-			case NI_OUTPUT_BUFFER_SIZE:
-				vnic->ni->output_buffer = fifo_create(attrs[i * 2 + 1], vnic->pool);
-				if(!vnic->ni->output_buffer) {
+			case NIC_OUTPUT_BUFFER_SIZE:
+				vnic->nic->output_buffer = fifo_create(attrs[i * 2 + 1], vnic->pool);
+				if(!vnic->nic->output_buffer) {
 					errno = 5;
 					gfree(vnic);
 					return NULL;
 				}
 				break;
-			case NI_MIN_BUFFER_SIZE:
-				vnic->ni->min_buffer_size = vnic->min_buffer_size = attrs[i * 2 + 1];
+			case NIC_MIN_BUFFER_SIZE:
+				vnic->nic->min_buffer_size = vnic->min_buffer_size = attrs[i * 2 + 1];
 				break;
-			case NI_MAX_BUFFER_SIZE:
-				vnic->ni->max_buffer_size = vnic->max_buffer_size = attrs[i * 2 + 1];
+			case NIC_MAX_BUFFER_SIZE:
+				vnic->nic->max_buffer_size = vnic->max_buffer_size = attrs[i * 2 + 1];
 				break;
-			case NI_INPUT_ACCEPT:
+			case NIC_INPUT_ACCEPT:
 				if(vnic->input_accept) {
 					if(!list_add(vnic->input_accept, (void*)attrs[i * 2 + 1])) {
 						errno = 5;
@@ -305,7 +305,7 @@ VNIC* vnic_create(uint64_t* attrs) {
 					}
 				}
 				break;
-			case NI_OUTPUT_ACCEPT:
+			case NIC_OUTPUT_ACCEPT:
 				if(vnic->output_accept) {
 					if(!list_add(vnic->output_accept, (void*)attrs[i * 2 + 1])) {
 						errno = 5;
@@ -318,10 +318,10 @@ VNIC* vnic_create(uint64_t* attrs) {
 
 		i++;
 	}
-	vnic->ni->pool = vnic->pool;
+	vnic->nic->pool = vnic->pool;
 
 	// Config
-	vnic->ni->config = map_create(8, NULL, NULL, vnic->pool);
+	vnic->nic->config = map_create(8, NULL, NULL, vnic->pool);
 
 	// Register the vnic
 	map_put(vnics, (void*)vnic->mac, vnic);
@@ -347,12 +347,12 @@ void vnic_destroy(VNIC* vnic) {
 	gfree(vnic);
 }
 
-bool vnic_contains(char* ni_dev, uint64_t mac) {
-	if(!ni_dev)
+bool vnic_contains(char* nic_dev, uint64_t mac) {
+	if(!nic_dev)
 		return false;
 	
 	uint16_t port = 0;
-	Device* dev = nic_parse_index(ni_dev, &port);
+	Device* dev = nic_parse_index(nic_dev, &port);
 	if(!dev) {
 		return false;
 	}
@@ -368,7 +368,7 @@ bool vnic_contains(char* ni_dev, uint64_t mac) {
 uint32_t vnic_update(VNIC* vnic, uint64_t* attrs) {
 	bool has_key(uint64_t key) {
 		int i = 0;
-		while(attrs[i * 2] != NI_NONE) {
+		while(attrs[i * 2] != NIC_NONE) {
 			if(attrs[i * 2] == key)
 				return true;
 			
@@ -381,7 +381,7 @@ uint32_t vnic_update(VNIC* vnic, uint64_t* attrs) {
 
 	uint64_t get_value(uint64_t key) {
 		int i = 0;
-		while(attrs[i * 2] != NI_NONE) {
+		while(attrs[i * 2] != NIC_NONE) {
 			if(attrs[i * 2] == key)
 				return attrs[i * 2 + 1];
 
@@ -402,13 +402,13 @@ uint32_t vnic_update(VNIC* vnic, uint64_t* attrs) {
 	List* output_accept = NULL;
 
 	int i = 0;
-	while(attrs[i * 2] != NI_NONE) {
+	while(attrs[i * 2] != NIC_NONE) {
 		switch(attrs[i * 2]) {
-			case NI_MAC:
-			case NI_DEV:
+			case NIC_MAC:
+			case NIC_DEV:
 				;
-				if(attrs[i * 2] == NI_DEV) {
-					if(has_key(NI_MAC)) {
+				if(attrs[i * 2] == NIC_DEV) {
+					if(has_key(NIC_MAC)) {
 						//do not
 						break;
 					}
@@ -416,8 +416,8 @@ uint32_t vnic_update(VNIC* vnic, uint64_t* attrs) {
 
 				Device* dev = NULL;
 				uint16_t port;
-				if(has_key(NI_DEV)) {
-					char* name = (char*)get_value(NI_DEV);
+				if(has_key(NIC_DEV)) {
+					char* name = (char*)get_value(NIC_DEV);
 					dev = nic_parse_index(name, &port);
 				} else {
 					dev = vnic->device;
@@ -431,7 +431,7 @@ uint32_t vnic_update(VNIC* vnic, uint64_t* attrs) {
 				Map* nics = ((NICPriv*)dev->priv)->nics;
 				Map* vnics = map_get(nics, (void*)(uint64_t)port);
 				uint64_t mac;
-				if(has_key(NI_MAC)) {
+				if(has_key(NIC_MAC)) {
 					mac = attrs[i * 2 + 1];
 				} else {
 					mac = vnic->mac;
@@ -442,7 +442,7 @@ uint32_t vnic_update(VNIC* vnic, uint64_t* attrs) {
 					goto failed;
 				}
 				break;
-			case NI_POOL_SIZE:
+			case NIC_POOL_SIZE:
 				;
 				uint64_t pool_size = attrs[i * 2 + 1];
 				if(pool_size < list_size(vnic->pools) * 0x200000) {
@@ -477,15 +477,15 @@ uint32_t vnic_update(VNIC* vnic, uint64_t* attrs) {
 					list_add(pools, ptr);
 				}
 				break;
-			case NI_INPUT_BANDWIDTH:
+			case NIC_INPUT_BANDWIDTH:
 				break;
-			case NI_OUTPUT_BANDWIDTH:
+			case NIC_OUTPUT_BANDWIDTH:
 				break;
-			case NI_PADDING_HEAD:
+			case NIC_PADDING_HEAD:
 				break;
-			case NI_PADDING_TAIL:
+			case NIC_PADDING_TAIL:
 				break;
-			case NI_INPUT_BUFFER_SIZE:
+			case NIC_INPUT_BUFFER_SIZE:
 				input_buffer_size = attrs[i * 2 + 1];
 				input_buffer = malloc_ex(sizeof(void*) * input_buffer_size, vnic->pool);
 				if(!input_buffer) {
@@ -493,7 +493,7 @@ uint32_t vnic_update(VNIC* vnic, uint64_t* attrs) {
 					goto failed;
 				}
 				break;
-			case NI_OUTPUT_BUFFER_SIZE:
+			case NIC_OUTPUT_BUFFER_SIZE:
 				output_buffer_size = attrs[i * 2 + 1];
 				output_buffer = malloc_ex(sizeof(void*) * output_buffer_size, vnic->pool);
 				if(!output_buffer) {
@@ -501,11 +501,11 @@ uint32_t vnic_update(VNIC* vnic, uint64_t* attrs) {
 					goto failed;
 				}
 				break;
-			case NI_MIN_BUFFER_SIZE:
+			case NIC_MIN_BUFFER_SIZE:
 				break;
-			case NI_MAX_BUFFER_SIZE:
+			case NIC_MAX_BUFFER_SIZE:
 				break;
-			case NI_INPUT_ACCEPT:
+			case NIC_INPUT_ACCEPT:
 				if(!input_accept) {
 					input_accept = list_create(vnic->pool);
 					if(!input_accept) {
@@ -519,7 +519,7 @@ uint32_t vnic_update(VNIC* vnic, uint64_t* attrs) {
 					goto failed;
 				}
 				break;
-			case NI_OUTPUT_ACCEPT:
+			case NIC_OUTPUT_ACCEPT:
 				if(!output_accept) {
 					output_accept = list_create(vnic->pool);
 					if(!output_accept) {
@@ -553,10 +553,10 @@ failed:
 	}
 
 	if(input_buffer)
-		ni_free(input_buffer);
+		nic_free(input_buffer);
 
 	if(output_buffer)
-		ni_free(output_buffer);
+		nic_free(output_buffer);
 
 	if(input_accept)
 		list_destroy(input_accept);
@@ -568,7 +568,7 @@ failed:
 
 succeed:
 
-	// NI_POOL_SIZE
+	// NIC_POOL_SIZE
 	if(pools) {
 		ListIterator iter;
 
@@ -578,44 +578,44 @@ succeed:
 			add_new_area(ptr, 0x200000, vnic->pool);
 		}
 		list_destroy(pools);
-		vnic->ni->pool_size = list_size(vnic->pools) * 0x200000;
+		vnic->nic->pool_size = list_size(vnic->pools) * 0x200000;
 	}
 
-	// NI_INPUT_BUFFER_SIZE
+	// NIC_INPUT_BUFFER_SIZE
 	if(input_buffer) {
 		void input_popped(void* data) {
 			Packet* packet = data;
 
 			uint16_t size = packet->end - packet->start;
-			vnic->ni->input_drop_bytes += size;
-			vnic->ni->input_drop_packets++;
+			vnic->nic->input_drop_bytes += size;
+			vnic->nic->input_drop_packets++;
 
-			ni_free(packet);
+			nic_free(packet);
 		}
 
-		void* array = vnic->ni->input_buffer->array;
-		fifo_reinit(vnic->ni->input_buffer, input_buffer, input_buffer_size, input_popped);
+		void* array = vnic->nic->input_buffer->array;
+		fifo_reinit(vnic->nic->input_buffer, input_buffer, input_buffer_size, input_popped);
 		free_ex(array, vnic->pool);
 	}
 
-	// NI_OUTPUT_BUFFER_SIZE
+	// NIC_OUTPUT_BUFFER_SIZE
 	if(output_buffer) {
 		void output_popped(void* data) {
 			Packet* packet = data;
 
-			vnic->ni->output_drop_bytes += packet->end - packet->start;
-			vnic->ni->output_drop_packets++;
+			vnic->nic->output_drop_bytes += packet->end - packet->start;
+			vnic->nic->output_drop_packets++;
 
 			free_ex(packet->buffer, vnic->pool);
 			free_ex(packet, vnic->pool);
 		}
 
-		void* array = vnic->ni->output_buffer->array;
-		fifo_reinit(vnic->ni->output_buffer, output_buffer, output_buffer_size, output_popped);
+		void* array = vnic->nic->output_buffer->array;
+		fifo_reinit(vnic->nic->output_buffer, output_buffer, output_buffer_size, output_popped);
 		free_ex(array, vnic->pool);
 	}
 
-	// NI_INPUT_ACCEPT
+	// NIC_INPUT_ACCEPT
 	if(input_accept) {
 		if(!vnic->input_accept) {
 			vnic->input_accept = input_accept;
@@ -627,7 +627,7 @@ succeed:
 		}
 	}
 
-	// NI_OUTPUT_ACCEPT
+	// NIC_OUTPUT_ACCEPT
 	if(output_accept) {
 		if(!vnic->output_accept) {
 			vnic->output_accept = output_accept;
@@ -640,13 +640,13 @@ succeed:
 	}
 
 	i = 0;
-	while(attrs[i * 2] != NI_NONE) {
+	while(attrs[i * 2] != NIC_NONE) {
 		switch(attrs[i * 2]) {
-			case NI_MAC:
-			case NI_DEV:
+			case NIC_MAC:
+			case NIC_DEV:
 				;
-				if(attrs[i * 2] == NI_DEV) {
-					if(has_key(NI_MAC)) {
+				if(attrs[i * 2] == NIC_DEV) {
+					if(has_key(NIC_MAC)) {
 						//do not
 						break;
 					}
@@ -658,8 +658,8 @@ succeed:
 
 				Device* dev = NULL;
 				uint16_t port;
-				if(has_key(NI_DEV)) {
-					char* name = (char*)get_value(NI_DEV);
+				if(has_key(NIC_DEV)) {
+					char* name = (char*)get_value(NIC_DEV);
 					dev = nic_parse_index(name, &port);
 					vnic->device = dev;
 					vnic->port = port;
@@ -670,44 +670,44 @@ succeed:
 				nics = ((NICPriv*)dev->priv)->nics;
 				vnics = map_get(nics, (void*)(uint64_t)port);
 				uint64_t mac;
-				if(has_key(NI_MAC)) {
+				if(has_key(NIC_MAC)) {
 					mac = attrs[i * 2 + 1];
-					vnic->ni->mac = vnic->mac = mac;
+					vnic->nic->mac = vnic->mac = mac;
 				} else {
 					mac = vnic->mac;
 				}
 				map_put(vnics, (void*)mac, vnic);
 
 				break;
-			case NI_INPUT_BANDWIDTH:
-				vnic->ni->input_bandwidth = vnic->input_bandwidth = attrs[i * 2 + 1];
+			case NIC_INPUT_BANDWIDTH:
+				vnic->nic->input_bandwidth = vnic->input_bandwidth = attrs[i * 2 + 1];
 				vnic->input_wait = TIMER_FREQUENCY_PER_SEC * 8 / vnic->input_bandwidth;
 				vnic->input_wait_grace = TIMER_FREQUENCY_PER_SEC / 100;
 				break;
-			case NI_OUTPUT_BANDWIDTH:
-				vnic->ni->output_bandwidth = vnic->output_bandwidth = attrs[i * 2 + 1];
+			case NIC_OUTPUT_BANDWIDTH:
+				vnic->nic->output_bandwidth = vnic->output_bandwidth = attrs[i * 2 + 1];
 				vnic->output_wait = TIMER_FREQUENCY_PER_SEC * 8 / vnic->output_bandwidth;
 				vnic->output_wait_grace = TIMER_FREQUENCY_PER_SEC / 1000;
 				break;
-			case NI_PADDING_HEAD:
+			case NIC_PADDING_HEAD:
 				vnic->padding_head = attrs[i * 2 + 1];
 				break;
-			case NI_PADDING_TAIL:
+			case NIC_PADDING_TAIL:
 				vnic->padding_tail = attrs[i * 2 + 1];
 				break;
-			case NI_MIN_BUFFER_SIZE:
+			case NIC_MIN_BUFFER_SIZE:
 				vnic->min_buffer_size = attrs[i * 2 + 1];
 				break;
-			case NI_MAX_BUFFER_SIZE:
+			case NIC_MAX_BUFFER_SIZE:
 				vnic->max_buffer_size = attrs[i * 2 + 1];
 				break;
-			case NI_INPUT_ACCEPT_ALL:
+			case NIC_INPUT_ACCEPT_ALL:
 				if(vnic->input_accept) {
 					list_destroy(vnic->input_accept);
 					vnic->input_accept = NULL;
 				}
 				break;
-			case NI_OUTPUT_ACCEPT_ALL:
+			case NIC_OUTPUT_ACCEPT_ALL:
 				if(vnic->output_accept) {
 					list_destroy(vnic->output_accept);
 					vnic->output_accept = NULL;
@@ -791,13 +791,13 @@ uint16_t size = size1 + size2;
 		if(buffer_size < vnic->min_buffer_size)
 			buffer_size = vnic->min_buffer_size;
 
-		if(!fifo_available(vnic->ni->input_buffer)) {
+		if(!fifo_available(vnic->nic->input_buffer)) {
 			printf("fifo dropped %016lx ", vnic->mac);
 			goto dropped;
 		}
 
 		// Packet
-		Packet* packet = ni_alloc(vnic->ni, buffer_size);
+		Packet* packet = nic_alloc(vnic->nic, buffer_size);
 		if(!packet) {
 			printf("memory dropped %016lx ", vnic->mac);
 			goto dropped;
@@ -818,7 +818,7 @@ uint16_t size = size1 + size2;
 
 		if(vnic->port & 0xfff) {
 			if(!vlan_input_process(vnic, packet)) {
-				ni_free(packet);
+				nic_free(packet);
 				goto dropped;
 			}
 		}
@@ -832,14 +832,14 @@ uint16_t size = size1 + size2;
 #endif /* DEBUG */
 
 		// Push
-		if(!fifo_push(vnic->ni->input_buffer, packet)) {
-			ni_free(packet);
+		if(!fifo_push(vnic->nic->input_buffer, packet)) {
+			nic_free(packet);
 			printf("fifo dropped %016lx ", vnic->mac);
 			goto dropped;
 		}
 
-		vnic->ni->input_bytes += size;
-		vnic->ni->input_packets++;
+		vnic->nic->input_bytes += size;
+		vnic->nic->input_packets++;
 		if(vnic->input_closed > time)
 			vnic->input_closed += vnic->input_wait * size;
 		else
@@ -849,8 +849,8 @@ uint16_t size = size1 + size2;
 		return true;
 
 dropped:
-		vnic->ni->input_drop_bytes += size;
-		vnic->ni->input_drop_packets++;
+		vnic->nic->input_drop_bytes += size;
+		vnic->nic->input_drop_packets++;
 
 		return false;
 	}
@@ -908,21 +908,21 @@ Packet* nic_process_output(uint8_t local_port) {
 				continue;
 			}
 
-			Packet* packet = fifo_pop(vnic->ni->output_buffer);
+			Packet* packet = fifo_pop(vnic->nic->output_buffer);
 			if(!packet) {
 				continue;
 			}
 
 			if(vnic->port & 0xfff) {
 				if(!vlan_output_process(vnic, packet)) {
-					ni_free(packet);
+					nic_free(packet);
 					continue;
 				}
 			}
 
 			uint16_t size = packet->end - packet->start;
-			vnic->ni->output_bytes += size;
-			vnic->ni->output_packets++;
+			vnic->nic->output_bytes += size;
+			vnic->nic->output_packets++;
 			if(vnic->output_closed > time)
 				vnic->output_closed += vnic->input_wait * size;
 			else
@@ -934,7 +934,7 @@ Packet* nic_process_output(uint8_t local_port) {
 
 			if(vnic->output_accept && list_index_of(vnic->output_accept, (void*)dmac, NULL) < 0) {
 				/*Debuging */
-				ni_free(packet);
+				nic_free(packet);
 				// Packet eliminated
 				continue;
 			}
@@ -968,9 +968,9 @@ void nic_statistics(uint64_t time) {
 	   map_iterator_init(&iter, nis);
 	   while(map_iterator_has_next(&iter)) {
 	   MapEntry* entry = map_iterator_next(&iter);
-	   VNIC* ni = entry->data;
+	   VNIC* nic = entry->data;
 
-	   printf("\033[1;0H%012x %d/%d %d/%d %d/%d    ", nic->mac, ni_pool_used(ni->ni), ni_pool_total(ni->ni), ni->ni->input_packets, ni->ni->output_packets, ni->ni->input_drop_packets, ni->ni->output_drop_packets);
+	   printf("\033[1;0H%012x %d/%d %d/%d %d/%d    ", nic->mac, nic_pool_used(nic->ni), nic_pool_total(nic->ni), nic->nic->input_packets, nic->nic->output_packets, nic->nic->input_drop_packets, nic->nic->output_drop_packets);
 	   }
 	 */
 }

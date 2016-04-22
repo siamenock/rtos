@@ -1,5 +1,0 @@
-#!/bin/bash
-
-BASE="`dirname \"$0\"`"
-
-exec sudo qemu-system-x86_64 `${BASE}/../lib/qemu-params` -m 256 -hda ${BASE}/../system.img -M pc -smp 8 -d cpu_reset -no-reboot -no-shutdown -monitor stdio -net nic,model=virtio -net tap,script=${BASE}/../lib/qemu-ifup $@

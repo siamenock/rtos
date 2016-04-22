@@ -8,22 +8,22 @@
  * Packet structure
  */
 
-typedef struct _NetworkInterface NetworkInterface;
+typedef struct _NIC NIC;
 
 /**
  * A Packet.
  */
 typedef struct _Packet {
-	NetworkInterface*	ni;		///< Associated NI which allocated the Packet
+	NIC*		nic;		///< Associated NIC which allocated the Packet
 	
-	uint32_t		status;		///< Packet status (deprecated)
-	uint64_t		time;		///< Packet in time in CPU clock
+	uint32_t	status;		///< Packet status (deprecated)
+	uint64_t	time;		///< Packet in time in CPU clock
 	
-	uint16_t		start;		///< Packet payload starting index of payload buffer
-	uint16_t		end;		///< Packet payload ending index of payload buffer
-	uint16_t		size;		///< Packet buffer size
+	uint16_t	start;		///< Packet payload starting index of payload buffer
+	uint16_t	end;		///< Packet payload ending index of payload buffer
+	uint16_t	size;		///< Packet buffer size
 	
-	uint8_t			buffer[0];	///< Packet buffer which contains packet payload itself
+	uint8_t		buffer[0];	///< Packet buffer which contains packet payload itself
 } Packet;
 
 /**

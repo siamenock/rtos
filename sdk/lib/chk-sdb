@@ -1,7 +1,0 @@
-#!/bin/bash
-
-TYPE=`file /dev/sdb | grep "block special" | wc -l`
-if [ $TYPE = "0" ]; then
-	echo "Error: /dev/sdb is not a block device"
-	exit 1
-fi
