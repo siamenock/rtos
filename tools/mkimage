@@ -54,7 +54,7 @@ popd 2> /dev/null
 
 dd if=/dev/zero of=$IMAGE bs=512 count=$(($SIZE * 2048))
 
-parted -s $IMAGE --			\
+sudo parted -s $IMAGE --			\
 	mklabel msdos			\
 	mkpart primary $BOOT_TYPE 1MiB $(($BOOT + 1))MiB	\
 	mkpart primary $ROOT_TYPE $(($BOOT + 1))MiB $(($BOOT + 1 + $ROOT))MiB	\
