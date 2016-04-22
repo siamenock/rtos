@@ -104,7 +104,7 @@ dis: kernel/build/kernel.elf
 	@echo "Dissable PacketNgin kernel image"
 	objdump -d kernel/build/kernel.elf > kernel.dis && vi kernel.dis
 
-clean:
+clean: Build.make
 	@${MAKE} --no-print-directory -C . -f Build.make clean
 
 help:
