@@ -49,7 +49,7 @@ check_number "boot size" $BOOT
 check_number "root size" $ROOT
 
 # Make disk image
-$BASE/grub-mkimage -v -O i386-pc -d$BASE/grub-core -p\(hd0,msdos1\)/boot/grub biosdisk part_msdos fat exfat bfs multiboot2 -o core.img
+$BASE/grub-mkimage -v -O i386-pc -d $BASE/grub-core -p\(hd0,msdos1\)/boot/grub biosdisk part_msdos fat exfat bfs multiboot2 -o $BASE/grub-core/core.img
 
 sudo parted -s $IMAGE --			\
 	mklabel msdos			\
