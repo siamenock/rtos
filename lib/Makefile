@@ -28,8 +28,8 @@ expat/lib/libexpat.a:
 
 libexpat.a: expat/lib/libexpat.a
 	cp expat/lib/libexpat.a .
-	mkdir -p ../sdk/include
-	cp -rL expat/include/* ../sdk/include
+	mkdir -p ../include
+	cp -rL expat/include/* ../include
 
 zlib/libz.a:
 	cd zlib; CFLAGS="-fno-stack-protector -O3" ./configure --static --64
@@ -37,9 +37,8 @@ zlib/libz.a:
 
 libz.a: zlib/libz.a
 	cp zlib/libz.a .
-	cp libz.a ../sdk/lib/
-	mkdir -p ../sdk/include
-	cp -rL zlib/*.h ../sdk/include/
+	mkdir -p ../include
+	cp -rL zlib/*.h ../include/
 
 openssl/libssl.a: 
 	cd openssl; CFLAGS="-fno-stack-protector -O3" ./Configure packetngin-x86_64 no-threads no-shared no-dso
@@ -48,9 +47,7 @@ openssl/libssl.a:
 libssl.a: openssl/libssl.a
 	cp openssl/libssl.a .
 	cp openssl/libcrypto.a .
-	cp -rL openssl/include/* ../sdk/include/
-	cp libssl.a ../sdk/lib/
-	cp libcrypto.a ../sdk/lib/
+	cp -rL openssl/include/* ../include/
 
 xdr/linux/libxdr.a:
 	make -C xdr -f Makefile.unix linux/libxdr.a

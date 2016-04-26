@@ -86,12 +86,11 @@ workspace "Kernel"
             "ar x ../libexpat.a",
             "ar rcs ../libpacketngin.a *.o",
 
-	    "cp -rL ../core/include/* ../../sdk/include",
-	    "cp -rL ../expat/include/* ../../sdk/include",
-	    "cp -rL ../openssl/include/* ../../sdk/include",
-	    "cp -rL ../zlib/*.h ../../sdk/include",
+	    "cp -rL ../core/include/* ../../include",
+	    "cp -rL ../expat/include/* ../../include",
+	    "cp -rL ../openssl/include/* ../../include",
+	    "cp -rL ../zlib/*.h ../../include",
 
-            "cp ../libpacketngin.a ../../sdk/lib/",
             "rm ./*.o -rf",
 
             -- Linux Application library
