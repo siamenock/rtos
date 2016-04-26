@@ -6,7 +6,7 @@ all: console
 
 console: src/console.c
 	gcc $(CFLAGS) -Wno-unused-variable -o $@ $^ -lcurl -DLINUX ../../lib/libumpn.a
-	cp -f $@ ../../sdk/bin
+	cp -f $@ ../../bin
 
 clean:
 	rm -f console

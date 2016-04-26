@@ -101,27 +101,25 @@ sdk: loader/build/loader.bin kernel.bin initrd.img system.img
 	@echo "* Copy system images"
 	mkdir -p $(SDK)/bin
 	cp $^ $(SDK)/bin
-	
-	@echo "* Copy library: core"
+
+	@echo "* Copy library headers"
 	mkdir -p $(SDK)/include
+	cp -r include/* $(SDK)/include
+
+	@echo "* Copy library: core"
 	mkdir -p $(SDK)/lib
-	cp -r lib/core/include/* $(SDK)/include
 	cp lib/libpacketngin.a $(SDK)/lib
 	
 	@echo "* Copy library: OpenSSL"
-	cp -r lib/openssl/include/* $(SDK)/include
 	cp lib/libcrypto.a lib/libssl.a $(SDK)/lib
 	
 	@echo "* Copy library: LwIP"
-	cp -r lib/lwip/src/include/lwipopts.h lib/lwip/src/include/lwip lib/lwip/src/include/ipv4/* $(SDK)/include
 	cp lib/liblwip.a $(SDK)/lib
 	
 	@echo "* Copy library: zlib"
-	cp -r lib/zlib/zconf.h lib/zlib/zlib.h $(SDK)/include
 	cp lib/libz.a $(SDK)/lib
 	
 	@echo "* Copy library: expat"
-	cp -r lib/expat/include/* $(SDK)/include
 	cp lib/libexpat.a $(SDK)/lib
 	
 	@echo "* Copy library: JSMN"

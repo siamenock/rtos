@@ -27,10 +27,7 @@ kernel.smap
 *.tmp
 
 # SDK
-sdk/bin/console
-sdk/include/*
-sdk/lib/*.a
-sdk/sysmte.img
+packetngin_sdk-*
 
 # Binary
 bin
