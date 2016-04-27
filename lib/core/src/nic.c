@@ -1,9 +1,10 @@
-#include <_string.h>
+#include <tlsf.h>
 #include <lock.h>
 #include <util/map.h>
 #include <net/nic.h>
 #include <net/interface.h>
 #include <errno.h>
+#include <string.h>
 #include <_malloc.h>
 
 int __nic_count;
@@ -125,15 +126,15 @@ inline bool nic_tryoutput(NIC* nic, Packet* packet) {
 }
 
 size_t nic_pool_used(NIC* nic) {
-	return __get_used_size(nic->pool);
+	return get_used_size(nic->pool);
 }
 
 size_t nic_pool_free(NIC* nic) {
-	return __get_total_size(nic->pool) - __get_used_size(nic->pool);
+	return get_total_size(nic->pool) - get_used_size(nic->pool);
 }
 
 size_t nic_pool_total(NIC* nic) {
-	return __get_total_size(nic->pool);
+	return get_total_size(nic->pool);
 }
 
 #define CONFIG_INIT					\

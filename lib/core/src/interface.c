@@ -1,7 +1,5 @@
 #include <net/interface.h>
-#define DONT_MAKE_WRAPPER
 #include <_malloc.h>
-#undef DONT_MAKE_WRAPPER
 #include <string.h>
 
 IPv4Interface* interface_alloc(void* pool) {

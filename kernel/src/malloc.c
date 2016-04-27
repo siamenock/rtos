@@ -1,5 +1,6 @@
 #include <tlsf.h>
 #include <malloc.h>
+#include <_malloc.h>
 #include "stdio.h"
 #include "pnkc.h"
 #include "page.h"
@@ -142,7 +143,7 @@ void freed(void* ptr) {
 
 #if 0
 inline void* malloc(size_t size) {
-	void* ptr = malloc_ex(size, __malloc_pool);
+	void* ptr = __malloc(size, __malloc_pool);
 	
 	if(!ptr) {
 		// TODO: print to stderr
@@ -164,7 +165,7 @@ inline void* malloc(size_t size) {
 }
 
 inline void free(void* ptr) {
-	free_ex(ptr, __malloc_pool);
+	__free(ptr, __malloc_pool);
 	
 	#if DEBUG
 	freed(ptr);
@@ -172,7 +173,7 @@ inline void free(void* ptr) {
 }
 
 inline void* realloc(void* ptr, size_t size) {
-	void* ptr2 = realloc_ex(ptr, size, __malloc_pool);
+	void* ptr2 = __realloc(ptr, size, __malloc_pool);
 	#if DEBUG
 	freed(ptr);
 	malloced(((void**)read_rbp())[1], size, ptr2);
@@ -181,7 +182,7 @@ inline void* realloc(void* ptr, size_t size) {
 }
 
 inline void* calloc(size_t nmemb, size_t size) {
-	void* ptr = calloc_ex(nmemb, size, __malloc_pool);
+	void* ptr = __calloc(nmemb, size, __malloc_pool);
 	#if DEBUG
 	malloced(((void**)read_rbp())[1], nmemb * size, ptr);
 	#endif /* DEBUG */

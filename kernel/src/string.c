@@ -1,6 +1,4 @@
-#define DONT_MAKE_WRAPPER
 #include <_string.h>
-#undef DONT_MAKE_WRAPPER
 #include <string.h>
 #include <stdbool.h>
 #include <stdint.h>

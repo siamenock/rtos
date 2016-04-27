@@ -2,7 +2,7 @@
 #include <string.h>
 #include <util/event.h>
 #include <lock.h>
-#include <tlsf.h>
+#include <_malloc.h>
 #include <timer.h>
 #include "asm.h"
 #include "apic.h"
@@ -83,11 +83,11 @@ void icc_init() {
 		shared->icc_pool = fifo_create(icc_max, gmalloc_pool);
 
 		for(int i = 0; i < icc_max; i++) {
-			ICC_Message* icc_message = malloc_ex(sizeof(ICC_Message), shared->icc_pool->pool);
+			ICC_Message* icc_message = __malloc(sizeof(ICC_Message), shared->icc_pool->pool);
 			fifo_push(shared->icc_pool, icc_message);
 		}
 
-		shared->icc_queues = malloc_ex(MP_MAX_CORE_COUNT * sizeof(Icc), gmalloc_pool);
+		shared->icc_queues = __malloc(MP_MAX_CORE_COUNT * sizeof(Icc), gmalloc_pool);
 
 		uint8_t* core_map = mp_core_map();
 		for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {

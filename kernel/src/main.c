@@ -4,7 +4,7 @@
 #include <errno.h>
 
 // Core
-#include "util/event.h"
+#include <util/event.h>
 
 // Kernel
 #include "asm.h"
@@ -33,6 +33,7 @@
 #include "shell.h"
 #include "loader.h"
 #include "vfio.h"
+#include "shared.h"
 
 // Drivers
 #include "driver/pata.h"
