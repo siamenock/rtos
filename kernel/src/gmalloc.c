@@ -1,14 +1,15 @@
 #include <stdio.h>
 #include <string.h>
-#include <tlsf.h>
 #include <util/list.h>
+#include <tlsf.h>
 #include <malloc.h>
+#include <_malloc.h>
+#include "malloc.h"
 #include "idt.h"
 #include "pnkc.h"
 #include "mp.h"
 #include "shared.h"
 #include "multiboot2.h"
-#include "malloc.h"
 #include "gmalloc.h"
 
 void* gmalloc_pool;

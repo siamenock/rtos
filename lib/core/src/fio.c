@@ -1,10 +1,10 @@
 #include <stdio.h>
 #include <util/fifo.h>
-#include <tlsf.h>
+#include <_malloc.h>
 #include <fio.h>
 
 FIO* fio_create(void* pool) {
-	FIO* fio = malloc_ex(sizeof(FIO), pool);
+	FIO* fio = __malloc(sizeof(FIO), pool);
 	if(!fio) {
 		printf("FIO malloc error\n");
 		return NULL;
@@ -13,7 +13,7 @@ FIO* fio_create(void* pool) {
 	fio->input_buffer = fifo_create(FIO_INPUT_BUFFER_SIZE, pool);
 	if(!fio->input_buffer) {
 		printf("fifo creation error\n");
-		free_ex(fio, pool);
+		__free(fio, pool);
 		return NULL;
 	}
 
@@ -21,7 +21,7 @@ FIO* fio_create(void* pool) {
 	if(!fio->output_buffer) {
 		printf("fifo creation error\n");
 		fifo_destroy(fio->input_buffer);
-		free_ex(fio, pool);
+		__free(fio, pool);
 		return NULL;
 	}
 

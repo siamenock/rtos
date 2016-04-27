@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <tlsf.h>
+#include <_malloc.h>
 #include <util/list.h>
 #include <elf.h>
 #include <errno.h>
@@ -284,7 +285,7 @@ static bool load_args(VM* vm, void* malloc_pool, uint32_t task_id) {
 	
 	// Second try: Push to malloc area
 	if(malloc_pool) {
-		vaddr = malloc_ex(len, malloc_pool);
+		vaddr = __malloc(len, malloc_pool);
 		goto dump;
 	}
 	
@@ -365,7 +366,7 @@ static bool relocate(VM* vm, void* malloc_pool, void* gmalloc_pool, uint32_t tas
 	if(task_addr(task_id, SYM_MALLOC_POOL)) {
 		*(uint64_t*)task_addr(task_id, SYM_MALLOC_POOL) = (uint64_t)malloc_pool;
 		
-		void* __stdin = malloc_ex(4096, malloc_pool);
+		void* __stdin = __malloc(4096, malloc_pool);
 		if(__stdin) {
 			*(uint64_t*)task_addr(task_id, SYM_STDIN) = (uint64_t)__stdin;
 			*(size_t*)task_addr(task_id, SYM_STDIN_SIZE) = 4096;
@@ -374,7 +375,7 @@ static bool relocate(VM* vm, void* malloc_pool, void* gmalloc_pool, uint32_t tas
 			return false;
 		}
 		
-		void* __stdout = malloc_ex(4096, malloc_pool);
+		void* __stdout = __malloc(4096, malloc_pool);
 		if(__stdout) {
 			*(uint64_t*)task_addr(task_id, SYM_STDOUT) = (uint64_t)__stdout;
 			*(size_t*)task_addr(task_id, SYM_STDOUT_SIZE) = 4096;
@@ -383,7 +384,7 @@ static bool relocate(VM* vm, void* malloc_pool, void* gmalloc_pool, uint32_t tas
 			return false;
 		}
 		
-		void* __stderr = malloc_ex(4096, malloc_pool);
+		void* __stderr = __malloc(4096, malloc_pool);
 		if(__stderr) {
 			*(uint64_t*)task_addr(task_id, SYM_STDERR) = (uint64_t)__stderr;
 			*(size_t*)task_addr(task_id, SYM_STDERR_SIZE) = 4096;
@@ -397,9 +398,9 @@ static bool relocate(VM* vm, void* malloc_pool, void* gmalloc_pool, uint32_t tas
 		if(!vm->fio) {
 			user_fio = fio_create(gmalloc_pool);
 
-			vm->fio = malloc_ex(sizeof(VFIO), gmalloc_pool);
-			vm->fio->input_buffer = malloc_ex(sizeof(FIFO), gmalloc_pool);
-			vm->fio->output_buffer = malloc_ex(sizeof(FIFO), gmalloc_pool);
+			vm->fio = __malloc(sizeof(VFIO), gmalloc_pool);
+			vm->fio->input_buffer = __malloc(sizeof(FIFO), gmalloc_pool);
+			vm->fio->output_buffer = __malloc(sizeof(FIFO), gmalloc_pool);
 
 			vm->fio->input_buffer->head = 0;
 			vm->fio->input_buffer->tail = 0;

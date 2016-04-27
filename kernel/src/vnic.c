@@ -1,7 +1,8 @@
 #include <errno.h>
 #include <string.h>
-#include <malloc.h>
 #include <tlsf.h>
+#include <malloc.h>
+#include <_malloc.h>
 #include <timer.h>
 #include <util/types.h>
 #include <net/ether.h>
@@ -237,7 +238,7 @@ VNIC* vnic_create(uint64_t* attrs) {
 	vnic->device = dev;
 	vnic->port = port;
 
-	vnic->nic = malloc_ex(sizeof(NIC), vnic->pool);
+	vnic->nic = __malloc(sizeof(NIC), vnic->pool);
 	bzero(vnic->nic, sizeof(NIC));
 
 	vnic->nic->min_buffer_size = vnic->min_buffer_size = 128;
@@ -487,7 +488,7 @@ uint32_t vnic_update(VNIC* vnic, uint64_t* attrs) {
 				break;
 			case NIC_INPUT_BUFFER_SIZE:
 				input_buffer_size = attrs[i * 2 + 1];
-				input_buffer = malloc_ex(sizeof(void*) * input_buffer_size, vnic->pool);
+				input_buffer = __malloc(sizeof(void*) * input_buffer_size, vnic->pool);
 				if(!input_buffer) {
 					result = 5;
 					goto failed;
@@ -495,7 +496,7 @@ uint32_t vnic_update(VNIC* vnic, uint64_t* attrs) {
 				break;
 			case NIC_OUTPUT_BUFFER_SIZE:
 				output_buffer_size = attrs[i * 2 + 1];
-				output_buffer = malloc_ex(sizeof(void*) * output_buffer_size, vnic->pool);
+				output_buffer = __malloc(sizeof(void*) * output_buffer_size, vnic->pool);
 				if(!output_buffer) {
 					result = 5;
 					goto failed;
@@ -595,7 +596,7 @@ succeed:
 
 		void* array = vnic->nic->input_buffer->array;
 		fifo_reinit(vnic->nic->input_buffer, input_buffer, input_buffer_size, input_popped);
-		free_ex(array, vnic->pool);
+		__free(array, vnic->pool);
 	}
 
 	// NIC_OUTPUT_BUFFER_SIZE
@@ -606,13 +607,13 @@ succeed:
 			vnic->nic->output_drop_bytes += packet->end - packet->start;
 			vnic->nic->output_drop_packets++;
 
-			free_ex(packet->buffer, vnic->pool);
-			free_ex(packet, vnic->pool);
+			__free(packet->buffer, vnic->pool);
+			__free(packet, vnic->pool);
 		}
 
 		void* array = vnic->nic->output_buffer->array;
 		fifo_reinit(vnic->nic->output_buffer, output_buffer, output_buffer_size, output_popped);
-		free_ex(array, vnic->pool);
+		__free(array, vnic->pool);
 	}
 
 	// NIC_INPUT_ACCEPT

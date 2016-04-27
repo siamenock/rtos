@@ -5,7 +5,6 @@
 #include <util/event.h>
 #include <util/ring.h>
 #include <net/md5.h>
-#include <tlsf.h>
 #include <timer.h>
 #include <file.h>
 #include "vm.h"

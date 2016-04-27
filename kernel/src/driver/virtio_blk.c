@@ -4,7 +4,6 @@
 // PacketNgin kernel header
 #include <util/list.h>
 #include <util/event.h>
-#include <tlsf.h>
 #include "disk.h"
 #include "../file.h"
 #include "../gmalloc.h"

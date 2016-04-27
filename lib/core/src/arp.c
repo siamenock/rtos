@@ -1,7 +1,5 @@
 #include <timer.h>
-#define DONT_MAKE_WRAPPER
 #include <_malloc.h>
-#undef DONT_MAKE_WRAPPER
 #include <net/interface.h>
 #include <net/ether.h>
 #include <net/arp.h>
