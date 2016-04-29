@@ -123,7 +123,6 @@ sdk: loader/build/loader.bin kernel.bin initrd.img system.img
 	cp lib/libexpat.a $(SDK)/lib
 	
 	@echo "* Copy library: JSMN"
-	cp -r lib/jsmn/*.h $(SDK)/include
 	cp lib/libjsmn.a $(SDK)/lib
 	
 	@echo "* Copy utilities"
