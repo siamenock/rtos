@@ -76,15 +76,6 @@ bool set_put(Set* set, void* data);
 void* set_get(Set* set, void* data);
 
 /**
- * Get an element data from the HashSet.
- *
- * @param set HashSet
- * @param data key of the element
- * @return the element's data or NULL if there is no such element
- */
-void* set_get_data(Set* set, void* data);
-
-/**
  * Check there is an element.
  *
  * @param set HashSet
