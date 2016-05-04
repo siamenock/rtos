@@ -18,6 +18,8 @@ workspace "Kernel"
         location "core/build"
         includedirs { "core/include", "TLSF/src", "jsmn/", "../cmocka/include" }
         files { "core/**.asm", "core/**.S", "core/**.h", "core/**.c" }
+        -- Exclude test sources
+        removefiles { "core/test/*"} 
         -- Enable exntension instruction for SSE. Do not need stack protector 
         buildoptions { "-msse4.1 -fno-stack-protector" }
 
@@ -27,6 +29,8 @@ workspace "Kernel"
         location "core/build"
         includedirs { "core/include", "TLSF/src", "jsmn/", "../cmocka/include" }
         files { "core/**.asm", "core/**.S", "core/**.h", "core/**.c" }
+        -- Exclude test sources and standard C library functions
+        removefiles { "core/test/*", "core/src/malloc.c" }
         buildoptions { "-msse4.1 -fno-stack-protector" }
         -- Define "LINUX" to make core library for Linux OS
         defines { "LINUX" }
