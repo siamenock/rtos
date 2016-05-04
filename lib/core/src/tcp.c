@@ -8,6 +8,9 @@
 
 bool tcp_port_alloc0(NIC* nic, uint32_t addr, uint16_t port) {
 	IPv4Interface* interface = nic_ip_get(nic, addr);
+	if(!interface)
+		return false;
+
 	if(!interface->tcp_ports) {
 		interface->tcp_ports = set_create(64, set_uint64_hash, set_uint64_equals, nic->pool);
 		if(!interface->tcp_ports)
@@ -22,6 +25,9 @@ bool tcp_port_alloc0(NIC* nic, uint32_t addr, uint16_t port) {
 
 uint16_t tcp_port_alloc(NIC* nic, uint32_t addr) {
 	IPv4Interface* interface = nic_ip_get(nic, addr);
+	if(!interface)
+		return 0;
+
 	if(!interface->tcp_ports) {
 		interface->tcp_ports = set_create(64, set_uint64_hash, set_uint64_equals, nic->pool);
 		if(!interface->tcp_ports)
