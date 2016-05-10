@@ -467,27 +467,29 @@ static int virtio_blk_init(DiskDriver* driver, const char* cmdline, DiskDriver**
 	priv->vq_blk->vring = gmalloc(sizeof(Vring));
 
 	count = pci_probe(virtio_device_type, virtio_device_probe, &virtio_pci_driver);
+	if(!count)
+		return -1;
 
 	// Virtio device PCI probing 
 	err = virtio_pci_probe(priv->vq_blk->vdev);
 	if(err)
-		return -1;
+		return -2;
 
 	// Feature synchronizing with host OS
 	err = synchronize_features(priv->vq_blk->vdev);
 	if(err)
-		return -2;
+		return -3;
 
 	// Initialize virtqueue & vring
 	err = init_vq(priv->vq_blk);
 	if(err)
-		return -3;
+		return -4;
 
 	// Disk attachment
 	for(int i = 0; i < count; i++) {
 		disks[i] = gmalloc(sizeof(DiskDriver));
 		if(!disks[i])
-			return -1; // Memory allocation fail
+			return -5; // Memory allocation fail
 
 		// Function pointer copy
 		memcpy(disks[i], driver, sizeof(DiskDriver));
