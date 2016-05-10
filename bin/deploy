@@ -33,5 +33,5 @@ fi
 
 echo "Copying PacketNgin RTOS image..."
 let "count = $count - 1"
-$(sudo dcfldd if=system.img of=/dev/${devices[$count]} conv=sync,noerror) 
+$(sudo dcfldd if=system.img of=/dev/${devices[$count]} && sync) 
 echo "Done"
