@@ -166,7 +166,8 @@ void stdio_dump(int coreno, int fd, char* buffer, volatile size_t* head, volatil
 	char* dump_lines(char* h, char* e) {
 		char* t = strchrn(h, e, '\n');
 		while(t) {
-			t++;
+			// Skip newline and null charater
+			t += 2;
 			while(t - h > body_len) {
 				write1(header, header_len);
 				write1(h, body_len);
