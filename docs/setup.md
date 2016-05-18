@@ -44,7 +44,7 @@ iface br0 inet manual
 	cd rtos/tools/grub
 	./autogen.sh
 	./configure
-	./make
+	make
 
 * Build cmocka
 	cd rtos/tools/cmocka
