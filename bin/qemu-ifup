@@ -8,7 +8,7 @@ NUM=$((NUM+200))
 /sbin/ifconfig $1 192.168.100.$NUM promisc up
 
 # Check br0 is exists
-HAS_BR0=`/sbin/ifconfig | grep br0`
+HAS_BR0=`/sbin/ifconfig | grep -w br0`
 if [ -n "$HAS_BR0" ]; then
 	/sbin/brctl addif br0 $1
 	route del -net 192.168.100.0 netmask 255.255.255.0 dev $1
