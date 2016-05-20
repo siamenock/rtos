@@ -23,7 +23,7 @@ void process(NIC* nic) {
 	
 	printf("dmac: %02x:%02x:%02x:%02x:%02x:%02x "
 		"smac: %02x:%02x:%02x:%02x:%02x:%02x "
-		"type: %04x payload: %d bytes\n", 
+		"type: %04x payload: %d\n", 
 		(dmac >> 40) & 0xff, (dmac >> 32) & 0xff, (dmac >> 24) & 0xff,
 		(dmac >> 16) & 0xff, (dmac >> 8) & 0xff, (dmac >> 0) & 0xff,
 		(smac >> 40) & 0xff, (smac >> 32) & 0xff, (smac >> 24) & 0xff,
