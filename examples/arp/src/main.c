@@ -3,6 +3,9 @@
 #include <net/nic.h>
 #include <net/packet.h>
 #include <net/ether.h>
+#include <net/arp.h>
+
+static uint32_t address = 0xc0a8640a;	// 192.168.100.10
 
 void ginit(int argc, char** argv) {
 }
@@ -17,18 +20,22 @@ void process(NIC* nic) {
 	
 	Ether* ether = (Ether*)(packet->buffer + packet->start);
 	
-	uint64_t dmac = endian48(ether->dmac);
-	uint64_t smac = endian48(ether->smac);
-	uint64_t type = endian16(ether->type);
-	
-	printf("dmac: %02x:%02x:%02x:%02x:%02x:%02x "
-		"smac: %02x:%02x:%02x:%02x:%02x:%02x "
-		"type: %04x payload: %d\n", 
-		(dmac >> 40) & 0xff, (dmac >> 32) & 0xff, (dmac >> 24) & 0xff,
-		(dmac >> 16) & 0xff, (dmac >> 8) & 0xff, (dmac >> 0) & 0xff,
-		(smac >> 40) & 0xff, (smac >> 32) & 0xff, (smac >> 24) & 0xff,
-		(smac >> 16) & 0xff, (smac >> 8) & 0xff, (smac >> 0) & 0xff,
-		type, packet->end - packet->start - sizeof(Ether));
+	if(endian16(ether->type) == ETHER_TYPE_ARP) {
+		// ARP response
+		ARP* arp = (ARP*)ether->payload;
+		if(endian16(arp->operation) == 1 && endian32(arp->tpa) == address) {
+			ether->dmac = ether->smac;
+			ether->smac = endian48(nic->mac);
+			arp->operation = endian16(2);
+			arp->tha = arp->sha;
+			arp->tpa = arp->spa;
+			arp->sha = ether->smac;
+			arp->spa = endian32(address);
+			
+			nic_output(nic, packet);
+			packet = NULL;
+		}
+	}
 	
 	if(packet)
 		nic_free(packet);
