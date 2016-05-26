@@ -42,24 +42,25 @@ void process(NIC* nic) {
 		IP* ip = (IP*)ether->payload;
 		
 		if(ip->protocol == IP_PROTOCOL_ICMP && endian32(ip->destination) == address) {
-			// Echo reply
 			ICMP* icmp = (ICMP*)ip->body;
 			
-			icmp->type = 0;
-			icmp->checksum = 0;
-			icmp->checksum = endian16(checksum(icmp, packet->end - packet->start - ETHER_LEN - IP_LEN));
-			
-			ip->destination = ip->source;
-			ip->source = endian32(address);
-			ip->ttl = endian8(64);
-			ip->checksum = 0;
-			ip->checksum = endian16(checksum(ip, ip->ihl * 4));
-			
-			ether->dmac = ether->smac;
-			ether->smac = endian48(nic->mac);
-			
-			nic_output(nic, packet);
-			packet = NULL;
+			if(icmp->type == 8) {	// ICMP Request
+				icmp->type = 0;
+				icmp->checksum = 0;
+				icmp->checksum = endian16(checksum(icmp, packet->end - packet->start - ETHER_LEN - IP_LEN));
+				
+				ip->destination = ip->source;
+				ip->source = endian32(address);
+				ip->ttl = endian8(64);
+				ip->checksum = 0;
+				ip->checksum = endian16(checksum(ip, ip->ihl * 4));
+				
+				ether->dmac = ether->smac;
+				ether->smac = endian48(nic->mac);
+				
+				nic_output(nic, packet);
+				packet = NULL;
+			}
 		}
 	}
 	
