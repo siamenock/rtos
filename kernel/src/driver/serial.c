@@ -26,12 +26,12 @@ static int init(void* device, void* data) {
 	/* Assert RTS and DTR. */
 	port_out8(SERIAL_IO_ADDR + 0x04, 3);
 
-	/* Set the divisor latch. */
+	/* Set the Line control register to user divisor latch. */
 	uint8_t reg = port_in8(SERIAL_IO_ADDR + 0x03);
 	port_out8(SERIAL_IO_ADDR + 0x03, reg | 0x80);
 
-	/* Write the divisor. */
-	int speed = 1; // Full speed
+	/* Set the divisor latch for speed. */
+	int speed = SERIAL_SPEED; // Full speed
 	uint16_t divisor = 115200 / speed;
 	port_out8(SERIAL_IO_ADDR + 0x00, divisor & 0xFF);
 	port_out8(SERIAL_IO_ADDR + 0x01, divisor >> 8);

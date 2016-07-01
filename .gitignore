@@ -29,9 +29,6 @@ kernel.smap
 # SDK
 packetngin_sdk-*
 
-# Binary
-bin
-
 # Hidden file
 .*
 
