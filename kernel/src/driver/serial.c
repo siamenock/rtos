@@ -30,9 +30,11 @@ static int init(void* device, void* data) {
 	uint8_t reg = port_in8(SERIAL_IO_ADDR + 0x03);
 	port_out8(SERIAL_IO_ADDR + 0x03, reg | 0x80);
 
-	/* Set the divisor latch for speed(115200). */
-	port_out8(SERIAL_IO_ADDR + 0x00, 1);
-	port_out8(SERIAL_IO_ADDR + 0x01, 0);
+	/* Set the divisor latch for speed. */
+	int speed = SERIAL_SPEED; // Full speed
+	uint16_t divisor = 115200 / speed;
+	port_out8(SERIAL_IO_ADDR + 0x00, divisor & 0xFF);
+	port_out8(SERIAL_IO_ADDR + 0x01, divisor >> 8);
 
 	/* Restore the previous value of the divisor.   *
 	 * And set 8 bits per character			*/
