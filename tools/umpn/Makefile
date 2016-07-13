@@ -1,6 +1,6 @@
 .PHONY: all clean 
 
-SDK = ../../sdk
+SDK = ../../
 NETAPP =  $(SDK)/examples/echo/src/main.c 
 CFLAGS = -I $(SDK)/include -I ./include -I ../../lib/TLSF/src -Werror -std=gnu99 -Wall -Dmain=net_app_main
 LIBS = ../../lib/libumpn.a
@@ -12,7 +12,6 @@ run: all
 
 packetngin: src/main.c src/tun.c src/ne.c src/ni.c $(NETAPP)
 	gcc $(CFLAGS) -o $@ $^ $(LIBS) 
-	cp -f $@ ../../sdk/bin
 
 clean:
 	rm -f packetngin
