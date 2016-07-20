@@ -53,14 +53,14 @@ workspace "Test"
             -- Set the target directory for a generated target file 
             targetdir "test/core"
             location "build/test/core"
-            includedirs { "core/include" }
-            files { "core/src/test/map.c", "core/src/**.h" }
+            includedirs { "core/include", "TLSF/src"}
+            files { "core/src/test/map.c", "core/src/map.c", "core/src/list.c", "core/src/asm.asm", "core/src/lock.c", "core/src/**.h", "core/src/_malloc.c", "TLSF/src/**.h",}
             -- Link testing target library
-            linkoptions { "../../../libumpn.a" }
+            linkoptions { "../../../libtlsf.a" }
             postbuildcommands {
                 '{DELETE} %{cfg.buildtarget.abspath}.xml',
-                '@export CMOCKA_XML_FILE=\'%{cfg.buildtarget.abspath}.xml\'; export CMOCKA_MESSAGE_OUTPUT=xml; %{cfg.buildtarget.abspath} 2>/dev/null',
-                '@export CMOCKA_MESSAGE_OUTPUT=stdout; %{cfg.buildtarget.abspath}'
+                '@export CMOCKA_XML_FILE=\'%{cfg.buildtarget.abspath}.xml\'; export CMOCKA_MESSAGE_OUTPUT=xml; %{cfg.buildtarget.abspath} 2>/dev/null ||:',
+                '@export CMOCKA_MESSAGE_OUTPUT=stdout; %{cfg.buildtarget.abspath} ||:'
             }
 
         -- [[ 1.4. Malloc test ]]
