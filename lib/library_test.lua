@@ -296,7 +296,7 @@ workspace "Test"
             includedirs { "core/include" }
             files { "core/src/ring.c", "core/src/test/ring.c", "core/include/util/**.h" }
             -- Link testing target library
-            linkoptions { "../../../libtlsf.a" }
+            linkoptions { "../../../libtlsf.a", "-lpthread" }
             postbuildcommands {
                 '{DELETE} %{cfg.buildtarget.abspath}.xml',
                 '@export CMOCKA_XML_FILE=\'%{cfg.buildtarget.abspath}.xml\'; export CMOCKA_MESSAGE_OUTPUT=xml; %{cfg.buildtarget.abspath} ||:',

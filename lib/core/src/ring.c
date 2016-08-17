@@ -10,24 +10,27 @@ ssize_t ring_write(char* buf, size_t head, volatile size_t* tail, size_t size, c
 		
 		memcpy(buf + *tail, data, len0);
 		*tail += len0;
-		
+
 		return len0;
 	} else {
 		size_t len1 = size - *tail;
 		size_t len2 = head;
-		
-		if(len1 >= len) {
-			len1 = len;
+
+		if(len1 + len2 > len) {
+			if(len1 >= len) {
+				len1 = len;
+				len2 = 0;
+			} else
+				len2 = len - len1;
+		} else {
+			len1 = 0;
 			len2 = 0;
-		} else if(len1 + len2 > len) {
-			len2 = len - len1;
 		}
 		
 		memcpy(buf + *tail, data, len1);
 		memcpy(buf, data + len1, len2);
 		
 		*tail = (*tail + len1 + len2) % size;
-		
 		return len1 + len2;
 	}
 }
