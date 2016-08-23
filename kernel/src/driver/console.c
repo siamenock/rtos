@@ -10,12 +10,12 @@ static CharIn*	console_in_drivers[CONSOLE_IN_DRIVERS_COUNT];
 
 #define EACH_OUT_CONSOLES(FUNC, ...)				\
 	for(int i = 0; i < CONSOLE_OUT_DRIVERS_COUNT; i++)	\
-		console_out_drivers[i]->FUNC(__VA_ARGS__);	
+		console_out_drivers[i]->FUNC(__VA_ARGS__);
 
 #define EACH_IN_CONSOLES(FUNC, ...)				\
 	for(int i = 0; i < CONSOLE_IN_DRIVERS_COUNT; i++)	\
-		console_in_drivers[i]->FUNC(__VA_ARGS__);	
-	
+		console_in_drivers[i]->FUNC(__VA_ARGS__);
+
 void console_init() {
 	console_out_drivers[CONSOLE_VGA_DRIVER] = &vga_driver;
 	console_out_drivers[CONSOLE_SERIAL_OUT_DRIVER] = &serial_out_driver;

@@ -34,6 +34,8 @@
 #include "loader.h"
 #include "vfio.h"
 #include "shared.h"
+#include "pnkc.h"
+#include "mmap.h"
 
 // Drivers
 #include "driver/pata.h"
@@ -44,8 +46,6 @@
 #include "driver/fs.h"
 #include "driver/bfs.h"
 #include "driver/console.h"
-
-#define RAMDISK_ADDR	(0x400000 + 0x200000 * MP_MAX_CORE_COUNT)
 
 static void ap_timer_init() {
 	extern const uint64_t TIMER_FREQUENCY_PER_SEC;
@@ -303,13 +303,13 @@ static void icc_resume(ICC_Message* msg) {
 }
 
 static void icc_pause(uint64_t vector, uint64_t error_code) {
+	printf("Interrupt occured!\n");
 	apic_eoi();
-	
-	task_switch(0);
+	//task_switch(0);
 }
 
 static void icc_stop(ICC_Message* msg) {
-	if(msg->result < 0) { //Not yet core is started.
+	if(msg->result < 0) { // Not yet core is started.
 		ICC_Message* msg2 = icc_alloc(ICC_TYPE_STOPPED);
 		msg2->result = msg->result;
 		icc_send(msg2, msg->apic_id);
@@ -391,37 +391,42 @@ static int exec(char* name) {
 	return EXEC_END;
 }
 
-void main(void) {
+void main() {
 	mp_init();
-	uint8_t apic_id = mp_apic_id();
+
+	uint64_t apic_id = 0; //mp_apic_id();
+	uint64_t _apic_id = mp_apic_id();
 
 	console_init();
-	uint64_t vga_buffer = PHYSICAL_TO_VIRTUAL(0x600000 - 0x70000);
+
+	uint64_t vga_buffer = PHYSICAL_TO_VIRTUAL(VGA_BUFFER_START);
 	stdio_init(apic_id, (void*)vga_buffer, 64 * 1024);
 	malloc_init(vga_buffer);
 
-	mp_sync();	// Barrier #1
+	printf("\nHello PacketNgin. This is core %d\n", _apic_id);
+	printf("\nThis MP ID : %d Core ID : %d\n", _apic_id, mp_core_id());
+	//mp_sync();	// Barrier #1
 	if(apic_id == 0) {
 		// Parse kernel arguments
-		uint32_t initrd_start = *(uint32_t*)(0x5c0000 - 0x400);
-		uint32_t initrd_end = *(uint32_t*)(0x5c0000 - 0x400 + 8);
+		uint64_t initrd_start = pnkc.initrd_start;
+		uint64_t initrd_end = pnkc.initrd_end;
 
 		printf("\x1b""32mOK""\x1b""0m\n");
 
-		printf("Copy RAM disk image from 0x%x to 0x%x (%d)\n", initrd_start, RAMDISK_ADDR, initrd_end - initrd_start);
-		memcpy((void*)RAMDISK_ADDR, (void*)(uintptr_t)initrd_start, initrd_end - initrd_start);
+		printf("Copy RAM disk image from 0x%x to 0x%x (%d)\n", initrd_start, RAMDISK_START, initrd_end - initrd_start);
+		memcpy((void*)RAMDISK_START, (void*)(uintptr_t)initrd_start, initrd_end - initrd_start);
 
 		printf("Analyze CPU information...\n");
 		cpu_init();
 		shared_init();
-		gmalloc_init(RAMDISK_ADDR, initrd_end - initrd_start);
+		gmalloc_init(RAMDISK_START, initrd_end - initrd_start);
 		timer_init(cpu_brand);
 
 		gdt_init();
 		tss_init();
 		idt_init();
 
-		mp_sync();	// Barrier #2
+		//mp_sync();	// Barrier #2
 
 		printf("Loading GDT...\n");
 		gdt_load();
@@ -431,7 +436,7 @@ void main(void) {
 
 		printf("Loading IDT...\n");
 		idt_load();
-		
+
 		printf("Initializing APICs...\n");
 		apic_activate();
 
@@ -440,10 +445,24 @@ void main(void) {
 
 		printf("Initailizing local APIC...\n");
 		apic_init();
+		
+		//apic_register(48, icc_pause);
 
 		printf("Initializing I/O APIC...\n");
-		ioapic_init();
+		//ioapic_init();
 		apic_enable();
+
+		/*
+		 *apic_write64(APIC_REG_ICR, ((uint64_t)1 << 56) |
+		 *                        //APIC_DSH_NONE | 
+		 *                        APIC_DSH_SELF | 
+		 *                        APIC_TM_EDGE | 
+		 *                        APIC_LV_DEASSERT | 
+		 *                        APIC_DM_PHYSICAL | 
+		 *                        APIC_DMODE_FIXED |
+		 *                        49);
+		 */
+		printf("Hello Interrupt? \n");
 
 		printf("Initializing Multi-tasking...\n");
 		task_init();
@@ -452,10 +471,8 @@ void main(void) {
 		event_init();
 
 		printf("Initializing inter-core communications...\n");
-		icc_init();
-
-		printf("Initializing kernel symbols...\n");
-		symbols_init();
+		//icc_init();
+		while(1);
 
 		printf("Initializing USB controller driver...\n");
 		usb_initialize();
@@ -479,7 +496,7 @@ void main(void) {
 
 		printf("Initializing RAM disk...\n");
 		char cmdline[32];
-		sprintf(cmdline, "-addr 0x%x -size 0x%x", RAMDISK_ADDR, initrd_end - initrd_start);
+		sprintf(cmdline, "-addr 0x%x -size 0x%x", RAMDISK_START, initrd_end - initrd_start);
 		if(!disk_register(&ramdisk_driver, cmdline)) {
 			printf("\tRAM disk driver registration FAILED!\n");
 			while(1) asm("hlt");
@@ -489,6 +506,9 @@ void main(void) {
 		fs_init();
 		fs_register(&bfs_driver);
 		fs_mount(DISK_TYPE_RAMDISK << 16 | 0x00, 0,  FS_TYPE_BFS, "/boot");
+
+		printf("Initializing kernel symbols...\n");
+		symbols_init();
 
 		printf("Initializing modules...\n");
 		module_init();

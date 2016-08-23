@@ -9,7 +9,7 @@
 
 uint64_t _apic_address;
 
-#define HANDLER_SIZE	64
+#define HANDLER_SIZE	256
 
 static APIC_Handler handlers[HANDLER_SIZE];
 

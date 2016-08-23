@@ -53,7 +53,7 @@ void gdt_init() {
 	SD8_INIT(sd8[i]);		// User code segment
 	SD8_BASE(sd8[i], 0);		// Ignored
 	SD8_LIMIT(sd8[i], 0x0fffff);	// Ignored
-	sd8[i].type = 0x0a;		// 1010 = Code , Read, Write
+	sd8[i].type = 0x0a;		// 1010 = Code , Execute, Read
 	sd8[i].s = 1;
 	sd8[i].dpl = 3;
 	sd8[i].p = 1;
@@ -71,6 +71,9 @@ void gdt_init() {
 		sd16[j].p = 1;
 		sd16[j].g = 1;
 	}
+}
+
+void _dummy() {
 }
 
 void gdt_load() {

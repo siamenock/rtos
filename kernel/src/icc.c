@@ -55,6 +55,9 @@ static void icc(uint64_t vector, uint64_t err) {
 
 	apic_eoi();
 
+	printf("ICC - vector : %d, err : %d\n", vector, err);
+	return ;
+
 	if(icc_msg == NULL)
 		return;
 
@@ -129,7 +132,8 @@ uint32_t icc_send(ICC_Message* msg, uint8_t apic_id) {
 	fifo_push(shared->icc_queues[apic_id].icc_queue, msg);
 	lock_unlock(&shared->icc_queues[apic_id].icc_queue_lock);
 
-	apic_write64(APIC_REG_ICR, ((uint64_t)apic_id << 56) |
+	// NOTE: APIC ID modification
+	apic_write64(APIC_REG_ICR, ((uint64_t)(apic_id + 1) << 56) |
 				APIC_DSH_NONE | 
 				APIC_TM_EDGE | 
 				APIC_LV_DEASSERT | 

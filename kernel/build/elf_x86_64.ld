@@ -8,8 +8,9 @@ SECTIONS
   /* Read-only sections, merged into text segment: */
   PROVIDE (__executable_start = 0x400000); . = 0x400000 + SIZEOF_HEADERS;
 /*********************************************************************************/
-  .text 0xffffffff80200000 :
+  .text 0xffffffff80200000 : AT(0x200000)
   {
+    _text = .;
     *(.text .stub .text.* .gnu.linkonce.t.*)
     /* .gnu.warning sections are handled specially by elf32.em.  */
     *(.gnu.warning)
@@ -18,7 +19,7 @@ SECTIONS
   .rodata         : { *(.rodata .rodata.* .gnu.linkonce.r.*) }
   .rodata1        : { *(.rodata1) }
 
-  .data 0xffffffff80400000 :
+  .data 0xffffffff80400000 : AT(0x400000)
   {
     *(.data .data.* .gnu.linkonce.d.*)
     SORT(CONSTRUCTORS)
@@ -38,7 +39,19 @@ SECTIONS
       pad the .data section.  */
    . = ALIGN(. != 0 ? 64 / 8 : 1);
   }
-/*********************************************************************************/  
+  . = ALIGN(4096);
+  __bss_end = .;
+
+  .pgtable 0xffffffff805c0000 : AT(0x5c0000)
+  {
+    __pgtable_start = .;
+    *(.pgtable)
+    __pgtable_end = .;
+  }
+
+
+/*********************************************************************************/
+/* All sections below will be striped */
   .interp         : { *(.interp) }
   .note.gnu.build-id : { *(.note.gnu.build-id) }
   .hash           : { *(.hash) }

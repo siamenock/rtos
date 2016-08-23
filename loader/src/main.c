@@ -334,6 +334,8 @@ void copy_kernel(uint8_t apic_id) {
 	uint32_t size = (uint32_t)(kernel_end - kernel_start);
 	
 	PNKC* pnkc = (PNKC*)pos;
+	pnkc->initrd_start = initrd_start;
+	pnkc->initrd_end = initrd_end;
 	pos += sizeof(PNKC);
 	
 	if(apic_id == 0) {
@@ -555,8 +557,8 @@ void main(uint32_t magic, uint32_t addr) {
 		activate_aps();
 		
 		// 64bit kernel arguments
-		*(uint32_t*)(0x5c0000 - 0x400) = initrd_start;
-		*(uint32_t*)(0x5c0000 - 0x400 + 8) = initrd_end;
+		//*(uint32_t*)(0x5c0000 - 0x400) = initrd_start;
+		//*(uint32_t*)(0x5c0000 - 0x400 + 8) = initrd_end;
 		
 		print("Jump to 64bit kernel: 0x00200000");
 		tab(75);

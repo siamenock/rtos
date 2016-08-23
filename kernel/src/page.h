@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #define PAGE_ENTRY_COUNT	512
+#define PAGE_TABLE_COUNT    64
 #define PAGE_TABLE_SIZE		0x1000		// 4096
 #define PAGE_PAGE_SIZE		0x200000	// 2M
 

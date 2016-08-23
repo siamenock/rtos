@@ -44,7 +44,8 @@ workspace "Kernel"
         -- Make version header 
         prebuildcommands {
             './mkver.sh > ../src/version.h',
-            "nasm -f elf64 -o obj/entry.o ../src/entry.asm"
+            'gcc -c -o obj/entry.o ../src/entry.S -D__ASSEMBLY__'
+            --"nasm -f elf64 -o obj/entry.o ../src/entry.asm"
         }
 
         -- Compile test sources when configured

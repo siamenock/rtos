@@ -17,7 +17,7 @@
 #define MMIO(bus, slot, function, reg)		(((uint64_t)bus << 20) | ((uint64_t)slot << 15) | ((uint64_t)function << 12) | ((uint64_t)reg))
 #define PORTIO(bus, slot, function, reg)	((1 << 31) | (bus << 16) | (slot << 11) | (function << 8) | (reg & 0xfc))
 
-#define PCI_DUMP		0
+#define PCI_DUMP		1
 
 void* pci_mmio[PCI_MAX_BUS];
 

@@ -84,6 +84,8 @@ void ioapic_init() {
 		redirection_map[i] = 0xff;
 		uint64_t redirection = ioapic_read64(IOAPIC_IDX_REDIRECTION_TABLE + i * 2);
 		redirection |= APIC_IM_DISABLED;
+		uint32_t* c = (uint32_t*)&redirection;
+		printf("%02d : %x %x\n", i, c[0], c[1]);
 		ioapic_write64(IOAPIC_IDX_REDIRECTION_TABLE + i * 2, redirection);
 	}
 	

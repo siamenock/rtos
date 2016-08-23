@@ -57,6 +57,7 @@ void mp_init() {
 	acpi_init();
 
 	// Calculate core ID
+	core_id = 0;
 	for(int i = 0; i < apic_id; i++) {
 		if(mp_cores[i])
 			core_id++;
@@ -72,7 +73,7 @@ void mp_init() {
 }
 
 uint8_t mp_apic_id() {
-	return apic_id;
+	return 0; //apic_id;
 }
 
 uint8_t mp_core_id() {
