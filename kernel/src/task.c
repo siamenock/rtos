@@ -43,8 +43,8 @@ typedef struct {
 } Resource;
 
 char* task_symbols[] = {
-	"__nis_count",
-	"__nis",
+	"__nic_count",
+	"__nics",
 	"__dpis",
 	"__app_status",
 	"__malloc_pool",

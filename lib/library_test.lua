@@ -53,14 +53,14 @@ workspace "Test"
             -- Set the target directory for a generated target file 
             targetdir "test/core"
             location "build/test/core"
-            includedirs { "core/include" }
-            files { "core/src/test/map.c", "core/src/**.h" }
+            includedirs { "core/include", "TLSF/src"}
+            files { "core/src/test/map.c", "core/src/map.c", "core/src/list.c", "core/src/asm.asm", "core/src/lock.c", "core/src/**.h", "core/src/_malloc.c", "TLSF/src/**.h",}
             -- Link testing target library
-            linkoptions { "../../../libumpn.a" }
+            linkoptions { "../../../libtlsf.a" }
             postbuildcommands {
                 '{DELETE} %{cfg.buildtarget.abspath}.xml',
-                '@export CMOCKA_XML_FILE=\'%{cfg.buildtarget.abspath}.xml\'; export CMOCKA_MESSAGE_OUTPUT=xml; %{cfg.buildtarget.abspath} 2>/dev/null',
-                '@export CMOCKA_MESSAGE_OUTPUT=stdout; %{cfg.buildtarget.abspath}'
+                '@export CMOCKA_XML_FILE=\'%{cfg.buildtarget.abspath}.xml\'; export CMOCKA_MESSAGE_OUTPUT=xml; %{cfg.buildtarget.abspath} 2>/dev/null ||:',
+                '@export CMOCKA_MESSAGE_OUTPUT=stdout; %{cfg.buildtarget.abspath} ||:'
             }
 
         -- [[ 1.4. Malloc test ]]
@@ -163,18 +163,19 @@ workspace "Test"
         -- [[ 1.10. Lock test ]]
         project "lock_test"
             kind "ConsoleApp"
+			linkoptions { "-lpthread" }
             -- Set the target directory for a generated target file 
             targetdir "test/core"
             location "build/test/core"
             includedirs { "core/include" }
             files { "core/src/asm.asm", "core/src/lock.c", "core/src/lock.c", "core/src/test/lock.c", "core/src/**.h" }
             -- Link testing target library
-            buildoptions { "-msse4.1" }
             postbuildcommands {
                 '{DELETE} %{cfg.buildtarget.abspath}.xml',
                 '@export CMOCKA_XML_FILE=\'%{cfg.buildtarget.abspath}.xml\'; export CMOCKA_MESSAGE_OUTPUT=xml; %{cfg.buildtarget.abspath} ||:',
                 '@export CMOCKA_MESSAGE_OUTPUT=stdout; %{cfg.buildtarget.abspath} ||:'
             }
+           
 
         -- [[ 1.11. File test ]]
         project "file_test"
@@ -212,26 +213,213 @@ workspace "Test"
                 '@export CMOCKA_MESSAGE_OUTPUT=stdout; %{cfg.buildtarget.abspath} ||:'
             }
 
-        -- [[ 1.13. RPC test ]]
-        project "rpc_test"
+
+----
+--        -- [[ 1.13. RPC test ]]
+--        project "rpc_test"
+--            kind "ConsoleApp"
+--            -- Set the target directory for a generated target file 
+--            targetdir "test/core"
+--            location "build/test/core"
+--            includedirs { "core/include" , "core/include/control"}
+--            files { "core/src/**.h" , "core/include/control/**.h", "core/src/rpc.c", "core/src/test/rpc.c" }
+--            -- Link testing target library
+--            buildoptions { "-D LINUX" }
+--            linkoptions { "-lpthread" }
+--            postbuildcommands {
+--                '{DELETE} %{cfg.buildtarget.abspath}.xml',
+--                '@export CMOCKA_XML_FILE=\'%{cfg.buildtarget.abspath}.xml\'; export CMOCKA_MESSAGE_OUTPUT=xml; %{cfg.buildtarget.abspath} ||:',
+--                '@export CMOCKA_MESSAGE_OUTPUT=stdout; %{cfg.buildtarget.abspath} ||:'
+--            }
+
+            
+    -- Templete other library below
+    -- [[ 2. Others ]] 
+        -- [[ 2.1 Cmd test ]]
+        project "cmd_test"
             kind "ConsoleApp"
             -- Set the target directory for a generated target file 
             targetdir "test/core"
             location "build/test/core"
-            includedirs { "core/include" , "core/include/control"}
-            files { "core/src/**.h" , "core/include/control/**.h", "core/src/rpc.c", "core/src/test/rpc.c" }
+            includedirs { "core/include", "TLSF/src" }
+            files { "core/src/cmd.c", "core/src/test/cmd.c", "core/include/util/**.h", "core/src/asm.asm", "core/src/lock.c", "core/src/**.h" , "core/src/_malloc.c", "TLSF/src/**.h", "core/src/map.c", "core/src/list.c" }
             -- Link testing target library
-            buildoptions { "-D LINUX" }
-            linkoptions { "-lpthread" }
+            linkoptions { "../../../libtlsf.a" }
             postbuildcommands {
                 '{DELETE} %{cfg.buildtarget.abspath}.xml',
                 '@export CMOCKA_XML_FILE=\'%{cfg.buildtarget.abspath}.xml\'; export CMOCKA_MESSAGE_OUTPUT=xml; %{cfg.buildtarget.abspath} ||:',
                 '@export CMOCKA_MESSAGE_OUTPUT=stdout; %{cfg.buildtarget.abspath} ||:'
             }
 
-            
-    -- Templete other library below
-    -- [[ 2. Others ]] 
+ 
+        -- [[ 2.2 Types test ]]
+        project "types_test"
+            kind "ConsoleApp"
+            -- Set the target directory for a generated target file 
+            targetdir "test/core"
+            location "build/test/core"
+            includedirs { "core/include" }
+            files { "core/src/types.c", "core/src/test/types.c", "core/src/_string.c", "core/sre/**.h" }
+            -- Link testing target library
+         --   linkoptions { "../../../libtlsf.a" }
+            buildoptions { "-msse4.1" }
+            postbuildcommands {
+                '{DELETE} %{cfg.buildtarget.abspath}.xml',
+                '@export CMOCKA_XML_FILE=\'%{cfg.buildtarget.abspath}.xml\'; export CMOCKA_MESSAGE_OUTPUT=xml; %{cfg.buildtarget.abspath} ||:',
+                '@export CMOCKA_MESSAGE_OUTPUT=stdout; %{cfg.buildtarget.abspath} ||:'
+            }
+
+
+        -- [[ 2.3 Json test ]]
+        project "json_test"
+            kind "ConsoleApp"
+            -- Set the target directory for a generated target file 
+            targetdir "test/core"
+            location "build/test/core"
+            includedirs { "core/include", "jsmn" }
+            files { "core/src/json.c", "core/src/test/json.c", "jsmn/jsmn.c", "jsmn/jsmn.h", "core/include/util/**.h" }
+            -- Link testing target library
+            linkoptions { "../../../libtlsf.a" }
+            postbuildcommands {
+                '{DELETE} %{cfg.buildtarget.abspath}.xml',
+                '@export CMOCKA_XML_FILE=\'%{cfg.buildtarget.abspath}.xml\'; export CMOCKA_MESSAGE_OUTPUT=xml; %{cfg.buildtarget.abspath} ||:',
+                '@export CMOCKA_MESSAGE_OUTPUT=stdout; %{cfg.buildtarget.abspath} ||:'
+            }
+
+
+        -- [[ 2.4 Ring test ]]
+        project "ring_test"
+            kind "ConsoleApp"
+            -- Set the target directory for a generated target file 
+            targetdir "test/core"
+            location "build/test/core"
+            includedirs { "core/include" }
+            files { "core/src/ring.c", "core/src/test/ring.c", "core/include/util/**.h" }
+            -- Link testing target library
+            linkoptions { "../../../libtlsf.a", "-lpthread" }
+            postbuildcommands {
+                '{DELETE} %{cfg.buildtarget.abspath}.xml',
+                '@export CMOCKA_XML_FILE=\'%{cfg.buildtarget.abspath}.xml\'; export CMOCKA_MESSAGE_OUTPUT=xml; %{cfg.buildtarget.abspath} ||:',
+                '@export CMOCKA_MESSAGE_OUTPUT=stdout; %{cfg.buildtarget.abspath} ||:'
+            }
+
+
+        -- [[ 2.5. Set test ]]
+        project "set_test"
+            kind "ConsoleApp"
+            -- Set the target directory for a generated target file 
+            targetdir "test/core"
+            location "build/test/core"
+            includedirs { "core/include", "TLSF/src"}
+            files { "core/src/test/set.c", "core/src/set.c", "core/src/list.c", "core/src/asm.asm", "core/src/lock.c", "core/src/**.h", "core/src/_malloc.c", "TLSF/src/**.h",}
+            -- Link testing target library
+            linkoptions { "../../../libtlsf.a" }
+            postbuildcommands {
+                '{DELETE} %{cfg.buildtarget.abspath}.xml',
+                '@export CMOCKA_XML_FILE=\'%{cfg.buildtarget.abspath}.xml\'; export CMOCKA_MESSAGE_OUTPUT=xml; %{cfg.buildtarget.abspath} 2>/dev/null ||:',
+                '@export CMOCKA_MESSAGE_OUTPUT=stdout; %{cfg.buildtarget.abspath} ||:' 
+            }
+
+        -- [[ 2.7 Vector test ]]
+        project "vector_test"
+            kind "ConsoleApp"
+            -- Set the target directory for a generated target file 
+            targetdir "test/core"
+            location "build/test/core"
+            includedirs { "core/include", "TLSF/src"}
+            files { "core/src/test/vector.c", "core/src/vector.c", "core/src/asm.asm", "core/src/**.h", "core/src/lock.c", "core/src/_malloc.c", "TLSF/src/**.h",}
+            -- Link testing target library
+            linkoptions { "../../../libtlsf.a" }
+            postbuildcommands {
+                '{DELETE} %{cfg.buildtarget.abspath}.xml',
+                '@export CMOCKA_XML_FILE=\'%{cfg.buildtarget.abspath}.xml\'; export CMOCKA_MESSAGE_OUTPUT=xml; %{cfg.buildtarget.abspath} 2>/dev/null ||:',
+                '@export CMOCKA_MESSAGE_OUTPUT=stdout; %{cfg.buildtarget.abspath} ||:'
+            }
+
+			
+        -- [[ 2.8 Event test ]]
+        project "event_test"
+            kind "ConsoleApp"
+            -- Set the target directory for a generated target file 
+            targetdir "test/core"
+            location "build/test/core"
+            includedirs { "core/include", "TLSF/src" }
+            files { "core/src/event.c", "core/src/test/event.c", "core/include/util/**.h", "core/src/asm.asm", "core/src/lock.c", "core/src/**.h", "core/src/_malloc.c", "TLSF/src/**.h", "core/src/map.c", "core/src/list.c", "core/src/timer.c" }
+            -- Link testing target library
+            linkoptions { "../../../libtlsf.a" }
+            postbuildcommands {
+                '{DELETE} %{cfg.buildtarget.abspath}.xml',
+                '@export CMOCKA_XML_FILE=\'%{cfg.buildtarget.abspath}.xml\'; export CMOCKA_MESSAGE_OUTPUT=xml; %{cfg.buildtarget.abspath} ||:',
+                '@export CMOCKA_MESSAGE_OUTPUT=stdout; %{cfg.buildtarget.abspath} ||:'
+            }
+
+
+        -- [[ 2.9 Fifo test ]]
+        project "fifo_test"
+            kind "ConsoleApp"
+            -- Set the target directory for a generated target file 
+            targetdir "test/core"
+            location "build/test/core"
+            includedirs { "core/include", "TLSF/src"}
+            files { "core/src/test/fifo.c", "core/src/fifo.c","core/src/asm.asm", "core/src/**.h", "core/src/lock.c", "core/src/_malloc.c", "TLSF/src/**.h",}
+            -- Link testing target library
+            linkoptions { "../../../libtlsf.a" }
+            postbuildcommands {
+                '{DELETE} %{cfg.buildtarget.abspath}.xml',
+                '@export CMOCKA_XML_FILE=\'%{cfg.buildtarget.abspath}.xml\'; export CMOCKA_MESSAGE_OUTPUT=xml; %{cfg.buildtarget.abspath} 2>/dev/null ||:',
+                '@export CMOCKA_MESSAGE_OUTPUT=stdout; %{cfg.buildtarget.abspath} ||:'
+            }
+
+    -- [[ 3. net ]] 
+        -- [[ 3.1 Crc test ]]
+        project "crc_test"
+            kind "ConsoleApp"
+            -- Set the target directory for a generated target file 
+            targetdir "test/core"
+            location "build/test/core"
+            includedirs { "core/include" }
+            files { "core/src/crc.c", "core/src/test/crc.c", "core/include/util/**.h" }
+            -- Link testing target library
+            linkoptions { "../../../libtlsf.a" }
+            postbuildcommands {
+                '{DELETE} %{cfg.buildtarget.abspath}.xml',
+                '@export CMOCKA_XML_FILE=\'%{cfg.buildtarget.abspath}.xml\'; export CMOCKA_MESSAGE_OUTPUT=xml; %{cfg.buildtarget.abspath} ||:',
+                '@export CMOCKA_MESSAGE_OUTPUT=stdout; %{cfg.buildtarget.abspath} ||:'
+            }
+
+
+        -- [[ 3.2 Checksum test ]]
+        project "checksum_test"
+            kind "ConsoleApp"
+            -- Set the target directory for a generated target file 
+            targetdir "test/core"
+            location "build/test/core"
+            includedirs { "core/include" }
+            files { "core/src/checksum.c", "core/src/test/checksum.c", "core/include/util/**.h" }
+            -- Link testing target library
+            linkoptions { "../../../libtlsf.a" }
+            postbuildcommands {
+                '{DELETE} %{cfg.buildtarget.abspath}.xml',
+                '@export CMOCKA_XML_FILE=\'%{cfg.buildtarget.abspath}.xml\'; export CMOCKA_MESSAGE_OUTPUT=xml; %{cfg.buildtarget.abspath} ||:',
+                '@export CMOCKA_MESSAGE_OUTPUT=stdout; %{cfg.buildtarget.abspath} ||:'
+            }
+
+
+        -- [[ 3.3 Interface test ]]
+        project "interface_test"
+            kind "ConsoleApp"
+            -- Set the target directory for a generated target file 
+            targetdir "test/core"
+            location "build/test/core"
+            includedirs { "core/include", "TLSF/src" }
+            files { "core/src/interface.c", "core/src/test/interface.c", "core/include/util/**.h", "core/src/asm.asm", "core/src/lock.c", "core/src/**.h" , "core/src/_malloc.c", "TLSF/src/**.h", "core/src/set.c", "core/src/list.c" }
+            -- Link testing target library
+            linkoptions { "../../../libtlsf.a" }
+            postbuildcommands {
+                '{DELETE} %{cfg.buildtarget.abspath}.xml',
+                '@export CMOCKA_XML_FILE=\'%{cfg.buildtarget.abspath}.xml\'; export CMOCKA_MESSAGE_OUTPUT=xml; %{cfg.buildtarget.abspath} ||:',
+                '@export CMOCKA_MESSAGE_OUTPUT=stdout; %{cfg.buildtarget.abspath} ||:'
+            }
         -- [[ 2.1 ... ]] 
         --[[
            [project "jsmn_test"

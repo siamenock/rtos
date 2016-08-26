@@ -2,7 +2,7 @@
 
 BASE=$(dirname $0)
 
-MODULES="boot.mod crypto.mod extcmd.mod gettext.mod normal.mod terminal.mod"
+MODULES="boot.mod crypto.mod extcmd.mod gettext.mod normal.mod terminal.mod serial.mod terminfo.mod"
 MODULES=`echo $MODULES | sed -r "s/([^ ]+)/$BASE\/grub-core\/\1/g"`
 
 # Ref: http://pete.akeo.ie/2014/05/compiling-and-installing-grub2-for.html

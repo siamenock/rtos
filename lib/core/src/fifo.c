@@ -28,7 +28,6 @@ bool fifo_resize(FIFO* fifo, size_t size, void(*popped)(void*)) {
 	void* array = __malloc(size * sizeof(void*), fifo->pool);
 	if(!array)
 		return false;
-	
 	void* _array = fifo->array;
 	fifo_reinit(fifo, array, size, popped);
 	__free(_array, fifo->pool);
@@ -46,13 +45,15 @@ void fifo_init(FIFO* fifo, void** array, size_t size) {
 
 void fifo_reinit(FIFO* fifo, void** array, size_t size, void(*popped)(void*)) {
 	size_t tail = 0;
-	while(fifo_available(fifo)) {
-		if(tail < size - 1)
+	while(!fifo_empty(fifo)) {
+		if(tail < size - 1) 
 			array[tail++] = fifo_pop(fifo);
-		else
+		else {
 			popped(fifo_pop(fifo));
+		}
 	}
-	
+
+	fifo->size = size;
 	fifo->array = array;
 	fifo->head = 0;
 	fifo->tail = tail;
