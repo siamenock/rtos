@@ -472,7 +472,25 @@ workspace "Test"
                 '@export CMOCKA_MESSAGE_OUTPUT=stdout; %{cfg.buildtarget.abspath} ||:'
             }
 
-        -- [[ 2.1 ... ]] 
+
+        -- [[ 3.7 Ip test ]]
+        project "ip_test"
+            kind "ConsoleApp"
+            -- Set the target directory for a generated target file 
+            targetdir "test/core"
+            location "build/test/core"
+            includedirs { "core/include" }
+            files { "core/src/ip.c", "core/src/test/ip.c", "core/src/**.h", "core/src/checksum.c", "core/src/ether.c" }
+            -- Link testing target library
+            linkoptions { "../../../libtlsf.a" }
+            postbuildcommands {
+                '{DELETE} %{cfg.buildtarget.abspath}.xml',
+                '@export CMOCKA_XML_FILE=\'%{cfg.buildtarget.abspath}.xml\'; export CMOCKA_MESSAGE_OUTPUT=xml; %{cfg.buildtarget.abspath} ||:',
+                '@export CMOCKA_MESSAGE_OUTPUT=stdout; %{cfg.buildtarget.abspath} ||:'
+            }
+
+
+			-- [[ 2.1 ... ]] 
         --[[
            [project "jsmn_test"
            [    kind "ConsoleApp"
