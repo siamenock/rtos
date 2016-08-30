@@ -1,4 +1,4 @@
-/* 
+/* 
  * MD5 hash in C and x86 assembly
  * 
  * Copyright (c) 2012 Nayuki Minase. All rights reserved.
@@ -19,7 +19,7 @@ void md5(uint8_t* message, uint32_t len, uint32_t* hash) {
 	uint32_t i;
 	for(i = 0; i + 64 <= len; i += 64) 
 		md5_compress(hash, (uint32_t*)(message + i));
-	
+
 	uint32_t block[16];
 	uint8_t *byteBlock = (uint8_t*)block;
 	int rem = len - i;
@@ -59,12 +59,11 @@ void md5_blocks(void** blocks, uint32_t block_count, uint32_t block_size, uint64
 		if(len < 64)
 			break;
 	}
-	
 	uint32_t block[16];
 	uint8_t *byteBlock = (uint8_t*)block;
 	int rem = len;
 	memcpy(byteBlock, message + j, rem);
-	
+
 	byteBlock[rem] = 0x80;
 	rem++;
 	if(64 - rem >= 8) {
