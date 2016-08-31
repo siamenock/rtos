@@ -184,7 +184,7 @@ uint64_t timer_us() {
 	if(clock_gettime(CLOCK_MONOTONIC, &ts) != 0)
 		return (uint64_t)-1;
 
-	return (uint64_t)(ts.tv_sec * 1000000);
+	return (uint64_t)(ts.tv_nsec * 1000 + ts.tv_sec * 1000000);
 
 #else /* LINUX */
 	/* (Current CPU Time Stamp Counter / CPU frequency per nano-seconds) */
@@ -198,7 +198,7 @@ uint64_t timer_ms() {
 	if(clock_gettime(CLOCK_MONOTONIC, &ts) != 0)
 		return (uint64_t)-1;
 
-	return (uint64_t)(ts.tv_sec * 1000);
+	return (uint64_t)(ts.tv_nsec * 1000000 + ts.tv_sec * 1000);
 
 #else /* LINUX */
 	/* (Current CPU Time Stamp Counter / CPU frequency per nano-seconds) */
