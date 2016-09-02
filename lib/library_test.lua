@@ -490,6 +490,38 @@ workspace "Test"
             }
 
 
+        -- [[ 3.8 Nic test ]]
+        project "nic_test"
+            kind "ConsoleApp"
+            -- Set the target directory for a generated target file 
+            targetdir "test/core"
+            location "build/test/core"
+            includedirs { "core/include", "TLSF/src" }
+            files { "core/src/nic.c", "core/src/test/nic.c", "core/src/interface.c", "core/include/util/**.h", "core/src/asm.asm", "core/src/lock.c", "core/src/**.h" , "core/src/_malloc.c", "TLSF/src/**.h", "core/src/fifo.c", "core/src/map.c", "core/src/list.c", "core/src/set.c" }
+            -- Link testing target library
+            linkoptions { "../../../libtlsf.a", "-lpthread" }
+            postbuildcommands {
+                '{DELETE} %{cfg.buildtarget.abspath}.xml',
+                '@export CMOCKA_XML_FILE=\'%{cfg.buildtarget.abspath}.xml\'; export CMOCKA_MESSAGE_OUTPUT=xml; %{cfg.buildtarget.abspath} ||:',
+                '@export CMOCKA_MESSAGE_OUTPUT=stdout; %{cfg.buildtarget.abspath} ||:'
+            }
+
+
+        -- [[ 3.9 Icmp test ]]
+        project "icmp_test"
+            kind "ConsoleApp"
+            -- Set the target directory for a generated target file 
+            targetdir "test/core"
+            location "build/test/core"
+            includedirs { "core/include", "TLSF/src" }
+            files { "core/src/icmp.c", "core/src/nic.c", "core/src/test/icmp.c", "core/src/interface.c", "core/include/util/**.h", "core/src/asm.asm", "core/src/lock.c", "core/src/**.h" , "core/src/_malloc.c", "TLSF/src/**.h", "core/src/fifo.c", "core/src/map.c", "core/src/list.c", "core/src/set.c", "core/src/checksum.c" }
+            -- Link testing target library
+            linkoptions { "../../../libtlsf.a", "-lpthread" }
+            postbuildcommands {
+                '{DELETE} %{cfg.buildtarget.abspath}.xml',
+                '@export CMOCKA_XML_FILE=\'%{cfg.buildtarget.abspath}.xml\'; export CMOCKA_MESSAGE_OUTPUT=xml; %{cfg.buildtarget.abspath} ||:',
+                '@export CMOCKA_MESSAGE_OUTPUT=stdout; %{cfg.buildtarget.abspath} ||:'
+            }
 			-- [[ 2.1 ... ]] 
         --[[
            [project "jsmn_test"
@@ -501,4 +533,4 @@ workspace "Test"
            [    files { "jsmn/src/test/cache.c", "jsmn/src/**.h" }
            [    -- Link testing target library
            [    linkoptions { "../../../jsmn.a" }
-           ]]
+          --]] 
