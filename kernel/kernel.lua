@@ -41,6 +41,9 @@ workspace "Kernel"
         -- Link external libaries named 
         links { "core", "tlsf", "lwip" }
 
+        -- Penguingin
+        defines { "__PENGUIN__" }
+
         -- Make version header 
         prebuildcommands {
             './mkver.sh > ../src/version.h',

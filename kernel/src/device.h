@@ -11,7 +11,7 @@ typedef struct device {
 	DeviceType	type;
 	void*		driver;	// Extends Driver
 	void*		device;
-	int		id;
+	int		    id;
 	void*		priv;
 } Device;
 

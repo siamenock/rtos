@@ -25,7 +25,6 @@ typedef struct _Packet {
 	
 	uint8_t		buffer[0];	///< Packet buffer which contains packet payload itself
 } Packet;
-
 /**
  * Dump packet payload to standard output
  * Don't dare use this function in production, but use it for debugging only.

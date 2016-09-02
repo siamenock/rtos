@@ -496,7 +496,8 @@ void manager_init() {
 		return;
 	}
 	manager_port = DEFAULT_MANAGER_PORT;
-	
+#ifdef __PENGUIN__
+#else
 	manager_netif = nic_init(manager_nic->nic, manage, NULL);
 	
 	manager_server_open();
@@ -505,6 +506,7 @@ void manager_init() {
 	event_timer_add(manager_timer, NULL, 100000, 100000);
 	
 	vm_stdio_handler(stdio_callback);
+#endif
 }
 
 uint32_t manager_get_ip() {

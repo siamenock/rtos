@@ -4,13 +4,7 @@
 #include <stdint.h>
 #include "page.h"
 #include "mp.h"
-
-#define GDTR_ADDR	PHYSICAL_TO_VIRTUAL(0x100000)
-#define GDTR_END_ADDR	(GDTR_ADDR + 16)
-#define GDT_ADDR	GDTR_END_ADDR
-#define GDT_END_ADDR	(GDT_ADDR + 8 * 5 + 16 * MP_MAX_CORE_COUNT)	// SD8 * 5 + SD16 * 16
-#define TSS_ADDR	GDT_END_ADDR
-#define TSS_END_ADDR	(TSS_ADDR + 104 * MP_MAX_CORE_COUNT)
+#include "mmap.h"
 
 typedef struct {
 	uint16_t limit;

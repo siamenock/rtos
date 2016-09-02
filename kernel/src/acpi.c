@@ -207,23 +207,25 @@ void acpi_init() {
 }
 
 static void acpi_enable() {
-	if(port_in16(fadt->pm1a_control_block) != 0)
+	if(port_in16(fadt->pm1a_control_block) != 0) {
+		while(1);
 		return;	// Already enabled
+	}
 	
 	port_out8(fadt->smi_command_port, fadt->acpi_enable);
-	for(int i = 0; i < 300; i++) {
+	for(int i = 0; i < 3000; i++) {
 		if(port_in16(fadt->pm1a_control_block) == 1)
 			break;
-		
-		timer_mwait(10);
+	
+		//timer_mwait(10);
 	}
 	
 	if(fadt->pm1b_control_block) {
-		for(int i = 0; i < 300; i++) {
+		for(int i = 0; i < 3000; i++) {
 			if(port_in16(fadt->pm1a_control_block) == 1)
 				break;
 			
-			timer_mwait(10);
+			//timer_mwait(10);
 		}
 	}
 }

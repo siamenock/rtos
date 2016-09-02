@@ -137,31 +137,63 @@ void timer_init(const char* cpu_brand) {
 }
 
 void timer_swait(uint32_t s) {
+#ifdef LINUX
+	struct timespec ts;
+	ts.tv_sec = s;
+	ts.tv_nsec = 0;
+
+	nanosleep(&ts, NULL);
+#else
 	uint64_t time = timer_frequency();
 	time += TIMER_FREQUENCY_PER_SEC * s;
 	while(timer_frequency() < time)
 		asm volatile("nop");
+#endif
 }
 
 void timer_mwait(uint32_t ms) {
+#ifdef LINUX
+	struct timespec ts;
+	ts.tv_sec = ms / 1000;
+	ts.tv_nsec = (ms % 1000) * 1000000;
+
+	nanosleep(&ts, NULL);
+#else
 	uint64_t time = timer_frequency();
 	time += __timer_ms * ms;
 	while(timer_frequency() < time)
 		asm volatile("nop");
+#endif
 }
 
 void timer_uwait(uint32_t us) {
+#ifdef LINUX
+	struct timespec ts;
+	ts.tv_sec = us / 1000000;
+	ts.tv_nsec = (us % 1000000) * 1000;
+
+	nanosleep(&ts, NULL);
+#else
 	uint64_t time = timer_frequency();
 	time += __timer_us * us;
 	while(timer_frequency() < time)
 		asm volatile("nop");
+#endif
 }
 
 void timer_nwait(uint32_t ns) {
+#ifdef LINUX
+	struct timespec ts;
+	ts.tv_sec = 0;
+	ts.tv_nsec = ns % 1000000000;
+
+	nanosleep(&ts, NULL);
+#else
 	uint64_t time = timer_frequency();
 	time += __timer_ns * ns;
 	while(timer_frequency() < time)
 		asm volatile("nop");
+#endif
 }
 
 uint64_t timer_ns() {

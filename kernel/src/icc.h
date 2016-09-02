@@ -23,7 +23,7 @@ typedef struct _ICC_Message {
 	uint32_t	id;
 	uint8_t		type;
 	uint8_t		apic_id;
-	int		result;
+	int		    result;
 	
 	union {
 		struct {

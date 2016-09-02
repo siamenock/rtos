@@ -2,6 +2,7 @@
 #define __PAGE_H__
 
 #include <stdint.h>
+#include "mmap.h"
 
 #define PAGE_ENTRY_COUNT	512
 #define PAGE_TABLE_COUNT    64
@@ -15,10 +16,7 @@
 #define PAGE_L4U_SIZE		59
 #define PAGE_L4K_INDEX		62
 #define PAGE_L4K_SIZE		2
-#define PAGE_L4U	((PageTable*)(PHYSICAL_TO_VIRTUAL(0x600000 - 0x40000) + PAGE_TABLE_SIZE * PAGE_L4U_INDEX))
-
-#define VIRTUAL_TO_PHYSICAL(addr)	(~0xffffffff80000000L & (addr))
-#define PHYSICAL_TO_VIRTUAL(addr)	(0xffffffff80000000L | (addr))
+#define PAGE_L4U	        ((PageTable*)(PHYSICAL_TO_VIRTUAL(PAGE_TABLE_START) + PAGE_TABLE_SIZE * PAGE_L4U_INDEX))
 
 #define TRANSLATE_TO_PHYSICAL(vaddr)	((uint64_t)PAGE_L4U[vaddr >> 21].base << 21 | (vaddr & 0x1fffff))
 

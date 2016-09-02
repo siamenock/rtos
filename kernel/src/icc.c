@@ -20,12 +20,14 @@ typedef void (*ICC_Handler)(ICC_Message*);
 static ICC_Handler icc_events[ICC_EVENTS_COUNT];
 
 static bool icc_event(void* context) {
+	printf("ICC event called\n");
 	uint8_t apic_id = mp_apic_id();
 	FIFO* icc_queue = shared->icc_queues[apic_id].icc_queue;
 
 	if(fifo_empty(icc_queue))
 		return true;
 
+	printf("Core %d queue is not empty\n", apic_id);
 	lock_lock(&shared->icc_queues[apic_id].icc_queue_lock);
 	ICC_Message* icc_msg = fifo_pop(icc_queue);
 	lock_unlock(&shared->icc_queues[apic_id].icc_queue_lock);
@@ -33,6 +35,7 @@ static bool icc_event(void* context) {
 	if(icc_msg == NULL)
 		return true;
 
+	printf("ICC Msg popped : %d (TYPE)\n", icc_msg->type);
 	if(icc_msg->type >= ICC_EVENTS_COUNT) {
 		icc_free(icc_msg);
 		return true;
@@ -43,6 +46,7 @@ static bool icc_event(void* context) {
 		return true;
 	}
 
+	printf("ICC event called\n");
 	icc_events[icc_msg->type](icc_msg); //event call
 
 	return true;
@@ -56,12 +60,14 @@ static void icc(uint64_t vector, uint64_t err) {
 	apic_eoi();
 
 	printf("ICC - vector : %d, err : %d\n", vector, err);
-	return ;
 
 	if(icc_msg == NULL)
 		return;
 
+	printf("ICC Message : \n \tAPIC ID : %d\n \tID : %d\n \tTYPE :%d\n "
+			, icc_msg->apic_id, icc_msg->id, icc_msg->type);
 	icc_msg->result = 0;
+	printf(" Current Task : %d\n", task_id());
 	if(task_id() != 0) {
 		if(icc_msg->type == ICC_TYPE_RESUME) {
 			icc_msg->result = -1000;
@@ -81,21 +87,29 @@ void icc_init() {
 	uint8_t core_count = mp_core_count();
 
 	extern void* gmalloc_pool;
-	if(mp_apic_id() == 0) {
+	uint8_t apic_id = mp_apic_id() - BSP_APIC_ID_OFFSET;
+	if(apic_id == 0) {
 		int icc_max = core_count * core_count;
 		shared->icc_pool = fifo_create(icc_max, gmalloc_pool);
 
+		//printf("Initial size : %d\n", fifo_size(shared->icc_pool));
 		for(int i = 0; i < icc_max; i++) {
 			ICC_Message* icc_message = __malloc(sizeof(ICC_Message), shared->icc_pool->pool);
 			fifo_push(shared->icc_pool, icc_message);
+			//printf("fifo pushed %d\n", fifo_size(shared->icc_pool));
 		}
 
 		shared->icc_queues = __malloc(MP_MAX_CORE_COUNT * sizeof(Icc), gmalloc_pool);
+		printf("ICC pool size : %d\n", fifo_size(shared->icc_pool));
+		printf("ICC queue : %p\n", shared->icc_queues);
+
+		lock_init(&shared->icc_lock_alloc);
 
 		uint8_t* core_map = mp_core_map();
 		for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
 			if(core_map[i] != MP_CORE_INVALID) {
 				shared->icc_queues[i].icc_queue = fifo_create(core_count, gmalloc_pool);
+				//printf("ICC FIFO queue [%2d]: %p\n", i, shared->icc_queues[i].icc_queue);
 				lock_init(&shared->icc_queues[i].icc_queue_lock);
 			}
 		}
@@ -132,8 +146,8 @@ uint32_t icc_send(ICC_Message* msg, uint8_t apic_id) {
 	fifo_push(shared->icc_queues[apic_id].icc_queue, msg);
 	lock_unlock(&shared->icc_queues[apic_id].icc_queue_lock);
 
-	// NOTE: APIC ID modification
-	apic_write64(APIC_REG_ICR, ((uint64_t)(apic_id + 1) << 56) |
+	printf("ICC send to %d\n", apic_id);
+	apic_write64(APIC_REG_ICR, ((uint64_t)(apic_id) << 56) |
 				APIC_DSH_NONE | 
 				APIC_TM_EDGE | 
 				APIC_LV_DEASSERT | 

@@ -244,6 +244,7 @@ static void icc_start(ICC_Message* msg) {
 	// TODO: Change blocks[0] to blocks
 	uint32_t id = loader_load(vm);
 
+	printf("Loading done \n");
 	if(errno != 0) {
 		ICC_Message* msg2 = icc_alloc(ICC_TYPE_STARTED);
 
@@ -391,11 +392,79 @@ static int exec(char* name) {
 	return EXEC_END;
 }
 
+/*
+ *  * Volatile isn't enough to prevent the compiler from reordering the
+ *   * read/write functions for the control registers and messing everything up.
+ *    * A memory clobber would solve the problem, but would prevent reordering of
+ *     * all loads stores around it, which can hurt performance. Solution is to
+ *      * use a variable and mimic reads and writes to it to enforce serialization
+ *       */
+static unsigned long __force_order;
+
+static inline unsigned long native_read_cr3(void)
+{
+	unsigned long val;
+	asm volatile("mov %%cr3,%0\n\t" : "=r" (val), "=m" (__force_order));
+	return val;
+}
+
+static inline void native_write_cr3(unsigned long val)
+{
+	asm volatile("mov %0,%%rdi": : "r" (val), "m" (__force_order));
+}
+
+static inline void __native_flush_tlb_single(unsigned long addr)
+{
+	asm volatile("invlpg (%0)" ::"r" (addr) : "memory");
+}
+
+static inline void clflush(volatile void *__p) {
+	asm volatile("clflush %0" : "+m" (*(volatile char *)__p));
+}
+
+static void clflush_cache_range(void *vaddr, unsigned int size) {
+	void *vend = vaddr + size - 1;
+
+	#define mb()	asm volatile("mfence":::"memory")
+
+	mb();
+
+	for (; vaddr < vend; vaddr += 64)
+		clflush(vaddr);
+	/*
+	 ** Flush any possible final partial cacheline:
+	 **/
+	clflush(vend);
+
+	mb();
+}
+
+static void fixup_page_table(uint8_t apic_id, uint64_t offset) {
+	uint64_t base = PAGE_TABLE_START + apic_id * 0x200000 + offset;
+	PageTable* l4u = (PageTable*)(base + PAGE_TABLE_SIZE * PAGE_L4U_INDEX);
+
+	for(int i = 0; i < PAGE_L4U_SIZE * PAGE_ENTRY_COUNT; i++) {
+		if(i == 0)
+			continue;
+
+		l4u[i].base = i + (offset >> 21);
+		l4u[i].p = 1;
+		l4u[i].us = 0;
+		l4u[i].rw = 1;
+		l4u[i].ps = 1;
+	}
+
+	uint64_t pml4 = PAGE_TABLE_START + apic_id * 0x200000 + offset;
+	asm volatile("movq %0, %%rdi" : : "r"(pml4));
+}
+
 void main() {
 	mp_init();
 
-	uint64_t apic_id = 0; //mp_apic_id();
-	uint64_t _apic_id = mp_apic_id();
+	uint64_t apic_id = mp_apic_id() - BSP_APIC_ID_OFFSET;
+
+	extern uint64_t PHYSICAL_OFFSET;
+	fixup_page_table(apic_id, PHYSICAL_OFFSET);
 
 	console_init();
 
@@ -403,23 +472,31 @@ void main() {
 	stdio_init(apic_id, (void*)vga_buffer, 64 * 1024);
 	malloc_init(vga_buffer);
 
-	printf("\nHello PacketNgin. This is core %d\n", _apic_id);
-	printf("\nThis MP ID : %d Core ID : %d\n", _apic_id, mp_core_id());
+	printf("\nHello PacketNgin\n");
+	printf("\nThis MP ID : %d Core ID : %d\n", apic_id, mp_core_id());
 	//mp_sync();	// Barrier #1
 	if(apic_id == 0) {
 		// Parse kernel arguments
 		uint64_t initrd_start = pnkc.initrd_start;
 		uint64_t initrd_end = pnkc.initrd_end;
 
-		printf("\x1b""32mOK""\x1b""0m\n");
-
-		printf("Copy RAM disk image from 0x%x to 0x%x (%d)\n", initrd_start, RAMDISK_START, initrd_end - initrd_start);
-		memcpy((void*)RAMDISK_START, (void*)(uintptr_t)initrd_start, initrd_end - initrd_start);
+/*
+ *                printf("\x1b""32mOK""\x1b""0m\n");
+ *
+ *                printf("Copy RAM disk image from 0x%x to 0x%x (%d)\n",
+ *                                initrd_start,
+ *                                PHYSICAL_TO_VIRTUAL(RAMDISK_START),
+ *                                initrd_end - initrd_start);
+ *
+ *                memcpy((void*)PHYSICAL_TO_VIRTUAL(RAMDISK_START),
+ *                                (void*)(uintptr_t)PHYSICAL_TO_VIRTUAL(initrd_start),
+ *                                initrd_end - initrd_start);
+ */
 
 		printf("Analyze CPU information...\n");
 		cpu_init();
-		shared_init();
 		gmalloc_init(RAMDISK_START, initrd_end - initrd_start);
+		shared_init();
 		timer_init(cpu_brand);
 
 		gdt_init();
@@ -462,7 +539,6 @@ void main() {
 		 *                        APIC_DMODE_FIXED |
 		 *                        49);
 		 */
-		printf("Hello Interrupt? \n");
 
 		printf("Initializing Multi-tasking...\n");
 		task_init();
@@ -471,65 +547,78 @@ void main() {
 		event_init();
 
 		printf("Initializing inter-core communications...\n");
-		//icc_init();
-		while(1);
+		icc_init();
+/*
+ *
+ *                printf("Initializing USB controller driver...\n");
+ *                usb_initialize();
+ *
+ *                printf("Initializing disk drivers...\n");
+ *                disk_init();
+ *                if(!disk_register(&pata_driver, NULL)) {
+ *                        printf("\tPATA driver registration FAILED!\n");
+ *                        while(1) asm("hlt");
+ *                }
+ *
+ *                if(!disk_register(&usb_msc_driver, NULL)) {
+ *                        printf("\tUSB MSC driver registration FAILED!\n");
+ *                        while(1) asm("hlt");
+ *                }
+ *
+ *                if(!disk_register(&virtio_blk_driver, NULL)) {
+ *                        printf("\tVIRTIO BLOCK driver registration FAILED!\n");
+ *                        while(1) asm("hlt");
+ *                }
+ *
+ *                printf("Initializing RAM disk...\n");
+ *                char cmdline[32];
+ *                sprintf(cmdline, "-addr 0x%x -size 0x%x", RAMDISK_START, initrd_end - initrd_start);
+ *                if(!disk_register(&ramdisk_driver, cmdline)) {
+ *                        printf("\tRAM disk driver registration FAILED!\n");
+ *                        while(1) asm("hlt");
+ *                }
+ *
+ *                printf("Initializing file system...\n");
+ *                fs_init();
+ *                fs_register(&bfs_driver);
+ *                fs_mount(DISK_TYPE_RAMDISK << 16 | 0x00, 0,  FS_TYPE_BFS, "/boot");
+ *
+ *                printf("Initializing kernel symbols...\n");
+ *                symbols_init();
+ *
+ *                printf("Initializing modules...\n");
+ *                module_init();
+ *
+ *                printf("Initializing device drivers...\n");
+ *                device_module_init();
+ *
+ *                uint16_t nic_count = device_count(DEVICE_TYPE_NIC);
+ *                printf("Initializing NICs: %d\n", nic_count);
+ *                init_nics(nic_count);
+ */
 
-		printf("Initializing USB controller driver...\n");
-		usb_initialize();
+/*
+ *                printf("Initializing VM manager...\n");
+ *                vm_init();
+ *
+ *                printf("Initializing RPC manager...\n");
+ *                manager_init();
+ *
+ *                printf("Initializing shell...\n");
+ *                shell_init();
+ */
 
-		printf("Initializing disk drivers...\n");
-		disk_init();
-		if(!disk_register(&pata_driver, NULL)) {
-			printf("\tPATA driver registration FAILED!\n");
-			while(1) asm("hlt");
-		}
+//		event_busy_add(idle0_event, NULL);
+		icc_register(ICC_TYPE_START, icc_start);
+		icc_register(ICC_TYPE_RESUME, icc_resume);
+		icc_register(ICC_TYPE_STOP, icc_stop);
+		apic_register(49, icc_pause);
 
-		if(!disk_register(&usb_msc_driver, NULL)) {
-			printf("\tUSB MSC driver registration FAILED!\n");
-			while(1) asm("hlt");
-		}
+		if(cpu_has_feature(CPU_FEATURE_MONITOR_MWAIT) && cpu_has_feature(CPU_FEATURE_MWAIT_INTERRUPT))
+			event_idle_add(idle_monitor_event, NULL);
+		else
+			event_idle_add(idle_hlt_event, NULL);
 
-		if(!disk_register(&virtio_blk_driver, NULL)) {
-			printf("\tVIRTIO BLOCK driver registration FAILED!\n");
-			while(1) asm("hlt");
-		}
-
-		printf("Initializing RAM disk...\n");
-		char cmdline[32];
-		sprintf(cmdline, "-addr 0x%x -size 0x%x", RAMDISK_START, initrd_end - initrd_start);
-		if(!disk_register(&ramdisk_driver, cmdline)) {
-			printf("\tRAM disk driver registration FAILED!\n");
-			while(1) asm("hlt");
-		}
-
-		printf("Initializing file system...\n");
-		fs_init();
-		fs_register(&bfs_driver);
-		fs_mount(DISK_TYPE_RAMDISK << 16 | 0x00, 0,  FS_TYPE_BFS, "/boot");
-
-		printf("Initializing kernel symbols...\n");
-		symbols_init();
-
-		printf("Initializing modules...\n");
-		module_init();
-
-		printf("Initializing device drivers...\n");
-		device_module_init();
-
-		uint16_t nic_count = device_count(DEVICE_TYPE_NIC);
-		printf("Initializing NICs: %d\n", nic_count);
-		init_nics(nic_count);
-
-		printf("Initializing VM manager...\n");
-		vm_init();
-
-		printf("Initializing RPC manager...\n");
-		manager_init();
-
-		printf("Initializing shell...\n");
-		shell_init();
-
-		event_busy_add(idle0_event, NULL);
 	} else {
 		mp_sync();	// Barrier #2
 		ap_timer_init();
@@ -555,12 +644,14 @@ void main() {
 			event_idle_add(idle_hlt_event, NULL);
 	}
 
-	mp_sync();
-
-	if(apic_id == 0) {
-		while(exec("/boot/init.psh") > 0)
-			event_loop();
-	}
+/*
+ *        mp_sync();
+ *
+ *        if(apic_id == 0) {
+ *                while(exec("/boot/init.psh") > 0)
+ *                        event_loop();
+ *        }
+ */
 
 	while(1) {
 		event_loop();

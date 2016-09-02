@@ -2,7 +2,7 @@
 #define __ENTRY_H__
 
 #define __START_KERNEL_map	0xffffffff80000000
-#define __START_KERNEL		0xffffffff80200000
+#define __START_KERNEL		0xffffffff80400000
 
 #define __ALIGN		.align 4,0x90
 

@@ -61,13 +61,22 @@ uint64_t* bmalloc_pool;
  */
 
 void gmalloc_init(uintptr_t ramdisk_addr, uint32_t ramdisk_size) {
-	uint64_t start = VIRTUAL_TO_PHYSICAL(IDT_END_ADDR);
+	uint64_t start = IDT_END_ADDR;
 	uint64_t end = VIRTUAL_TO_PHYSICAL((uint64_t)shared);
 	
+	printf("Gmalloc Address : %p\n", start);
+	printf("Shared Address : %p\n", end);
+
 	init_memory_pool(end - start, (void*)start, 0);
+
+	void print_pool(char* message, size_t total) {
+		size_t mb = total / 1024 / 1024;
+		size_t kb = total / 1024 - mb * 1024;
+		printf("%s: %d.%dMB ", message, mb, kb);
+	}
 	
 	gmalloc_pool = (void*)start;
-	
+
 	// Reserved memory blocks
 	typedef struct {
 		uintptr_t start;
@@ -77,7 +86,7 @@ void gmalloc_init(uintptr_t ramdisk_addr, uint32_t ramdisk_size) {
 	Block reserved[4 + MP_MAX_CORE_COUNT + 1 /* PHYSICAL_OFFSET */];
 	int reserved_count = 0;
 	reserved[reserved_count].start = IVT_AREA_START;
-	reserved[reserved_count].end = BDA_AREA_END;
+	reserved[reserved_count].end = DESC_TABLE_AREA_START; //BDA_AREA_END;
 	reserved_count++;
 
 	reserved[reserved_count].start = DESC_TABLE_AREA_START;
@@ -96,12 +105,13 @@ void gmalloc_init(uintptr_t ramdisk_addr, uint32_t ramdisk_size) {
 	for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
 		if(core_map[i] == MP_CORE_INVALID)
 			continue;
-		
-		reserved[reserved_count].start = 0x400000 + 0x200000 * i;
-		reserved[reserved_count].end = 0x400000 + 0x200000 * (i + 1);
+
+		reserved[reserved_count].start = KERNEL_DATA_AREA_START + KERNEL_DATA_AREA_SIZE * i;
+		reserved[reserved_count].end = KERNEL_DATA_AREA_START + KERNEL_DATA_AREA_SIZE * (i + 1);
 		reserved_count++;
 	}
 
+#ifdef __PENGUIN__
 	void relocate(Block* blocks, int count) {
 		// TODO: need to set physical end
 		for(int i = 0; i < count; i++) {
@@ -109,33 +119,25 @@ void gmalloc_init(uintptr_t ramdisk_addr, uint32_t ramdisk_size) {
 			r->start += PHYSICAL_OFFSET;
 			r->end += PHYSICAL_OFFSET;
 		}
-
-		reserved[reserved_count].start = 0x0;
-		reserved[reserved_count].end = PHYSICAL_OFFSET;
-		reserved_count++;
 	}
 
+	// Relocate blocks adding physcial offset. This should be done to find actual
+	// physical memory map using e820.
 	relocate(reserved, reserved_count);
 
-	// Find mmap infomation structure by multiboot2
-	/*
-	 *struct multiboot_tag_mmap* mmap = find_mmap();
-	 *if(!mmap) {
-	 *        printf("MMAP information not found!\n");
-	 *        while(1) asm("hlt");
-	 *} 
-	 *
-	 */
-	//int count = (mmap->size - 8) / mmap->entry_size;
+	reserved[reserved_count].start = 0x0;
+	reserved[reserved_count].end = PHYSICAL_OFFSET;
+	reserved_count++;
+
+	for(int i = 0; i < reserved_count; i++) {
+		Block* r = &reserved[i];
+	//	printf("Reserved[%02d] : %p ~ %p\n", i, r->start, r->end);
+	}
+
+#endif /* __PENGUIN__ */
+
 	int count = pnkc.smap_count;
 
-	/*
-	 *for(int i = 0; i < count; i++) {
-	 *        SMAP* entry = &pnkc.smap[i];
-	 *        printf("SMAP TYPE : %d\n", entry->type);
-	 *}
-	 *while(1);
-	 */
 	// Print MMAP information and find available blocks
 	List* blocks = list_create(NULL);
 	printf("System memory map\n");
@@ -202,20 +204,34 @@ void gmalloc_init(uintptr_t ramdisk_addr, uint32_t ramdisk_size) {
 	list_iterator_init(&iter, blocks);
 	while(list_iterator_has_next(&iter)) {
 		Block* b = list_iterator_next(&iter);
+
+#ifdef __PENGUIN__
+		// Rearrange memory offset since we access physical memory space
+		// by MMU having physcial offset
+		b->start -= PHYSICAL_OFFSET;
+		b->end -= PHYSICAL_OFFSET;
+#endif /* __PENGUIN__ */
+
 		uintptr_t start = (b->start + 0x200000 - 1) & ~((uintptr_t)0x200000 - 1);
 		uintptr_t end = b->end & ~((uintptr_t)0x200000 - 1);
 
 		if(start >= end) {
 			add_new_area((void*)b->start, b->end - b->start, gmalloc_pool);
+			//printf("Add %p ~ %p \n", b->start, b->end - b->start);
+
 			b->start = b->end = 0;
 		} else {
 			if(start > b->start) {
 				add_new_area((void*)b->start, start - b->start, gmalloc_pool);
+				//printf("Add %p ~ %p \n", b->start, start - b->start);
+
 				b->start = start;
 			}
 
 			if(end < b->end) {
 				add_new_area((void*)end, b->end - end, gmalloc_pool);
+				//printf("Add %p ~ %p \n", end, b->end - end);
+
 				b->end = end;
 			}
 		}
@@ -226,9 +242,10 @@ void gmalloc_init(uintptr_t ramdisk_addr, uint32_t ramdisk_size) {
 			free(b);
 			list_iterator_remove(&iter);
 		}
+		printf("\n");
 	}
 
-	// extend bmalloc pool
+	// Extend bmalloc pool
 	Block* pop() {
 		uintptr_t last_start = UINTPTR_MAX;
 		int last_index = -1;
@@ -269,12 +286,6 @@ void gmalloc_init(uintptr_t ramdisk_addr, uint32_t ramdisk_size) {
 	}
 	
 	list_destroy(blocks);
-	
-	void print_pool(char* message, size_t total) {
-		size_t mb = total / 1024 / 1024;
-		size_t kb = total / 1024 - mb * 1024;
-		printf("%s: %d.%dMB ", message, mb, kb);
-	}
 	
 	printf("Memory pool: ");
 	print_pool("local", malloc_total());

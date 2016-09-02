@@ -13,7 +13,7 @@ uint64_t pushfq();
 uint64_t rdtsc();
 void hlt();
 //bool cmpxchg(volatile uint8_t* s1, uint8_t s2, uint8_t d);
-void clflush(void* addr);
+//void clflush(void* addr);
 void wbinvd();
 uint64_t read_cr0();
 uint64_t read_cr2();

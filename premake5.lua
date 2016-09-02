@@ -65,7 +65,7 @@ workspace "Kernel"
 
     -- Library
     include "lib/library.lua"
-    -- Kernel 
+    -- Kernel
     include "kernel/kernel.lua"
     -- Drivers
     include "drivers/drivers.lua"

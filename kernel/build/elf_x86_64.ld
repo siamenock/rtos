@@ -8,7 +8,7 @@ SECTIONS
   /* Read-only sections, merged into text segment: */
   PROVIDE (__executable_start = 0x400000); . = 0x400000 + SIZEOF_HEADERS;
 /*********************************************************************************/
-  .text 0xffffffff80200000 : AT(0x200000)
+  .text 0xffffffff80400000 : AT(0x400000)
   {
     _text = .;
     *(.text .stub .text.* .gnu.linkonce.t.*)
@@ -19,7 +19,7 @@ SECTIONS
   .rodata         : { *(.rodata .rodata.* .gnu.linkonce.r.*) }
   .rodata1        : { *(.rodata1) }
 
-  .data 0xffffffff80400000 : AT(0x400000)
+  .data 0xffffffff80600000 : AT(0x600000)
   {
     *(.data .data.* .gnu.linkonce.d.*)
     SORT(CONSTRUCTORS)
@@ -42,7 +42,7 @@ SECTIONS
   . = ALIGN(4096);
   __bss_end = .;
 
-  .pgtable 0xffffffff805c0000 : AT(0x5c0000)
+  .pgtable 0xffffffff807c0000 : AT(0x7c0000)
   {
     __pgtable_start = .;
     *(.pgtable)

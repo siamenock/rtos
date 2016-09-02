@@ -280,8 +280,6 @@ void init_page_tables(uint8_t apic_id) {
 	l4k[1].exb = 0;
 	
 	// Kernel local area(malloc, TLB, TS, data, bss, stack)
-	l4k[2 + apic_id] = l4k[2];
-	
 	l4k[2].base = 2 + apic_id;	// 2 * (2 + apic_id)MB
 	l4k[2].p = 1;
 	l4k[2].us = 0;

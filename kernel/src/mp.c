@@ -44,7 +44,6 @@ void mp_init() {
 	a = 0x01;
 	cpuid(&a, &b, &c, &d);
 	apic_id = (b >> 24) & 0xff;
-
 	// Analyze floating pointer structure
 	//   Get IO APIC address
 	//   Other core APIC IDs
@@ -53,6 +52,8 @@ void mp_init() {
 	};
 
 	mp_parse_fps(&parser, NULL);
+
+	memset(mp_cores, 0x0, sizeof(mp_cores));
 
 	acpi_init();
 
@@ -64,6 +65,7 @@ void mp_init() {
 	}
 
 	// Calculate core count
+	core_count = 0;
 	for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
 		if(mp_cores[i])
 			mp_cores[i] = core_count++;
@@ -73,7 +75,7 @@ void mp_init() {
 }
 
 uint8_t mp_apic_id() {
-	return 0; //apic_id;
+	return apic_id;
 }
 
 uint8_t mp_core_id() {

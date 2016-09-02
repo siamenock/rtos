@@ -5,22 +5,25 @@
 #include "entry.h"
 #include "pnkc.h"
 #include "mmap.h"
+#include "mp.h"
 
 struct boot_params boot_params;
 char boot_command_line[COMMAND_LINE_SIZE];
 uint64_t PHYSICAL_OFFSET;
 PNKC pnkc;
 
-//#define __aligned(x)		__attribute__((aligned(x)))
-//#define __always_unused		__attribute__((unused))
+static __always_inline void cpuid(uint32_t* a, uint32_t* b, uint32_t* c, uint32_t* d) {
+	asm volatile("cpuid"
+			: "=a"(*a), "=b"(*b), "=c"(*c), "=d"(*d)
+			: "a"(*a), "b"(*b), "c"(*c), "d"(*d));
+}
 
-/*
- *static PageDirectory    _l2[512]	__aligned(4096) __always_unused;
- *static PageDirectory*   _l3u[512]	__aligned(4096) __always_unused;
- *static PageDirectory*   _l3k[512]	__aligned(4096) __always_unused;
- *static PageTable*       _l4u[512 * 59]  __aligned(4096) __always_unused;
- *static PageTable*       _l4k[512 * 2]   __aligned(4096) __always_unused;
- */
+static __always_inline uint8_t get_apic_id() {
+	uint32_t a = 0x01, b, c, d;
+	cpuid(&a, &b, &c, &d);
+
+	return (b >> 24) & 0xff;
+}
 
 static __always_inline void init_page_tables(uint8_t apic_id, uint64_t offset) {
 	//uint64_t virtual_base = (uint64_t)&_l2;
@@ -32,12 +35,12 @@ static __always_inline void init_page_tables(uint8_t apic_id, uint64_t offset) {
 	PageTable* l4u = (PageTable*)(base + PAGE_TABLE_SIZE * PAGE_L4U_INDEX);
 	PageTable* l4k = (PageTable*)(base + PAGE_TABLE_SIZE * PAGE_L4K_INDEX);
 
-	// Clean TLB area*/
+	// Clean TLB area
 	volatile uint32_t* p = (uint32_t*)base;
 	for(int i = 0; i < 65536; i++)
 		*p++ = 0;
 
-	// Level 2*/
+	// Level 2
 	l2[0].base = (uint64_t)l3u >> 12;
 	l2[0].p = 1;
 	l2[0].us = 1;
@@ -63,13 +66,15 @@ static __always_inline void init_page_tables(uint8_t apic_id, uint64_t offset) {
 		l3k[PAGE_ENTRY_COUNT - PAGE_L4K_SIZE + i].rw = 1;
 	}
 
-	// Level 4
+	// Level4
 	for(int i = 0; i < PAGE_L4U_SIZE * PAGE_ENTRY_COUNT; i++) {
 		l4u[i].base = i;// + (offset >> 21);
 		l4u[i].p = 1;
-		l4u[i].us = 1;
+		l4u[i].us = 0;
 		l4u[i].rw = 1;
 		l4u[i].ps = 1;
+		// Cache disabled
+		//l4u[i].pcd = 1;
 	}
 
 	// Kernel global area(gmalloc, segment descriptor, IDT, code, rodata)
@@ -149,7 +154,7 @@ static __always_inline void save_bootdata(uint64_t** real_mode_data, uint64_t* o
 }
 
 static __always_inline void init_kernel_stack() {
-	uint64_t kernel_stack_end = KERNEL_STACK_END;
+	uint64_t kernel_stack_end = PHYSICAL_TO_VIRTUAL(KERNEL_STACK_END);
 	asm volatile("movq %0, %%rsp" : : "m"(kernel_stack_end));
 	asm volatile("movq %0, %%rbp" : : "m"(kernel_stack_end));
 }
@@ -195,26 +200,43 @@ static void reserve_mmap() {
 	memcpy(pnkc.smap, boot_params.e820_map, sizeof(boot_params.e820_map));
 }
 
+static void _main() {
+	init_kernel_stack();
+
+	extern void main();
+	main();
+}
+
+static __always_inline void jump_kernel() {
+	uint64_t address = (uint64_t)_main;
+
+	asm volatile("pushq $0" ::);
+	asm volatile("pushq $0x08" ::);
+	asm volatile("pushq %0" :: "r"(address));
+	asm volatile("lretq" ::);
+}
+
 /* C entry point of kernel */
 void entry() {
 	uint64_t* real_mode_data;
 	uint64_t offset;
 	save_bootdata(&real_mode_data, &offset);
 
-	init_page_tables(0, offset);
+	// APIC ID started with 1, so we have to substract for data structrues
+	uint8_t apic_id = get_apic_id() - BSP_APIC_ID_OFFSET;
+	init_page_tables(apic_id, offset);
 
-	activate_pae(0);
-	activate_pml4(0, offset);
-	activate_longmode(0);
-	activate_paging(0);
+	activate_pae(apic_id);
+	activate_pml4(apic_id, offset);
+	activate_longmode(apic_id);
+	activate_paging(apic_id);
 
 	copy_bootdata(real_mode_data);
 	PHYSICAL_OFFSET = offset;
 
-	init_kernel_stack();
 	reserve_initrd();
 	reserve_mmap();
 
-	extern void main();
-	main();
+	jump_kernel();
 }
+

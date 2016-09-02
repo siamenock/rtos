@@ -4,8 +4,8 @@ SECTION .text
 
 global lgdt, ltr, lidt
 global sti, cli, pushfq
-global rdtsc, hlt;, cmpxchg
-global clflush, wbinvd
+global rdtsc, hlt   ;, cmpxchg
+;global clflush, wbinvd
 global pause
 global read_cr0
 global read_cr2, write_cr2
@@ -65,9 +65,9 @@ hlt:
 ;	mov		rax, 1
 ;	ret
 
-clflush:
-	clflush	[rdi]
-	ret
+;clflush:
+;	clflush	[rdi]
+;	ret
 
 wbinvd:
 	wbinvd

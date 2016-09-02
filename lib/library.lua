@@ -19,7 +19,7 @@ workspace "Kernel"
         includedirs { "core/include", "TLSF/src", "jsmn/", "../cmocka/include" }
         files { "core/**.asm", "core/**.S", "core/**.h", "core/**.c" }
         -- Exclude test sources
-        removefiles { "core/test/*"} 
+        removefiles { "core/src/test/*" }
         -- Enable exntension instruction for SSE. Do not need stack protector 
         buildoptions { "-msse4.1 -fno-stack-protector" }
 
@@ -30,8 +30,9 @@ workspace "Kernel"
         includedirs { "core/include", "TLSF/src", "jsmn/", "../cmocka/include" }
         files { "core/**.asm", "core/**.S", "core/**.h", "core/**.c" }
         -- Exclude test sources and standard C library functions
-        removefiles { "core/test/*", "core/src/malloc.c" }
-        buildoptions { "-msse4.1 -fno-stack-protector" }
+        removefiles { "core/src/test/*", "core/src/malloc.c" }
+        -- Memory model needs to be large rather than kernel
+        buildoptions { "-msse4.1 -fno-stack-protector -mcmodel=large" }
         -- Define "LINUX" to make core library for Linux OS
         defines { "LINUX" }
 
@@ -43,7 +44,7 @@ workspace "Kernel"
         files { "TLSF/**.h", "TLSF/**.c" }
         removefiles { "TLSF/examples/*" }
         -- Enable extra waring flag
-        buildoptions { "-Wextra -Wwrite-strings -Wstrict-prototypes -Wmissing-prototypes -Wno-long-long -Wstrict-aliasing=1"}
+        buildoptions { "-mcmodel=large -Wextra -Wwrite-strings -Wstrict-prototypes -Wmissing-prototypes -Wno-long-long -Wstrict-aliasing=1"}
         -- Define flags related TLSF
         defines { "USE_MMAP=0", "US_SBRK=0", "USE_PRINTF=0", "TLSF_STATISTIC=1", "TLSF_USE_LOCKS=1" }
 
@@ -90,10 +91,12 @@ workspace "Kernel"
             "ar x ../libexpat.a",
             "ar rcs ../libpacketngin.a *.o",
 
-	    "cp -rL ../core/include/* ../../include",
-	    "cp -rL ../expat/include/* ../../include",
-	    "cp -rL ../openssl/include/* ../../include",
-	    "cp -rL ../zlib/*.h ../../include",
+            "cp -rL ../core/include/* ../../include",
+            "cp -rL ../lwip/src/include/* ../../include",
+            "cp -rL ../TLSF/src/*.h ../../include",
+            "cp -rL ../expat/include/* ../../include",
+            "cp -rL ../openssl/include/* ../../include",
+            "cp -rL ../zlib/*.h ../../include",
 
             "rm ./*.o -rf",
 
