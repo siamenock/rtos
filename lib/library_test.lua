@@ -516,7 +516,7 @@ workspace "Test"
             includedirs { "core/include", "TLSF/src" }
             files { "core/src/icmp.c", "core/src/nic.c", "core/src/test/icmp.c", "core/src/interface.c", "core/include/util/**.h", "core/src/asm.asm", "core/src/lock.c", "core/src/**.h" , "core/src/_malloc.c", "TLSF/src/**.h", "core/src/fifo.c", "core/src/map.c", "core/src/list.c", "core/src/set.c", "core/src/checksum.c" }
             -- Link testing target library
-            linkoptions { "../../../libtlsf.a", "-lpthread" }
+            linkoptions { "../../../libtlsf.a" }
             postbuildcommands {
                 '{DELETE} %{cfg.buildtarget.abspath}.xml',
                 '@export CMOCKA_XML_FILE=\'%{cfg.buildtarget.abspath}.xml\'; export CMOCKA_MESSAGE_OUTPUT=xml; %{cfg.buildtarget.abspath} ||:',
