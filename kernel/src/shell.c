@@ -831,7 +831,7 @@ static int cmd_create(int argc, char** argv, void(*callback)(char* result, int e
 	
 	uint32_t vmid = vm_create(vm);
 	if(vmid == 0) {
-		callback(NULL, -1);
+		callback("false", -1);
 	} else {
 		sprintf(cmd_result, "%d", vmid);
 		callback(cmd_result, 0);
@@ -1263,6 +1263,8 @@ Command commands[] = {
 };
 
 static void cmd_callback(char* result, int exit_status) {
+	if(!result)
+		return;
 	cmd_update_var(result, exit_status);
 	cmd_async = false;
 	printf("%s\n", result);
