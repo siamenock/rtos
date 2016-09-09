@@ -479,8 +479,8 @@ workspace "Test"
             -- Set the target directory for a generated target file 
             targetdir "test/core"
             location "build/test/core"
-            includedirs { "core/include" }
-            files { "core/src/ip.c", "core/src/test/ip.c", "core/src/**.h", "core/src/checksum.c", "core/src/ether.c" }
+            includedirs { "core/include", "TLSF/src" }
+            files { "core/src/ip.c", "core/src/test/ip.c", "core/src/icmp.c", "core/src/nic.c", "core/src/interface.c", "core/include/util/**.h", "core/src/asm.asm", "core/src/lock.c", "core/src/**.h" , "core/src/_malloc.c", "TLSF/src/**.h", "core/src/fifo.c", "core/src/map.c", "core/src/list.c", "core/src/set.c", "core/src/checksum.c" }
             -- Link testing target library
             linkoptions { "../../../libtlsf.a" }
             postbuildcommands {
