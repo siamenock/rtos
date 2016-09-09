@@ -60,7 +60,7 @@ bool vector_available(Vector* vector);
 bool vector_is_empty(Vector* vector);
 
 /**
- * Add an element to the Vector.
+ * Add an element to the Vector. size of vector grows if there is no more space to hold an element
  *
  * @param vector Vector
  * @param data an element to add

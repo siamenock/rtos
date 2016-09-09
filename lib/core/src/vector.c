@@ -39,12 +39,27 @@ bool vector_is_empty(Vector* vector) {
 }
 
 bool vector_add(Vector* vector, void* data) {
-	if(vector->index < vector->size) {
-		vector->array[vector->index++] = data;
-		return true;
-	} else {
-		return false;
-	}
+    if(vector->index < vector->size) {
+        vector->array[vector->index++] = data;
+        return true;
+    } else {
+        void **old_array = vector->array;
+        void **new_array = __malloc((vector->size * 2) * sizeof(void *), vector->pool);
+        if(!new_array) {
+            __free(new_array, vector->pool);
+            return false;
+        }
+
+        for (size_t i = 0; i < vector->size; ++i)
+            new_array[i] = old_array[i];
+        __free(old_array, vector->pool);
+
+        vector->size *= 2;
+        vector->array = new_array;
+
+        vector->array[vector->index++] = data;
+        return true;
+    }
 }
 
 void* vector_get(Vector* vector, size_t index) {
