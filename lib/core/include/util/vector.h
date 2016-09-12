@@ -60,13 +60,21 @@ bool vector_available(Vector* vector);
 bool vector_is_empty(Vector* vector);
 
 /**
- * Add an element to the Vector. size of vector grows if there is no more space to hold an element
+ * Add an element to the Vector. automatic reallocation of the allocated storage space is occurred if -and only if- the new vector size surpasses the current vector capacity.
  *
  * @param vector Vector
  * @param data an element to add
  * @return true if the element is added
  */
 bool vector_add(Vector* vector, void* data);
+
+/**
+ * Requests the vector to reduce its capacity to fit its size.
+ *
+ * @param vector Vector
+ * @return true if the vector successfully shrinked
+ */
+bool vector_shrink_to_fit(Vector* vector);
 
 /**
  * Get an element from the Vector.
