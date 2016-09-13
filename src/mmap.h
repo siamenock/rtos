@@ -6,10 +6,12 @@
 #include <stdint.h>
 #include "mp.h"
 
+#define PHYSICAL_OFFSET		        0x38000000l	/* 896 MB */
+
 #define R_BASE                      0x200000
 
-#define VIRTUAL_TO_PHYSICAL(addr)	(~0xffffffff80000000L & (addr))
-#define PHYSICAL_TO_VIRTUAL(addr)	(0xffffffff80000000L | (addr))
+#define VIRTUAL_TO_PHYSICAL(addr)	(~0xffffffff80000000L & ((uint64_t)addr))
+#define PHYSICAL_TO_VIRTUAL(addr)	(0xffffffff80000000L | ((uint64_t)addr))
 
 /*
  * BIOS area (0M ~ 1M)

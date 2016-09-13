@@ -3,6 +3,7 @@
 #include <malloc.h>
 #include <sys/time.h>
 #include <util/event.h>
+#include <util/cmd.h>
 
 #include "command.h"
 

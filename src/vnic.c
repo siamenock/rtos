@@ -1,5 +1,6 @@
 #include <errno.h>
 #include <string.h>
+#include <stdlib.h>
 #include <tlsf.h>
 #include <malloc.h>
 #include <_malloc.h>
@@ -15,11 +16,10 @@
 //#include "pci.h"
 #include "driver/nic.h"
 #include "device.h"
-#include <stdlib.h>
 
 #include "vnic.h"
 
-#define DEBUG		0
+#define DEBUG		1
 #define ALIGN		16
 
 Device* nic_current;
@@ -42,11 +42,9 @@ Device* nic_parse_index(char* _argv, uint16_t* port) {
 	if(*next != '.' && *next != '\0')
 		return NULL;
 
-	printf("Port is %d\n", *port);
 	Device* dev = NULL;
 	uint16_t nic_count = device_count(DEVICE_TYPE_NIC);
 	for(int i = 0; i < nic_count; i++) {
-		printf("Hello\n");
 		if(*port < ((NICInfo*)nic_devices[i]->priv)->port_count) {
 			dev = nic_devices[i];
 			break;
@@ -329,6 +327,33 @@ VNIC* vnic_create(uint64_t* attrs) {
 	// Register the vnic
 	map_put(vnics, (void*)vnic->mac, vnic);
 
+/*
+ *        printf("VNIC created %p \n", vnic);
+ *        
+ *        printf("%s : %p \n"," nic", vnic->nic);
+ *        printf("%s : %p \n"," pools", vnic->pools);
+ *        printf("%s : %p \n"," pool", vnic->pool);
+ *
+ *        printf("%s : %p \n"," device", vnic->device);
+ *        printf("%s : %x \n"," port;", vnic->port);
+ *
+ *        printf("%s : %llx \n"," mac", vnic->mac);
+ *        printf("%s : %llx \n"," input_bandwidth", vnic->input_bandwidth);
+ *        printf("%s : %llx \n"," input_wait", vnic->input_wait);
+ *        printf("%s : %llx \n"," input_wait_grace", vnic->input_wait_grace);
+ *        printf("%s : %llx \n"," output_bandwidth", vnic->output_bandwidth);
+ *        printf("%s : %llx \n"," output_wait", vnic->output_wait);
+ *        printf("%s : %llx \n"," output_wait_grace", vnic->output_wait_grace);
+ *        printf("%s : %x \n"," padding_head", vnic->padding_head);
+ *        printf("%s : %x \n"," padding_tail", vnic->padding_tail);
+ *        printf("%s : %x \n"," min_buffer_size", vnic->min_buffer_size);
+ *        printf("%s : %x \n"," max_buffer_size", vnic->max_buffer_size);
+ *        printf("%s : %p \n"," input_accept", vnic->input_accept);
+ *        printf("%s : %p \n"," output_accept", vnic->output_accept);
+ *
+ *        printf("VNIC SPec end\n");
+ */
+	
 	return vnic;
 }
 
@@ -767,12 +792,14 @@ void nic_process_input(uint8_t local_port, uint8_t* buf1, uint32_t size1, uint8_
 	uint64_t time = timer_frequency();
 
 #if DEBUG
-	printf("Input:  [%02d] %02x:%02x:%02x:%02x:%02x:%02x %02x:%02x:%02x:%02x:%02x:%02x\n",
-			local_port,
-			(dmac >> 40) & 0xff, (dmac >> 32) & 0xff, (dmac >> 24) & 0xff,
-			(dmac >> 16) & 0xff, (dmac >> 8) & 0xff, (dmac >> 0) & 0xff,
-			(smac >> 40) & 0xff, (smac >> 32) & 0xff, (smac >> 24) & 0xff,
-			(smac >> 16) & 0xff, (smac >> 8) & 0xff, (smac >> 0) & 0xff);
+	/*
+	 *printf("Input:  [%02d] %02x:%02x:%02x:%02x:%02x:%02x %02x:%02x:%02x:%02x:%02x:%02x\n",
+	 *                local_port,
+	 *                (dmac >> 40) & 0xff, (dmac >> 32) & 0xff, (dmac >> 24) & 0xff,
+	 *                (dmac >> 16) & 0xff, (dmac >> 8) & 0xff, (dmac >> 0) & 0xff,
+	 *                (smac >> 40) & 0xff, (smac >> 32) & 0xff, (smac >> 24) & 0xff,
+	 *                (smac >> 16) & 0xff, (smac >> 8) & 0xff, (smac >> 0) & 0xff);
+	 */
 #endif /* DEBUG */
 
 	bool input(VNIC* vnic) {
@@ -877,8 +904,9 @@ dropped:
 		if(!vnic)
 			vnic = map_get(vnics, (void*)(uint64_t)0xffffffffffff);
 		
-		if(!vnic)
+		if(!vnic) {
 			return;
+		}
 		
 		if(input(vnic))
 			nic_rx++;

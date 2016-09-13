@@ -13,8 +13,6 @@
 #include "vnic.h"
 #include "file.h"
 
-#define DEBUG	1
-
 static void usage(const char* cmd) {
 	printf("\nUsage :\n");
         for(int i = 0; commands[i].name != NULL; i++) {
@@ -576,12 +574,13 @@ static int cmd_clear(int argc, char** argv, void(*callback)(char* result, int ex
 	/*return 0;*/
 /*}*/
 
-/*static int cmd_shutdown(int argc, char** argv, void(*callback)(char* result, int exit_status)) {*/
-	/*printf("Shutting down\n");*/
-	/*acpi_shutdown();*/
+static int cmd_shutdown(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	printf("Shutting down\n");
+	exit(0);
+//	acpi_shutdown();
 	
-	/*return 0;*/
-/*}*/
+	return 0;
+}
 
 /*static uint32_t arping_addr;*/
 /*static uint32_t arping_count;*/
@@ -710,6 +709,17 @@ static int cmd_create(int argc, char** argv, void(*callback)(char* result, int e
 			i++;
 			
 			NICSpec* nic = &(vm->nics[vm->nic_count++]);
+			
+			// Default value
+			nic->mac = 0;
+			nic->dev = malloc(strlen("eth0") + 1);
+			nic->dev = strcpy(nic->dev, "eth0");
+			nic->input_buffer_size = 1024;
+			nic->output_buffer_size = 1024;
+			nic->input_bandwidth = 1000000000; /* 1 GB */
+			nic->output_bandwidth = 1000000000; /* 1 GB */
+			nic->pool_size = 0x400000; /* 4 MB */
+
 			for( ; i < argc; i++) {
 				if(strcmp(argv[i], "mac:") == 0) {
 					i++;
@@ -722,6 +732,7 @@ static int cmd_create(int argc, char** argv, void(*callback)(char* result, int e
 					i++;
 					nic->dev = malloc(strlen(argv[i] + 1));
 					strcpy(nic->dev, argv[i]);
+					printf("Device alloc %s \n", argv[i]);
 				} else if(strcmp(argv[i], "ibuf:") == 0) {
 					i++;
 					if(!is_uint32(argv[i])) {
@@ -758,7 +769,7 @@ static int cmd_create(int argc, char** argv, void(*callback)(char* result, int e
 					}
 					nic->padding_head = parse_uint16(argv[i]);
 				} else if(strcmp(argv[i], "tpad:") == 0) {
-					i++;
+				i++;
 					if(!is_uint16(argv[i])) {
 						printf("oband must be uint16\n");
 						return -1;
@@ -786,7 +797,7 @@ static int cmd_create(int argc, char** argv, void(*callback)(char* result, int e
 	
 	uint32_t vmid = vm_create(vm);
 	if(vmid == 0) {
-		callback(NULL, -1);
+		callback("false", -1);
 	} else {
 		sprintf(cmd_result, "%d", vmid);
 		callback(cmd_result, 0);
@@ -801,43 +812,56 @@ static int cmd_create(int argc, char** argv, void(*callback)(char* result, int e
 	return 0;
 }
 
-/*static int cmd_vm_delete(int argc, char** argv, void(*callback)(char* result, int exit_status)) {*/
-	/*if(argc < 1) {*/
-		/*return CMD_STATUS_WRONG_NUMBER;*/
-	/*}*/
+static int cmd_vm_delete(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	if(argc < 1) {
+		return CMD_STATUS_WRONG_NUMBER;
+	}
 
-	/*if(!is_uint32(argv[1])) {*/
-		/*return -1;*/
-	/*}*/
+	if(!is_uint32(argv[1])) {
+		return -1;
+	}
 
-	/*uint32_t vmid = parse_uint32(argv[1]);*/
-	/*bool ret = vm_delete(vmid);*/
+	uint32_t vmid = parse_uint32(argv[1]);
+	bool ret = vm_delete(vmid);
 
-	/*if(ret)*/
-		/*callback("true", 0);*/
-	/*else*/
-		/*callback("false", -1);*/
+	if(ret)
+		callback("true", 0);
+	else
+		callback("false", -1);
 
-	/*return 0;*/
-/*}*/
+	return 0;
+}
 
-/*static int cmd_vm_list(int argc, char** argv, void(*callback)(char* result, int exit_status)) {*/
-	/*uint32_t vmids[MAX_VM_COUNT];*/
-	/*int len = vm_list(vmids, MAX_VM_COUNT);*/
+static int cmd_vm_list(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+//#include "apic.h"
+	/*
+	 *printf("Hello\n");
+	 *apic_write64(APIC_REG_ICR, ((uint64_t)1 << 56) |
+	 *                        APIC_DSH_NONE |
+	 *                        APIC_TM_EDGE |
+	 *                        APIC_LV_DEASSERT |
+	 *                        APIC_DM_PHYSICAL |
+	 *                        APIC_DMODE_FIXED |
+	 *                        48);
+	 *printf("APIC done\n");
+	 */
+	
+	uint32_t vmids[MAX_VM_COUNT];
+	int len = vm_list(vmids, MAX_VM_COUNT);
 
-	/*char* p = cmd_result;*/
-	/*for(int i = 0; i < len; i++) {*/
-		/*p += sprintf(p, "%lu", vmids[i]) - 1;*/
-		/*if(i + 1 < len) {*/
-			/**p++ = ' ';*/
-		/*} else {*/
-			/**p++ = '\0';*/
-		/*}*/
-	/*}*/
+	char* p = cmd_result;
+	for(int i = 0; i < len; i++) {
+		p += sprintf(p, "%u", vmids[i]); // NOTE: sprintf return 1 not 2 //- 1;
+		if(i + 1 < len) {
+			*p++ = ' ';
+		} else {
+			*p++ = '\0';
+		}
+	}
 
-	/*callback(cmd_result, 0);*/
-	/*return 0;*/
-/*}*/
+	callback(cmd_result, 0);
+	return 0;
+}
 
 static int cmd_upload(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	if(argc < 3) {
@@ -853,10 +877,9 @@ static int cmd_upload(int argc, char** argv, void(*callback)(char* result, int e
 	int fd = open(argv[2], O_RDONLY);
 	if(fd < 0) {
 		printf("Cannot open file: %s\n", argv[2]);
-		perror("Cannot open file : ");
 		return -1;
 	}
-	
+
 	int offset = 0;
 	int len;
 	char buf[4096];
@@ -870,6 +893,7 @@ static int cmd_upload(int argc, char** argv, void(*callback)(char* result, int e
 		offset += len;
 	}
 
+	printf("%d\n", len);
 	close(fd);
 	callback("true", 0);
 	return 0;
@@ -1128,11 +1152,11 @@ Command commands[] = {
 		/*.desc = "Shutdown the node.", */
 		/*.func = cmd_shutdown */
 	/*},*/
-	/*{ */
-		/*.name = "halt", */
-		/*.desc = "Shutdown the node.", */
-		/*.func = cmd_shutdown */
-	/*},*/
+	{
+		.name = "halt",
+		.desc = "Shutdown the node.",
+		.func = cmd_shutdown
+	},
 	/*{ */
 		/*.name = "arping", */
 		/*.desc = "ARP ping to the host.",*/
@@ -1145,18 +1169,18 @@ Command commands[] = {
 		.args = "vmid: uint32, core: (number: int) memory: (size: uint32) storage: (size: uint32) [nic: mac: (addr: uint64) ibuf: (size: uint32) obuf: (size: uint32) iband: (size: uint64) oband: (size: uint64) pool: (size: uint32)]* [args: [string]+ ]",
 		.func = cmd_create
 	},
-	/*{*/
-		/*.name = "delete",*/
-		/*.desc = "Delete VM",*/
-		/*.args = "result: bool, vmid: uint32",*/
-		/*.func = cmd_vm_delete*/
-	/*},*/
-	/*{*/
-		/*.name = "list",*/
-		/*.desc = "List VM",*/
-		/*.args = "result: uint64[]",*/
-		/*.func = cmd_vm_list*/
-	/*},*/
+	{
+		.name = "delete",
+		.desc = "Delete VM",
+		.args = "result: bool, vmid: uint32",
+		.func = cmd_vm_delete
+	},
+	{
+		.name = "list",
+		.desc = "List VM",
+		.args = "result: uint64[]",
+		.func = cmd_vm_list
+	},
 	{
 		.name = "upload",
 		.desc = "Upload file",
@@ -1187,18 +1211,20 @@ Command commands[] = {
 		/*.args = "result: bool, vmid: uint32",*/
 		/*.func = cmd_status_set*/
 	/*},*/
-	/*{*/
-		/*.name = "stop",*/
-		/*.desc = "Stop VM",*/
-		/*.args = "result: bool, vmid: uint32",*/
-		/*.func = cmd_status_set*/
-	/*},*/
-	/*{*/
-		/*.name = "status",*/
-		/*.desc = "Get VM's status",*/
-		/*.args = "result: string(\"start\", \"pause\", or \"stop\") vmid: uint32",*/
-		/*.func = cmd_status_get*/
-	/*},*/
+	{
+		.name = "stop",
+		.desc = "Stop VM",
+		.args = "result: bool, vmid: uint32",
+		.func = cmd_status_set
+	},
+	/*
+	 *{
+	 *        .name = "status",
+	 *        .desc = "Get VM's status",
+	 *        .args = "result: string(\"start\", \"pause\", or \"stop\") vmid: uint32",
+	 *        .func = cmd_status_get
+	 *},
+	 */
 	/*{*/
 		/*.name = "stdin",*/
 		/*.desc = "Write stdin to vm",*/
@@ -1217,6 +1243,8 @@ Command commands[] = {
 };
 
 static void cmd_callback(char* result, int exit_status) {
+	if(!result)
+		return;
 	cmd_update_var(result, exit_status);
 	//cmd_async = false;
 	printf("%s\n", result);
@@ -1236,9 +1264,7 @@ static int execute_cmd(char* line, bool is_dump) {
 		} else if(exit_status == CMD_STATUS_NOT_FOUND) {
 			printf("wrong name of command\n");
 		} else if(exit_status < 0) {
-#if DEBUG
 			printf("error code : %d\n", exit_status);
-#endif
 		} else {
 			printf("%d'std argument type wrong\n", exit_status); 
 		}

@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <string.h>
 #include "lock.h"
 #include "shared.h"
@@ -21,14 +22,16 @@ static uint8_t sync_lock;
 #define SYNC_LOCK	(uint8_t volatile*)VIRTUAL_TO_PHYSICAL((uint64_t)&sync_lock)
 
 void mp_init() {
-	printf("Core address : %p", shared->mp_cores);
+//	printf("Core address : %p", shared->mp_cores);
 	memcpy(mp_cores, shared->mp_cores, sizeof(mp_cores));
 	
-	printf("MP Cores : ");
-	for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
-		printf("%02x ", mp_cores[i]);
-	}
-	printf("\n");
+	/*
+	 *printf("MP Cores : ");
+	 *for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
+	 *        printf("%02x ", mp_cores[i]);
+	 *}
+	 *printf("\n");
+	 */
 }
 
 uint8_t mp_apic_id() {

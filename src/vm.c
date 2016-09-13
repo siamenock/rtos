@@ -15,6 +15,8 @@
 #include "icc.h"
 #include "gmalloc.h"
 #include "stdio.h"
+#include "shared.h"
+#include "mmap.h"
 
 static uint32_t	last_vmid = 1;
 //static Map*	vms;
@@ -46,10 +48,9 @@ typedef struct {
 
 static Core cores[MP_MAX_CORE_COUNT];
 
-//static VM_STDIO_CALLBACK stdio_callback;
+static VM_STDIO_CALLBACK stdio_callback;
 
 static void icc_started(ICC_Message* msg) {
-	printf("ICC started\n");
 	Core* core = &cores[msg->apic_id];
 	VM* vm = core->vm;
 
@@ -59,9 +60,9 @@ static void icc_started(ICC_Message* msg) {
 		core->stdin_head = msg->data.started.stdin_head;
 		core->stdin_tail = msg->data.started.stdin_tail;
 		core->stdin_size = msg->data.started.stdin_size;
-		core->stdout = msg->data.started.stdout;
-		core->stdout_head = msg->data.started.stdout_head;
-		core->stdout_tail = msg->data.started.stdout_tail;
+		core->stdout = (char*)((uint64_t)msg->data.started.stdout - PHYSICAL_OFFSET);
+		core->stdout_head = (size_t*)((uint64_t)msg->data.started.stdout_head - PHYSICAL_OFFSET);
+		core->stdout_tail = (size_t*)((uint64_t)msg->data.started.stdout_tail - PHYSICAL_OFFSET);
 		core->stdout_size = msg->data.started.stdout_size;
 		core->stderr = msg->data.started.stderr;
 		core->stderr_head = msg->data.started.stderr_head;
@@ -101,7 +102,6 @@ static void icc_started(ICC_Message* msg) {
 	
 	vm->status = error_code == 0 ? VM_STATUS_START : VM_STATUS_STOP;
 	
-	printf("Event trigger fired\n");
 	event_trigger_fire(EVENT_VM_STARTED, vm, NULL, NULL);
 	
 	if(error_code != 0) {
@@ -136,114 +136,111 @@ static void icc_started(ICC_Message* msg) {
 		}
 		printf("]\n");
 	}
-
-	printf("End of ICC started\n");
 }
 
-/*static void icc_paused(ICC_Message* msg) {*/
-	/*VM* vm = cores[msg->apic_id].vm;*/
+static void icc_paused(ICC_Message* msg) {
+	VM* vm = cores[msg->apic_id].vm;
 	
-	/*cores[msg->apic_id].status = VM_STATUS_PAUSE;*/
+	cores[msg->apic_id].status = VM_STATUS_PAUSE;
 	
-	/*printf("Execution paused on core[%d].\n", mp_apic_id_to_core_id(msg->apic_id));*/
+	printf("Execution paused on core[%d].\n", mp_apic_id_to_core_id(msg->apic_id));
 	
-	/*icc_free(msg);*/
-	/*for(int i = 0; i < vm->core_size; i++) {*/
-		/*if(cores[vm->cores[i]].status != VM_STATUS_PAUSE)*/
-			/*return;*/
-	/*}*/
+	icc_free(msg);
+	for(int i = 0; i < vm->core_size; i++) {
+		if(cores[vm->cores[i]].status != VM_STATUS_PAUSE)
+			return;
+	}
 	
-	/*vm->status = VM_STATUS_PAUSE;*/
+	vm->status = VM_STATUS_PAUSE;
 	
-	/*event_trigger_fire(EVENT_VM_PAUSED, vm, NULL, NULL);*/
+	event_trigger_fire(EVENT_VM_PAUSED, vm, NULL, NULL);
 	
-	/*printf("VM paused on cores[");*/
-	/*for(int i = 0; i < vm->core_size; i++) {*/
-		/*printf("%d", mp_apic_id_to_core_id(vm->cores[i]));*/
-		/*if(i + 1 < vm->core_size) {*/
-			/*printf(", ");*/
-		/*}*/
-	/*}*/
-	/*printf("]\n");*/
-/*}*/
+	printf("VM paused on cores[");
+	for(int i = 0; i < vm->core_size; i++) {
+		printf("%d", mp_apic_id_to_core_id(vm->cores[i]));
+		if(i + 1 < vm->core_size) {
+			printf(", ");
+		}
+	}
+	printf("]\n");
+}
 
-/*static void icc_resumed(ICC_Message* msg) {*/
-	/*if(msg->result == -1000) {	// VM is not strated yet*/
-		/*ICC_Message* msg2 = icc_alloc(ICC_TYPE_RESUME);*/
-		/*icc_send(msg2, msg->apic_id);*/
-		/*icc_free(msg);*/
-		/*return;*/
-	/*}*/
+static void icc_resumed(ICC_Message* msg) {
+	if(msg->result == -1000) {	// VM is not strated yet
+		ICC_Message* msg2 = icc_alloc(ICC_TYPE_RESUME);
+		icc_send(msg2, msg->apic_id);
+		icc_free(msg);
+		return;
+	}
 
-	/*VM* vm = cores[msg->apic_id].vm;*/
+	VM* vm = cores[msg->apic_id].vm;
 	
-	/*cores[msg->apic_id].status = VM_STATUS_START;*/
+	cores[msg->apic_id].status = VM_STATUS_START;
 	
-	/*printf("Execution resumed on core[%d].\n", mp_apic_id_to_core_id(msg->apic_id));*/
+	printf("Execution resumed on core[%d].\n", mp_apic_id_to_core_id(msg->apic_id));
 	
-	/*icc_free(msg);*/
+	icc_free(msg);
 	
-	/*for(int i = 0; i < vm->core_size; i++) {*/
-		/*if(cores[vm->cores[i]].status != VM_STATUS_START)*/
-			/*return;*/
-	/*}*/
+	for(int i = 0; i < vm->core_size; i++) {
+		if(cores[vm->cores[i]].status != VM_STATUS_START)
+			return;
+	}
 	
-	/*vm->status = VM_STATUS_START;*/
+	vm->status = VM_STATUS_START;
 	
-	/*event_trigger_fire(EVENT_VM_RESUMED, vm, NULL, NULL);*/
+	event_trigger_fire(EVENT_VM_RESUMED, vm, NULL, NULL);
 	
-	/*printf("VM resumed on cores[");*/
-	/*for(int i = 0; i < vm->core_size; i++) {*/
-		/*printf("%d", mp_apic_id_to_core_id(vm->cores[i]));*/
-		/*if(i + 1 < vm->core_size) {*/
-			/*printf(", ");*/
-		/*}*/
-	/*}*/
-	/*printf("]\n");*/
-/*}*/
+	printf("VM resumed on cores[");
+	for(int i = 0; i < vm->core_size; i++) {
+		printf("%d", mp_apic_id_to_core_id(vm->cores[i]));
+		if(i + 1 < vm->core_size) {
+			printf(", ");
+		}
+	}
+	printf("]\n");
+}
 
-/*static void icc_stopped(ICC_Message* msg) {*/
-	/*if(msg->result == -1000) {	// VM is not strated yet*/
-		/*printf("icc stopped error\n");*/
-		/*ICC_Message* msg2 = icc_alloc(ICC_TYPE_STOP);*/
-		/*icc_send(msg2, msg->apic_id);*/
-		/*icc_free(msg);*/
-		/*// resend stop icc*/
-		/*return;*/
-	/*}*/
+static void icc_stopped(ICC_Message* msg) {
+	if(msg->result == -1000) {	// VM is not strated yet
+		ICC_Message* msg2 = icc_alloc(ICC_TYPE_STOP);
+		icc_send(msg2, msg->apic_id);
+		icc_free(msg);
+		// resend stop icc
+		return;
+	}
 
-	/*VM* vm = cores[msg->apic_id].vm;*/
+	VM* vm = cores[msg->apic_id].vm;
 	
-	/*cores[msg->apic_id].status = VM_STATUS_PAUSE;*/
-	/*cores[msg->apic_id].error_code = msg->result;*/
-	/*cores[msg->apic_id].return_code = msg->data.stopped.return_code;*/
-	/*cores[msg->apic_id].stdin = NULL;*/
-	/*cores[msg->apic_id].stdout = NULL;*/
-	/*cores[msg->apic_id].stderr = NULL;*/
+	cores[msg->apic_id].status = VM_STATUS_PAUSE;
+	cores[msg->apic_id].error_code = msg->result;
+	cores[msg->apic_id].return_code = msg->data.stopped.return_code;
+	cores[msg->apic_id].stdin = NULL;
+	cores[msg->apic_id].stdout = NULL;
+	cores[msg->apic_id].stderr = NULL;
 	
-	/*printf("Execution completed on core[%d].\n", mp_apic_id_to_core_id(msg->apic_id));*/
+	printf("Execution completed on core[%d].\n", mp_apic_id_to_core_id(msg->apic_id));
 	
-	/*icc_free(msg);*/
+	icc_free(msg);
 
-	/*for(int i = 0; i < vm->core_size; i++) {*/
-		/*if(cores[vm->cores[i]].status != VM_STATUS_PAUSE) {*/
-			/*return;*/
-		/*}*/
-	/*}*/
+	for(int i = 0; i < vm->core_size; i++) {
+		if(cores[vm->cores[i]].status != VM_STATUS_PAUSE) {
+			return;
+		}
+	}
 	
-	/*vm->status = VM_STATUS_STOP;*/
+	vm->status = VM_STATUS_STOP;
 	
-	/*event_trigger_fire(EVENT_VM_STOPPED, vm, NULL, NULL);*/
+	event_trigger_fire(EVENT_VM_STOPPED, vm, NULL, NULL);
 	
-	/*printf("VM stopped on cores[");*/
-	/*for(int i = 0; i < vm->core_size; i++) {*/
-		/*printf("%d(%d/%d)", mp_apic_id_to_core_id(vm->cores[i]), cores[vm->cores[i]].error_code, cores[vm->cores[i]].return_code);*/
-		/*if(i + 1 < vm->core_size) {*/
-			/*printf(", ");*/
-		/*}*/
-	/*}*/
-	/*printf("]\n");*/
-/*}*/
+	printf("VM stopped on cores[");
+	for(int i = 0; i < vm->core_size; i++) {
+		printf("%d(%d/%d)", mp_apic_id_to_core_id(vm->cores[i]), cores[vm->cores[i]].error_code, cores[vm->cores[i]].return_code);
+		if(i + 1 < vm->core_size) {
+			printf(", ");
+		}
+	}
+	printf("]\n");
+}
 
 static bool vm_destroy(VM* vm, int core) {
 	bool is_destroy = true;
@@ -320,56 +317,63 @@ static bool vm_loop(void* context) {
 		Core* core = &cores[i];
 		
 		if(core->status != VM_STATUS_PAUSE && core->status != VM_STATUS_START) {
-			//printf("\t Core [%02d] not started...\n", i);
 			continue;
 		}
-		
-	//	printf("\t\t Core [%02d] have been started...\n", i);
 		int thread_id = -1;
+	/*
+	 *
+	 *        if(core->stdout == NULL) {
+	 *                printf("stdout NULL\n");
+	 *                return true;
+	 *        }
+	 *        printf("Core stdout : %p (%p), head : %d (%p) tail : %d (%p) \n",
+	 *                        *core->stdout, core->stdout,
+	 *                        *core->stdout_head, core->stdout_head,
+	 *                        *core->stdout_tail, core->stdout_tail);
+	 */
+		if(core->stdout != NULL && *core->stdout_head != *core->stdout_tail) {
+			//printf("Something printed\n");
+			thread_id = get_thread_id(core->vm, i);
+			
+			stdio_callback(core->vm->id, thread_id, 1, core->stdout, core->stdout_head, core->stdout_tail, core->stdout_size);
+		}
 		
-		/*
-		 *if(core->stdout != NULL && *core->stdout_head != *core->stdout_tail) {
-		 *        thread_id = get_thread_id(core->vm, i);
-		 *        
-		 *        stdio_callback(core->vm->id, thread_id, 1, core->stdout, core->stdout_head, core->stdout_tail, core->stdout_size);
-		 *}
-		 *
-		 *if(core->stderr != NULL && *core->stderr_head != *core->stderr_tail) {
-		 *        if(thread_id == -1)
-		 *                thread_id = get_thread_id(core->vm, i);
-		 *        
-		 *        stdio_callback(core->vm->id, thread_id, 2, core->stderr, core->stderr_head, core->stderr_tail, core->stderr_size);
-		 *}
-		 */
+		if(core->stderr != NULL && *core->stderr_head != *core->stderr_tail) {
+			if(thread_id == -1)
+				thread_id = get_thread_id(core->vm, i);
+			
+			stdio_callback(core->vm->id, thread_id, 2, core->stderr, core->stderr_head, core->stderr_tail, core->stderr_size);
+		}
 	}
 	
-/*
- *        void stdio_dump(int coreno, int fd, char* buffer, volatile size_t* head, volatile size_t* tail, size_t size);
- *        
- *        for(int i = 1; i < MP_MAX_CORE_COUNT; i++) {
- *                if(cores[i].status == VM_STATUS_INVALID)
- *                        continue;
- *        
- *                char* buffer = (char*)MP_CORE(__stdout, i);
- *                volatile size_t* head = (size_t*)MP_CORE(&__stdout_head, i);
- *                volatile size_t* tail = (size_t*)MP_CORE(&__stdout_tail, i);
- *                size_t size = *(size_t*)MP_CORE(&__stdout_size, i);
- *
- *                while(*head != *tail) {
- *                        stdio_dump(mp_apic_id_to_core_id(i), 1, buffer, head, tail, size);
- *                }
- *                
- *                buffer = (char*)MP_CORE(__stderr, i);
- *                head = (size_t*)MP_CORE(&__stderr_head, i);
- *                tail = (size_t*)MP_CORE(&__stderr_tail, i);
- *                size = *(size_t*)MP_CORE(&__stderr_size, i);
- *                
- *                while(*head != *tail) {
- *                        stdio_dump(mp_apic_id_to_core_id(i), 2, buffer, head, tail, size);
- *                }
- *        }
- *        
- */
+	/*void stdio_dump(int coreno, int fd, char* buffer, volatile size_t* head, volatile size_t* tail, size_t size);*/
+	
+	/*for(int i = 1; i < MP_MAX_CORE_COUNT; i++) {*/
+		/*if(cores[i].status == VM_STATUS_INVALID)*/
+			/*continue;*/
+
+
+		/*char* buffer = *(shared->__stdout); //(char*)MP_CORE(__stdout, i);*/
+		/*volatile size_t* head = *(shared->__stdout_head); //(size_t*)MP_CORE(&__stdout_head, i);*/
+		/*volatile size_t* tail = *(shared->__stdout_tail);//(size_t*)MP_CORE(&__stdout_tail, i);*/
+		/*size_t size = *(shared->__stdout_size);// *(size_t*)MP_CORE(&__stdout_size, i);*/
+
+		/*while(*head != *tail) {*/
+			/*stdio_dump(mp_apic_id_to_core_id(i), 1, buffer, head, tail, size);*/
+		/*}*/
+		
+		/*
+		 *buffer = (char*)MP_CORE(__stderr, i);
+		 *head = (size_t*)MP_CORE(&__stderr_head, i);
+		 *tail = (size_t*)MP_CORE(&__stderr_tail, i);
+		 *size = *(size_t*)MP_CORE(&__stderr_size, i);
+		 *
+		 *while(*head != *tail) {
+		 *        stdio_dump(mp_apic_id_to_core_id(i), 2, buffer, head, tail, size);
+		 *}
+		 */
+	/*}*/
+	
 	return true;
 }
 
@@ -377,11 +381,9 @@ void vm_init() {
 	vms = map_create(4, map_uint64_hash, map_uint64_equals, NULL);
 	
 	icc_register(ICC_TYPE_STARTED, icc_started);
-	/*
-	 *icc_register(ICC_TYPE_PAUSED, icc_paused);
-	 *icc_register(ICC_TYPE_RESUMED, icc_resumed);
-	 *icc_register(ICC_TYPE_STOPPED, icc_stopped);
-	 */
+	icc_register(ICC_TYPE_PAUSED, icc_paused);
+	icc_register(ICC_TYPE_RESUMED, icc_resumed);
+	icc_register(ICC_TYPE_STOPPED, icc_stopped);
 	
 	// Core 0 is occupied by RPC manager
 	cores[0].status = VM_STATUS_START;
@@ -393,6 +395,7 @@ void vm_init() {
 	}
 
 	event_idle_add(vm_loop, NULL);
+	//event_timer_add(vm_loop, NULL, 0, 1000000);
 }
 
 uint32_t vm_create(VMSpec* vm_spec) {
@@ -458,6 +461,9 @@ uint32_t vm_create(VMSpec* vm_spec) {
 	memset(vm->storage.blocks, 0x0, vm->storage.count * sizeof(void*));
 	for(uint32_t i = 0; i < vm->storage.count; i++) {
 		vm->storage.blocks[i] = bmalloc();
+		if(i == 0)
+			printf("Storage block : %p\n", vm->storage.blocks[i]);
+
 		if(!vm->storage.blocks[i]) {
 			printf("Manager: Not enough storage to allocate.\n");
 			vm_destroy(vm, -1);
@@ -499,7 +505,7 @@ uint32_t vm_create(VMSpec* vm_spec) {
 		
 		uint64_t attrs[] = {
 			NIC_MAC, mac,
-			NIC_DEV,	(uint64_t)nics[i].dev,
+			NIC_DEV, (uint64_t)nics[i].dev,
 			NIC_INPUT_BUFFER_SIZE, nics[i].input_buffer_size,
 			NIC_OUTPUT_BUFFER_SIZE, nics[i].output_buffer_size,
 			NIC_INPUT_BANDWIDTH, nics[i].input_bandwidth,
@@ -572,52 +578,55 @@ uint32_t vm_create(VMSpec* vm_spec) {
 	return vmid;
 }
 
-/*bool vm_delete(uint32_t vmid) {*/
-	/*VM* vm = map_get(vms, (void*)(uint64_t)vmid);*/
-	/*if(!vm)*/
-		/*return false;*/
+bool vm_delete(uint32_t vmid) {
+	VM* vm = map_get(vms, (void*)(uint64_t)vmid);
+	if(!vm) {
+		printf("No VMID : %d\n", vmid);
+		return false;
+	}
 	
-	/*for(int i = 0; i < vm->core_size; i++) {*/
-		/*if(cores[vm->cores[i]].status == VM_STATUS_START) {*/
-			/*return false;*/
-		/*}*/
-	/*}*/
+	for(int i = 0; i < vm->core_size; i++) {
+		if(cores[vm->cores[i]].status == VM_STATUS_START) {
+			printf("No Core started: %d\n", i);
+			return false;
+		}
+	}
 	
-	/*map_remove(vms, (void*)(uint64_t)vmid);*/
+	map_remove(vms, (void*)(uint64_t)vmid);
 	
-	/*printf("Manager: Delete vm[%d] on cores [", vmid);*/
-	/*for(int i = 0; i < vm->core_size; i++) {*/
-		/*printf("%d", mp_apic_id_to_core_id(vm->cores[i]));*/
-		/*if(i + 1 < vm->core_size)*/
-			/*printf(", ");*/
-	/*}*/
-	/*printf("]\n");*/
+	printf("Manager: Delete vm[%d] on cores [", vmid);
+	for(int i = 0; i < vm->core_size; i++) {
+		printf("%d", mp_apic_id_to_core_id(vm->cores[i]));
+		if(i + 1 < vm->core_size)
+			printf(", ");
+	}
+	printf("]\n");
 	
-	/*vm_destroy(vm, -1);*/
+	vm_destroy(vm, -1);
 	
-	/*return true;*/
-/*}*/
+	return true;
+}
 
-/*bool vm_contains(uint32_t vmid) {*/
-	/*return map_contains(vms, (void*)(uint64_t)vmid);*/
-/*}*/
+bool vm_contains(uint32_t vmid) {
+	return map_contains(vms, (void*)(uint64_t)vmid);
+}
 
-/*int vm_count() {*/
-	/*return map_size(vms);*/
-/*}*/
+int vm_count() {
+	return map_size(vms);
+}
 
-/*int vm_list(uint32_t* vmids, int size) {*/
-	/*int i = 0;*/
+int vm_list(uint32_t* vmids, int size) {
+	int i = 0;
 	
-	/*MapIterator iter;*/
-	/*map_iterator_init(&iter, vms);*/
-	/*while(i < size && map_iterator_has_next(&iter)) {*/
-		/*MapEntry* entry = map_iterator_next(&iter);*/
-		/*vmids[i++] = (uint32_t)(uint64_t)entry->key;*/
-	/*}*/
+	MapIterator iter;
+	map_iterator_init(&iter, vms);
+	while(i < size && map_iterator_has_next(&iter)) {
+		MapEntry* entry = map_iterator_next(&iter);
+		vmids[i++] = (uint32_t)(uint64_t)entry->key;
+	}
 	
-	/*return i;*/
-/*}*/
+	return i;
+}
 
 typedef struct {
 	VM_STATUS_CALLBACK	callback;
@@ -669,7 +678,7 @@ void vm_status_set(uint32_t vmid, int status, VM_STATUS_CALLBACK callback, void*
 	uint64_t event_type = 0;
 	switch(status) {
 		case VM_STATUS_START:
-			printf("VM Status start\n");
+			printf("VM (%p) Status start\n", vm);
 			if(vm->status != VM_STATUS_STOP) {
 				callback(false, context);
 				return;
@@ -694,6 +703,7 @@ void vm_status_set(uint32_t vmid, int status, VM_STATUS_CALLBACK callback, void*
 			icc_type = ICC_TYPE_RESUME;
 			break;
 		case VM_STATUS_STOP:
+			printf("VM (%p) Status stop\n", vm);
 			if(vm->status != VM_STATUS_PAUSE && vm->status != VM_STATUS_START) {
 				callback(false, context);
 				return;
@@ -715,7 +725,6 @@ void vm_status_set(uint32_t vmid, int status, VM_STATUS_CALLBACK callback, void*
 	info->context = context;
 	info->status = status;
 	
-	printf("Event added. Info : %p\n", info);
 	event_trigger_add(event_type, status_changed, info);
 	
 	for(int i = 0; i < vm->core_size; i++) {
@@ -732,13 +741,25 @@ void vm_status_set(uint32_t vmid, int status, VM_STATUS_CALLBACK callback, void*
 			printf("Try to send ICC to %d\n", vm->cores[i]);
 			cores[vm->cores[i]].error_code = 0;
 			ICC_Message* msg = icc_alloc(icc_type);
-			if(status == VM_STATUS_START)
+			if(status == VM_STATUS_START) {
+				/*
+				 *printf("Hello VM : \n");
+				 *printf("ID : %d\n", vm->id);
+				 *printf("Core size : %d\n", vm->core_size);
+				 *printf("Storage : %d\n", vm->storage.count);
+				 *printf("Memory : %d\n", vm->memory.count);
+				 *printf("NIC : %d\n",  vm->nic_count);
+				 *printf("Argc : %d\n",  vm->argc);
+				 *printf("Argv: %p\n",  vm->argv);
+				 *printf("Status : %d\n",  vm->status);
+				 */
+
 				msg->data.start.vm = vm;
+			}
 			icc_send(msg, vm->cores[i]);
 			printf("Sending done\n");
 		}
 	}
-	printf("Entirely done\n");
 }
 
 /*int vm_status_get(uint32_t vmid) {*/
@@ -782,8 +803,10 @@ ssize_t vm_storage_write(uint32_t vmid, void* buf, size_t offset, size_t size) {
 	if(!vm)
 		return -1;
 
-	if(!size)
+	if(!size) {
+		printf("WARN: file size is zero\n");
 		return 0;
+	}
 	
 	if((uint64_t)offset + size > (uint64_t)vm->storage.count * VM_STORAGE_SIZE_ALIGN)
 		return -1;
@@ -843,38 +866,38 @@ ssize_t vm_storage_write(uint32_t vmid, void* buf, size_t offset, size_t size) {
 	/*return true;*/
 /*}*/
 
-/*ssize_t vm_stdio(uint32_t vmid, int thread_id, int fd, const char* str, size_t size) {*/
-	/*VM* vm = map_get(vms, (void*)(uint64_t)vmid);*/
-	/*if(!vm)*/
-		/*return -1;*/
+ssize_t vm_stdio(uint32_t vmid, int thread_id, int fd, const char* str, size_t size) {
+	VM* vm = map_get(vms, (void*)(uint64_t)vmid);
+	if(!vm)
+		return -1;
 	
-	/*if(thread_id < 0 || thread_id >= vm->core_size)*/
-		/*return -1;*/
+	if(thread_id < 0 || thread_id >= vm->core_size)
+		return -1;
 	
-	/*Core* core = &cores[vm->cores[thread_id]];*/
-	/*if(core->status != VM_STATUS_PAUSE && core->status != VM_STATUS_START)*/
-		/*return -1;*/
+	Core* core = &cores[vm->cores[thread_id]];
+	if(core->status != VM_STATUS_PAUSE && core->status != VM_STATUS_START)
+		return -1;
 	
-	/*switch(fd) {*/
-		/*case 0:*/
-			/*if(core->stdin)*/
-				/*return ring_write(core->stdin, *core->stdin_head, core->stdin_tail, core->stdin_size, str, size);*/
-			/*else*/
-				/*return -1;*/
-		/*case 1:*/
-			/*if(core->stdout)*/
-				/*return ring_write(core->stdout, *core->stdout_head, core->stdout_tail, core->stdout_size, str, size);*/
-			/*else*/
-				/*return -1;*/
-		/*case 2:*/
-			/*if(core->stderr)*/
-				/*return ring_write(core->stderr, *core->stderr_head, core->stderr_tail, core->stderr_size, str, size);*/
-			/*return -1;*/
-		/*default:*/
-			/*return -1;*/
-	/*}*/
-/*}*/
+	switch(fd) {
+		case 0:
+			if(core->stdin)
+				return ring_write(core->stdin, *core->stdin_head, core->stdin_tail, core->stdin_size, str, size);
+			else
+				return -1;
+		case 1:
+			if(core->stdout)
+				return ring_write(core->stdout, *core->stdout_head, core->stdout_tail, core->stdout_size, str, size);
+			else
+				return -1;
+		case 2:
+			if(core->stderr)
+				return ring_write(core->stderr, *core->stderr_head, core->stderr_tail, core->stderr_size, str, size);
+			return -1;
+		default:
+			return -1;
+	}
+}
 
-/*void vm_stdio_handler(VM_STDIO_CALLBACK callback) {*/
-	/*stdio_callback = callback;*/
-/*}*/
+void vm_stdio_handler(VM_STDIO_CALLBACK callback) {
+	stdio_callback = callback;
+}

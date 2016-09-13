@@ -5,6 +5,7 @@
 #include <util/event.h>
 #include "apic.h"
 #include "shared.h"
+#include "task.h"
 /*
  *#include <util/event.h>
  *#include <lock.h>
@@ -13,7 +14,6 @@
  *#include "asm.h"
  *#include "mp.h"
  *#include "gmalloc.h"
- *#include "task.h"
  */
 
 #include "icc.h"
@@ -173,7 +173,6 @@ static bool icc_event(void* context) {
 	if(fifo_empty(icc_queue))
 		return true;
 
-	printf("Core %d queue is not empty\n", apic_id);
 	lock_lock(&shared->icc_queues[apic_id].icc_queue_lock);
 	ICC_Message* icc_msg = fifo_pop(icc_queue);
 	lock_unlock(&shared->icc_queues[apic_id].icc_queue_lock);
@@ -226,8 +225,10 @@ static void icc(uint64_t vector, uint64_t err) {
 }
 
 void icc_init() {
-	printf("ICC pool size : %d\n", fifo_size(shared->icc_pool));
-	printf("ICC queue : %p\n", shared->icc_queues);
+	/*
+	 *printf("ICC pool size : %zd\n", fifo_size(shared->icc_pool));
+	 *printf("ICC queue : %p\n", shared->icc_queues);
+	 */
 
 	event_busy_add(icc_event, NULL);
 
@@ -254,7 +255,7 @@ void icc_free(ICC_Message* msg) {
 }
 
 uint32_t icc_send(ICC_Message* msg, uint8_t apic_id) {
-	printf("ICC send\n");
+	printf("ICC send to %d, Type %d\n", apic_id, (msg->type == ICC_TYPE_PAUSE ? 49 : 48));
 	uint32_t _icc_id = msg->id;
 
 	lock_lock(&shared->icc_queues[apic_id].icc_queue_lock);

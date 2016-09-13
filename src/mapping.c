@@ -5,8 +5,6 @@
 #include "mmap.h"
 #include "shared.h"
 
-#define PHYSICAL_OFFSET		0x38000000l	/* 896 MB */
-
 #define MAPPING_AREA		(PHYSICAL_OFFSET + DESC_TABLE_AREA_START)
 // TODO: gmalloc can be expanded til over 2G when bmalloc area added
 #define MAPPING_AREA_SIZE	0x80000000	/* 2 GB */
@@ -41,5 +39,15 @@ int mapping_init() {
 	printf("Memory mapped area : %lx ~ %lx\n", (uint64_t)mapping,
 			(uint64_t)mapping + MAPPING_AREA_SIZE);
 
+	/*
+	 *uint8_t* ptr = (uint8_t*)0x620000;
+	 *for(int i = 0; i < 512; i++) {
+	 *        if((i % 8 == 0) && i != 0)
+	 *                printf("\n");
+	 *        if(i % 8 == 0)
+	 *                printf("%08x : ", 0x620000 + i);
+	 *        printf("%02x ", ptr[i]);
+	 *}
+	 */
 	return 0;
 }

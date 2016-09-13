@@ -7,13 +7,13 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <arpa/inet.h>
+#include <net/udp.h>
 /*
  *#undef IP_TTL
  *#include <net/ip.h>
  *#include <net/arp.h>
  *#include <net/icmp.h>
  *#include <net/checksum.h>
- *#include <net/udp.h>
  *#include <net/tftp.h>
  */
 #include <net/ether.h>
@@ -358,44 +358,53 @@ static err_t manager_accept(void* arg, struct tcp_pcb* pcb, err_t err) {
 	/*return packet;*/
 /*}*/
 
-/*static void stdio_callback(uint32_t vmid, int thread_id, int fd, char* buffer, volatile size_t* head, volatile size_t* tail, size_t size) {*/
-	/*ListIterator iter;*/
-	/*list_iterator_init(&iter, clients);*/
-	/*size_t len0, len1, len2;*/
-	/*bool wrapped;*/
+static void stdio_callback(uint32_t vmid, int thread_id, int fd, char* buffer, volatile size_t* head, volatile size_t* tail, size_t size) {
+	printf("Application > ");
+	fflush(stdout);
+//	ListIterator iter;
+//	list_iterator_init(&iter, clients);
+	size_t len0, len1, len2;
+	bool wrapped;
 
-	/*if(*head <= *tail) {*/
-		/*wrapped = false;*/
+	if(*head <= *tail) {
+		wrapped = false;
 
-		/*len0 = *tail - *head;*/
-	/*} else {*/
-		/*wrapped = true;*/
+		len0 = *tail - *head;
+	} else {
+		wrapped = true;
 
-		/*len1 = size - *head;*/
-		/*len2 = *tail;*/
-	/*}*/
+		len1 = size - *head;
+		len2 = *tail;
+	}
 
-	/*while(list_iterator_has_next(&iter)) {*/
-		/*struct tcp_pcb* pcb = list_iterator_next(&iter);*/
-		/*RPC* rpc = pcb->callback_arg;*/
+	/*
+	 *while(list_iterator_has_next(&iter)) {
+	 *        struct tcp_pcb* pcb = list_iterator_next(&iter);
+	 *        RPC* rpc = pcb->callback_arg;
+	 */
 	
-		/*if(wrapped) {*/
-			/*rpc_stdio(rpc, vmid, thread_id, fd, buffer + *head, len1, NULL, NULL);*/
-			/*rpc_stdio(rpc, vmid, thread_id, fd, buffer, len2, NULL, NULL);*/
+		if(wrapped) {
+			write(STDOUT_FILENO, buffer + *head, len1);
+			write(STDOUT_FILENO, buffer, len2);
+			//rpc_stdio(rpc, vmid, thread_id, fd, buffer + *head, len1, NULL, NULL);
+			//rpc_stdio(rpc, vmid, thread_id, fd, buffer, len2, NULL, NULL);
 
-		/*} else {*/
-			/*rpc_stdio(rpc, vmid, thread_id, fd, buffer + *head, len0, NULL, NULL);*/
-		/*}	*/
-		
-		/*rpc_loop(rpc);*/
-	/*}*/
+		} else {
+			write(STDOUT_FILENO, buffer + *head, len0);
+			//rpc_stdio(rpc, vmid, thread_id, fd, buffer + *head, len0, NULL, NULL);
+		}	
+	/*
+	 *        
+	 *        rpc_loop(rpc);
+	 *}
+	 */
 	
-	/*if(wrapped) {*/
-		/**head = (*head + len1 + len2) % size;*/
-	/*} else {*/
-		/**head += len0;*/
-	/*}*/
-/*}*/
+	if(wrapped) {
+		*head = (*head + len1 + len2) % size;
+	} else {
+		*head += len0;
+	}
+}
 
 struct tcp_pcb* tcp_new() {
 	return malloc(sizeof(struct tcp_pcb));
@@ -572,7 +581,7 @@ void manager_init() {
 	event_idle_add(manager_loop, NULL);
 	//event_timer_add(manager_timer, NULL, 100000, 100000);
 	
-	//vm_stdio_handler(stdio_callback);
+	vm_stdio_handler(stdio_callback);
 }
 
 /*uint32_t manager_get_ip() {*/

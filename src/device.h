@@ -15,7 +15,6 @@ typedef struct device {
 	void*		priv;
 } Device;
 
-void device_init();
 Device* device_register(DeviceType type, void* driver, void* device, void* data);
 bool device_deregister(int id);
 int device_count(DeviceType type);

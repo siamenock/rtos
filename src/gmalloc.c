@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include "tlsf.h"
+#include <tlsf.h>
 #include "mmap.h"
 #include "gmalloc.h"
 #include "shared.h"
@@ -71,18 +71,16 @@ inline void* gmalloc(size_t size) {
 			return ptr;
 
 		// TODO: print to stderr
-		/*
-		 *printf("WARN: Not enough global memory!!!\n");
-		 *
-		 *void* block = bmalloc();
-		 *if(!block) {
-		 *        // TODO: print to stderr
-		 *        printf("ERROR: Not enough block memory!!!\n");
-		 *        return NULL;
-		 *}
-		 *
-		 *add_new_area(block, 0x200000, gmalloc_pool);
-		 */
+		printf("WARN: Not enough global memory!!!\n");
+		
+		void* block = bmalloc();
+		if(!block) {
+			// TODO: print to stderr
+			printf("ERROR: Not enough block memory!!!\n");
+			return NULL;
+		}
+		
+		add_new_area(block, 0x200000, gmalloc_pool);
 	} while(1);
 }
 

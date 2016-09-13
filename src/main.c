@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <util/event.h>
 #include <timer.h>
 #include "apic.h"
@@ -8,13 +9,25 @@
 #include "gmalloc.h"
 #include "vm.h"
 #include "manager.h"
-#include "driver/nic.h"
 #include "shell.h"
+#include "malloc.h"
+#include "vnic.h"
+#include "socket.h"
+#include "driver/nic.h"
 
 static bool idle0_event() {
-//	timer_swait(1);
+	extern Device* nic_current;
+	int poll_count = 0;
+	for(int i = 0; i < MAX_NIC_DEVICE_COUNT; i++) {
+		Device* dev = nic_devices[i];
+		if(dev == NULL)
+			break;
 
-	//printf("Polling .....\n");
+		nic_current = dev;
+		NICDriver* nic = nic_current->driver;
+
+		poll_count += nic->poll(nic_current->id);
+	}
 	return true;
 }
 
@@ -83,14 +96,17 @@ int main() {
 	printf("\nInitializing gmalloc area...\n");
 	gmalloc_init();
 
+	printf("\nInitializing local malloc area...\n");
+	malloc_init();
+
 	printf("\nInitializing events...\n");
 	event_init();
 
 	printf("\nInitializing inter-core communications...\n");
 	icc_init();
 
-	printf("Initializing dummy NIC device...\n");
-	device_init();
+	printf("Initializing linux socket device...\n");
+	socket_init();
 
 	uint16_t nic_count = device_count(DEVICE_TYPE_NIC);
 	printf("Initializing NICs: %d\n", nic_count);
