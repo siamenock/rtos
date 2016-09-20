@@ -17,12 +17,13 @@
 #include <net/ip.h>
 
 #define POOL_SIZE	0x40000
+#define DS_SIZE		8			// Random value
 
 extern int __nic_count;
 extern NIC* __nics[NIC_SIZE];
 
 /**
- * sample_reply_packet
+ * Sample_reply_packet
  * 192.168.10.111 > 192.168.10.101: ICMP echo request, id 31419, seq 14, length 64
  */
 uint8_t icmp_request_packet[] = { 
@@ -42,7 +43,7 @@ uint8_t icmp_request_packet[] = {
 };
 
 /**
- * sample_reply_packet
+ * Sample_reply_packet
  * 192.168.10.101 > 192.168.10.111: ICMP echo reply, id 31419, seq 14, length 64
  */
 uint8_t icmp_reply_packet[] = {
@@ -62,6 +63,7 @@ uint8_t icmp_reply_packet[] = {
 };
 
 static void icmp_process_func(void** state) {
+	// Nic initilization
 	void* malloc_pool = malloc(POOL_SIZE);
 	init_memory_pool(POOL_SIZE, malloc_pool, 0);
 
@@ -70,22 +72,24 @@ static void icmp_process_func(void** state) {
 
 	__nics[0]->pool_size = POOL_SIZE;
 	__nics[0]->pool = malloc_pool;
-	__nics[0]->output_buffer = fifo_create(2, malloc_pool);
-	__nics[0]->config = map_create(8, NULL, NULL, __nics[0]->pool);
+	__nics[0]->output_buffer = fifo_create(DS_SIZE, malloc_pool);
+	__nics[0]->config = map_create(DS_SIZE, NULL, NULL, __nics[0]->pool);
 
-	Packet* packet = nic_alloc(__nics[0], 98);
+	Packet* packet = nic_alloc(__nics[0], sizeof(icmp_request_packet));
 	memcpy(packet->buffer + packet->start, icmp_request_packet, sizeof(icmp_request_packet));
 
-	
 	Ether* ether = (Ether*)(packet->buffer + packet->start);
 	IP* ip = (IP*)ether->payload;
 	uint32_t addr = endian32(ip->destination);
-
 	nic_ip_add(__nics[0], addr);
 
+	// For configuring same value of identification(16bit) and flag(3bit).
+	ip->id = 0xe948;
+	ip->flags_offset = 0;
+
 	assert_true(icmp_process(packet));
-	memcpy(packet->buffer, icmp_reply_packet, sizeof(icmp_reply_packet));
-	assert_memory_equal(fifo_pop(__nics[0]->output_buffer), packet, sizeof(packet));
+	packet = fifo_pop(__nics[0]->output_buffer);
+	assert_memory_equal(packet->buffer + packet->start, icmp_reply_packet, sizeof(icmp_reply_packet));
 
 	destroy_memory_pool(malloc_pool);
 	free(malloc_pool);
