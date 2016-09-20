@@ -101,6 +101,20 @@ void* vector_remove(Vector* vector, size_t index) {
 	}
 }
 
+void* vector_remove_last(Vector* vector) {
+    if (vector->index <= 0)
+        return NULL;
+    else
+        return vector->array[--vector->index];
+}
+
+void* vector_get_last(Vector* vector) {
+    if (vector->index <= 0)
+        return NULL;
+    else
+        return vector->array[vector->index - 1];
+}
+
 size_t vector_size(Vector* vector) {
 	return vector->index;
 }

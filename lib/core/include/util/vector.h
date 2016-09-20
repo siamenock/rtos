@@ -105,6 +105,22 @@ size_t vector_index_of(Vector* vector, void* data, bool(*comp_fn)(void*,void*));
 void* vector_remove(Vector* vector, size_t index);
 
 /**
+ * Get the last element from the Vector.
+ *
+ * @param vector Vector
+ * @return an element or NULL if there is no element
+ */
+void* vector_remove_last(Vector* vector);
+
+/**
+ * Remove the last element from the Vector.
+ *
+ * @param vector Vector;
+ * @return removed element or NULL if the Vector is empty
+ */
+void* vector_get_last(Vector* vector);
+
+/**
  * Get the number of elements of the Vector.
  *
  * @param vector Vector
