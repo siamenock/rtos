@@ -72,9 +72,9 @@ bool vector_add(Vector* vector, void* data);
  * Requests the vector to reduce its capacity to fit its size.
  *
  * @param vector Vector
- * @return true if the vector successfully shrinked
+ * @return true if the vector successfully packed
  */
-bool vector_shrink_to_fit(Vector* vector);
+bool vector_pack(Vector* vector);
 
 /**
  * Get an element from the Vector.
