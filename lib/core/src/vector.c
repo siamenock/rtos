@@ -40,7 +40,7 @@ bool vector_is_empty(Vector* vector) {
 
 bool vector_add(Vector* vector, void* data) {
     if(vector->index >= vector->size) {
-        size_t new_size = vector->size * 1.5;
+        size_t new_size = (vector->size * 1.5) + 1;
         void** array = __realloc(vector->array, sizeof(void*) * new_size, vector->pool);
         if (!array)
             return false;
