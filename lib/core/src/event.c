@@ -36,9 +36,11 @@ static List* triggers;
 static List* idle_events;
 
 void event_init() {
+#ifndef LINUX
 	extern uint64_t __timer_ms;
 	if(!__timer_ms)
 		return;
+#endif
 		
 	busy_events = list_create(NULL);
 	timer_events = list_create(NULL);
