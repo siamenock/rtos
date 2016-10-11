@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <malloc.h>
+#include <fcntl.h>
 #include <sys/time.h>
 #include <util/event.h>
 #include <util/cmd.h>
@@ -30,6 +31,18 @@ static bool shell_process(void* context) {
 	return true;
 }
 
+static bool script_process() {
+	int fd = open("./boot.psh", O_RDONLY);
+	if(fd == -1) {
+		printf("There is no initial script\n");
+		return false;
+	}
+
+	command_process(fd);
+
+	return true;
+}
+
 bool shell_init() {
 	cmd_init();
 
@@ -40,6 +53,9 @@ bool shell_init() {
 	printf("PacketNgin ver 2.0\n");
 	printf("> ");
 	fflush(stdout);
+
+	/* Initcial script processing */
+	script_process();
 
 	/* Commands input processing */
 	event_busy_add(shell_process, &stdin);

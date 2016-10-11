@@ -21,8 +21,6 @@
  *#include "mmap.h"
  */
 
-extern void* gmalloc_pool;
-
 uint32_t bmalloc_count;
 uint64_t* bmalloc_pool;
 

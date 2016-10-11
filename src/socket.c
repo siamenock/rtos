@@ -168,25 +168,27 @@ static void get_info(int id, NICInfo* info) {
 }
 
 static int poll(int id) {
-	int len = socket_read(socket_fd, socket_buffer);
-	if(len <= 0)
-		return 0;
-
-	if(len > 1524)
-		printf("WARN: huge packet taken\n");
-	// RX
-	nic_process_input(0, socket_buffer, len, NULL, 0);
-
-	// TX
-	Packet* packet = nic_process_output(0);
-	if(packet) {
-		printf("Packet out \n");
-		packet_dump(packet);
-
-		int len = packet->end - packet->start;
-		memcpy(socket_buffer, packet->buffer + packet->start, len);
-		socket_write(socket_fd, socket_buffer, len);
-	}
+/*
+ *        int len = socket_read(socket_fd, socket_buffer);
+ *        if(len <= 0)
+ *                return 0;
+ *
+ *        if(len > 1524)
+ *                printf("WARN: huge packet taken\n");
+ *        // RX
+ *        nic_process_input(0, socket_buffer, len, NULL, 0);
+ *
+ *        // TX
+ *        Packet* packet = nic_process_output(0);
+ *        if(packet) {
+ *                printf("Packet out \n");
+ *                packet_dump(packet);
+ *
+ *                int len = packet->end - packet->start;
+ *                memcpy(socket_buffer, packet->buffer + packet->start, len);
+ *                socket_write(socket_fd, socket_buffer, len);
+ *        }
+ */
 /*
  *        uint8_t _packet[] = {
  *                0x7f, 0xff, 0xf3, 0xd5, 0x6f, 0x7d, 0x90, 0x9f,

@@ -43,7 +43,7 @@ static void init_nics(int count) {
 		if(!nic_priv)
 			continue;
 
-		nic_priv->nics = map_create(8, NULL, NULL, NULL);
+		nic_priv->nics = map_create(8, NULL, NULL, gmalloc_pool);
 
 		nic_devices[i]->priv = nic_priv;
 
@@ -58,9 +58,10 @@ static void init_nics(int count) {
 			sprintf(name_buf, "eth%d", index);
 			uint16_t port = j << 12;
 
-			Map* vnics = map_create(16, NULL, NULL, NULL);
+			Map* vnics = map_create(16, NULL, NULL, gmalloc_pool);
 			map_put(nic_priv->nics, (void*)(uint64_t)port, vnics);
-
+			
+			printf("NICs in physical NIC(%s): %p\n", name_buf, nic_priv->nics);
 			printf("\t%s : [%02lx:%02lx:%02lx:%02lx:%02lx:%02lx] [%c]\n", name_buf,
 					(info.mac[j] >> 40) & 0xff,
 					(info.mac[j] >> 32) & 0xff,

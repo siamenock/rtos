@@ -22,7 +22,7 @@ int mapping_init() {
 	printf("Assuming physical mapping area : %lx\n", MAPPING_AREA);
 
 	/* Mapping area : 1 MB */
-	mapping = mmap((void*)DESC_TABLE_AREA_START, MAPPING_AREA_SIZE, PROT_READ|PROT_WRITE,
+	mapping = mmap((void*)DESC_TABLE_AREA_START, MAPPING_AREA_SIZE, PROT_READ|PROT_WRITE|PROT_EXEC,
 			MAP_SHARED, fd, (off_t)MAPPING_AREA);
 
 	if(mapping == MAP_FAILED) {

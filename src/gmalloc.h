@@ -19,4 +19,6 @@ void bfree(void* ptr);
 size_t bmalloc_total();
 size_t bmalloc_used();
 
+extern void* gmalloc_pool;
+
 #endif /* __GMALLOC_H__ */
