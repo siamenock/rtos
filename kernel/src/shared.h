@@ -12,9 +12,15 @@ typedef struct {
 } Icc;
 
 typedef struct {
-    uint8_t             mp_cores[MP_MAX_CORE_COUNT];
-    uint32_t            bmalloc_count;
-    uint64_t*           bmalloc_pool;
+	// Standard I/O
+	char**			__stdout;
+	size_t*			__stdout_head;
+	size_t*			__stdout_tail;
+	size_t*			__stdout_size;
+
+	uint8_t			mp_cores[MP_MAX_CORE_COUNT];
+	uint32_t		bmalloc_count;
+	uint64_t*		bmalloc_pool;
 
 	struct _FIFO*		icc_pool;
 	volatile uint8_t	icc_lock_alloc;

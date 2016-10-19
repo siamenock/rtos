@@ -31,7 +31,7 @@ static int init(void* device, void* data) {
 	port_out8(SERIAL_IO_ADDR + 0x03, reg | 0x80);
 
 	/* Write the divisor. */
-	int speed = 1; // Full speed
+	int speed = 115200; // Full speed
 	uint16_t divisor = 115200 / speed;
 	port_out8(SERIAL_IO_ADDR + 0x00, divisor & 0xFF);
 	port_out8(SERIAL_IO_ADDR + 0x01, divisor >> 8);

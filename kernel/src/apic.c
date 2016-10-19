@@ -6,6 +6,7 @@
 #include "port.h"
 #include "asm.h"
 #include "apic.h"
+#include "mmap.h"
 
 uint64_t _apic_address;
 
@@ -67,7 +68,7 @@ static void dummy_timer_handler(uint64_t vector, uint64_t error_code) {
 }
 
 void apic_init() {
-	apic_register(32, dummy_timer_handler);
+//	apic_register(32, dummy_timer_handler);
 	
 	apic_write32(APIC_REG_SIVR, apic_read32(APIC_REG_SIVR) | 0x100);
 
@@ -113,6 +114,11 @@ void apic_resume() {
 }
 
 APIC_Handler apic_register(uint64_t vector, APIC_Handler handler) {
+	/*
+	 *extern bool stdio_enabled;
+	 *if(stdio_enabled)
+	 *        printf("Vector %d registed\n", vector);
+	 */
 	APIC_Handler old = handlers[vector];
 	handlers[vector] = handler;
 	
@@ -171,22 +177,22 @@ typedef struct {
 } __attribute__ ((packed)) Frame;
 
 uint64_t apic_user_rip() {
-	Frame* frame = (void*)(0xffffffff805b0000 - sizeof(Frame));
+	Frame* frame = (void*)(PHYSICAL_TO_VIRTUAL(KERNEL_INTR_STACK_END) - sizeof(Frame));//(void*)(0xffffffff805b0000 - sizeof(Frame));
 	return frame->rip;
 }
 
 uint64_t apic_user_rsp() {
-	Frame* frame = (void*)(0xffffffff805b0000 - sizeof(Frame));
+	Frame* frame = (void*)(PHYSICAL_TO_VIRTUAL(KERNEL_INTR_STACK_END) - sizeof(Frame));//(void*)(0xffffffff805b0000 - sizeof(Frame))
 	return frame->rsp;
 }
 
 uint64_t apic_user_return_code() {
-	Frame* frame = (void*)(0xffffffff805b0000 - sizeof(Frame));
+	Frame* frame = (void*)(PHYSICAL_TO_VIRTUAL(KERNEL_INTR_STACK_END) - sizeof(Frame));//(void*)(0xffffffff805b0000 - sizeof(Frame))
 	return frame->rbx;
 }
 
 void apic_dump(uint64_t vector, uint64_t error_code) {
-	Frame* frame = (void*)(0xffffffff805b0000 - sizeof(Frame));
+	Frame* frame = (void*)(PHYSICAL_TO_VIRTUAL(KERNEL_INTR_STACK_END) - sizeof(Frame));//(void*)(0xffffffff805b0000 - sizeof(Frame))
 	
 	printf("\n* Exception: ver=%d.%d.%d-%s core=%d, vector=0x%lx, error=0x%lx\n", VERSION_MAJOR, VERSION_MINOR, VERSION_MICRO, VERSION_TAG, mp_core_id(), vector, error_code);
 	printf("AX=%016lx BX=%016lx CX=%016lx DX=%016lx\n", frame->rax, frame->rbx, frame->rcx, frame->rdx);
@@ -296,6 +302,7 @@ void isr_exception_handler(uint64_t vector, uint64_t error_code) {
 }
 
 void isr_interrupt_handler(uint64_t vector) {
+	printf("Interrupt handler\n");
 	if(vector < HANDLER_SIZE && handlers[vector]) {
 		(handlers[vector])(vector, 0);
 	} else {

@@ -98,7 +98,7 @@ exit:
 
 void vfio_poll(VM* _vm) {
 	VM* vm = _vm;
-	VFIO* fio = vm->fio;
+	VFIO* fio;// = vm->fio;
 
 	// Check if user changed the fifo head on purpose	
 	if(fio->input_addr->head != fio->input_buffer->head)

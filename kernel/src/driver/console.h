@@ -7,7 +7,7 @@
 
 /* Console output driver */
 enum {
-    CONSOLE_VGA_DRIVER,
+    //CONSOLE_VGA_DRIVER,
     CONSOLE_SERIAL_OUT_DRIVER,
      
     CONSOLE_OUT_DRIVERS_COUNT

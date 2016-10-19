@@ -89,6 +89,8 @@ static void init_nics(int count) {
 			Map* vnics = map_create(16, NULL, NULL, NULL);
 			map_put(nic_priv->nics, (void*)(uint64_t)port, vnics);
 
+			printf("NICs in private data : %p\n", nic_priv->nics);
+
 			printf("\t%s : [%02x:%02x:%02x:%02x:%02x:%02x] [%c]\n", name_buf,
 				(info.mac[j] >> 40) & 0xff,
 				(info.mac[j] >> 32) & 0xff,
@@ -138,6 +140,7 @@ static bool idle0_event(void* data) {
 		poll_count += nic->poll(nic_current->id);
 	}
 
+#ifdef VFIO_ENABLED
 	// Poll FIO
 #define MAX_VM_COUNT	128
 	uint32_t vmids[MAX_VM_COUNT];
@@ -159,6 +162,7 @@ static bool idle0_event(void* data) {
 		if(fifo_size(fio->input_addr) > 0)
 			vfio_poll(vm);
 	}
+#endif
 
 	// idle
 /*	
@@ -238,13 +242,13 @@ static void context_switch() {
 }
 
 static void icc_start(ICC_Message* msg) {
-	printf("Loading VM... \n");
 	VM* vm = msg->data.start.vm;
+	printf("Loading VM...(%p) \n", vm);
 
 	// TODO: Change blocks[0] to blocks
 	uint32_t id = loader_load(vm);
 
-	printf("Loading done \n");
+	printf("Loading done %d\n", id);
 	if(errno != 0) {
 		ICC_Message* msg2 = icc_alloc(ICC_TYPE_STARTED);
 
@@ -260,6 +264,19 @@ static void icc_start(ICC_Message* msg) {
 	for(int i = 0; i < vm->nic_count; i++) {
 		task_resource(id, RESOURCE_NI, vm->nics[i]);
 		nics[i] = vm->nics[i]->nic;
+
+		/*
+		 *printf("----------------- VNIC %p\n", vm->nics[i]);
+		 *printf("----------------- NICS %p\n", nics[i]);
+		 *uint8_t* ptr = (uint8_t*)nics[i];
+		 *printf("Max buffer size : %d\n", vm->nics[i]->max_buffer_size);
+		 *printf("NIC : %p\n", vm->nics[i]->nic);
+		 *printf("Pool : %p\n", vm->nics[i]->pool);
+		 *for(int j = 0; j < 32; j++) {
+		 *        printf("%02x ", ptr[j]);
+		 *}
+		 *printf("\n");
+		 */
 	}
 		
 	printf("Starting VM...\n");
@@ -269,6 +286,11 @@ static void icc_start(ICC_Message* msg) {
 	msg2->data.started.stdin_head = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)task_addr(id, SYM_STDIN_HEAD));
 	msg2->data.started.stdin_tail = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)task_addr(id, SYM_STDIN_TAIL));
 	msg2->data.started.stdin_size = *(int*)task_addr(id, SYM_STDIN_SIZE);
+	/*
+	 *printf("STDOUT ADDRESS : %p\n", (void*)TRANSLATE_TO_PHYSICAL((uint64_t)*(char**)task_addr(id, SYM_STDOUT)));
+	 *printf("HEAD ADDRESS : %p\n",  (void*)TRANSLATE_TO_PHYSICAL((uint64_t)task_addr(id, SYM_STDOUT_HEAD)));
+	 *printf("TAIL ADDRESS : %p\n",  (void*)TRANSLATE_TO_PHYSICAL((uint64_t)task_addr(id, SYM_STDOUT_TAIL)));
+	 */
 	msg2->data.started.stdout = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)*(char**)task_addr(id, SYM_STDOUT));
 	msg2->data.started.stdout_head = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)task_addr(id, SYM_STDOUT_HEAD));
 	msg2->data.started.stdout_tail = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)task_addr(id, SYM_STDOUT_TAIL));
@@ -281,7 +303,7 @@ static void icc_start(ICC_Message* msg) {
 	icc_send(msg2, msg->apic_id);
 
 	icc_free(msg);
-	
+
 	context_switch();
 }
 
@@ -452,12 +474,18 @@ static void fixup_page_table(uint8_t apic_id, uint64_t offset) {
 		l4u[i].us = 0;
 		l4u[i].rw = 1;
 		l4u[i].ps = 1;
+		// Write through
+		//l4u[i].pwt = 1;
 	}
 
+	// Local APIC address (0xfee00000: 0x7F7(PFN))
+	l4u[0x7f7].base = 0x7f7;
+
 	uint64_t pml4 = PAGE_TABLE_START + apic_id * 0x200000 + offset;
-	asm volatile("movq %0, %%rdi" : : "r"(pml4));
+	asm volatile("movq %0, %%cr3" : : "r"(pml4));
 }
 
+bool stdio_enabled = false;
 void main() {
 	mp_init();
 
@@ -465,15 +493,15 @@ void main() {
 
 	extern uint64_t PHYSICAL_OFFSET;
 	fixup_page_table(apic_id, PHYSICAL_OFFSET);
-
 	console_init();
 
 	uint64_t vga_buffer = PHYSICAL_TO_VIRTUAL(VGA_BUFFER_START);
 	stdio_init(apic_id, (void*)vga_buffer, 64 * 1024);
 	malloc_init(vga_buffer);
 
-	printf("\nHello PacketNgin\n");
-	printf("\nThis MP ID : %d Core ID : %d\n", apic_id, mp_core_id());
+	stdio_enabled = true;
+	printf("\nPacketNgin ver 2.0.\n");
+	extern uint64_t _apic_address;
 	//mp_sync();	// Barrier #1
 	if(apic_id == 0) {
 		// Parse kernel arguments
@@ -529,17 +557,6 @@ void main() {
 		//ioapic_init();
 		apic_enable();
 
-		/*
-		 *apic_write64(APIC_REG_ICR, ((uint64_t)1 << 56) |
-		 *                        //APIC_DSH_NONE | 
-		 *                        APIC_DSH_SELF | 
-		 *                        APIC_TM_EDGE | 
-		 *                        APIC_LV_DEASSERT | 
-		 *                        APIC_DM_PHYSICAL | 
-		 *                        APIC_DMODE_FIXED |
-		 *                        49);
-		 */
-
 		printf("Initializing Multi-tasking...\n");
 		task_init();
 
@@ -548,6 +565,18 @@ void main() {
 
 		printf("Initializing inter-core communications...\n");
 		icc_init();
+
+		/*
+		 *apic_write64(APIC_REG_ICR, ((uint64_t)1 << 56) |
+		 *                        APIC_DSH_NONE | 
+		 *                        APIC_DSH_SELF | 
+		 *                        APIC_TM_EDGE | 
+		 *                        APIC_LV_DEASSERT | 
+		 *                        APIC_DM_PHYSICAL | 
+		 *                        APIC_DMODE_FIXED |
+		 *                        48);
+		 */
+
 /*
  *
  *                printf("Initializing USB controller driver...\n");
@@ -616,8 +645,10 @@ void main() {
 
 		if(cpu_has_feature(CPU_FEATURE_MONITOR_MWAIT) && cpu_has_feature(CPU_FEATURE_MWAIT_INTERRUPT))
 			event_idle_add(idle_monitor_event, NULL);
-		else
+		else {
+			printf("IDLE event add\n");
 			event_idle_add(idle_hlt_event, NULL);
+		}
 
 	} else {
 		mp_sync();	// Barrier #2

@@ -43,8 +43,8 @@ typedef struct {
 } Resource;
 
 char* task_symbols[] = {
-	"__nis_count",
-	"__nis",
+	"__nic_count",
+	"__nics",
 	"__dpis",
 	"__app_status",
 	"__malloc_pool",
@@ -98,7 +98,9 @@ void ts_clear();
 static uint32_t current_task;
 static uint32_t last_fpu_task = (uint32_t)-1;
 
+
 static void device_not_available_handler(uint64_t vector, uint64_t error_code) {
+	//printf("Vector 7 occured\n");
 	ts_clear();
 	
 	if(last_fpu_task != (uint32_t)-1) {
@@ -168,11 +170,13 @@ void* task_addr(uint32_t id, uint32_t symbol) {
 	return (void*)tasks[id].symbols[symbol];
 }
 
+extern uint64_t PHYSICAL_OFFSET;
+
 void task_mmap(uint32_t id, uint64_t vaddr, uint64_t paddr, bool is_user, bool is_writable, bool is_executable, char* desc) {
 	list_add(tasks[id].mmap, (void*)vaddr);
 	
 	uint64_t idx = vaddr >> 21;
-	PAGE_L4U[idx].base = paddr >> 21;
+	PAGE_L4U[idx].base = (paddr >> 21) + (PHYSICAL_OFFSET >> 21);
 	PAGE_L4U[idx].us = !!is_user;
 	PAGE_L4U[idx].rw = !!is_writable;
 	PAGE_L4U[idx].exb = !is_executable;
@@ -200,13 +204,40 @@ void task_resource(uint32_t id, uint8_t type, void* data) {
 			bool is_first = true;
 			VNIC* vnic = (VNIC*)data;
 			
+/*
+ *                                printf("VNIC created %p \n", vnic);
+ *                                
+ *                                printf("%s : %p \n"," nic", vnic->nic);
+ *                                printf("%s : %p \n"," pools", vnic->pools);
+ *                                printf("%s : %p \n"," pool", vnic->pool);
+ *
+ *                                printf("%s : %p \n"," device", vnic->device);
+ *                                printf("%s : %x \n"," port;", vnic->port);
+ *
+ *                                printf("%s : %x \n"," mac", vnic->mac);
+ *                                printf("%s : %x \n"," input_bandwidth", vnic->input_bandwidth);
+ *                                printf("%s : %x \n"," input_wait", vnic->input_wait);
+ *                                printf("%s : %x \n"," input_wait_grace", vnic->input_wait_grace);
+ *                                printf("%s : %x \n"," output_bandwidth", vnic->output_bandwidth);
+ *                                printf("%s : %x \n"," output_wait", vnic->output_wait);
+ *                                printf("%s : %x \n"," output_wait_grace", vnic->output_wait_grace);
+ *                                printf("%s : %x \n"," padding_head", vnic->padding_head);
+ *                                printf("%s : %x \n"," padding_tail", vnic->padding_tail);
+ *                                printf("%s : %x \n"," min_buffer_size", vnic->min_buffer_size);
+ *                                printf("%s : %x \n"," max_buffer_size", vnic->max_buffer_size);
+ *                                printf("%s : %p \n"," input_accept", vnic->input_accept);
+ *                                printf("%s : %p \n"," output_accept", vnic->output_accept);
+ *
+ *                                printf("VNIC Spec end\n");
+ *
+ */
 			ListIterator iter;
 			list_iterator_init(&iter, vnic->pools);
 			while(list_iterator_has_next(&iter)) {
 				uint64_t vaddr = (uint64_t)list_iterator_next(&iter);
 				
 				uint64_t idx = vaddr >> 21;
-				PAGE_L4U[idx].base = idx;
+				PAGE_L4U[idx].base = idx + (PHYSICAL_OFFSET >> 21);
 				PAGE_L4U[idx].us = 1;
 				PAGE_L4U[idx].rw = 1;
 				PAGE_L4U[idx].exb = 1;
@@ -248,7 +279,7 @@ void task_destroy(uint32_t id) {
 		
 		bfree((void*)((uint64_t)PAGE_L4U[idx].base << 21));
 		
-		PAGE_L4U[idx].base = idx;
+		PAGE_L4U[idx].base = idx + (PHYSICAL_OFFSET >> 21);
 		PAGE_L4U[idx].us = 0;
 		PAGE_L4U[idx].rw = 1;
 		PAGE_L4U[idx].exb = 1;
@@ -317,6 +348,16 @@ void task_switch(uint32_t id) {
 	uint32_t old_task = current_task;
 	current_task = id;
 	
+/*
+ *        printf("Task %d to %d\n", old_task, current_task);
+ *        printf("Last FPU %d\n", last_fpu_task);
+ *
+ *        printf("Task Old \n");
+ *        task_dump(old_task);
+ *        printf("Task New \n");
+ *        task_dump(current_task);
+ *
+ */
 	if(current_task == last_fpu_task) {
 		ts_clear();
 	} else {

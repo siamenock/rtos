@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define BSP_APIC_ID_OFFSET          1
+#define BSP_APIC_ID_OFFSET      1
 
 #define MP_MAX_CORE_COUNT	16
 #define MP_CORE_INVALID		255

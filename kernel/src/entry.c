@@ -89,16 +89,17 @@ static __always_inline void init_page_tables(uint8_t apic_id, uint64_t offset) {
 	}
 
 	// Kernel global area(code, rodata, modules, gmalloc)
-	l4k[1].exb = 0;
+	int r_base = 1;
+	l4k[1 + r_base].exb = 0;
 
 	// Kernel local area(malloc, TLB, TS, data, bss, stack)
-	l4k[2 + apic_id] = l4k[2];
+	l4k[2 + apic_id + r_base] = l4k[2 + r_base];
 
-	l4k[2].base = 2 + apic_id + (offset >> 21);	// 2 * (2 + apic_id)MB
-	l4k[2].p = 1;
-	l4k[2].us = 0;
-	l4k[2].rw = 1;
-	l4k[2].ps = 1;
+	l4k[2 + r_base].base = 2 + apic_id + (offset >> 21) + r_base;	// 2 * (2 + apic_id)MB
+	l4k[2 + r_base].p = 1;
+	l4k[2 + r_base].us = 0;
+	l4k[2 + r_base].rw = 1;
+	l4k[2 + r_base].ps = 1;
 }
 
 static __always_inline void activate_pml4(uint8_t apic_id, uint64_t offset) {

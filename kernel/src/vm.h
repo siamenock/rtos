@@ -3,7 +3,7 @@
 
 #include <sys/types.h>
 #include <control/vmspec.h>
-#include "vfio.h"
+//#include "vfio.h"
 #include "mp.h"
 #include "vnic.h"
 
@@ -28,7 +28,7 @@ typedef struct _VM {
 	Block		storage;
 	int		    nic_count;
 	VNIC**		nics;	// gmalloc, ni_create
-	VFIO*		fio;
+	//VFIO*		fio;
 	
 	int		    argc;
 	char**		argv;	// gmalloc

@@ -11,7 +11,6 @@ startup_64:
 	mov	$entry - __START_KERNEL_map, %r14
 	addq	%rbp, %r14
 
-
 	// Boot parameter passed by Linux
 	movq	%rsi, %rsi
 	// Physical offset

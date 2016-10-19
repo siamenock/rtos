@@ -42,7 +42,7 @@ void malloc_init(uint64_t end) {
 	//extern char __bss_end[];
 	uint64_t start = PHYSICAL_TO_VIRTUAL(KERNEL_DATA_END); //(uint64_t)__bss_end;//PHYSICAL_TO_VIRTUAL(0x400000 + (addr1 > addr2 ? addr1 : addr2));
 
-	//printf("End : %p, Start : %p \n", end, start);
+	printf("Malloc End : %p, Start : %p \n", VIRTUAL_TO_PHYSICAL(end), KERNEL_DATA_END);
 
 	__malloc_pool = (void*)start;
 	init_memory_pool((uint32_t)(end - start), __malloc_pool, 0);
