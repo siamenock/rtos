@@ -13,6 +13,7 @@
 #include "malloc.h"
 #include "vnic.h"
 #include "socket.h"
+#include "dispatcher.h"
 #include "driver/nic.h"
 
 static bool idle0_event() {
@@ -62,6 +63,7 @@ static void init_nics(int count) {
 			map_put(nic_priv->nics, (void*)(uint64_t)port, vnics);
 			
 			printf("NICs in physical NIC(%s): %p\n", name_buf, nic_priv->nics);
+			dispatcher_register_nic((void*)nic_priv->nics);
 			printf("\t%s : [%02lx:%02lx:%02lx:%02lx:%02lx:%02lx] [%c]\n", name_buf,
 					(info.mac[j] >> 40) & 0xff,
 					(info.mac[j] >> 32) & 0xff,
@@ -86,6 +88,10 @@ int main() {
 
 	printf("\nInitializing memory mapping...\n");
 	if(mapping_init() < 0)
+		goto error;
+
+	printf("\nInitializing PacketNgin kernel module...\n");
+	if(dispatcher_init() < 0)
 		goto error;
 
 	printf("\nInitializing shared memory area...\n");
@@ -139,6 +145,6 @@ int main() {
 
 	return 0;
 error:
-	printf("Initial memory mapping error occured. Terminated...\n");
+	printf("Manager initialization error occured. Terminated...\n");
 	return -1;
 }

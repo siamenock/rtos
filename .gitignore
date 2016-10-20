@@ -1,0 +1,12 @@
+# Temp
+*.swp
+
+# Build
+build
+
+# Tag 
+tags
+cscope*
+
+# Binary
+manager

@@ -12,6 +12,7 @@
 #include "vm.h"
 #include "vnic.h"
 #include "file.h"
+#include "dispatcher.h"
 
 static void usage(const char* cmd) {
 	printf("\nUsage :\n");
@@ -576,6 +577,7 @@ static int cmd_clear(int argc, char** argv, void(*callback)(char* result, int ex
 
 static int cmd_shutdown(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	printf("Shutting down\n");
+	dispatcher_exit();
 	exit(0);
 //	acpi_shutdown();
 	
