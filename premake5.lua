@@ -32,7 +32,11 @@ workspace "Build"
             "make clean -C tools",
 
             "make clean -f Loader.make",
-            "make clean -f Kernel.make"
+            "make clean -f Kernel.make",
+
+            "rm -f kernel.bin",
+            "rm -f kernel.smap",
+            "rm -f initrd.img"
         }
 
 -- [[ Workspace 2. Loader ]]

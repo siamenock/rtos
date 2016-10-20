@@ -20,7 +20,6 @@ test: Test.make
 	make clean -f Test.make
 	make -f Test.make
 
-
 # Default running option is QEMU
 ifndef option
 option	:= qemu
@@ -126,7 +125,8 @@ sdk: loader/build/loader.bin kernel.bin initrd.img system.img
 	cp lib/libjsmn.a $(SDK)/lib
 	
 	@echo "* Copy utilities"
-	cp -rL bin/* $(SDK)/bin/
+	cp -rL bin/console $(SDK)/bin/
+	cp -rL bin/deploy $(SDK)/bin/
 	
 	@echo "* Archiving to $(SDK).tgz"
 	tar cfz $(SDK).tgz $(SDK)
@@ -144,6 +144,8 @@ dis: kernel/build/kernel.elf
 
 clean: Build.make
 	@${MAKE} --no-print-directory -C . -f Build.make clean
+	rm -rf $(SDK)
+	rm -f $(SDK).tgz
 
 help:
 	@echo "Usage: make [config=name] [target] [option=name]"
