@@ -2,6 +2,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <malloc.h>
+#include <_malloc.h>
 #include <time.h>
 #include <fcntl.h>
 #include <sys/time.h>
@@ -864,6 +865,12 @@ Command commands[] = {
 size_t cmd_count = sizeof(commands) / sizeof(Command);
 
 int main(int _argc, char** _argv) {
+	void* malloc_pool = malloc(4096 * 10);
+	if(!malloc_pool)
+		return -1;
+
+	__malloc_init(malloc_pool, 4096 * 10);
+
 	cmd_init();
 
 	void cmd_callback(char* result, int exit_status) {

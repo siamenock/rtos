@@ -4,6 +4,7 @@
 
 #include <stddef.h>
 
+void __malloc_init(void* start, size_t size);
 void* __malloc(size_t size, void* mem_pool);
 void __free(void *ptr, void* mem_pool);
 void* __realloc(void *ptr, size_t new_size, void* mem_pool);

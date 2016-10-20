@@ -4,6 +4,11 @@
 /* NOTE: __malloc_pool must be initialized before used */
 void* __malloc_pool;
 
+void __malloc_init(void* start, size_t size) {
+	__malloc_pool = start;
+	init_memory_pool(size, start, 0);
+}
+
 void* __malloc(size_t size, void* mem_pool) {
 	if(!mem_pool)
 		return malloc_ex(size, __malloc_pool);
