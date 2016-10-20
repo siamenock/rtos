@@ -180,7 +180,6 @@ static bool icc_event(void* context) {
 	if(icc_msg == NULL)
 		return true;
 
-	printf("ICC Msg popped : %d (TYPE)\n", icc_msg->type);
 	if(icc_msg->type >= ICC_EVENTS_COUNT) {
 		icc_free(icc_msg);
 		return true;
@@ -191,7 +190,6 @@ static bool icc_event(void* context) {
 		return true;
 	}
 
-	printf("ICC event called\n");
 	icc_events[icc_msg->type](icc_msg); //event call
 
 	return true;
@@ -204,7 +202,6 @@ static void icc(uint64_t vector, uint64_t err) {
 
 	apic_eoi();
 
-	printf("ICC occured\n");
 	if(icc_msg == NULL)
 		return;
 
@@ -225,11 +222,6 @@ static void icc(uint64_t vector, uint64_t err) {
 }
 
 void icc_init() {
-	/*
-	 *printf("ICC pool size : %zd\n", fifo_size(shared->icc_pool));
-	 *printf("ICC queue : %p\n", shared->icc_queues);
-	 */
-
 	event_busy_add(icc_event, NULL);
 
 	apic_register(48, icc);
@@ -255,7 +247,6 @@ void icc_free(ICC_Message* msg) {
 }
 
 uint32_t icc_send(ICC_Message* msg, uint8_t apic_id) {
-	printf("ICC send to %d, Type %d\n", apic_id, (msg->type == ICC_TYPE_PAUSE ? 49 : 48));
 	uint32_t _icc_id = msg->id;
 
 	lock_lock(&shared->icc_queues[apic_id].icc_queue_lock);

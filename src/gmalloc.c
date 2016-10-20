@@ -27,12 +27,9 @@ uint64_t* bmalloc_pool;
 void gmalloc_init() {
 	/* Gmalloc pool area : IDT_END_ADDR */
 	gmalloc_pool = (void*)VIRTUAL_TO_PHYSICAL(IDT_END_ADDR);
-	printf("Gmalloc area : %lx \n", (uint64_t)gmalloc_pool);
 
 	bmalloc_pool = (void*)VIRTUAL_TO_PHYSICAL((uint64_t)shared->bmalloc_pool);
 	bmalloc_count = shared->bmalloc_count;
-
-	printf("Bmalloc area : %lx [%d] \n", (uint64_t)bmalloc_pool, bmalloc_count);
 
 	void print_pool(char* message, size_t total) {
 		size_t mb = total / 1024 / 1024;
@@ -44,14 +41,6 @@ void gmalloc_init() {
 	print_pool("global", gmalloc_total());
 	print_pool("block", bmalloc_total());
 	printf("\n");
-/*
- *        uint8_t* ptr = (uint8_t*)0x25000a0;
- *
- *        for(int i = 0; i < 8; i++) {
- *                printf("%02x ", ptr[i]);
- *        }
- *        printf("\n");
- */
 }
 
 inline size_t gmalloc_total() {

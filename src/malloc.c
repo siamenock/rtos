@@ -13,7 +13,6 @@ void malloc_init() {
 		exit(-1);
 	}
 
-	printf("malloc_pool : %p\n", __malloc_pool);
 	init_memory_pool(LOCAL_MALLOC_SIZE, __malloc_pool, 0);
 }
 
