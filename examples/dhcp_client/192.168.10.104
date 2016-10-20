@@ -1,0 +1,108 @@
+#include <stdio.h>
+#include <string.h>
+#include <readline.h>
+#include <thread.h>
+#include <net/nic.h>
+#include <net/dhcp.h>
+#include <net/ip.h>
+#include <net/udp.h>
+#include <net/ether.h>
+
+
+Request callback_request=NULL;
+
+bool myRequest(NIC* ni, uint32_t transactionId, uint32_t offered_ip, uint32_t gateway_ip) {
+	printf("here is my request\n\n\n\n");
+	dhcp_request(ni, transactionId, offered_ip, gateway_ip);
+	return true;
+}
+
+void ginit(int argc, char** argv) {
+	//callback 
+	callback_request = (Request) myRequest;
+}
+
+void init(int argc, char** argv) {
+}
+
+void process(NIC* ni) {
+	Packet* packet = nic_input(ni);
+	if(!packet)
+		return;
+
+	Ether* ether = (Ether*)(packet->buffer + packet->start);
+
+	if(endian16(ether->type) == ETHER_TYPE_IPv4) {
+		IP* ip = (IP*)ether->payload;
+
+		if(ip->protocol == IP_PROTOCOL_UDP) {
+			UDP* udp = (UDP*)ip->body;
+			if(udp->source == endian16(0x0043)) {
+				Dhcp* dhcp = (Dhcp*)udp->body;
+				DhcpOption* dop = (DhcpOption*)dhcp->options;
+			        uint32_t index = 0;	
+				if(read_u8(dop->data, &index) == 0x02) {
+					uint32_t transactionId = endian32(dhcp->transactionId);
+					uint32_t yip = endian32(dhcp->yip);
+					uint32_t gip = endian32(dhcp->gip);
+					if(callback_request) {
+						callback_request(ni, endian32(transactionId), yip, gip);
+					}
+				}
+			}
+		} 
+	}
+}
+
+
+void destroy() {
+}
+
+void gdestroy() {
+}
+
+int main(int argc, char** argv) {
+	printf("Thread %d booting\n", thread_id());
+	if(thread_id() == 0) {
+		ginit(argc, argv);
+	}
+
+	thread_barrior();
+
+	init(argc, argv);
+
+	thread_barrior();
+
+	uint32_t i = 0;
+	while(1) {
+		uint32_t count = nic_count();
+		if(count > 0) {
+			i = (i + 1) % count;
+			NIC* ni = nic_get(i);
+			if(nic_has_input(ni)) {
+				process(ni);
+			}
+
+			char* line = readline();
+			if(line) { 
+				if(!strcmp(line, "discover")) {
+					dhcp_discover(ni);
+				}
+			}
+		}
+
+	}
+
+	thread_barrior();
+
+	destroy();
+
+	thread_barrior();
+
+	if(thread_id() == 0) {
+		gdestroy(argc, argv);
+	}
+
+	return 0;
+}
+
