@@ -59,61 +59,63 @@ static void ap_timer_init() {
 	__timer_ns = *(uint64_t*)VIRTUAL_TO_PHYSICAL((uint64_t)&__timer_ns);
 }
 
-static void init_nics(int count) {
-	int index = 0;
-	extern uint64_t manager_mac;
-	for(int i = 0; i < count; i++) {
-		nic_devices[i] = device_get(DEVICE_TYPE_NIC, i);
-		if(!nic_devices[i])
-			continue;
-
-		NICPriv* nic_priv = gmalloc(sizeof(NICPriv));
-		if(!nic_priv)
-			continue;
-
-		nic_priv->nics = map_create(8, NULL, NULL, NULL);
-
-		nic_devices[i]->priv = nic_priv;
-
-		NICInfo info;
-		((NICDriver*)nic_devices[i]->driver)->get_info(nic_devices[i]->id, &info);
-
-		nic_priv->port_count = info.port_count;
-		for(int j = 0; j < info.port_count; j++) {
-			nic_priv->mac[j] = info.mac[j];
-
-			char name_buf[64];
-			sprintf(name_buf, "eth%d", index);
-			uint16_t port = j << 12;
-
-			Map* vnics = map_create(16, NULL, NULL, NULL);
-			map_put(nic_priv->nics, (void*)(uint64_t)port, vnics);
-
-			printf("NICs in private data : %p\n", nic_priv->nics);
-
-			printf("\t%s : [%02x:%02x:%02x:%02x:%02x:%02x] [%c]\n", name_buf,
-				(info.mac[j] >> 40) & 0xff,
-				(info.mac[j] >> 32) & 0xff,
-				(info.mac[j] >> 24) & 0xff,
-				(info.mac[j] >> 16) & 0xff,
-				(info.mac[j] >> 8) & 0xff,
-				(info.mac[j] >> 0) & 0xff,
-				manager_mac == 0 ? '*' : ' ');
-
-			if(!manager_mac)
-				manager_mac = info.mac[j];
-
-			index++;
-		}
-	}
-}
+/*
+ *static void init_nics(int count) {
+ *        int index = 0;
+ *        extern uint64_t manager_mac;
+ *        for(int i = 0; i < count; i++) {
+ *                nic_devices[i] = device_get(DEVICE_TYPE_NIC, i);
+ *                if(!nic_devices[i])
+ *                        continue;
+ *
+ *                NICPriv* nic_priv = gmalloc(sizeof(NICPriv));
+ *                if(!nic_priv)
+ *                        continue;
+ *
+ *                nic_priv->nics = map_create(8, NULL, NULL, NULL);
+ *
+ *                nic_devices[i]->priv = nic_priv;
+ *
+ *                NICInfo info;
+ *                ((NICDriver*)nic_devices[i]->driver)->get_info(nic_devices[i]->id, &info);
+ *
+ *                nic_priv->port_count = info.port_count;
+ *                for(int j = 0; j < info.port_count; j++) {
+ *                        nic_priv->mac[j] = info.mac[j];
+ *
+ *                        char name_buf[64];
+ *                        sprintf(name_buf, "eth%d", index);
+ *                        uint16_t port = j << 12;
+ *
+ *                        Map* vnics = map_create(16, NULL, NULL, NULL);
+ *                        map_put(nic_priv->nics, (void*)(uint64_t)port, vnics);
+ *
+ *                        printf("NICs in private data : %p\n", nic_priv->nics);
+ *
+ *                        printf("\t%s : [%02x:%02x:%02x:%02x:%02x:%02x] [%c]\n", name_buf,
+ *                                (info.mac[j] >> 40) & 0xff,
+ *                                (info.mac[j] >> 32) & 0xff,
+ *                                (info.mac[j] >> 24) & 0xff,
+ *                                (info.mac[j] >> 16) & 0xff,
+ *                                (info.mac[j] >> 8) & 0xff,
+ *                                (info.mac[j] >> 0) & 0xff,
+ *                                manager_mac == 0 ? '*' : ' ');
+ *
+ *                        if(!manager_mac)
+ *                                manager_mac = info.mac[j];
+ *
+ *                        index++;
+ *                }
+ *        }
+ *}
+ */
 
 #define VGA_BUFFER_PAGES	12
 //static uint64_t idle_time;
 extern Device* nic_devices[];
 
+/*
 static bool idle0_event(void* data) {
-	/*
 	static uint64_t tick;
 	uint64_t time = cpu_tsc();
 	
@@ -124,7 +126,6 @@ static bool idle0_event(void* data) {
 		idle_time = 0;
 		return;
 	}
-	*/
 	
 	// Poll NICs
 	extern Device* nic_current;
@@ -165,14 +166,13 @@ static bool idle0_event(void* data) {
 #endif
 
 	// idle
-/*	
 	for(int i = 0; i < 1000; i++)
 		asm volatile("nop");
-*/	
 	
 	//idle_time += cpu_tsc() - time;
 	return true;
 }
+*/
 
 static bool idle_monitor_event(void* data) {
 	static uint8_t trigger;
@@ -243,12 +243,11 @@ static void context_switch() {
 
 static void icc_start(ICC_Message* msg) {
 	VM* vm = msg->data.start.vm;
-	printf("Loading VM...(%p) \n", vm);
+	printf("Loading VM... \n");
 
 	// TODO: Change blocks[0] to blocks
 	uint32_t id = loader_load(vm);
 
-	printf("Loading done %d\n", id);
 	if(errno != 0) {
 		ICC_Message* msg2 = icc_alloc(ICC_TYPE_STARTED);
 
@@ -264,19 +263,6 @@ static void icc_start(ICC_Message* msg) {
 	for(int i = 0; i < vm->nic_count; i++) {
 		task_resource(id, RESOURCE_NI, vm->nics[i]);
 		nics[i] = vm->nics[i]->nic;
-
-		/*
-		 *printf("----------------- VNIC %p\n", vm->nics[i]);
-		 *printf("----------------- NICS %p\n", nics[i]);
-		 *uint8_t* ptr = (uint8_t*)nics[i];
-		 *printf("Max buffer size : %d\n", vm->nics[i]->max_buffer_size);
-		 *printf("NIC : %p\n", vm->nics[i]->nic);
-		 *printf("Pool : %p\n", vm->nics[i]->pool);
-		 *for(int j = 0; j < 32; j++) {
-		 *        printf("%02x ", ptr[j]);
-		 *}
-		 *printf("\n");
-		 */
 	}
 		
 	printf("Starting VM...\n");
@@ -286,11 +272,7 @@ static void icc_start(ICC_Message* msg) {
 	msg2->data.started.stdin_head = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)task_addr(id, SYM_STDIN_HEAD));
 	msg2->data.started.stdin_tail = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)task_addr(id, SYM_STDIN_TAIL));
 	msg2->data.started.stdin_size = *(int*)task_addr(id, SYM_STDIN_SIZE);
-	/*
-	 *printf("STDOUT ADDRESS : %p\n", (void*)TRANSLATE_TO_PHYSICAL((uint64_t)*(char**)task_addr(id, SYM_STDOUT)));
-	 *printf("HEAD ADDRESS : %p\n",  (void*)TRANSLATE_TO_PHYSICAL((uint64_t)task_addr(id, SYM_STDOUT_HEAD)));
-	 *printf("TAIL ADDRESS : %p\n",  (void*)TRANSLATE_TO_PHYSICAL((uint64_t)task_addr(id, SYM_STDOUT_TAIL)));
-	 */
+
 	msg2->data.started.stdout = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)*(char**)task_addr(id, SYM_STDOUT));
 	msg2->data.started.stdout_head = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)task_addr(id, SYM_STDOUT_HEAD));
 	msg2->data.started.stdout_tail = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)task_addr(id, SYM_STDOUT_TAIL));
@@ -350,116 +332,71 @@ static void icc_stop(ICC_Message* msg) {
 #define EXEC_NOT_ENOUGH_BUFFER	1
 #define EXEC_END		0
 
-static int exec(char* name) {
-	static char line[CMD_SIZE];
-	static size_t head = 0;
-	static size_t eod = 0;
-	static size_t seek = 0;
-	int ret;
-
-	int fd = open(name, "r");
-	if(fd < 0)
-		return EXEC_NOT_FOUND_FILE;
-
-	while((ret = read(fd, &line[eod], CMD_SIZE - eod)) > 0) {
-		eod += ret;
-		for(; seek < eod; seek++) {
-			if(line[seek] == '\n' || line[seek] == '\0') {
-				for(; head < seek; head++) {
-					if(line[head] == ' ')
-						head++;
-					else
-						break;
-				}
-
-				if(line[head] == '#') {
-					head = seek + 1;
-					continue;
-				}
-
-				if(__stdin_tail >= __stdin_head) {
-					if((seek + 1 - head) > (__stdin_size - ( __stdin_tail - __stdin_head))) {
-						printf("Wrong2 %d %d\n", seek - head, __stdin_size - ( __stdin_tail - __stdin_head));
-						return EXEC_NOT_ENOUGH_BUFFER;
-					}
-				} else {
-					if((seek + 1 - head) > (__stdin_head - __stdin_tail)) {
-						printf("Wrong2_2 %d %d\n", seek - head, __stdin_head - __stdin_tail);
-						return EXEC_NOT_ENOUGH_BUFFER;
-					}
-				}
-
-				apic_disable();
-				for(;head <= seek; head++) {
-					stdio_putchar(line[head]);
-				}
-				apic_enable();
-			}
-		}
-
-		if(head == 0 && eod == CMD_SIZE){
-			return EXEC_ERROR;
-		} else {
-			if((eod - head) > 0) {
-				memmove(line, &line[head], eod - head);
-				eod -= head;
-				seek = eod;
-				head = 0;
-			}
-		}
-	}
-
-	close(fd);
-
-	return EXEC_END;
-}
-
 /*
- *  * Volatile isn't enough to prevent the compiler from reordering the
- *   * read/write functions for the control registers and messing everything up.
- *    * A memory clobber would solve the problem, but would prevent reordering of
- *     * all loads stores around it, which can hurt performance. Solution is to
- *      * use a variable and mimic reads and writes to it to enforce serialization
- *       */
-static unsigned long __force_order;
-
-static inline unsigned long native_read_cr3(void)
-{
-	unsigned long val;
-	asm volatile("mov %%cr3,%0\n\t" : "=r" (val), "=m" (__force_order));
-	return val;
-}
-
-static inline void native_write_cr3(unsigned long val)
-{
-	asm volatile("mov %0,%%rdi": : "r" (val), "m" (__force_order));
-}
-
-static inline void __native_flush_tlb_single(unsigned long addr)
-{
-	asm volatile("invlpg (%0)" ::"r" (addr) : "memory");
-}
-
-static inline void clflush(volatile void *__p) {
-	asm volatile("clflush %0" : "+m" (*(volatile char *)__p));
-}
-
-static void clflush_cache_range(void *vaddr, unsigned int size) {
-	void *vend = vaddr + size - 1;
-
-	#define mb()	asm volatile("mfence":::"memory")
-
-	mb();
-
-	for (; vaddr < vend; vaddr += 64)
-		clflush(vaddr);
-	/*
-	 ** Flush any possible final partial cacheline:
-	 **/
-	clflush(vend);
-
-	mb();
-}
+ *static int exec(char* name) {
+ *        static char line[CMD_SIZE];
+ *        static size_t head = 0;
+ *        static size_t eod = 0;
+ *        static size_t seek = 0;
+ *        int ret;
+ *
+ *        int fd = open(name, "r");
+ *        if(fd < 0)
+ *                return EXEC_NOT_FOUND_FILE;
+ *
+ *        while((ret = read(fd, &line[eod], CMD_SIZE - eod)) > 0) {
+ *                eod += ret;
+ *                for(; seek < eod; seek++) {
+ *                        if(line[seek] == '\n' || line[seek] == '\0') {
+ *                                for(; head < seek; head++) {
+ *                                        if(line[head] == ' ')
+ *                                                head++;
+ *                                        else
+ *                                                break;
+ *                                }
+ *
+ *                                if(line[head] == '#') {
+ *                                        head = seek + 1;
+ *                                        continue;
+ *                                }
+ *
+ *                                if(__stdin_tail >= __stdin_head) {
+ *                                        if((seek + 1 - head) > (__stdin_size - ( __stdin_tail - __stdin_head))) {
+ *                                                printf("Wrong2 %d %d\n", seek - head, __stdin_size - ( __stdin_tail - __stdin_head));
+ *                                                return EXEC_NOT_ENOUGH_BUFFER;
+ *                                        }
+ *                                } else {
+ *                                        if((seek + 1 - head) > (__stdin_head - __stdin_tail)) {
+ *                                                printf("Wrong2_2 %d %d\n", seek - head, __stdin_head - __stdin_tail);
+ *                                                return EXEC_NOT_ENOUGH_BUFFER;
+ *                                        }
+ *                                }
+ *
+ *                                apic_disable();
+ *                                for(;head <= seek; head++) {
+ *                                        stdio_putchar(line[head]);
+ *                                }
+ *                                apic_enable();
+ *                        }
+ *                }
+ *
+ *                if(head == 0 && eod == CMD_SIZE){
+ *                        return EXEC_ERROR;
+ *                } else {
+ *                        if((eod - head) > 0) {
+ *                                memmove(line, &line[head], eod - head);
+ *                                eod -= head;
+ *                                seek = eod;
+ *                                head = 0;
+ *                        }
+ *                }
+ *        }
+ *
+ *        close(fd);
+ *
+ *        return EXEC_END;
+ *}
+ */
 
 static void fixup_page_table(uint8_t apic_id, uint64_t offset) {
 	uint64_t base = PAGE_TABLE_START + apic_id * 0x200000 + offset;
@@ -474,8 +411,6 @@ static void fixup_page_table(uint8_t apic_id, uint64_t offset) {
 		l4u[i].us = 0;
 		l4u[i].rw = 1;
 		l4u[i].ps = 1;
-		// Write through
-		//l4u[i].pwt = 1;
 	}
 
 	// Local APIC address (0xfee00000: 0x7F7(PFN))
@@ -485,7 +420,6 @@ static void fixup_page_table(uint8_t apic_id, uint64_t offset) {
 	asm volatile("movq %0, %%cr3" : : "r"(pml4));
 }
 
-bool stdio_enabled = false;
 void main() {
 	mp_init();
 
@@ -499,9 +433,8 @@ void main() {
 	stdio_init(apic_id, (void*)vga_buffer, 64 * 1024);
 	malloc_init(vga_buffer);
 
-	stdio_enabled = true;
 	printf("\nPacketNgin ver 2.0.\n");
-	extern uint64_t _apic_address;
+
 	//mp_sync();	// Barrier #1
 	if(apic_id == 0) {
 		// Parse kernel arguments
@@ -551,8 +484,6 @@ void main() {
 		printf("Initailizing local APIC...\n");
 		apic_init();
 		
-		//apic_register(48, icc_pause);
-
 		printf("Initializing I/O APIC...\n");
 		//ioapic_init();
 		apic_enable();
@@ -566,19 +497,7 @@ void main() {
 		printf("Initializing inter-core communications...\n");
 		icc_init();
 
-		/*
-		 *apic_write64(APIC_REG_ICR, ((uint64_t)1 << 56) |
-		 *                        APIC_DSH_NONE | 
-		 *                        APIC_DSH_SELF | 
-		 *                        APIC_TM_EDGE | 
-		 *                        APIC_LV_DEASSERT | 
-		 *                        APIC_DM_PHYSICAL | 
-		 *                        APIC_DMODE_FIXED |
-		 *                        48);
-		 */
-
 /*
- *
  *                printf("Initializing USB controller driver...\n");
  *                usb_initialize();
  *
@@ -624,9 +543,7 @@ void main() {
  *                uint16_t nic_count = device_count(DEVICE_TYPE_NIC);
  *                printf("Initializing NICs: %d\n", nic_count);
  *                init_nics(nic_count);
- */
-
-/*
+ *
  *                printf("Initializing VM manager...\n");
  *                vm_init();
  *
@@ -635,9 +552,10 @@ void main() {
  *
  *                printf("Initializing shell...\n");
  *                shell_init();
+ *
+ *                event_busy_add(idle0_event, NULL);
  */
 
-//		event_busy_add(idle0_event, NULL);
 		icc_register(ICC_TYPE_START, icc_start);
 		icc_register(ICC_TYPE_RESUME, icc_resume);
 		icc_register(ICC_TYPE_STOP, icc_stop);
@@ -646,7 +564,6 @@ void main() {
 		if(cpu_has_feature(CPU_FEATURE_MONITOR_MWAIT) && cpu_has_feature(CPU_FEATURE_MWAIT_INTERRUPT))
 			event_idle_add(idle_monitor_event, NULL);
 		else {
-			printf("IDLE event add\n");
 			event_idle_add(idle_hlt_event, NULL);
 		}
 

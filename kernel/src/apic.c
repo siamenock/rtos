@@ -62,10 +62,10 @@ void apic_activate() {
 }
 
 // Dummy interrupt handler
-static void dummy_timer_handler(uint64_t vector, uint64_t error_code) {
+//static void dummy_timer_handler(uint64_t vector, uint64_t error_code) {
 	// Do nothing
-	apic_eoi();
-}
+//	apic_eoi();
+//}
 
 void apic_init() {
 //	apic_register(32, dummy_timer_handler);
@@ -114,11 +114,6 @@ void apic_resume() {
 }
 
 APIC_Handler apic_register(uint64_t vector, APIC_Handler handler) {
-	/*
-	 *extern bool stdio_enabled;
-	 *if(stdio_enabled)
-	 *        printf("Vector %d registed\n", vector);
-	 */
 	APIC_Handler old = handlers[vector];
 	handlers[vector] = handler;
 	
@@ -207,12 +202,10 @@ void apic_dump(uint64_t vector, uint64_t error_code) {
 	for(int i = -20; i < 0; i += 4) {
 		printf("%016lx %016lx %016lx %016lx\n", p[i], p[i + 1], p[i + 2], p[i + 3]);
 	}
-	/*
 	printf("----------------------------\n");
 	for(int i = 0; i < 40; i += 4) {
 		printf("%016lx %016lx %016lx %016lx\n", p[i], p[i + 1], p[i + 2], p[i + 3]);
 	}
-	*/
 }
 
 void isr_exception_handler(uint64_t vector, uint64_t error_code) {
@@ -302,7 +295,6 @@ void isr_exception_handler(uint64_t vector, uint64_t error_code) {
 }
 
 void isr_interrupt_handler(uint64_t vector) {
-	printf("Interrupt handler\n");
 	if(vector < HANDLER_SIZE && handlers[vector]) {
 		(handlers[vector])(vector, 0);
 	} else {

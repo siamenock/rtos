@@ -64,9 +64,6 @@ void gmalloc_init(uintptr_t ramdisk_addr, uint32_t ramdisk_size) {
 	uint64_t start = IDT_END_ADDR;
 	uint64_t end = VIRTUAL_TO_PHYSICAL((uint64_t)shared);
 	
-	printf("Gmalloc Address : %p\n", start);
-	printf("Shared Address : %p\n", end);
-
 	init_memory_pool(end - start, (void*)start, 0);
 
 	void print_pool(char* message, size_t total) {
@@ -128,11 +125,6 @@ void gmalloc_init(uintptr_t ramdisk_addr, uint32_t ramdisk_size) {
 	reserved[reserved_count].start = 0x0;
 	reserved[reserved_count].end = PHYSICAL_OFFSET;
 	reserved_count++;
-
-	for(int i = 0; i < reserved_count; i++) {
-		Block* r = &reserved[i];
-	//	printf("Reserved[%02d] : %p ~ %p\n", i, r->start, r->end);
-	}
 
 #endif /* __PENGUIN__ */
 
@@ -217,32 +209,27 @@ void gmalloc_init(uintptr_t ramdisk_addr, uint32_t ramdisk_size) {
 
 		if(start >= end) {
 			add_new_area((void*)b->start, b->end - b->start, gmalloc_pool);
-			//printf("Add %p ~ %p \n", b->start, b->end - b->start);
 
 			b->start = b->end = 0;
 		} else {
 			if(start > b->start) {
 				add_new_area((void*)b->start, start - b->start, gmalloc_pool);
-				//printf("Add %p ~ %p \n", b->start, start - b->start);
 
 				b->start = start;
 			}
 
 			if(end < b->end) {
 				add_new_area((void*)end, b->end - end, gmalloc_pool);
-				//printf("Add %p ~ %p \n", end, b->end - end);
 
 				b->end = end;
 			}
 		}
-
 		if(b->start < b->end) {
 			bmalloc_count += (end - start) / 0x200000;
 		} else {
 			free(b);
 			list_iterator_remove(&iter);
 		}
-		printf("\n");
 	}
 
 	// Extend bmalloc pool

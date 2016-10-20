@@ -44,3 +44,9 @@ cscope.files
 *.make
 build
 
+# Generated
+./kernel/test/*
+loader/src/entry_tmp.asm
+include
+lib/expat-2.1.0/*
+lib/zlib-1.2.8/Makefile

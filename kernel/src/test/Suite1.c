@@ -8,12 +8,12 @@
 
 #ifdef ACEUNIT_SUITES
 
-extern TestSuite_t fileFixture;
 extern TestSuite_t gmallocFixture;
+extern TestSuite_t fileFixture;
 
 const TestSuite_t *suitesOf1[] = {
-    &fileFixture,
     &gmallocFixture,
+    &fileFixture,
     NULL
 };
 
