@@ -23,4 +23,6 @@ struct dispatcher_work {
 int dispatcher_init(struct net_device *dev);
 void dispatcher_exit(void);
 
+extern bool dispatcher_enabled;
+
 #endif /* __DISPATCHER_H__ */

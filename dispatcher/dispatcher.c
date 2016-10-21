@@ -22,6 +22,8 @@ static spinlock_t work_lock;
 static struct list_head work_list;
 static struct net_device *dispatcher_netdev;
 
+bool dispatcher_enabled = false;
+
 /* TODO: Will be removed. Configuration variable. It should be allocated by manager */
 Map* nics;
 void* __malloc_pool;
@@ -175,11 +177,26 @@ static long dispatcher_ioctl(struct file *f, unsigned int ioctl,
 				printk("Failed to start PacketNgin worker\n");
 				break;
 			}
+
+			printk("Set promiscuity of Network Device\n");
+			rtnl_lock();
+			dev_set_promiscuity(dispatcher_netdev, 1);
+			rtnl_unlock();
 			return 0;
 
 		case DISPATCHER_UNSET_MANAGER:
 			printk("Unset manager on disptacher worker\n");
+			dispatcher_enabled = false;
+
+			dispatcher_work_queue_flush();	
+			dispatcher_netdev->netdev_ops->ndo_open(dispatcher_netdev);
+
 			dispatcher_worker_stop();
+
+			printk("Unset promiscuity of Network Device\n");
+			rtnl_lock();
+			dev_set_promiscuity(dispatcher_netdev, -1);
+			rtnl_unlock();
 			return 0;
 
 		case DISPATCHER_REGISTER_NIC:
@@ -197,15 +214,20 @@ static long dispatcher_ioctl(struct file *f, unsigned int ioctl,
 				return -ENOMEM;
 			}
 
+			dispatcher_netdev->netdev_ops->ndo_stop(dispatcher_netdev);
+
 			dispatcher_work_queue(rx_work);
 			dispatcher_work_queue(tx_work);
 
+			dispatcher_enabled = true;
 			return 0;
 
 		case DISPATCHER_UNREGISTER_NIC:
 			printk("Unregister NIC on dispatcher device\n");
-			dispatcher_work_queue_flush();	
+			dispatcher_enabled = false;
 
+			dispatcher_work_queue_flush();	
+			dispatcher_netdev->netdev_ops->ndo_open(dispatcher_netdev);
 			return 0;
 		default:
 			printk("IOCTL %d does not supported\n", ioctl);

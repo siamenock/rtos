@@ -110,10 +110,15 @@ static inline struct skb_vnet_hdr *skb_vnet_hdr(struct sk_buff *skb)
 }
 
 /* PacketNgin modification */
-static bool virtnet_rx(struct sk_buff *skb)
+static inline bool virtnet_rx(struct sk_buff *skb)
 {
-	uint8_t* buf = skb_mac_header(skb);
-	if (!buf)
+	uint8_t* buf;
+
+	// PacketNgin Fast path is not enabled now
+	if (!dispatcher_enabled)
+		return false;
+
+	if (!(buf = skb_mac_header(skb)))
 		return false;
 
 	return nic_process_input(0, buf, ETH_HLEN + skb->len, 0, 0);
@@ -361,7 +366,7 @@ static void receive_buf(struct net_device *dev, void *buf, unsigned int len)
 	}
 
 	/* PacketNgin modification */
-	if(virtnet_rx(skb)) {
+	if (virtnet_rx(skb)) {
 		dev_kfree_skb(skb);
 	} else {
 		//dev_kfree_skb(skb);
@@ -741,9 +746,8 @@ static void virtnet_netpoll(struct net_device *dev)
 
 static int virtnet_open(struct net_device *dev)
 {
-	//struct virtnet_info *vi = netdev_priv(dev);
-
-	//virtnet_napi_enable(vi);
+	struct virtnet_info *vi = netdev_priv(dev);
+	virtnet_napi_enable(vi);
 	return 0;
 }
 
@@ -794,9 +798,8 @@ static bool virtnet_send_command(struct virtnet_info *vi, u8 class, u8 cmd,
 
 static int virtnet_close(struct net_device *dev)
 {
-	//struct virtnet_info *vi = netdev_priv(dev);
-
-	//napi_disable(&vi->napi);
+	struct virtnet_info *vi = netdev_priv(dev);
+	napi_disable(&vi->napi);
 
 	return 0;
 }
