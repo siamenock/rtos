@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include "mp.h"
 
+#define SHARED_MAGIC		0x481230420134f090
+
 struct _FIFO;
 
 typedef struct {
@@ -12,12 +14,8 @@ typedef struct {
 } Icc;
 
 typedef struct {
-	// Standard I/O
-	char**			__stdout;
-	size_t*			__stdout_head;
-	size_t*			__stdout_tail;
-	size_t*			__stdout_size;
-
+	uint64_t		magic;
+		
 	uint8_t			mp_cores[MP_MAX_CORE_COUNT];
 	uint32_t		bmalloc_count;
 	uint64_t*		bmalloc_pool;
