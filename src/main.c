@@ -90,12 +90,13 @@ int main() {
 	if(mapping_init() < 0)
 		goto error;
 
+	printf("\nInitializing shared memory area...\n");
+	if(shared_init() < 0)
+		goto error;
+
 	printf("\nInitializing PacketNgin kernel module...\n");
 	if(dispatcher_init() < 0)
 		goto error;
-
-	printf("\nInitializing shared memory area...\n");
-	shared_init();
 
 	printf("\nInitializing mulitiprocessor core data...\n");
 	mp_init();

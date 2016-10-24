@@ -635,15 +635,11 @@ typedef struct {
 } CallbackInfo;
 
 static bool status_changed(uint64_t event_type, void* event, void* context) {
-	printf("Status changed function fired\n");
 	VM* vm = event;
 	CallbackInfo* info = context;
-	printf("Callback info : %p\n", info);
 	
 	bool result = vm->status == info->status || (vm->status == VM_STATUS_START && info->status == VM_STATUS_RESUME);
-	printf("Command callback\n");
 	info->callback(result, info->context);
-	printf("Command callback\n");
 	
 	char* op = "";
 	switch(info->status) {
@@ -661,7 +657,6 @@ static bool status_changed(uint64_t event_type, void* event, void* context) {
 	}
 	printf("]\n");
 	
-	printf("Info free\n");
 	free(info);
 	
 	return false;
@@ -729,7 +724,6 @@ void vm_status_set(uint32_t vmid, int status, VM_STATUS_CALLBACK callback, void*
 	
 	for(int i = 0; i < vm->core_size; i++) {
 		if(status == VM_STATUS_PAUSE) {
-			printf("Try to pause VM\n");
 			apic_write64(APIC_REG_ICR, ((uint64_t)vm->cores[i] << 56) |
 						APIC_DSH_NONE |
 						APIC_TM_EDGE |
@@ -738,7 +732,6 @@ void vm_status_set(uint32_t vmid, int status, VM_STATUS_CALLBACK callback, void*
 						APIC_DMODE_FIXED |
 						49);
 		} else {
-			printf("Try to send ICC to %d\n", vm->cores[i]);
 			cores[vm->cores[i]].error_code = 0;
 			ICC_Message* msg = icc_alloc(icc_type);
 			if(status == VM_STATUS_START) {
@@ -852,19 +845,19 @@ ssize_t vm_storage_write(uint32_t vmid, void* buf, size_t offset, size_t size) {
 	/*return size;*/
 /*}*/
 
-/*bool vm_storage_md5(uint32_t vmid, uint32_t size, uint32_t digest[4]) {*/
-	/*VM* vm = map_get(vms, (void*)(uint64_t)vmid);*/
-	/*if(!vm)*/
-		/*return false;*/
+bool vm_storage_md5(uint32_t vmid, uint32_t size, uint32_t digest[4]) {
+	VM* vm = map_get(vms, (void*)(uint64_t)vmid);
+	if(!vm)
+		return false;
 	
-	/*uint32_t block_count = size / VM_MEMORY_SIZE_ALIGN;*/
-	/*if(vm->storage.count < block_count)*/
-		/*return false;*/
+	uint32_t block_count = size / VM_MEMORY_SIZE_ALIGN;
+	if(vm->storage.count < block_count)
+		return false;
 
-	/*md5_blocks(vm->storage.blocks, vm->storage.count, VM_STORAGE_SIZE_ALIGN, size, digest);*/
+	md5_blocks(vm->storage.blocks, vm->storage.count, VM_STORAGE_SIZE_ALIGN, size, digest);
 	
-	/*return true;*/
-/*}*/
+	return true;
+}
 
 ssize_t vm_stdio(uint32_t vmid, int thread_id, int fd, const char* str, size_t size) {
 	VM* vm = map_get(vms, (void*)(uint64_t)vmid);

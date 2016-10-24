@@ -23,3 +23,9 @@ workspace "Penguin"
         libdirs { "." }
         links { "umpn", "rt" }
 
+        -- Make version header 
+        prebuildcommands {
+            '../mkver.sh > ../src/version.h'
+        }
+                    
+

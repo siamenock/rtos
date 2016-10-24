@@ -584,54 +584,60 @@ void manager_init() {
 	vm_stdio_handler(stdio_callback);
 }
 
-/*uint32_t manager_get_ip() {*/
-	/*return manager_ip;*/
-/*}*/
+/*
+ *uint32_t manager_get_ip() {
+ *        return manager_ip;
+ *}
+ */
 
-/*void manager_set_ip(uint32_t ip) {*/
-	/*if(manager_nic == NULL)*/
-		/*return;*/
-
-	/*IPv4Interface* interface = nic_ip_get(manager_nic->nic, manager_ip);*/
-	/*if(!interface)*/
-		/*return;*/
-
-	/*if(!nic_ip_add(manager_nic->nic, ip))*/
-		/*return;*/
-
-	/*IPv4Interface* _interface = nic_ip_get(manager_nic->nic, ip);*/
-	/*_interface->gateway = interface->gateway;*/
-	/*_interface->netmask = interface->netmask;*/
-	/*_interface->_default = interface->_default;*/
-
-	/*nic_ip_remove(manager_nic->nic, manager_ip);*/
-	/*manager_ip = ip;*/
-
-	/*struct ip_addr ip2;*/
-	/*IP4_ADDR(&ip2, (ip >> 24) & 0xff, (ip >> 16) & 0xff, (ip >> 8) & 0xff, (ip >> 0) & 0xff);*/
-	/*netif_set_ipaddr(manager_netif, &ip2);*/
-
-	/*manager_server_close();*/
-	/*manager_server_open();*/
-/*}*/
-
-/*uint16_t manager_get_port() {*/
-	/*return manager_port;*/
-/*}*/
-
-/*void manager_set_port(uint16_t port) {*/
-	/*if(manager_nic == NULL)*/
-		/*return;*/
-
-	/*if(!udp_port_alloc0(manager_nic->nic, manager_ip, port))*/
-		/*return;*/
-
-	/*udp_port_free(manager_nic->nic, manager_ip, manager_port);*/
-	/*manager_port = port;*/
-
-	/*manager_server_close();*/
-	/*manager_server_open();*/
-/*}*/
+/*
+ *void manager_set_ip(uint32_t ip) {
+ *        if(manager_nic == NULL)
+ *                return;
+ *
+ *        IPv4Interface* interface = nic_ip_get(manager_nic->nic, manager_ip);
+ *        if(!interface)
+ *                return;
+ *
+ *        if(!nic_ip_add(manager_nic->nic, ip))
+ *                return;
+ *
+ *        IPv4Interface* _interface = nic_ip_get(manager_nic->nic, ip);
+ *        _interface->gateway = interface->gateway;
+ *        _interface->netmask = interface->netmask;
+ *        _interface->_default = interface->_default;
+ *
+ *        nic_ip_remove(manager_nic->nic, manager_ip);
+ *        manager_ip = ip;
+ *
+ *        struct ip_addr ip2;
+ *        IP4_ADDR(&ip2, (ip >> 24) & 0xff, (ip >> 16) & 0xff, (ip >> 8) & 0xff, (ip >> 0) & 0xff);
+ *        netif_set_ipaddr(manager_netif, &ip2);
+ *
+ *        manager_server_close();
+ *        manager_server_open();
+ *}
+ *
+ */
+/*
+ *uint16_t manager_get_port() {
+ *        return manager_port;
+ *}
+ *
+ *void manager_set_port(uint16_t port) {
+ *        if(manager_nic == NULL)
+ *                return;
+ *
+ *        if(!udp_port_alloc0(manager_nic->nic, manager_ip, port))
+ *                return;
+ *
+ *        udp_port_free(manager_nic->nic, manager_ip, manager_port);
+ *        manager_port = port;
+ *
+ *        manager_server_close();
+ *        manager_server_open();
+ *}
+ */
 
 /*uint32_t manager_get_gateway() {*/
 	/*if(manager_nic == NULL)*/

@@ -13,6 +13,9 @@
 #include "vnic.h"
 #include "file.h"
 #include "dispatcher.h"
+#include "version.h"
+#include "manager.h"
+#include "driver/nic.h"
 
 static void usage(const char* cmd) {
 	printf("\nUsage :\n");
@@ -24,33 +27,33 @@ static void usage(const char* cmd) {
 }
 
 static int cmd_clear(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
-	printf("\f");
+	printf(">");
 
 	return 0;
 }
 
-/*static int cmd_echo(int argc, char** argv, void(*callback)(char* result, int exit_status)) {*/
-	/*int pos = 0;*/
-	/*for(int i = 1; i < argc; i++) {*/
-		/*pos += sprintf(cmd_result + pos, "%s", argv[i]) - 1;*/
-		/*if(i + 1 < argc) {*/
-			/*cmd_result[pos++] = ' ';*/
-		/*}*/
-	/*}*/
-	/*callback(cmd_result, 0);*/
+static int cmd_echo(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	int pos = 0;
+	for(int i = 1; i < argc; i++) {
+		pos += sprintf(cmd_result + pos, "%s", argv[i]) - 1;
+		if(i + 1 < argc) {
+			cmd_result[pos++] = ' ';
+		}
+	}
+	callback(cmd_result, 0);
 
-	/*return 0;*/
-/*}*/
+	return 0;
+}
 
-/*static int cmd_sleep(int argc, char** argv, void(*callback)(char* result, int exit_status)) {*/
-	/*uint32_t time = 1;*/
-	/*if(argc >= 2 && is_uint32(argv[1])) {*/
-		/*time = parse_uint32(argv[1]);*/
-	/*}*/
-	/*timer_mwait(time);*/
+static int cmd_sleep(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	uint32_t time = 1;
+	if(argc >= 2 && is_uint32(argv[1])) {
+		time = parse_uint32(argv[1]);
+	}
+	sleep(time);
 	
-	/*return 0;*/
-/*}*/
+	return 0;
+}
 
 /*static char* months[] = {*/
 	/*"???",*/
@@ -83,196 +86,200 @@ static int cmd_clear(int argc, char** argv, void(*callback)(char* result, int ex
 	/*uint32_t date = rtc_date();*/
 	/*uint32_t time = rtc_time();*/
 	
-	/*printf("%s %s %d %02d:%02d:%02d UTC %d\n", weeks[RTC_WEEK(date)], months[RTC_MONTH(date)], RTC_DATE(date), */
+	/*printf("%s %s %d %02d:%02d:%02d UTC %d\n", weeks[RTC_WEEK(date)], months[RTC_MONTH(date)], RTC_DATE(date),*/
 		/*RTC_HOUR(time), RTC_MINUTE(time), RTC_SECOND(time), 2000 + RTC_YEAR(date));*/
 	
 	/*return 0;*/
 /*}*/
 
-/*static bool parse_addr(char* argv, uint32_t* address) {*/
-	/*char* next = NULL;*/
-	/*uint32_t temp;*/
-	/*temp = strtol(argv, &next, 0);*/
-	/*if(temp > 0xff)*/
-		/*return false;*/
+/*
+ *static bool parse_addr(char* argv, uint32_t* address) {
+ *        char* next = NULL;
+ *        uint32_t temp;
+ *        temp = strtol(argv, &next, 0);
+ *        if(temp > 0xff)
+ *                return false;
+ *
+ *        *address = (temp & 0xff) << 24;
+ *        if(next == argv)
+ *                return false;
+ *        argv = next;
+ *
+ *        if(*argv != '.')
+ *                return false;
+ *        argv++;
+ *        temp = strtol(argv, &next, 0);
+ *        if(temp > 0xff)
+ *                return false;
+ *
+ *        *address |= (temp & 0xff) << 16;
+ *        if(next == argv)
+ *                return false;
+ *        argv = next;
+ *
+ *        if(*argv != '.')
+ *                return false;
+ *        argv++;
+ *        temp = strtol(argv, &next, 0);
+ *        if(temp > 0xff)
+ *                return false;
+ *        *address |= (temp & 0xff) << 8;
+ *        if(next == argv)
+ *                return false;
+ *        argv = next;
+ *
+ *        if(*argv != '.')
+ *                return false;
+ *        argv++;
+ *        temp = strtol(argv, &next, 0);
+ *        if(temp > 0xff)
+ *                return false;
+ *        *address |= temp & 0xff;
+ *        if(next == argv)
+ *                return false;
+ *        argv = next;
+ *
+ *        if(*argv != '\0')
+ *                return false;
+ *
+ *        return true;
+ *}
+ */
 
-	/**address = (temp & 0xff) << 24;*/
-	/*if(next == argv)*/
-		/*return false;*/
-	/*argv = next;*/
-
-	/*if(*argv != '.')*/
-		/*return false;*/
-	/*argv++;*/
-	/*temp = strtol(argv, &next, 0);*/
-	/*if(temp > 0xff)*/
-		/*return false;*/
-
-	/**address |= (temp & 0xff) << 16;*/
-	/*if(next == argv)*/
-		/*return false;*/
-	/*argv = next;*/
-
-	/*if(*argv != '.')*/
-		/*return false;*/
-	/*argv++;*/
-	/*temp = strtol(argv, &next, 0);*/
-	/*if(temp > 0xff)*/
-		/*return false;*/
-	/**address |= (temp & 0xff) << 8;*/
-	/*if(next == argv)*/
-		/*return false;*/
-	/*argv = next;*/
-
-	/*if(*argv != '.')*/
-		/*return false;*/
-	/*argv++;*/
-	/*temp = strtol(argv, &next, 0);*/
-	/*if(temp > 0xff)*/
-		/*return false;*/
-	/**address |= temp & 0xff;*/
-	/*if(next == argv)*/
-		/*return false;*/
-	/*argv = next;*/
-
-	/*if(*argv != '\0')*/
-		/*return false;*/
-
-	/*return true;*/
-/*}*/
-
-/*static int cmd_manager(int argc, char** argv, void(*callback)(char* result, int exit_status)) {*/
-	/*if(manager_nic == NULL) {*/
-		/*printf("Can'nt found manager\n");*/
-		/*return -1;*/
-	/*}*/
-
-	/*if(argc == 1) {*/
-		/*printf("HWaddr %02x:%02x:%02x:%02x:%02x:%02x\n",*/
-			/*(manager_nic->mac >> 40) & 0xff,*/
-			/*(manager_nic->mac >> 32) & 0xff,*/
-			/*(manager_nic->mac >> 24) & 0xff,*/
-			/*(manager_nic->mac >> 16) & 0xff,*/
-			/*(manager_nic->mac >> 8) & 0xff,*/
-			/*(manager_nic->mac >> 0) & 0xff);*/
-		/*uint32_t ip = manager_get_ip();*/
-		/*printf("%10sinet addr:%d.%d.%d.%d  ", "", (ip >> 24) & 0xff, (ip >> 16) & 0xff, (ip >> 8) & 0xff, (ip >> 0) & 0xff);*/
-		/*uint16_t port = manager_get_port();*/
-		/*printf("port:%d\n", port);*/
-		/*uint32_t mask = manager_get_netmask();*/
-		/*printf("%10sMask:%d.%d.%d.%d\n", "", (mask >> 24) & 0xff, (mask >> 16) & 0xff, (mask >> 8) & 0xff, (mask >> 0) & 0xff);*/
-		/*uint32_t gw = manager_get_gateway();*/
-		/*printf("%10sGateway:%d.%d.%d.%d\n", "", (gw >> 24) & 0xff, (gw >> 16) & 0xff, (gw >> 8) & 0xff, (gw >> 0) & 0xff);*/
-
-		/*return 0;*/
-	/*}*/
-
-	/*if(!manager_nic) {*/
-		/*printf("Can'nt found manager\n");*/
-		/*return -1;*/
-	/*}*/
-
-	/*if(!strcmp("ip", argv[1])) {*/
-		/*uint32_t old = manager_get_ip();*/
-		/*if(argc == 2) {*/
-			/*printf("%d.%d.%d.%d\n", (old >> 24) & 0xff, (old >> 16) & 0xff, (old >> 8) & 0xff, (old >> 0) & 0xff);*/
-			/*return 0;*/
-		/*}*/
-
-		/*uint32_t address;*/
-		/*if(!parse_addr(argv[2], &address)) {*/
-			/*printf("address wrong\n");*/
-			/*return 0;*/
-		/*}*/
-
-		/*manager_set_ip(address);*/
-	/*} else if(!strcmp("port", argv[1])) {*/
-		/*uint16_t old = manager_get_port();*/
-		/*if(argc == 2) {*/
-			/*printf("%d\n", old);*/
-			/*return 0;*/
-		/*}*/
-
-		/*if(!is_uint16(argv[2])) {*/
-			/*printf("port number wrong\n");*/
-			/*return -1;*/
-		/*}*/
-
-		/*uint16_t port = parse_uint16(argv[2]);*/
-
-		/*manager_set_port(port);*/
-	/*} else if(!strcmp("netmask", argv[1])) {*/
-		/*uint32_t old = manager_get_netmask();*/
-		/*if(argc == 2) {*/
-			/*printf("%d.%d.%d.%d\n", (old >> 24) & 0xff, (old >> 16) & 0xff, (old >> 8) & 0xff, (old >> 0) & 0xff);*/
-			/*return 0;*/
-		/*}*/
-
-		/*uint32_t address;*/
-		/*if(!parse_addr(argv[2], &address)) {*/
-			/*printf("address wrong\n");*/
-			/*return 0;*/
-		/*}*/
-
-		/*manager_set_netmask(address);*/
-
-		/*printf("Manager's Gateway changed from %d.%d.%d.%d to %d.%d.%d.%d\n",*/
-			/*(old >> 24) & 0xff, (old >> 16) & 0xff, (old >> 8) & 0xff, (old >> 0) & 0xff,*/
-			/*(address >> 24) & 0xff, (address >> 16) & 0xff, (address >> 8) & 0xff, (address >> 0) & 0xff);*/
-
-	/*} else if(!strcmp("gateway", argv[1])) {*/
-		/*uint32_t old = manager_get_gateway();*/
-		/*if(argc == 2) {*/
-			/*printf("%d.%d.%d.%d\n", (old >> 24) & 0xff, (old >> 16) & 0xff, (old >> 8) & 0xff, (old >> 0) & 0xff);*/
-			/*return 0;*/
-		/*}*/
-
-		/*uint32_t address;*/
-		/*if(!parse_addr(argv[2], &address)) {*/
-			/*printf("address wrong\n");*/
-			/*return 0;*/
-		/*}*/
-
-		/*manager_set_gateway(address);*/
-
-		/*printf("Manager's Gateway changed from %d.%d.%d.%d to %d.%d.%d.%d\n",*/
-			/*(old >> 24) & 0xff, (old >> 16) & 0xff, (old >> 8) & 0xff, (old >> 0) & 0xff,*/
-			/*(address >> 24) & 0xff, (address >> 16) & 0xff, (address >> 8) & 0xff, (address >> 0) & 0xff);*/
-	/*} else if(!strcmp("nic", argv[1])) {*/
-		/*if(argc == 2) {*/
-			/*printf("Network Interface name required\n");*/
-			/*return false;*/
-		/*}*/
-
-		/*if(argc != 3) {*/
-			/*printf("Wrong Parameter\n");*/
-			/*return false;*/
-		/*}*/
-
-		/*uint16_t port = 0;*/
-		/*Device* dev = nic_parse_index(argv[2], &port);*/
-		/*if(!dev)*/
-			/*return -2;*/
-
-		/*uint64_t attrs[] = {*/
-			/*NIC_MAC, ((NICPriv*)dev->priv)->mac[port >> 12],*/
-			/*NIC_DEV, (uint64_t)argv[2],*/
-			/*NIC_NONE*/
-		/*};*/
-
-		/*if(vnic_update(manager_nic, attrs)) {*/
-			/*printf("Can'nt found device\n");*/
-			/*return -3;*/
-		/*}*/
-		/*manager_set_interface();*/
-
-		/*return 0;*/
-	/*} else*/
-		/*return -1;*/
-
-	/*return 0;*/
-/*}*/
-
+/*
+ *static int cmd_manager(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+ *        if(manager_nic == NULL) {
+ *                printf("Can'nt found manager\n");
+ *                return -1;
+ *        }
+ *
+ *        if(argc == 1) {
+ *                printf("HWaddr %02x:%02x:%02x:%02x:%02x:%02x\n",
+ *                        (manager_nic->mac >> 40) & 0xff,
+ *                        (manager_nic->mac >> 32) & 0xff,
+ *                        (manager_nic->mac >> 24) & 0xff,
+ *                        (manager_nic->mac >> 16) & 0xff,
+ *                        (manager_nic->mac >> 8) & 0xff,
+ *                        (manager_nic->mac >> 0) & 0xff);
+ *                uint32_t ip = manager_get_ip();
+ *                printf("%10sinet addr:%d.%d.%d.%d  ", "", (ip >> 24) & 0xff, (ip >> 16) & 0xff, (ip >> 8) & 0xff, (ip >> 0) & 0xff);
+ *                uint16_t port = manager_get_port();
+ *                printf("port:%d\n", port);
+ *                uint32_t mask = manager_get_netmask();
+ *                printf("%10sMask:%d.%d.%d.%d\n", "", (mask >> 24) & 0xff, (mask >> 16) & 0xff, (mask >> 8) & 0xff, (mask >> 0) & 0xff);
+ *                uint32_t gw = manager_get_gateway();
+ *                printf("%10sGateway:%d.%d.%d.%d\n", "", (gw >> 24) & 0xff, (gw >> 16) & 0xff, (gw >> 8) & 0xff, (gw >> 0) & 0xff);
+ *
+ *                return 0;
+ *        }
+ *
+ *        if(!manager_nic) {
+ *                printf("Can'nt found manager\n");
+ *                return -1;
+ *        }
+ *
+ *        if(!strcmp("ip", argv[1])) {
+ *                uint32_t old = manager_get_ip();
+ *                if(argc == 2) {
+ *                        printf("%d.%d.%d.%d\n", (old >> 24) & 0xff, (old >> 16) & 0xff, (old >> 8) & 0xff, (old >> 0) & 0xff);
+ *                        return 0;
+ *                }
+ *
+ *                uint32_t address;
+ *                if(!parse_addr(argv[2], &address)) {
+ *                        printf("address wrong\n");
+ *                        return 0;
+ *                }
+ *
+ *                manager_set_ip(address);
+ *        } else if(!strcmp("port", argv[1])) {
+ *                uint16_t old = manager_get_port();
+ *                if(argc == 2) {
+ *                        printf("%d\n", old);
+ *                        return 0;
+ *                }
+ *
+ *                if(!is_uint16(argv[2])) {
+ *                        printf("port number wrong\n");
+ *                        return -1;
+ *                }
+ *
+ *                uint16_t port = parse_uint16(argv[2]);
+ *
+ *                manager_set_port(port);
+ *        } else if(!strcmp("netmask", argv[1])) {
+ *                uint32_t old = manager_get_netmask();
+ *                if(argc == 2) {
+ *                        printf("%d.%d.%d.%d\n", (old >> 24) & 0xff, (old >> 16) & 0xff, (old >> 8) & 0xff, (old >> 0) & 0xff);
+ *                        return 0;
+ *                }
+ *
+ *                uint32_t address;
+ *                if(!parse_addr(argv[2], &address)) {
+ *                        printf("address wrong\n");
+ *                        return 0;
+ *                }
+ *
+ *                manager_set_netmask(address);
+ *
+ *                printf("Manager's Gateway changed from %d.%d.%d.%d to %d.%d.%d.%d\n",
+ *                        (old >> 24) & 0xff, (old >> 16) & 0xff, (old >> 8) & 0xff, (old >> 0) & 0xff,
+ *                        (address >> 24) & 0xff, (address >> 16) & 0xff, (address >> 8) & 0xff, (address >> 0) & 0xff);
+ *
+ *        } else if(!strcmp("gateway", argv[1])) {
+ *                uint32_t old = manager_get_gateway();
+ *                if(argc == 2) {
+ *                        printf("%d.%d.%d.%d\n", (old >> 24) & 0xff, (old >> 16) & 0xff, (old >> 8) & 0xff, (old >> 0) & 0xff);
+ *                        return 0;
+ *                }
+ *
+ *                uint32_t address;
+ *                if(!parse_addr(argv[2], &address)) {
+ *                        printf("address wrong\n");
+ *                        return 0;
+ *                }
+ *
+ *                manager_set_gateway(address);
+ *
+ *                printf("Manager's Gateway changed from %d.%d.%d.%d to %d.%d.%d.%d\n",
+ *                        (old >> 24) & 0xff, (old >> 16) & 0xff, (old >> 8) & 0xff, (old >> 0) & 0xff,
+ *                        (address >> 24) & 0xff, (address >> 16) & 0xff, (address >> 8) & 0xff, (address >> 0) & 0xff);
+ *        } else if(!strcmp("nic", argv[1])) {
+ *                if(argc == 2) {
+ *                        printf("Network Interface name required\n");
+ *                        return false;
+ *                }
+ *
+ *                if(argc != 3) {
+ *                        printf("Wrong Parameter\n");
+ *                        return false;
+ *                }
+ *
+ *                uint16_t port = 0;
+ *                Device* dev = nic_parse_index(argv[2], &port);
+ *                if(!dev)
+ *                        return -2;
+ *
+ *                uint64_t attrs[] = {
+ *                        NIC_MAC, ((NICPriv*)dev->priv)->mac[port >> 12],
+ *                        NIC_DEV, (uint64_t)argv[2],
+ *                        NIC_NONE
+ *                };
+ *
+ *                if(vnic_update(manager_nic, attrs)) {
+ *                        printf("Can'nt found device\n");
+ *                        return -3;
+ *                }
+ *                manager_set_interface();
+ *
+ *                return 0;
+ *        } else
+ *                return -1;
+ *
+ *        return 0;
+ *}
+ *
+ */
 /*static int cmd_nic(int argc, char** argv, void(*callback)(char* result, int exit_status)) {*/
 	/*extern Device* nic_devices[];*/
 	/*uint16_t nic_device_index = 0;*/
@@ -373,7 +380,7 @@ static int cmd_clear(int argc, char** argv, void(*callback)(char* result, int ex
 				/*(vnic->mac >> 32) & 0xff,*/
 				/*(vnic->mac >> 24) & 0xff,*/
 				/*(vnic->mac >> 16) & 0xff,*/
-				/*(vnic->mac >> 8) & 0xff, */
+				/*(vnic->mac >> 8) & 0xff,*/
 				/*(vnic->mac >> 0) & 0xff);*/
 
 			/*uint16_t port_num = vnic->port >> 12;*/
@@ -494,86 +501,88 @@ static int cmd_clear(int argc, char** argv, void(*callback)(char* result, int ex
 	/*return 0;*/
 /*}*/
 
-/*static int cmd_version(int argc, char** argv, void(*callback)(char* result, int exit_status)) {*/
-	/*printf("%d.%d.%d-%s\n", VERSION_MAJOR, VERSION_MINOR, VERSION_MICRO, VERSION_TAG);*/
+static int cmd_version(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	printf("%d.%d.%d-%s\n", VERSION_MAJOR, VERSION_MINOR, VERSION_MICRO, VERSION_TAG);
 	
-	/*return 0;*/
-/*}*/
+	return 0;
+}
 
-/*static int cmd_turbo(int argc, char** argv, void(*callback)(char* result, int exit_status)) {*/
-	/*if(argc > 2) {*/
-		/*return CMD_STATUS_WRONG_NUMBER;*/
-	/*}*/
-
-	/*uint64_t perf_status = read_msr(0x00000198);*/
-	/*perf_status = ((perf_status & 0xff00) >> 8);*/
-	/*if(!cpu_has_feature(CPU_FEATURE_TURBO_BOOST)) {*/
-		/*printf("Not Support Turbo Boost\n");*/
-		/*printf("\tPerfomance status : %d.%d Ghz\n", perf_status / 10, perf_status % 10);*/
-
-		/*return 0;*/
-	/*}*/
-
-	/*uint64_t perf_ctrl = read_msr(0x00000199);*/
-
-	/*if(argc == 1) {*/
-		/*if(perf_ctrl & 0x100000000) {*/
-			/*printf("Turbo Boost Disabled\n");*/
-			/*printf("\tPerfomance status : %d.%d Ghz\n", perf_status / 10, perf_status % 10);*/
-		/*} else {*/
-			/*printf("Turbo Boost Enabled\n");*/
-			/*printf("\tPerfomance status : %d.%d Ghz\n", perf_status / 10, perf_status % 10);*/
-		/*}*/
-
-		/*return 0;*/
-	/*}*/
-
-	/*if(!strcmp(argv[1], "off")) {*/
-		/*if(perf_ctrl & 0x100000000) {*/
-			/*printf("Turbo Boost Already Disabled\n");*/
-			/*printf("\tPerfomance status : %d.%d Ghz\n",  perf_status / 10, perf_status % 10);*/
-		/*} else {*/
-			/*write_msr(0x00000199, 0x10000ff00);*/
-			/*printf("Turbo Boost Disabled\n");*/
-			/*perf_status = read_msr(0x00000198);*/
-			/*perf_status = ((perf_status & 0xff00) >> 8);*/
-			/*printf("\tPerfomance status : %d.%d Ghz\n", perf_status / 10, perf_status % 10);*/
-		/*}*/
-	/*} else if(!strcmp(argv[1], "on")) {*/
-		/*if(perf_ctrl & 0x100000000) {*/
-			/*write_msr(0x00000199, 0xff00);*/
-			/*printf("Turbo Boost Enabled\n");*/
-			/*perf_status = read_msr(0x00000198);*/
-			/*perf_status = ((perf_status & 0xff00) >> 8);*/
-			/*printf("\tPerfomance status : %d.%d Ghz\n", perf_status / 10, perf_status % 10);*/
-		/*} else {*/
-			/*printf("Turbo Boost Already Enabled\n");*/
-			/*printf("\tPerfomance status : %d.%d Ghz\n", perf_status / 10, perf_status % 10);*/
-		/*}*/
-	/*} else {*/
-		/*return -1;*/
-	/*}*/
-
-	/*return 0;*/
-/*}*/
-
-/*static int cmd_reboot(int argc, char** argv, void(*callback)(char* result, int exit_status)) {*/
-	/*asm volatile("cli");*/
-	
-	/*uint8_t code;*/
-	/*do {*/
-		/*code = port_in8(0x64);	// Keyboard Control*/
-		/*if(code & 0x01)*/
-			/*port_in8(0x60);	// Keyboard I/O*/
-	/*} while(code & 0x02);*/
-	
-	/*port_out8(0x64, 0xfe);	// Reset command*/
-	
-	/*while(1)*/
-		/*asm("hlt");*/
-	
-	/*return 0;*/
-/*}*/
+/*
+ *static int cmd_turbo(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+ *        if(argc > 2) {
+ *                return CMD_STATUS_WRONG_NUMBER;
+ *        }
+ *
+ *        uint64_t perf_status = read_msr(0x00000198);
+ *        perf_status = ((perf_status & 0xff00) >> 8);
+ *        if(!cpu_has_feature(CPU_FEATURE_TURBO_BOOST)) {
+ *                printf("Not Support Turbo Boost\n");
+ *                printf("\tPerfomance status : %d.%d Ghz\n", perf_status / 10, perf_status % 10);
+ *
+ *                return 0;
+ *        }
+ *
+ *        uint64_t perf_ctrl = read_msr(0x00000199);
+ *
+ *        if(argc == 1) {
+ *                if(perf_ctrl & 0x100000000) {
+ *                        printf("Turbo Boost Disabled\n");
+ *                        printf("\tPerfomance status : %d.%d Ghz\n", perf_status / 10, perf_status % 10);
+ *                } else {
+ *                        printf("Turbo Boost Enabled\n");
+ *                        printf("\tPerfomance status : %d.%d Ghz\n", perf_status / 10, perf_status % 10);
+ *                }
+ *
+ *                return 0;
+ *        }
+ *
+ *        if(!strcmp(argv[1], "off")) {
+ *                if(perf_ctrl & 0x100000000) {
+ *                        printf("Turbo Boost Already Disabled\n");
+ *                        printf("\tPerfomance status : %d.%d Ghz\n",  perf_status / 10, perf_status % 10);
+ *                } else {
+ *                        write_msr(0x00000199, 0x10000ff00);
+ *                        printf("Turbo Boost Disabled\n");
+ *                        perf_status = read_msr(0x00000198);
+ *                        perf_status = ((perf_status & 0xff00) >> 8);
+ *                        printf("\tPerfomance status : %d.%d Ghz\n", perf_status / 10, perf_status % 10);
+ *                }
+ *        } else if(!strcmp(argv[1], "on")) {
+ *                if(perf_ctrl & 0x100000000) {
+ *                        write_msr(0x00000199, 0xff00);
+ *                        printf("Turbo Boost Enabled\n");
+ *                        perf_status = read_msr(0x00000198);
+ *                        perf_status = ((perf_status & 0xff00) >> 8);
+ *                        printf("\tPerfomance status : %d.%d Ghz\n", perf_status / 10, perf_status % 10);
+ *                } else {
+ *                        printf("Turbo Boost Already Enabled\n");
+ *                        printf("\tPerfomance status : %d.%d Ghz\n", perf_status / 10, perf_status % 10);
+ *                }
+ *        } else {
+ *                return -1;
+ *        }
+ *
+ *        return 0;
+ *}
+ *
+ *static int cmd_reboot(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+ *        asm volatile("cli");
+ *        
+ *        uint8_t code;
+ *        do {
+ *                code = port_in8(0x64);	// Keyboard Control
+ *                if(code & 0x01)
+ *                        port_in8(0x60);	// Keyboard I/O
+ *        } while(code & 0x02);
+ *        
+ *        port_out8(0x64, 0xfe);	// Reset command
+ *        
+ *        while(1)
+ *                asm("hlt");
+ *        
+ *        return 0;
+ *}
+ */
 
 static int cmd_shutdown(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	printf("Shutting down\n");
@@ -635,39 +644,39 @@ static int cmd_shutdown(int argc, char** argv, void(*callback)(char* result, int
 	/*return 0;*/
 /*}*/
 
-/*static int cmd_md5(int argc, char** argv, void(*callback)(char* result, int exit_status)) {*/
-	/*if(argc < 3) {*/
-		/*return CMD_STATUS_WRONG_NUMBER;*/
-	/*}*/
+static int cmd_md5(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	if(argc < 3) {
+		return CMD_STATUS_WRONG_NUMBER;
+	}
 
-	/*if(!is_uint32(argv[1])) {*/
-		/*return -1;*/
-	/*}*/
+	if(!is_uint32(argv[1])) {
+		return -1;
+	}
 
-	/*if(!is_uint64(argv[2])) {*/
-		/*return -2;*/
-	/*}*/
+	if(!is_uint64(argv[2])) {
+		return -2;
+	}
 
-	/*uint32_t vmid = parse_uint32(argv[1]);*/
-	/*uint64_t size = parse_uint64(argv[2]);*/
-	/*uint32_t md5sum[4];*/
-	/*bool ret = vm_storage_md5(vmid, size, md5sum);*/
+	uint32_t vmid = parse_uint32(argv[1]);
+	uint64_t size = parse_uint64(argv[2]);
+	uint32_t md5sum[4];
+	bool ret = vm_storage_md5(vmid, size, md5sum);
 
-	/*if(!ret) {*/
-		/*sprintf(cmd_result, "(nil)");*/
-		/*printf("Can'nt md5 checksum\n");*/
-	/*} else {*/
-		/*char* p = (char*)cmd_result;*/
-		/*for(int i = 0; i < 16; i++, p += 2) {*/
-			/*sprintf(p, "%02x", ((uint8_t*)md5sum)[i]);*/
-		/*}*/
-		/**p = '\0';*/
-	/*}*/
+	if(!ret) {
+		sprintf(cmd_result, "(nil)");
+		printf("Can'nt md5 checksum\n");
+	} else {
+		char* p = (char*)cmd_result;
+		for(int i = 0; i < 16; i++, p += 2) {
+			sprintf(p, "%02x", ((uint8_t*)md5sum)[i]);
+		}
+		*p = '\0';
+	}
 
-	/*if(ret)*/
-		/*callback(cmd_result, 0);*/
-	/*return 0;*/
-/*}*/
+	if(ret)
+		callback(cmd_result, 0);
+	return 0;
+}
 
 static int cmd_create(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	if(argc < 2) {
@@ -835,19 +844,6 @@ static int cmd_vm_delete(int argc, char** argv, void(*callback)(char* result, in
 }
 
 static int cmd_vm_list(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
-//#include "apic.h"
-	/*
-	 *printf("Hello\n");
-	 *apic_write64(APIC_REG_ICR, ((uint64_t)1 << 56) |
-	 *                        APIC_DSH_NONE |
-	 *                        APIC_TM_EDGE |
-	 *                        APIC_LV_DEASSERT |
-	 *                        APIC_DM_PHYSICAL |
-	 *                        APIC_DMODE_FIXED |
-	 *                        48);
-	 *printf("APIC done\n");
-	 */
-	
 	uint32_t vmids[MAX_VM_COUNT];
 	int len = vm_list(vmids, MAX_VM_COUNT);
 
@@ -936,91 +932,86 @@ static int cmd_status_set(int argc, char** argv, void(*callback)(char* result, i
 	return 0;
 }
 
-/*static int cmd_status_get(int argc, char** argv, void(*callback)(char* result, int exit_status)) {*/
-	/*if(argc < 2) {*/
-		/*return CMD_STATUS_WRONG_NUMBER;*/
-	/*}*/
+static int cmd_status_get(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	if(argc < 2) {
+		return CMD_STATUS_WRONG_NUMBER;
+	}
 	
-	/*if(!is_uint32(argv[1])) {*/
-		/*return -1;*/
-	/*}*/
+	if(!is_uint32(argv[1])) {
+		return -1;
+	}
 
-	/*uint32_t vmid = parse_uint32(argv[1]);*/
-	/*extern Map* vms;*/
-	/*VM* vm = map_get(vms, (void*)(uint64_t)vmid);*/
-	/*if(!vm) {*/
-		/*printf("Can'nt found VM\n");*/
-		/*return -1;*/
-	/*}*/
+	uint32_t vmid = parse_uint32(argv[1]);
+	extern Map* vms;
+	VM* vm = map_get(vms, (void*)(uint64_t)vmid);
+	if(!vm) {
+		printf("Can'nt found VM\n");
+		return -1;
+	}
 
-	/*void print_vm_status(int status) {*/
-		/*switch(status) {*/
-			/*case VM_STATUS_START:*/
-				/*printf("start");*/
-				/*//callback("start", 0);*/
-				/*break;*/
-			/*case VM_STATUS_PAUSE:*/
-				/*printf("pause");*/
-				/*//callback("pause", 0);*/
-				/*break;*/
-			/*case VM_STATUS_STOP:*/
-				/*printf("stop");*/
-				/*//callback("stop", 0);*/
-				/*break;*/
-			/*default:*/
-				/*printf("invalid");*/
-				/*//callback("invalid", -1);*/
-				/*break;*/
-		/*}*/
-	/*}*/
+	void print_vm_status(int status) {
+		switch(status) {
+			case VM_STATUS_START:
+				callback("start", 0);
+				break;
+			case VM_STATUS_PAUSE:
+				callback("pause", 0);
+				break;
+			case VM_STATUS_STOP:
+				callback("stop", 0);
+				break;
+			default:
+				callback("invalid", -1);
+				break;
+		}
+	}
 
-	/*printf("VM ID: %d\n", vmid);*/
-	/*printf("Status: ");*/
-	/*print_vm_status(vm->status);*/
-	/*printf("\n");*/
-	/*printf("Core size: %d\n", vm->core_size);*/
-	/*printf("Core: ");*/
-	/*for(int i = 0; i < vm->core_size; i++) {*/
-		/*printf("[%d] ", vm->cores[i]);*/
-	/*}*/
-	/*printf("\n");*/
+	printf("VM ID: %d\n", vmid);
+	printf("Status: ");
+	print_vm_status(vm->status);
+	printf("\n");
+	printf("Core size: %d\n", vm->core_size);
+	printf("Core: ");
+	for(int i = 0; i < vm->core_size; i++) {
+		printf("[%d] ", vm->cores[i]);
+	}
+	printf("\n");
 
-	/*return 0;*/
-/*}*/
+	return 0;
+}
 
+static int cmd_stdio(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	if(argc < 3) {
+		printf("Argument is not enough\n");
+		return -1;
+	}
 
-/*static int cmd_stdio(int argc, char** argv, void(*callback)(char* result, int exit_status)) {*/
-	/*if(argc < 3) {*/
-		/*printf("Argument is not enough\n");*/
-		/*return -1;*/
-	/*}*/
+	uint32_t id;
+	uint8_t thread_id;
 
-	/*uint32_t id;*/
-	/*uint8_t thread_id;*/
+	if(!is_uint32(argv[1])) {
+		printf("VM ID is wrong\n");
+		return -1;
+	}
+	if(!is_uint8(argv[2])) {
+		printf("Thread ID is wrong\n");
+		return -2;
+	}
 
-	/*if(!is_uint32(argv[1])) {*/
-		/*printf("VM ID is wrong\n");*/
-		/*return -1;*/
-	/*}*/
-	/*if(!is_uint8(argv[2])) {*/
-		/*printf("Thread ID is wrong\n");*/
-		/*return -2;*/
-	/*}*/
+	id = parse_uint32(argv[1]);
+	thread_id = parse_uint8(argv[2]);
 
-	/*id = parse_uint32(argv[1]);*/
-	/*thread_id = parse_uint8(argv[2]);*/
+	for(int i = 3; i < argc; i++) {
+		printf("%s\n", argv[i]);
+		ssize_t len = vm_stdio(id, thread_id, 0, argv[i], strlen(argv[i]) + 1);
+		if(!len) {
+			printf("stdio fail\n");
+			return -i;
+		}
+	}
 
-	/*for(int i = 3; i < argc; i++) {*/
-		/*printf("%s\n", argv[i]);*/
-		/*ssize_t len = vm_stdio(id, thread_id, 0, argv[i], strlen(argv[i]) + 1);*/
-		/*if(!len) {*/
-			/*printf("stdio fail\n");*/
-			/*return -i;*/
-		/*}*/
-	/*}*/
-
-	/*return 0;*/
-/*}*/
+	return 0;
+}
 
 /*static int cmd_mount(int argc, char** argv, void(*callback)(char* result, int exit_status)) {*/
 	/*if(argc < 5) {*/
@@ -1090,34 +1081,34 @@ Command commands[] = {
 		/*.func = cmd_test*/
 	/*},*/
 /*#endif*/
-	/*{ */
-		/*.name = "version", */
-		/*.desc = "Print the kernel version.", */
-		/*.func = cmd_version */
-	/*},*/
+	{
+		.name = "version",
+		.desc = "Print the kernel version.",
+		.func = cmd_version
+	},
 	/*{*/
 		/*.name = "turbo",*/
 		/*.desc = "Turbo Boost Enable/Disable",*/
 		/*.args = "[on/off]",*/
 		/*.func = cmd_turbo*/
 	/*},*/
-	/*{ */
-		/*.name = "clear", */
-		/*.desc = "Clear screen.", */
-		/*.func = cmd_clear */
-	/*},*/
-	/*{ */
-		/*.name = "echo", */
-		/*.desc = "Echo arguments.",*/
-		/*.args = "[variable: string]*",*/
-		/*.func = cmd_echo */
-	/*},*/
-	/*{*/
-		/*.name = "sleep",*/
-		/*.desc = "Sleep n seconds",*/
-		/*.args = "[n: uint32]",*/
-		/*.func = cmd_sleep*/
-	/*},*/
+	{
+		.name = "clear",
+		.desc = "Clear screen.",
+		.func = cmd_clear
+	},
+	{
+		.name = "echo",
+		.desc = "Echo arguments.",
+		.args = "[variable: string]*",
+		.func = cmd_echo
+	},
+	{
+		.name = "sleep",
+		.desc = "Sleep n seconds",
+		.args = "[n: uint32]",
+		.func = cmd_sleep
+	},
 	/*{ */
 		/*.name = "date", */
 		/*.desc = "Print current date and time.", */
@@ -1149,13 +1140,8 @@ Command commands[] = {
 		/*.desc = "Reboot the node.",*/
 		/*.func = cmd_reboot*/
 	/*},*/
-	/*{ */
-		/*.name = "shutdown", */
-		/*.desc = "Shutdown the node.", */
-		/*.func = cmd_shutdown */
-	/*},*/
 	{
-		.name = "halt",
+		.name = "shutdown",
 		.desc = "Shutdown the node.",
 		.func = cmd_shutdown
 	},
@@ -1189,50 +1175,48 @@ Command commands[] = {
 		.args = "result: bool, vmid: uint32 path: string",
 		.func = cmd_upload
 	},
-	/*{*/
-		/*.name = "md5",*/
-		/*.desc = "MD5 storage",*/
-		/*.args = "result: hex16 string, vmid: uint32 size: uint64",*/
-		/*.func = cmd_md5*/
-	/*},*/
+	{
+		.name = "md5",
+		.desc = "MD5 storage",
+		.args = "result: hex16 string, vmid: uint32 size: uint64",
+		.func = cmd_md5
+	},
 	{
 		.name = "start",
 		.desc = "Start VM",
 		.args = "result: bool, vmid: uint32",
 		.func = cmd_status_set
 	},
-	/*{*/
-		/*.name = "pause",*/
-		/*.desc = "Pause VM",*/
-		/*.args = "result: bool, vmid: uint32",*/
-		/*.func = cmd_status_set*/
-	/*},*/
-	/*{*/
-		/*.name = "resume",*/
-		/*.desc = "Resume VM",*/
-		/*.args = "result: bool, vmid: uint32",*/
-		/*.func = cmd_status_set*/
-	/*},*/
+	{
+		.name = "pause",
+		.desc = "Pause VM",
+		.args = "result: bool, vmid: uint32",
+		.func = cmd_status_set
+	},
+	{
+		.name = "resume",
+		.desc = "Resume VM",
+		.args = "result: bool, vmid: uint32",
+		.func = cmd_status_set
+	},
 	{
 		.name = "stop",
 		.desc = "Stop VM",
 		.args = "result: bool, vmid: uint32",
 		.func = cmd_status_set
 	},
-	/*
-	 *{
-	 *        .name = "status",
-	 *        .desc = "Get VM's status",
-	 *        .args = "result: string(\"start\", \"pause\", or \"stop\") vmid: uint32",
-	 *        .func = cmd_status_get
-	 *},
-	 */
-	/*{*/
-		/*.name = "stdin",*/
-		/*.desc = "Write stdin to vm",*/
-		/*.args = "result: bool, vmid: uint32 thread_id: uint8 msg: string",*/
-		/*.func = cmd_stdio*/
-	/*},*/
+	{
+		.name = "status",
+		.desc = "Get VM's status",
+		.args = "result: string(\"start\", \"pause\", or \"stop\") vmid: uint32",
+		.func = cmd_status_get
+	},
+	{
+		.name = "stdin",
+		.desc = "Write stdin to vm",
+		.args = "result: bool, vmid: uint32 thread_id: uint8 msg: string",
+		.func = cmd_stdio
+	},
 	/*{*/
 		/*.name = "mount",*/
 		/*.desc = "Mount file system",*/

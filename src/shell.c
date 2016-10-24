@@ -23,7 +23,7 @@ static bool shell_process(void* context) {
 		return false;
 	} else if(ret) {
 		if(FD_ISSET(STDIN_FILENO, (fd_set*)&temp) != 0) {
-			/* Process input command */
+			// Process input command
 			command_process(STDIN_FILENO);
 		}
 	}
@@ -33,10 +33,8 @@ static bool shell_process(void* context) {
 
 static bool script_process() {
 	int fd = open("./boot.psh", O_RDONLY);
-	if(fd == -1) {
-		printf("There is no initial script\n");
+	if(fd == -1)
 		return false;
-	}
 
 	command_process(fd);
 
