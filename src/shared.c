@@ -1,27 +1,21 @@
 #include <stdio.h>
+#include <string.h>
+#include "mp.h"
 #include "shared.h"
 #include "mmap.h"
 
 Shared* shared;
 
-void shared_init() {
-	/* Shared area : 2 MB - sizeof(Shared) */
-	shared = (Shared*)(DESC_TABLE_AREA_END - sizeof(Shared));
-	printf("Shared area : %lx \n", (uint64_t)shared);
+int shared_init() {
+	shared = (Shared*)(KERNEL_TEXT_AREA_START - sizeof(Shared));
+	if(!mp_apic_id()) {
+		memset(shared, 0x0, sizeof(Shared));
+		shared->magic = SHARED_MAGIC;
+		memset(shared->mp_cores, MP_CORE_INVALID, MP_MAX_CORE_COUNT * sizeof(uint8_t));
+	} else if(shared->magic != SHARED_MAGIC) {
+		printf("Wrong Shared Magic Number\n");
+		return -1;
+	}
 
-	/*
-	 *printf("Standard I/O: \n");
-	 *printf("Stdout	: %p\n", shared->__stdout);
-	 *printf("Haed	: %p\n", shared->__stdout_head);
-	 *printf("Tail	: %p\n", shared->__stdout_tail);
-	 *printf("Size	: %p\n", shared->__stdout_size);
-	 */
-
-	/*
-	 *uint8_t* ptr = (uint8_t*)shared;
-	 *for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
-	 *        printf("%02x ", ptr[i]);
-	 *}
-	 *printf("\n");
-	 */
+	return 0;
 }

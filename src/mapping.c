@@ -1,15 +1,15 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
 #include <sys/mman.h>
+#include "smap.h"
 #include "mmap.h"
 #include "shared.h"
 
-#define MAPPING_AREA		(PHYSICAL_OFFSET + DESC_TABLE_AREA_START)
-// TODO: gmalloc can be expanded til over 2G when bmalloc area added
-#define MAPPING_AREA_SIZE	0x80000000	/* 2 GB */
+unsigned long mapping_area_size;
+#define MAPPING_AREA_SIZE	mapping_area_size	/* mem - kernel_start_address */
 
-void* mapping;
 void* gmalloc_pool;
 
 int mapping_init() {
@@ -19,35 +19,27 @@ int mapping_init() {
 		return -1;
 	}
 
-	printf("Assuming physical mapping area : %lx\n", MAPPING_AREA);
+	for(uint8_t i = 0 ; i < smap_count; i++) {
+		if(smap[i].type != SMAP_TYPE_MEMORY)
+			continue;
 
-	/* Mapping area : 1 MB */
-	mapping = mmap((void*)DESC_TABLE_AREA_START, MAPPING_AREA_SIZE, PROT_READ|PROT_WRITE|PROT_EXEC,
-			MAP_SHARED, fd, (off_t)MAPPING_AREA);
+		void* mapping = mmap((void*)smap[i].base, smap[i].length, PROT_READ|PROT_WRITE|PROT_EXEC,
+				MAP_SHARED, fd, smap[i].base);
 
-	if(mapping == MAP_FAILED) {
-		perror("Mapping memory for absolute memory access failed.\n");
-		return -1;
-	} else if(mapping != (void*)DESC_TABLE_AREA_START) {
-		printf("Mapping memory (%p) is not same as dedicated memory (%p).\n",
-				mapping, (void*)DESC_TABLE_AREA_START);
+		if(mapping == MAP_FAILED) {
+			perror("Mapping memory for absolute memory access failed.\n");
+			return -1;
+		} else if(mapping != (void*)smap[i].base) {
+			printf("Mapping memory (%p) is not same as dedicated memory.\n",
+					mapping);
 
-		munmap(mapping, MAPPING_AREA_SIZE);
-		return -1;
+			munmap(mapping, MAPPING_AREA_SIZE);
+			return -1;
+		}
+		mapping_area_size += smap[i].length;
 	}
 
-	printf("Memory mapped area : %lx ~ %lx\n", (uint64_t)mapping,
-			(uint64_t)mapping + MAPPING_AREA_SIZE);
+	printf("Assuming physical mapping area : %lx\n", mapping_area_size);
 
-	/*
-	 *uint8_t* ptr = (uint8_t*)0x620000;
-	 *for(int i = 0; i < 512; i++) {
-	 *        if((i % 8 == 0) && i != 0)
-	 *                printf("\n");
-	 *        if(i % 8 == 0)
-	 *                printf("%08x : ", 0x620000 + i);
-	 *        printf("%02x ", ptr[i]);
-	 *}
-	 */
 	return 0;
 }
