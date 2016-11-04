@@ -18,6 +18,10 @@ uint64_t timer_frequency() {
 
 void timer_init(const char* cpu_brand) {
 	// e.g. Intel(R) Core(TM) i7-3770 CPU @ 3.40GHz
+#ifdef LINUX
+	/* Linux don't need to calculate frequency */
+	return;
+#endif
 	if(strstr(cpu_brand, "Intel") != NULL && strstr(cpu_brand, "@ ") != NULL) {
 		int number = 0;
 		int is_dot_found = 0;

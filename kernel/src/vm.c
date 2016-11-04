@@ -472,7 +472,8 @@ uint32_t vm_create(VMSpec* vm_spec) {
 		if(mac == 0) {
 			do {
 				mac = timer_frequency() & 0x0fffffffffffL;
-				mac |= 0x02L << 40;	// Locally administrered
+				mac |= 0x03L << 40;	// Locally administrered
+				mac ^= 0x01L << 40; // Unicast set
 			} while(vnic_contains(nics[i].dev, mac));
 		} else if(vnic_contains(nics[i].dev, mac)) {
 			printf("Manager: The mac address already in use: %012x.\n", mac);
