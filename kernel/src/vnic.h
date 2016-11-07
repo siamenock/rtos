@@ -52,6 +52,7 @@ Device* nic_parse_index(char* _argv, uint16_t* port);
 VNIC* vnic_create(uint64_t* attrs);
 void vnic_destroy(VNIC* nic);
 bool vnic_contains(char* nic_dev, uint64_t mac);
+uint64_t vnic_get_device_mac(char* nic_dev);
 
 /**
  * Return

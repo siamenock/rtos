@@ -759,10 +759,15 @@ static int cmd_create(int argc, char** argv, void(*callback)(char* result, int e
 				if(strcmp(argv[i], "mac:") == 0) {
 					i++;
 					if(!is_uint64(argv[i])) {
-						printf("mac must be uint64\n");
-						return -1;
-					}
-					nic->mac = parse_uint64(argv[i]);
+						if(!strcmp(argv[i], "dev_mac")) {
+							nic->mac = NICSPEC_DEVICE_MAC;
+							continue;
+						} else {
+							printf("mac must be uint64\n");
+							return i;
+						}
+					} else 
+						nic->mac = parse_uint64(argv[i]) & 0xffffffffffff;
 				} else if(strcmp(argv[i], "dev:") == 0) {
 					i++;
 					nic->dev = malloc(strlen(argv[i] + 1));
