@@ -350,8 +350,16 @@ void copy_kernel(uint8_t apic_id) {
 		log("Copying kernel:\n");
 	}
 
-	uint32_t multiboot_temp_addr = 0x2400000;	// Behind the RAM disk area
 
+	// Copy Ramdisk
+	if(apic_id == 0) {
+		//print("\n    Ramdisk 0x");
+// #define RAMDISK_ADDR	(0x400000 + 0x200000 * MP_MAX_CORE_COUNT)
+		//print_32(0x2400000); print(" ("); print_32(initrd_end - initrd_start); print(") ");
+		copy((void*)0x2400000, (void*)initrd_start, initrd_end - initrd_start, 1);
+	}
+
+	uint32_t multiboot_temp_addr = 0x2600000;	// Behind the RAM disk area
 	// Clean
 	if(apic_id == 0) {
 		// Temporarily copy multiboot info

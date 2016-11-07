@@ -408,8 +408,8 @@ void main(void) {
 
 		printf("\x1b""32mOK""\x1b""0m\n");
 
-		printf("Copy RAM disk image from 0x%x to 0x%x (%d)\n", initrd_start, RAMDISK_ADDR, initrd_end - initrd_start);
-		memcpy((void*)RAMDISK_ADDR, (void*)(uintptr_t)initrd_start, initrd_end - initrd_start);
+// 		printf("Copy RAM disk image from 0x%x to 0x%x (%d)\n", initrd_start, RAMDISK_ADDR, initrd_end - initrd_start);
+// 		memcpy((void*)RAMDISK_ADDR, (void*)(uintptr_t)initrd_start, initrd_end - initrd_start);
 
 		printf("Analyze CPU information...\n");
 		cpu_init();
