@@ -15,6 +15,8 @@ typedef enum {
 #define VM_MAX_ARGC		256
 #define VM_MAX_ARGV		4096
 
+#define NICSPEC_DEVICE_MAC	((uint64_t)1 << 48)
+
 typedef struct {
 	uint64_t	mac;
 	//uint32_t	port;

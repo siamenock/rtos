@@ -475,6 +475,12 @@ uint32_t vm_create(VMSpec* vm_spec) {
 				mac |= 0x03L << 40;	// Locally administrered
 				mac ^= 0x01L << 40; // Unicast set
 			} while(vnic_contains(nics[i].dev, mac));
+		} else if(mac & NICSPEC_DEVICE_MAC) {
+			mac = vnic_get_device_mac(nics[i].dev);
+			if(vnic_contains(nics[i].dev, mac)) {
+				vm_destroy(vm, -1);
+				return 0;
+			}
 		} else if(vnic_contains(nics[i].dev, mac)) {
 			printf("Manager: The mac address already in use: %012x.\n", mac);
 			map_remove(vms, (void*)(uint64_t)vmid);

@@ -366,6 +366,20 @@ bool vnic_contains(char* nic_dev, uint64_t mac) {
 	return map_contains(vnics, (void*)mac);
 }
 
+uint64_t vnic_get_device_mac(char* nic_dev) {
+	if(!nic_dev)
+		return 0;
+
+	uint16_t port = 0;
+	Device* dev = nic_parse_index(nic_dev, &port);
+	if(!dev) {
+		return 0;
+	}
+
+	return ((NICPriv*)dev->priv)->mac[port];
+}
+
+
 uint32_t vnic_update(VNIC* vnic, uint64_t* attrs) {
 	bool has_key(uint64_t key) {
 		int i = 0;

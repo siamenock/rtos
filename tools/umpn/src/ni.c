@@ -122,7 +122,7 @@ VNIC* vnic_create(uint64_t* attrs) {
 		return NULL;
 	}
 	
-	init_memory_pool(0x200000, pool, 0);
+	init_memory_pool(0x200000, pool, 1);
 	vnic->pool = pool;
 	
 	// Allocate extra pools
@@ -154,7 +154,6 @@ VNIC* vnic_create(uint64_t* attrs) {
 	
 	// Allocate NetworkInterface
 	vnic->nic = malloc_ex(sizeof(NIC), vnic->pool);
-	printf("Test: %p\n", vnic->nic);
 	bzero(vnic->nic, sizeof(NIC));
 	
 	// Default attributes
@@ -201,7 +200,6 @@ VNIC* vnic_create(uint64_t* attrs) {
 				break;
 			case NIC_INPUT_BUFFER_SIZE:
 				vnic->nic->input_buffer = fifo_create(attrs[i * 2 + 1], vnic->pool);
-				printf("buffer1: %p\n", vnic->nic->input_buffer);
 				if(!vnic->nic->input_buffer) {
 					errno = 5;
 					tlsf_free(vnic);
@@ -607,14 +605,11 @@ void nic_process_input(uint8_t local_port, uint8_t* buf1, uint32_t size1, uint8_
 			memcpy(packet->buffer + packet->start + size1, buf2, size2);
 		
 		
-		// Push
-		printf("Push\n");
 		if(!fifo_push(vnic->nic->input_buffer, packet)) {
 			nic_free(packet);
 			printf("fifo dropped %016lx ", vnic->mac);
 			goto dropped;
 		}
-		printf("Pushed\n");
 		
 		vnic->nic->input_bytes += size;
 		vnic->nic->input_packets++;
