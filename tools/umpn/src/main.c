@@ -563,7 +563,7 @@ int main(int _argc, char** _argv) {
 	if(__gmalloc_pool == MAP_FAILED)
 		return -1;
 
-	init_memory_pool(0x200000, __gmalloc_pool, 0);
+	init_memory_pool(0x200000, __gmalloc_pool, 1);
 
 	barrior_lock = gmalloc(sizeof(uint8_t volatile));
 	barrior = gmalloc(sizeof(uint32_t volatile));
