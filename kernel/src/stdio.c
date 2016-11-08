@@ -411,6 +411,7 @@ void stdio_scancode(int code) {
 	// Parse char scancode
 #define PUT()		ring_write(__stdin, __stdin_head, &__stdin_tail, __stdin_size, &ch, 1)
 
+	// ASCII escape: http://ascii-table.com/ansi-escape-sequences-vt-100.php
 	bool is_cap = false;
 	char ch;
 	if(extention > 0) {
@@ -439,6 +440,22 @@ void stdio_scancode(int code) {
 				ch = 'O';
 				PUT();
 				ch = 'F';
+				PUT();
+				break;
+			case 0x48:	// arrow up
+				ch = 0x1b;	// ESC
+				PUT();
+				ch = 'O';
+				PUT();
+				ch = 'A';
+				PUT();
+				break;
+			case 0x50:	// arrow down
+				ch = 0x1b;	// ESC
+				PUT();
+				ch = 'O';
+				PUT();
+				ch = 'B';
 				PUT();
 				break;
 			case 0x51:	// page down

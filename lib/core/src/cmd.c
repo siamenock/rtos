@@ -3,6 +3,7 @@
 #include <malloc.h>
 #include <util/cmd.h>
 #include <util/map.h>
+#include <util/fifo.h>
 
 static Map* variables = NULL;
 static char* variable = NULL;
@@ -171,19 +172,93 @@ void cmd_update_var(char* result, int exit_status) {
 	}
 }
 
+static void cmd_history_reset() {
+	cmd_history.index = -1;
+}
+
+static bool cmd_history_using() {
+	return (cmd_history.index != -1);
+}
+
+static int cmd_history_save(char* line) {
+	int len = strlen(line);
+	if(len <= 0)
+		return -1;
+
+	FIFO* histories = cmd_history.histories;
+	char* buf = malloc(len + 1);
+	strcpy(buf, line);
+	if(!fifo_available(histories)) {
+		char* str = fifo_pop(histories);
+		free(str);
+	}
+
+	fifo_push(histories, buf);
+	return 0;
+}
+
+static int cmd_history_count() {
+	return fifo_size(cmd_history.histories);
+}
+
+static char* cmd_history_get(size_t idx) {
+	FIFO* histories = cmd_history.histories;
+	if(fifo_empty(histories))
+		return NULL;
+
+	if(idx >= (fifo_size(histories) - 1))
+		idx = fifo_size(histories) - 1;
+
+	// Return reversely
+	idx = fifo_size(histories) - 1 - idx;
+	return fifo_peek(histories, idx);
+}
+
+static char* cmd_history_get_past() {
+	if(cmd_history.index >= (cmd_history_count() - 1))
+		return cmd_history_get(cmd_history.index);
+
+	return cmd_history_get(++cmd_history.index);
+}
+
+static char* cmd_history_get_current() {
+	if(cmd_history.index == -1)
+		return NULL;
+
+	return cmd_history_get(cmd_history.index);
+}
+
+static char* cmd_history_get_later() {
+	if(cmd_history.index <= 0)
+		return NULL;
+
+	return cmd_history_get(--cmd_history.index);
+}
+
+#define HISTORY_SIZE 30
+
+CommandHistory cmd_history = {
+	.index = -1, // Initial index value
+	.using = cmd_history_using,
+	.reset = cmd_history_reset,
+	.save = cmd_history_save,
+	.count = cmd_history_count,
+	.get_past = cmd_history_get_past,
+	.get_current = cmd_history_get_current,
+	.get_later = cmd_history_get_later,
+};
+
 void cmd_init(void) {
 	variables = map_create(16, map_string_hash, map_string_equals, NULL);
 	map_put(variables, strdup("$?"), strdup("(nil)"));
 	map_put(variables, strdup("$nil"), strdup("(nil)"));
+	cmd_history.histories = fifo_create(HISTORY_SIZE, NULL);
 }
 
-//1. check argument
-//2. get variable
-//3. 
 int cmd_exec(char* line, void(*callback)(char* result, int exit_status)) {
 	int argc;
 	char* argv[CMD_MAX_ARGC];
-	
+
 	argc = cmd_parse_line(line, argv);
 	if(argc == 0 || argv[0][0] == '#')
 		return 0;

@@ -1270,10 +1270,27 @@ static void cmd_callback(char* result, int exit_status) {
 	printf("%s\n", result);
 }
 
+static void history_erase() {
+	if(!cmd_history.using())
+		// Nothing to be erased
+		return;
+
+	/*
+	 *if(cmd_history.index >= cmd_history.count() - 1)
+	 *        // No more entity to be erased
+	 *        return;
+	 *        
+	 */
+	int len = strlen(cmd_history.get_current());
+	for(int i = 0; i < len; i++)
+		putchar('\b');
+}
+
 void shell_callback() {
 	static char cmd[CMD_SIZE];
 	static int cmd_idx = 0;
 	extern Device* device_stdout;
+	char* line;
 
 	if(cmd_async)
 		return;
@@ -1284,9 +1301,12 @@ void shell_callback() {
 			case '\n':
 				cmd[cmd_idx] = '\0';
 				putchar(ch);
+				if(!cmd_history.using())
+					cmd_history.save(cmd);
 				cmd_exec(cmd, cmd_callback);
 				printf("# ");
 				cmd_idx = 0;
+				cmd_history.reset();
 				break;
 			case '\f':
 				putchar(ch);
@@ -1316,6 +1336,27 @@ void shell_callback() {
 					case 'O':
 						ch = stdio_getchar();
 						switch(ch) {
+							case 'A': // Up
+								history_erase();
+								line = cmd_history.get_past();
+								if(line) {
+									printf("%s", line);
+									strcpy(cmd, line);
+									cmd_idx = strlen(line);
+								}
+								break;
+							case 'B': // Down
+								history_erase();
+								line = cmd_history.get_later();
+								if(line) {
+									printf("%s", line);
+									strcpy(cmd, line);
+									cmd_idx = strlen(line);
+								} else {
+									cmd_history.reset();
+									cmd_idx = 0;
+								}
+								break;
 							case 'H':
 								((CharOut*)device_stdout->driver)->scroll(device_stdout->id, INT32_MIN);
 								break;
