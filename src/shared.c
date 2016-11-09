@@ -8,6 +8,7 @@ Shared* shared;
 
 int shared_init() {
 	shared = (Shared*)(KERNEL_TEXT_AREA_START - sizeof(Shared));
+	printf("Shared space: %p\n", shared);
 	if(!mp_apic_id()) {
 		memset(shared, 0x0, sizeof(Shared));
 		shared->magic = SHARED_MAGIC;

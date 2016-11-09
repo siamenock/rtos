@@ -7,7 +7,7 @@ void idt_init() {
 	IDTR* idtr = (IDTR*)IDTR_ADDR;
 	IDTR_INIT(*idtr);
 	idtr->limit = IDT_END_ADDR - IDT_ADDR - 1;
-	idtr->base = IDT_ADDR;
+	idtr->base = PHYSICAL_TO_VIRTUAL(IDT_ADDR);
 	
 	//TODO Read isr address from elf
 	ID* id = (ID*)IDT_ADDR;

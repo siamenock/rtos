@@ -26,14 +26,15 @@ static void wakeup_ap(long kernel_start_address) {
 	if(!cpu_end)
 		return;
 
-	printf("\tBooting APs: ");
+	printf("\tBooting APs:\n");
 	for(int cpu = cpu_start; cpu < cpu_end + 1; cpu++) {
 		int apicid = syscall(__NR_multikernel_boot, cpu, KERNEL_TEXT_AREA_START);
 		if(apicid < 0) {
 			continue;
 		}
 		shared->mp_cores[apicid] = cpu;
-		printf("APIC ID: %d CPU ID: %d ", apicid, cpu);
+		core_count++;
+		printf("\t\tAPIC ID: %d CPU ID: %d\n", apicid, cpu);
 	}
 	printf("Done\n");
 }
@@ -44,9 +45,10 @@ void mp_init0() {
 
 void mp_init(unsigned long kernel_start_address) {
 	core_id = 0;
+	core_count = 1;
 
 	shared->mp_cores[apic_id] = core_id;
-// 	wakeup_ap(kernel_start_address);
+ 	wakeup_ap(kernel_start_address);
 }
 
 uint8_t mp_apic_id() {

@@ -24,7 +24,7 @@ static bool shell_process(void* context) {
 	} else if(ret) {
 		if(FD_ISSET(STDIN_FILENO, (fd_set*)&temp) != 0) {
 			/* Process input command */
-			command_process(STDIN_FILENO);
+ 			command_process(STDIN_FILENO);
 		}
 	}
 
@@ -38,13 +38,13 @@ static bool script_process() {
 		return false;
 	}
 
-	command_process(fd);
+ 	command_process(fd);
 
 	return true;
 }
 
 bool shell_init() {
-	cmd_init();
+ 	cmd_init();
 
 	static fd_set stdin;
 	FD_ZERO(&stdin);

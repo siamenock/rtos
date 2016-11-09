@@ -6,15 +6,13 @@
 #include <stdint.h>
 #include "mp.h"
 
-//#define PHYSICAL_OFFSET		        0x38000000l	/* 896 MB */
-extern void* kernel_start_address;
-//TODO Fix here
+unsigned long kernel_start_address;
 #define PHYSICAL_OFFSET		    (uint64_t)kernel_start_address
 
-#define R_BASE                      PHYSICAL_OFFSET
+#define R_BASE                      0x200000
 
-#define VIRTUAL_TO_PHYSICAL(addr)	((~0xffffffff80000000L & ((uint64_t)addr)) + PHYSICAL_OFFSET)
-#define PHYSICAL_TO_VIRTUAL(addr)	(0xffffffff80000000L | ((uint64_t)addr))
+#define VIRTUAL_TO_PHYSICAL(addr)	((~0xffffffff80000000L & ((uint64_t)addr - R_BASE)) + PHYSICAL_OFFSET)
+#define PHYSICAL_TO_VIRTUAL(addr)	(0xffffffff80000000L | ((uint64_t)addr - PHYSICAL_OFFSET) + R_BASE)
 
 /*
  * BIOS area (0M ~ 1M)
@@ -30,17 +28,17 @@ extern void* kernel_start_address;
  * Description table area (1M ~ 2M)
  **/
 // NOTE: This area must be accessed by virtual memory since 0 ~ 2M area is identity mapped
-#define DESC_TABLE_AREA_START       (0x100000 + R_BASE)    /* 1 MB */
-#define DESC_TABLE_AREA_END         (0x200000 + R_BASE)    /* 2 MB */
+#define DESC_TABLE_AREA_START       (0x100000 + PHYSICAL_OFFSET)    /* 1 MB */
+#define DESC_TABLE_AREA_END         (0x200000 + PHYSICAL_OFFSET)    /* 2 MB */
 
 /*
  * Kernel text area (2M ~ 4M)
  **/
-#define KERNEL_TEXT_AREA_START      (0x200000 + R_BASE)    /* 2 MB */
+#define KERNEL_TEXT_AREA_START      (0x200000 + PHYSICAL_OFFSET)    /* 2 MB */
 #define KERNEL_TEXT_AREA_SIZE       0x200000                /* 2 MB */
-#define KERNEL_TEXT_AREA_END        (0x400000 + R_BASE)    /* 4 MB */
+#define KERNEL_TEXT_AREA_END        (0x400000 + PHYSICAL_OFFSET)    /* 4 MB */
 
-#define GDTR_ADDR	                (0x100000 + R_BASE)
+#define GDTR_ADDR	                (0x100000 + PHYSICAL_OFFSET)
 #define GDTR_END_ADDR	            (GDTR_ADDR + 16)
 #define GDT_ADDR	                GDTR_END_ADDR
 #define GDT_END_ADDR	            (GDT_ADDR + 8 * 5 + 16 * MP_MAX_CORE_COUNT)	// SD8 * 5 + SD16 * 16
@@ -49,14 +47,14 @@ extern void* kernel_start_address;
 /*
  * Kernel data area (4M ~ 6M)
  **/
-#define KERNEL_DATA_AREA_START      (0x400000 + R_BASE)    /* 4 MB */
+#define KERNEL_DATA_AREA_START      (0x400000 + PHYSICAL_OFFSET)    /* 4 MB */
 #define KERNEL_DATA_AREA_SIZE	0x200000
-#define KERNEL_DATA_AREA_END        (0x600000 + R_BASE)    /* 6 MB */
+#define KERNEL_DATA_AREA_END        (0x600000 + PHYSICAL_OFFSET)    /* 6 MB */
 
 // End of kernel - defined in linker script
 extern char __bss_end[];
 
-#define KERNEL_DATA_START           (0x400000 + R_BASE)    /* 4 MB */
+#define KERNEL_DATA_START           (0x400000 + PHYSICAL_OFFSET)    /* 4 MB */
 #define KERNEL_DATA_END             VIRTUAL_TO_PHYSICAL((uint64_t)__bss_end)
 
 #define LOCAL_MALLOC_START          KERNEL_DATA_END

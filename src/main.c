@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #define __USE_POSIX
 #include <string.h>
 #include <sys/types.h>
@@ -162,8 +163,8 @@ static int parse_args(char* args) {
 	return 0;
 }
 
-void* kernel_start_address; //Kenrel Start address
-void* rd_start_address; 	//Ramdisk Start address
+unsigned long kernel_start_address; //Kenrel Start address
+unsigned long rd_start_address; 	//Ramdisk Start address
 
 static int parse_param(char* param) {
 	int fd = open(param, O_RDONLY);
@@ -187,9 +188,9 @@ static int parse_param(char* param) {
 		return ret;
 
 	char* e;
-	kernel_start_address = (long long)strtol(_kernel_start_address, &e, 16);
+	kernel_start_address = strtol(_kernel_start_address, &e, 16);
 	//TODO: check alignment 2Mbyte
-	rd_start_address = (long long)strtol(_rd_start_address, &e, 16);
+	rd_start_address = strtol(_rd_start_address, &e, 16);
 	//TODO: NO Need ramdisk
 
 	printf("\n");
@@ -252,14 +253,14 @@ int main(int argc, char** argv) {
 		printf("boot_command_line: %p\n", boot_command_line);
 		strcpy(boot_command_line, _boot_command_line);
 
-		symbol_addr = elf_get_symbol("PHYSICAL_OFFSET");
+		symbol_addr = elf_get_symbol("kernel_start_address");
 		if(!symbol_addr) {
-			printf("Can't Get Symbol Address: \"PHYSICAL_OFFSET\"\n");
+			printf("Can't Get Symbol Address: \"kernel_start_address\"\n");
 			return -2;
 		}
-		uint64_t* _PHYSICAL_OFFSET = (uint64_t*)VIRTUAL_TO_PHYSICAL(symbol_addr);
-		printf("PHYSICAL_OFFSET: %p\n", _PHYSICAL_OFFSET);
-		*_PHYSICAL_OFFSET = (uint64_t)kernel_start_address; //TODO fix here
+		uint64_t* _kernel_start_address = (uint64_t*)VIRTUAL_TO_PHYSICAL(symbol_addr);
+		printf("kernel_start_address: %p\n", _kernel_start_address);
+		*_kernel_start_address = (uint64_t)kernel_start_address; //TODO fix here
 
 		return 0;
 	}
@@ -287,7 +288,83 @@ int main(int argc, char** argv) {
 
 	//TODO Fix Timer init libary
 	//How to get frequency per second in linux?
-	//timer_init(cpu_brand);
+	void _timer_init(char* cpu_brand) {
+		uint64_t _frequency;
+		if(strstr(cpu_brand, "Intel") != NULL && strstr(cpu_brand, "@ ") != NULL) {
+			int number = 0;
+			int is_dot_found = 0;
+			int dot = 0;
+
+			const char* ch = strstr(cpu_brand, "@ ");
+			ch += 2;
+			while((*ch >= '0' && *ch <= '9') || *ch == '.') {
+				if(*ch == '.') {
+					is_dot_found = 1;
+				} else {
+					number *= 10;
+					number += *ch - '0';
+
+					dot += is_dot_found;
+				}
+
+				ch++;
+			}
+
+			uint64_t frequency = 0;
+			if(strncmp(ch, "THz", 3) == 0) {
+			} else if(strncmp(ch, "GHz", 3) == 0) {
+				frequency = 1000000000L;
+			} else if(strncmp(ch, "MHz", 3) == 0) {
+				frequency = 1000000L;
+			} else if(strncmp(ch, "KHz", 3) == 0) {
+				frequency = 1000L;
+			} else if(strncmp(ch, "Hz", 3) == 0) {
+				frequency = 1L;
+			}
+
+			while(dot > 0) {
+				frequency /= 10;
+				dot--;
+			}
+
+			_frequency = frequency * number;
+		} else {
+			uint64_t time_tsc1 = timer_frequency();
+			sleep(1);
+			uint64_t time_tsc0 = timer_frequency();
+
+			_frequency = time_tsc0 - time_tsc1;
+		}
+
+		unsigned long symbol_addr = elf_get_symbol("TIMER_FREQUENCY_PER_SEC");
+		if(!symbol_addr) {
+			printf("Can't Get Symbol Address: \"TIMER_FREQUENCY_PER_SEC\"");
+		}
+		uint64_t* _TIMER_FREQUENCY_PER_SEC = (uint64_t*)VIRTUAL_TO_PHYSICAL(symbol_addr);
+		*_TIMER_FREQUENCY_PER_SEC = _frequency;
+
+		symbol_addr = elf_get_symbol("__timer_ms");
+		if(!symbol_addr) {
+			printf("Can't Get Symbol Address: \"__timer_ms\"");
+		}
+		uint64_t* ___timer_ms = (uint64_t*)VIRTUAL_TO_PHYSICAL(symbol_addr);
+		*___timer_ms = _frequency / 1000;
+
+		symbol_addr = elf_get_symbol("__timer_us");
+		if(!symbol_addr) {
+			printf("Can't Get Symbol Address: \"__timer_us\"");
+		}
+		uint64_t* ___timer_us = (uint64_t*)VIRTUAL_TO_PHYSICAL(symbol_addr);
+		*___timer_us = *___timer_ms / 1000;
+
+		symbol_addr = elf_get_symbol("__timer_ns");
+		if(!symbol_addr) {
+			printf("Can't Get Symbol Address: \"__timer_ns\"");
+		}
+		uint64_t* ___timer_ns = (uint64_t*)VIRTUAL_TO_PHYSICAL(symbol_addr);
+		*___timer_ns = *___timer_us / 1000;
+	}	
+	_timer_init(cpu_brand);
 
  	printf("\nInitilizing GDT...\n");
  	gdt_init();
@@ -304,26 +381,26 @@ int main(int argc, char** argv) {
  	printf("\nInitializing events...\n");
 	event_init();
 
- 	printf("\nInitializing inter-core communications...\n");
- 	icc_init();
- 
- 	printf("Initializing linux socket device...\n");
- 	socket_init();
- 
- 	uint16_t nic_count = device_count(DEVICE_TYPE_NIC);
- 	printf("Initializing NICs: %d\n", nic_count);
- 	init_nics(nic_count);
- 
- 	printf("Initializing VM manager...\n");
- 	vm_init();
- 
- 	printf("Initializing RPC manager...\n");
- 	manager_init();
- 
- 	printf("Initializing shell...\n");
- 	shell_init();
- 
- 	event_idle_add(idle0_event, NULL);
+  	printf("\nInitializing inter-core communications...\n");
+  	icc_init();
+  
+  	printf("Initializing linux socket device...\n");
+  	socket_init();
+  
+  	uint16_t nic_count = device_count(DEVICE_TYPE_NIC);
+  	printf("Initializing NICs: %d\n", nic_count);
+  	init_nics(nic_count);
+
+  	printf("Initializing VM manager...\n");
+  	vm_init();
+  
+  	printf("Initializing RPC manager...\n");
+  	manager_init();
+  
+  	printf("Initializing shell...\n");
+  	shell_init();
+  
+  	event_idle_add(idle0_event, NULL);
 	/*
 	 *apic_write64(APIC_REG_ICR, ((uint64_t)1 << 56) |
 	 *                APIC_DSH_NONE |
@@ -333,6 +410,8 @@ int main(int argc, char** argv) {
 	 *                APIC_DMODE_FIXED |
 	 *                48);
 	 */
+
+	mp_sync();
 	while(1)
 		event_loop();
 

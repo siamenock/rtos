@@ -6,6 +6,7 @@
 #include "apic.h"
 #include "shared.h"
 #include "task.h"
+#include "mmap.h"
 /*
  *#include <util/event.h>
  *#include <lock.h>
@@ -225,13 +226,30 @@ static void icc(uint64_t vector, uint64_t err) {
 }
 
 void icc_init() {
-	/*
-	 *printf("ICC pool size : %zd\n", fifo_size(shared->icc_pool));
-	 *printf("ICC queue : %p\n", shared->icc_queues);
-	 */
+	uint8_t core_count = mp_core_count();
 
+	extern void* gmalloc_pool;
+	uint8_t apic_id = mp_apic_id();
+	if(apic_id == 0) {
+		int icc_max = core_count * core_count;
+		shared->icc_pool = fifo_create(icc_max, gmalloc_pool);
+		for(int i = 0; i < icc_max; i++) {
+			ICC_Message* icc_message = __malloc(sizeof(ICC_Message), shared->icc_pool->pool);
+			fifo_push(shared->icc_pool, icc_message);
+		}
+
+		shared->icc_queues = __malloc(MP_MAX_CORE_COUNT * sizeof(Icc), gmalloc_pool);
+
+		lock_init(&shared->icc_lock_alloc);
+		uint8_t* core_map = mp_core_map();
+		for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
+			if(core_map[i] != MP_CORE_INVALID) {
+				shared->icc_queues[i].icc_queue = fifo_create(core_count, gmalloc_pool);
+				lock_init(&shared->icc_queues[i].icc_queue_lock);
+			}
+		}
+	}
 	event_busy_add(icc_event, NULL);
-
 	apic_register(48, icc);
 }
 

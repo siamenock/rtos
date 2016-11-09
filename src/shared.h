@@ -16,7 +16,7 @@ typedef struct {
 typedef struct {
 	uint64_t		magic;
 		
-	uint8_t			mp_cores[MP_MAX_CORE_COUNT];
+	volatile uint8_t	mp_cores[MP_MAX_CORE_COUNT];
 	volatile uint32_t	sync_map;
 	volatile uint8_t	sync_lock;
 

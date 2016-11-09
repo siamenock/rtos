@@ -9,7 +9,8 @@ void gdt_init() {
 	GDTR* gdtr = (GDTR*)GDTR_ADDR;
 	GDTR_INIT(*gdtr);
 	gdtr->limit = GDT_END_ADDR - GDT_ADDR - 1; 	// null, Kernel code segment, kernel data segment, task segment
-	gdtr->base = GDT_ADDR;
+	//gdtr->base = GDT_ADDR;
+	gdtr->base = PHYSICAL_TO_VIRTUAL(GDT_ADDR);
 	
 	// Segments
 	int i = 0;
@@ -78,8 +79,8 @@ void tss_init() {
 	for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
 		TSS_INIT(tss[i]);
 		//TODO Fix here
-		tss[i].ist[0] = PHYSICAL_TO_VIRTUAL(0x600000 - 0x50000); // Kernel interrupt stack
-		tss[i].ist[1] = PHYSICAL_TO_VIRTUAL(0x600000 - 0x58000); // User interrupt stack
+		tss[i].ist[0] = PHYSICAL_TO_VIRTUAL(KERNEL_INTR_STACK_START); // Kernel interrupt stack
+		tss[i].ist[1] = PHYSICAL_TO_VIRTUAL(USER_INTR_STACK_START); // User interrupt stack
 		tss[i].io_map = 0xffff;	// Not using I/O map
 	}
 }
