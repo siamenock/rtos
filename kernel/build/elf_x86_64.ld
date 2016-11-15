@@ -5,10 +5,34 @@ ENTRY(_start)
 STARTUP(obj/entry.o)
 SECTIONS
 {
-  /* Read-only sections, merged into text segment: */
+  /* 
+   * Description table area (2M ~ 3M)
+   * */
+  .desc_table 0xffffffff80200000 : AT(0x200000)
+  {
+    DESC_TABLE_AREA_START = .; 
+    *(.desc_table)
+    DESC_TABLE_AREA_END = .; 
+  }
+
+  /*
+   * Shared area (3M ~ 4M)
+   * */
+  /*
+   *.shared 0xffffffff80300000 : AT(0x300000)
+   *{
+   *  SHARED_AREA_START = .; 
+   *  *(.shared)
+   *  SHARED_AREA_END = .; 
+   *}
+   */
+
+  /* 
+   * Kernel text area (4M ~ 6M)
+   * */
   PROVIDE (__executable_start = 0x400000); . = 0x400000 + SIZEOF_HEADERS;
-/*********************************************************************************/
-  .text 0xffffffff80400000 : AT(0x400000)
+  KERNEL_TEXT_AREA_START = 0xffffffff80400000;
+  .text KERNEL_TEXT_AREA_START : AT(0x400000)
   {
     _text = .;
     *(.text .stub .text.* .gnu.linkonce.t.*)
@@ -19,14 +43,21 @@ SECTIONS
   .rodata         : { *(.rodata .rodata.* .gnu.linkonce.r.*) }
   .rodata1        : { *(.rodata1) }
 
-  .data 0xffffffff80600000 : AT(0x600000)
+  KERNEL_TEXT_AREA_END = KERNEL_TEXT_AREA_START + 0x200000;
+
+  /* 
+   * Kernel data area (6M ~ 8M)
+   * */
+  KERNEL_DATA_AREA_START = KERNEL_TEXT_AREA_END;
+
+  KERNEL_DATA_START = KERNEL_DATA_AREA_START;
+  .data KERNEL_DATA_START : AT(0x600000)
   {
     *(.data .data.* .gnu.linkonce.d.*)
     SORT(CONSTRUCTORS)
   }
   .data1          : { *(.data1) }
 
-  __bss_start = .;
   .bss            :
   {
    *(.dynbss)
@@ -40,14 +71,49 @@ SECTIONS
    . = ALIGN(. != 0 ? 64 / 8 : 1);
   }
   . = ALIGN(4096);
-  __bss_end = .;
+  KERNEL_DATA_END = .;
 
-  .pgtable 0xffffffff807c0000 : AT(0x7c0000)
+  .vga_buffer : 
   {
-    __pgtable_start = .;
-    *(.pgtable)
-    __pgtable_end = .;
+    VGA_BUFFER_START = .;
+    *(.vga_buffer)
+    VGA_BUFFER_END = .;
   }
+
+  .user_intr_stack : 
+  {
+    USER_INTR_STACK_START = .;
+    *(.user_intr_stack)
+    USER_INTR_STACK_END = .;
+  }
+
+  .kernel_intr_stack : 
+  {
+    KERNEL_INTR_STACK_START = .;
+    *(.kernel_intr_stack)
+    KERNEL_INTR_STACK_END = .;
+  }
+
+  .kernel_stack : 
+  {
+    KERNEL_STACK_START = .;
+    *(.kernel_stack)
+    KERNEL_STACK_END = .;
+  }
+
+  .pgtable : 
+  {
+    PAGE_TABLE_START = .;
+    *(.pgtable)
+    PAGE_TABLE_END = .;
+  }
+
+  /* Left space (~ 8M) is for local malloc */
+  LOCAL_MALLOC_START = .;
+  LOCAL_MALLOC_END = KERNEL_DATA_AREA_END;
+
+  KERNEL_DATA_AREA_END = KERNEL_DATA_AREA_START + 0x200000;
+
 
 
 /*********************************************************************************/
@@ -106,14 +172,14 @@ SECTIONS
   PROVIDE (_etext = .);
   PROVIDE (etext = .);
 
-  .eh_frame_hdr : { *(.eh_frame_hdr) }
-  .eh_frame       : ONLY_IF_RO { KEEP (*(.eh_frame)) }
+  /*.eh_frame_hdr : { *(.eh_frame_hdr) }*/
+  /*.eh_frame       : ONLY_IF_RO { KEEP (*(.eh_frame)) }*/
   .gcc_except_table   : ONLY_IF_RO { *(.gcc_except_table .gcc_except_table.*) }
   /* Adjust the address for the data segment.  We want to adjust up to
      the same address within the page on the next page up.  */
   . = ALIGN (CONSTANT (MAXPAGESIZE)) - ((CONSTANT (MAXPAGESIZE) - .) & (CONSTANT (MAXPAGESIZE) - 1)); . = DATA_SEGMENT_ALIGN (CONSTANT (MAXPAGESIZE), CONSTANT (COMMONPAGESIZE));
   /* Exception handling  */
-  .eh_frame       : ONLY_IF_RW { KEEP (*(.eh_frame)) }
+  .eh_frame       : ONLY_IF_RW { KEEP (*(.eh_frame)) } 
   .gcc_except_table   : ONLY_IF_RW { *(.gcc_except_table .gcc_except_table.*) }
   /* Thread Local Storage sections  */
   .tdata	  : { *(.tdata .tdata.* .gnu.linkonce.td.*) }
@@ -234,5 +300,5 @@ SECTIONS
   .debug_pubtypes 0 : { *(.debug_pubtypes) }
   .debug_ranges   0 : { *(.debug_ranges) }
   .gnu.attributes 0 : { KEEP (*(.gnu.attributes)) }
-  /DISCARD/ : { *(.note.GNU-stack) *(.gnu_debuglink) }
+  /DISCARD/ : { *(.note.GNU-stack) *(.gnu_debuglink) *(.eh_frame_hdr) *(.eh_frame) }
 }

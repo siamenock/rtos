@@ -28,6 +28,7 @@ kernel.smap
 
 # SDK
 packetngin_sdk-*
+examples/*
 
 # Binary
 bin

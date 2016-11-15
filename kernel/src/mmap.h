@@ -1,96 +1,89 @@
 #ifndef __MMAP_H__
 #define __MMAP_H__
 
-/* This header describes PacketNgin memory map. (docs/mmap.md) */
+/* 
+ * This header describes PacketNgin memory map. (docs/mmap.md) 
+ * All of these addresses are virtual address. Address mapping is 
+ * described in PacketNgin linker script (kernel/build/elf_x86_64.ld) 
+ **/
 
 #include <stdint.h>
-#include "mp.h"
-
-#define R_BASE				0x200000
-
-#define VIRTUAL_TO_PHYSICAL(addr)	(~0xffffffff80000000L & ((uint64_t)addr))
-#define PHYSICAL_TO_VIRTUAL(addr)	(0xffffffff80000000L | ((uint64_t)addr))
 
 /*
- * BIOS area (0M ~ 1M)
+ * BIOS area (0M ~ 2M)
  **/
-#define BIOS_AREA_START			0x0
-#define BIOS_AREA_END			0x100000		/* 1 MB */
+#define BIOS_AREA_START		0x0
+#define BIOS_AREA_END		0x200000 /* 2 MB */
 
-#define IVT_AREA_START			0x0
-#define IVT_AREA_END             	0x03FF
-#define BDA_AREA_START           	0x0400
-#define BDA_AREA_END             	0x04FF
+#define BDA_AREA_START		0x0400
+#define BDA_AREA_END		0x04FF
 
 /*
- * Description table area (1M ~ 2M)
+ * Description table area (2M ~ 3M)
  **/
-// NOTE: This area must be accessed by virtual memory since 0 ~ 2M area is identity mapped
-#define DESC_TABLE_AREA_START		(0x100000 + R_BASE)	/* 1 MB */
-#define DESC_TABLE_AREA_END		(0x200000 + R_BASE)	/* 2 MB */
+extern char DESC_TABLE_AREA_START[];		
+extern char DESC_TABLE_AREA_END[];		
 
-#define GDTR_ADDR			(0x100000 + R_BASE)
-#define GDTR_END_ADDR			(GDTR_ADDR + 16)
-#define GDT_ADDR	                GDTR_END_ADDR
-#define GDT_END_ADDR			(GDT_ADDR + 8 * 5 + 16 * MP_MAX_CORE_COUNT)	// SD8 * 5 + SD16 * 16
-#define TSS_ADDR	                GDT_END_ADDR
-#define TSS_END_ADDR			(TSS_ADDR + 104 * MP_MAX_CORE_COUNT)
+extern char GDTR_ADDR[];		
+extern char GDTR_END_ADDR[];	
+extern char GDT_ADDR[];	        
+extern char GDT_END_ADDR[];	
+extern char TSS_ADDR[];	        
+extern char TSS_END_ADDR[];	
 
-#define IDTR_ADDR	                TSS_END_ADDR
-#define IDTR_END_ADDR			(IDTR_ADDR + 16)
-#define IDT_ADDR	                IDTR_END_ADDR
-#define IDT_END_ADDR			(IDT_ADDR + 16 * 100)
-
-/*
- * Kernel text area (2M ~ 4M)
- **/
-#define KERNEL_TEXT_AREA_START		 (0x200000 + R_BASE)	/* 2 MB */
-#define KERNEL_TEXT_AREA_SIZE      	 0x200000		/* 2 MB */
-#define KERNEL_TEXT_AREA_END       	 (0x400000 + R_BASE)    /* 4 MB */
+extern char IDTR_ADDR[];	
+extern char IDTR_END_ADDR[];	
+extern char IDT_ADDR[];	       
+extern char IDT_END_ADDR[];			
 
 /*
- * Kernel data area (4M ~ 6M)
- **/
-#define KERNEL_DATA_AREA_START		 (0x400000 + R_BASE)    /* 4 MB */
-#define KERNEL_DATA_AREA_SIZE      	 0x200000		/* 2 MB */
-#define KERNEL_DATA_AREA_END       	 (0x600000 + R_BASE)    /* 6 MB */
-
-// End of kernel - defined in linker script
-extern char __bss_end[];
-
-#define KERNEL_DATA_START		  (0x400000 + R_BASE)    /* 4 MB */
-#define KERNEL_DATA_END           	  VIRTUAL_TO_PHYSICAL((uint64_t)__bss_end)
-
-#define LOCAL_MALLOC_START        	  KERNEL_DATA_END
-#define LOCAL_MALLOC_END          	  VGA_BUFFER_START
-
-#define VGA_BUFFER_START          	  (USER_INTR_STACK_START - VGA_BUFFER_SIZE)
-#define VGA_BUFFER_SIZE           	  0x10000		/* 64 KB */
-#define VGA_BUFFER_END            	  USER_INTR_STACK_START
-
-#define USER_INTR_STACK_START     	  (KERNEL_INTR_STACK_START - USER_INTR_STACK_SIZE)
-#define USER_INTR_STACK_SIZE      	  0x8000		/* 32 KB */
-#define USER_INTR_STACK_END       	  KERNEL_INTR_STACK_START
-
-#define KERNEL_INTR_STACK_START   	  (KERNEL_STACK_START - KERNEL_INTR_STACK_SIZE)
-#define KERNEL_INTR_STACK_SIZE    	  0x8000                /* 32 KB */
-#define KERNEL_INTR_STACK_END     	  KERNEL_STACK_START
-
-#define KERNEL_STACK_START        	  (PAGE_TABLE_START - KERNEL_STACK_SIZE)
-#define KERNEL_STACK_SIZE         	  0x10000               /* 64 KB */
-#define KERNEL_STACK_END          	  PAGE_TABLE_START
-
-#define PAGE_TABLE_START          	  (KERNEL_DATA_AREA_END - (4096 * 64))
-#define PAGE_TABLE_END            	  KERNEL_DATA_AREA_END
-
-/*
- * Kernel data area (6M ~ 36M)
+ * Gmalloc area (3M ~ 4M)
  **/
 
-// Kernel data area above (4M ~ 6M) is duplicated here for 15 cores PacketNgin support maximum 16 cores.
+/*
+ * Kernel text area (4M ~ 6M)
+ **/
+extern char KERNEL_TEXT_AREA_START[];		 
+extern char KERNEL_TEXT_AREA_END[];       	
+#define KERNEL_TEXT_AREA_SIZE		(KERNEL_TEXT_AREA_END - KERNEL_TEXT_AREA_START)
 
 /*
- * Ramdisk area (36M ~ sizeof(initrd.img))
+ * Kernel data area (6M ~ 8M)
+ **/
+extern char KERNEL_DATA_AREA_START[];		 
+extern char KERNEL_DATA_AREA_END[];       	
+#define KERNEL_DATA_AREA_SIZE		(KERNEL_DATA_AREA_END - KERNEL_DATA_AREA_START)
+
+extern char KERNEL_DATA_START[];	
+extern char KERNEL_DATA_END[];         
+
+extern char LOCAL_MALLOC_START[];      
+extern char LOCAL_MALLOC_END[];       
+
+extern char VGA_BUFFER_START[];      
+extern char VGA_BUFFER_END[];       
+
+extern char USER_INTR_STACK_START[];
+extern char USER_INTR_STACK_END[];  
+
+extern char KERNEL_INTR_STACK_START[];
+extern char KERNEL_INTR_STACK_END[];  
+
+extern char KERNEL_STACK_START[];    
+extern char KERNEL_STACK_END[];     
+
+extern char PAGE_TABLE_START[];    
+extern char PAGE_TABLE_END[];     
+
+/*
+ * Kernel data area (8M ~ 38M)
+ * 
+ * Kernel data area above (4M ~ 6M) is duplicated here for 15 cores.
+ * PacketNgin support maximum 16 cores.
+ **/
+
+/*
+ * Ramdisk area (38M ~ sizeof(initrd.img))
  **/
 #define RAMDISK_START               (KERNEL_TEXT_AREA_START + KERNEL_TEXT_AREA_SIZE * 16)
 

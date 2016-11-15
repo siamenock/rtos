@@ -25,8 +25,8 @@ workspace "Kernel"
         -- Force to make symbol table
         flags { "Symbols" }
 
-        -- Designate linker script. Beginning exection starts with 'main'
-        linkoptions { "-T elf_x86_64.ld -e main" }
+        -- Discard build-id information. Designate linker script. Beginning exection starts with 'main'
+        linkoptions { "-Wl,--build-id=none -T elf_x86_64.ld -e main" }
         -- We cares about files below
         files { "src/**.asm", "src/**.h", "src/**.c"}
         -- Startup file is linked by linker script

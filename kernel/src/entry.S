@@ -44,10 +44,9 @@ startup_64:
 	pushq	%r14		# target address in negative space
 	lretq
 
-	// FIXME: avoid to waste of memory. It's just for PNKC
-	.org	0x200, 0
-
+	/* Temporary GDT */
 	.section ".data"
+	.balign 16
 gdt:
 	.word	gdt_end - gdt
 	.long	0xffffffff		# GDT address. It will be modified in runtime
@@ -59,11 +58,69 @@ gdt:
 	.quad   0x0000000000000000	/* TS continued */
 gdt_end:
 
+	/* 
+	 * Description table area 
+	 * */
+	.section ".desc_table", "a", @nobits
+	.balign 4096 
+	.globl GDTR_ADDR
+GDTR_ADDR:
+	.fill 0x10, 1, 0
+
+	.globl GDT_ADDR
+GDT_ADDR:
+	.fill 8 /* SD8 */ * 5 + 16 /* SD16 */ * 16 /* MP_MAX_CORE_COUNT */, 1, 0
+	.globl GDT_END_ADDR
+GDT_END_ADDR:
+
+	.globl TSS_ADDR 
+TSS_ADDR:
+	.fill 104 * 16 /* MP_MAX_CORE_COUNT */
+
+	.globl IDTR_ADDR 
+IDTR_ADDR:
+	.fill 16, 1, 0
+
+	.globl IDT_ADDR 
+IDT_ADDR:
+	.fill 16 * 100
+	.globl IDT_END_ADDR
+IDT_END_ADDR:
+	.org GDTR_ADDR + 0x100000, 0 
+
+	/* 
+	 * Shared area 
+	 * */
 	/*
-	 * Space for page tables (not in .bss so not zeroed)
-	 **/
+	 *.section ".shared", "a", @nobits
+	 *.balign 4096 
+	 *.fill 0x100000, 1, 0
+	 */
+
+	/*
+	 * Kernel data area
+	 * */	
+	// VGA buffer
+	.section ".vga_buffer","a",@nobits
+	.balign 4096
+	.fill 0x10000, 1, 0
+
+	// User interrupt stack
+	.section ".user_intr_stack","a",@nobits
+	.balign 4096
+	.fill 0x8000, 1, 0
+
+	// Kernel interrupt stack
+	.section ".kernel_intr_stack","a",@nobits
+	.balign 4096
+	.fill 0x8000, 1, 0
+
+	// Kernel stack
+	.section ".kernel_stack","a",@nobits
+	.balign 4096
+	.fill 0x10000, 1, 0
+	
+	// Page table
 	.section ".pgtable","a",@nobits
 	.balign 4096
-
-pgtable:
 	.fill 64 * 4096, 1, 0

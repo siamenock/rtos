@@ -6,6 +6,7 @@
 #include "port.h"
 #include "asm.h"
 #include "apic.h"
+#include "page.h"
 #include "mmap.h"
 
 uint64_t _apic_address;

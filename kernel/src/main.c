@@ -399,7 +399,7 @@ static void icc_stop(ICC_Message* msg) {
  */
 
 static void fixup_page_table(uint8_t apic_id, uint64_t offset) {
-	uint64_t base = PAGE_TABLE_START + apic_id * 0x200000 + offset;
+	uint64_t base = VIRTUAL_TO_PHYSICAL(PAGE_TABLE_START) + apic_id * 0x200000 + offset;
 	PageTable* l4u = (PageTable*)(base + PAGE_TABLE_SIZE * PAGE_L4U_INDEX);
 
 	for(int i = 0; i < PAGE_L4U_SIZE * PAGE_ENTRY_COUNT; i++) {
@@ -416,7 +416,7 @@ static void fixup_page_table(uint8_t apic_id, uint64_t offset) {
 	// Local APIC address (0xfee00000: 0x7F7(PFN))
 	l4u[0x7f7].base = 0x7f7;
 
-	uint64_t pml4 = PAGE_TABLE_START + apic_id * 0x200000 + offset;
+	uint64_t pml4 = VIRTUAL_TO_PHYSICAL(PAGE_TABLE_START) + apic_id * 0x200000 + offset;
 	asm volatile("movq %0, %%cr3" : : "r"(pml4));
 }
 
@@ -429,18 +429,14 @@ void main() {
 	fixup_page_table(apic_id, PHYSICAL_OFFSET);
 	console_init();
 
-	uint64_t vga_buffer = PHYSICAL_TO_VIRTUAL(VGA_BUFFER_START);
+	uint64_t vga_buffer = (uint64_t)VGA_BUFFER_START;
 	stdio_init(apic_id, (void*)vga_buffer, 64 * 1024);
-	malloc_init(vga_buffer);
+	malloc_init();
 
 	printf("\nPacketNgin ver 2.0.\n");
 
 	//mp_sync();	// Barrier #1
 	if(apic_id == 0) {
-		// Parse kernel arguments
-		uint64_t initrd_start = pnkc.initrd_start;
-		uint64_t initrd_end = pnkc.initrd_end;
-
 /*
  *                printf("\x1b""32mOK""\x1b""0m\n");
  *
@@ -453,17 +449,39 @@ void main() {
  *                                (void*)(uintptr_t)PHYSICAL_TO_VIRTUAL(initrd_start),
  *                                initrd_end - initrd_start);
  */
-
 		printf("Analyze CPU information...\n");
 		cpu_init();
-		gmalloc_init(RAMDISK_START, initrd_end - initrd_start);
+		gmalloc_init();
 		shared_init();
 		timer_init(cpu_brand);
 
+
+		void print_pool(char* message, size_t total) {
+			size_t mb = total / 1024 / 1024;
+			size_t kb = total / 1024 - mb * 1024;
+			printf("\n%s: %d.%dMB \n", message, mb, kb);
+		}
+		
+#include "tlsf.h"
+		extern uint64_t* gmalloc_pool;
+		inline size_t gmalloc_total() {
+			return get_total_size(gmalloc_pool);
+		}
+
+
+		printf("Memory pool: ");
+		print_pool("global", gmalloc_total());
 		gdt_init();
+		printf("Memory pool: ");
+		print_pool("global", gmalloc_total());
 		tss_init();
+		printf("Memory pool: ");
+		print_pool("global", gmalloc_total());
 		idt_init();
 
+
+		printf("Memory pool: ");
+		print_pool("global", gmalloc_total());
 		//mp_sync();	// Barrier #2
 
 		printf("Loading GDT...\n");

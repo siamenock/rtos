@@ -5,6 +5,7 @@
 #include "entry.h"
 #include "pnkc.h"
 #include "mmap.h"
+#include "page.h"
 #include "mp.h"
 
 struct boot_params boot_params;
@@ -26,9 +27,7 @@ static __always_inline uint8_t get_apic_id() {
 }
 
 static __always_inline void init_page_tables(uint8_t apic_id, uint64_t offset) {
-	//uint64_t virtual_base = (uint64_t)&_l2;
-	uint64_t base = PAGE_TABLE_START + apic_id * 0x200000 + offset;
-	//virtual_base - __START_KERNEL_map + offset; //0x600000 + apic_id * 0x200000 - 0x40000 + offset;
+	uint64_t base = VIRTUAL_TO_PHYSICAL(PAGE_TABLE_START) + apic_id * 0x200000 + offset;
 	PageDirectory* l2 = (PageDirectory*)(base + PAGE_TABLE_SIZE * PAGE_L2_INDEX);
 	PageDirectory* l3u = (PageDirectory*)(base + PAGE_TABLE_SIZE * PAGE_L3U_INDEX);
 	PageDirectory* l3k = (PageDirectory*)(base + PAGE_TABLE_SIZE * PAGE_L3K_INDEX);
@@ -68,13 +67,11 @@ static __always_inline void init_page_tables(uint8_t apic_id, uint64_t offset) {
 
 	// Level4
 	for(int i = 0; i < PAGE_L4U_SIZE * PAGE_ENTRY_COUNT; i++) {
-		l4u[i].base = i;// + (offset >> 21);
+		l4u[i].base = i;
 		l4u[i].p = 1;
 		l4u[i].us = 0;
 		l4u[i].rw = 1;
 		l4u[i].ps = 1;
-		// Cache disabled
-		//l4u[i].pcd = 1;
 	}
 
 	// Kernel global area(gmalloc, segment descriptor, IDT, code, rodata)
@@ -103,9 +100,7 @@ static __always_inline void init_page_tables(uint8_t apic_id, uint64_t offset) {
 }
 
 static __always_inline void activate_pml4(uint8_t apic_id, uint64_t offset) {
-	//uint64_t virtual_base = (uint64_t)&_l2;
-	uint64_t pml4 = PAGE_TABLE_START + apic_id * 0x200000 + offset;
-		//virtual_base - __START_KERNEL_map + offset; //0x600000 + apic_id * 0x200000 - 0x40000 + offset;
+	uint64_t pml4 = VIRTUAL_TO_PHYSICAL(PAGE_TABLE_START) + apic_id * 0x200000 + offset;
 	asm volatile("movq %0, %%cr3" : : "r"(pml4));
 }
 
@@ -155,7 +150,7 @@ static __always_inline void save_bootdata(uint64_t** real_mode_data, uint64_t* o
 }
 
 static __always_inline void init_kernel_stack() {
-	uint64_t kernel_stack_end = PHYSICAL_TO_VIRTUAL(KERNEL_STACK_END);
+	uint64_t kernel_stack_end = (uint64_t)KERNEL_STACK_END;
 	asm volatile("movq %0, %%rsp" : : "m"(kernel_stack_end));
 	asm volatile("movq %0, %%rbp" : : "m"(kernel_stack_end));
 }
