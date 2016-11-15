@@ -6,7 +6,7 @@ Shared* shared;
 
 int shared_init() {
 	/* Shared area : 2 MB - sizeof(Shared) */
-	shared = (Shared*)(KERNEL_TEXT_AREA_START- sizeof(Shared));
+	shared = (Shared*)(DESC_TABLE_AREA_END - sizeof(Shared));
 
 	if(shared->magic != SHARED_MAGIC) {
 		printf("Shared area magic number is not same as PacketNgin kernel\n");

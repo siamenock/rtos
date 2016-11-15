@@ -25,9 +25,7 @@ uint32_t bmalloc_count;
 uint64_t* bmalloc_pool;
 
 void gmalloc_init() {
-	/* Gmalloc pool area : IDT_END_ADDR */
-	gmalloc_pool = (void*)VIRTUAL_TO_PHYSICAL(IDT_END_ADDR);
-
+	gmalloc_pool = (void*)VIRTUAL_TO_PHYSICAL((uint64_t)shared->gmalloc_pool);
 	bmalloc_pool = (void*)VIRTUAL_TO_PHYSICAL((uint64_t)shared->bmalloc_pool);
 	bmalloc_count = shared->bmalloc_count;
 
@@ -38,8 +36,8 @@ void gmalloc_init() {
 	}
 	
 	printf("Memory pool: ");
-	print_pool("global", gmalloc_total());
-	print_pool("block", bmalloc_total());
+	printf("global %lx", gmalloc_total());
+	printf("block %lx", bmalloc_total());
 	printf("\n");
 }
 

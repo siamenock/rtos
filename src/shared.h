@@ -14,13 +14,11 @@ typedef struct {
 } Icc;
 
 typedef struct {
-	// Magic
-	uint64_t		magic;
-
 	// Core
 	uint8_t			mp_cores[MP_MAX_CORE_COUNT];
 
 	// Memory
+	uint64_t*		gmalloc_pool;
 	uint32_t		bmalloc_count;
 	uint64_t*		bmalloc_pool;
 
@@ -29,6 +27,9 @@ typedef struct {
 	volatile uint8_t	icc_lock_free;
 
 	Icc*			icc_queues;
+
+	// Magic
+	uint64_t		magic;
 } Shared;
 
 Shared* shared;

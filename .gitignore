@@ -1,5 +1,6 @@
 # Temp
 *.swp
+*.swo
 
 # Build
 build
