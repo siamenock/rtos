@@ -3,6 +3,7 @@
 #include <lock.h>
 #include <util/fifo.h>
 #include <util/event.h>
+#include <_malloc.h>
 #include "apic.h"
 #include "shared.h"
 #include "task.h"

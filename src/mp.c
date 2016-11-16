@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <string.h>
-#define __USE_MISC
 #include <unistd.h>
 #include <syscall.h>
 #include "lock.h"
@@ -21,14 +20,17 @@ static uint8_t apic_id;		// APIC ID
 static uint8_t core_id;
 static uint8_t core_count;
 
+//extern uint64_t _ioapic_address;
+extern uint64_t _apic_address;
+
 #define __NR_multikernel_boot 312
 static void wakeup_ap(long kernel_start_address) {
 	if(!cpu_end)
 		return;
 
-	printf("\tBooting APs:\n");
+	printf("\tBooting APs : %p\n", kernel_start_address);
 	for(int cpu = cpu_start; cpu < cpu_end + 1; cpu++) {
-		int apicid = syscall(__NR_multikernel_boot, cpu, KERNEL_TEXT_AREA_START);
+		int apicid = syscall(__NR_multikernel_boot, cpu, kernel_start_address);
 		if(apicid < 0) {
 			continue;
 		}
@@ -40,6 +42,8 @@ static void wakeup_ap(long kernel_start_address) {
 }
 
 void mp_init0() {
+	_apic_address = 0xfee00000;
+
 	apic_id = 0;
 }
 
@@ -67,49 +71,80 @@ uint8_t mp_core_count() {
 	return core_count;
 }
 
-void mp_sync0() {
-	uint32_t map = 1 << apic_id;
-	
-	uint32_t full = 0;
-	for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
-		if(shared->mp_cores[i] != MP_CORE_INVALID)
-			full |= 1 << i;
-	}
+/*
+ *void mp_sync0() {
+ *        uint32_t map = 1 << apic_id;
+ *        
+ *        uint32_t full = 0;
+ *        for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
+ *                if(shared->mp_cores[i] != MP_CORE_INVALID)
+ *                        full |= 1 << i;
+ *        }
+ *
+ *        lock_lock(&shared->sync_lock);
+ *        shared->sync_map |= map;
+ *        lock_unlock(&shared->sync_lock);
+ *
+ *        while(shared->sync_map != full && shared->sync_map & map) {
+ *                full = 0;
+ *                for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
+ *                        if(shared->mp_cores[i] != MP_CORE_INVALID)
+ *                                full |= 1 << i;
+ *                }
+ *                __asm volatile("nop");
+ *        }
+ *}
+ */
 
-	lock_lock(&shared->sync_lock);
-	shared->sync_map |= map;
-	lock_unlock(&shared->sync_lock);
-
-	while(shared->sync_map != full && shared->sync_map & map) {
-		full = 0;
-		for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
-			if(shared->mp_cores[i] != MP_CORE_INVALID)
-				full |= 1 << i;
-		}
-		__asm volatile("nop");
-	}
+void mp_sync(int barrier) {
+	shared->sync[barrier] = 1;
+	printf("Sync memory : %p\n", &shared->sync[barrier]);
+/*
+ *        uint32_t map = 1 << apic_id;
+ *        
+ *        uint32_t full = 0;
+ *        for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
+ *                if(mp_cores[i] != MP_CORE_INVALID)
+ *                        full |= 1 << i;
+ *        }
+ *
+ *        lock_lock(SYNC_LOCK);
+ *        if(SYNC_MAP == full) {	// The first one
+ *                SYNC_MAP = map;
+ *        } else {
+ *                SYNC_MAP |= map;
+ *        }
+ *        lock_unlock(SYNC_LOCK);
+ */
+/*
+ *
+ *        while(SYNC_MAP != full && SYNC_MAP & map)
+ *                asm volatile("nop");
+ */
 }
 
-void mp_sync() {
-	uint32_t map = 1 << apic_id;
-	
-	uint32_t full = 0;
-	for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
-		if(shared->mp_cores[i] != MP_CORE_INVALID)
-			full |= 1 << i;
-	}
-
-	lock_lock(&shared->sync_lock);
-	if(shared->sync_map == full) {	// The first one
-		shared->sync_map = map;
-	} else {
-		shared->sync_map |= map;
-	}
-	lock_unlock(&shared->sync_lock);
-
-	while(shared->sync_map != full && shared->sync_map & map)
-		__asm volatile("nop");
-}
+/*
+ *void mp_sync() {
+ *        uint32_t map = 1 << apic_id;
+ *        
+ *        uint32_t full = 0;
+ *        for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
+ *                if(shared->mp_cores[i] != MP_CORE_INVALID)
+ *                        full |= 1 << i;
+ *        }
+ *
+ *        lock_lock(&shared->sync_lock);
+ *        if(shared->sync_map == full) {	// The first one
+ *                shared->sync_map = map;
+ *        } else {
+ *                shared->sync_map |= map;
+ *        }
+ *        lock_unlock(&shared->sync_lock);
+ *
+ *        while(shared->sync_map != full && shared->sync_map & map)
+ *                __asm volatile("nop");
+ *}
+ */
 
 /*
  *void mp_parse_fps(MP_Parser* parser, void* context) {
@@ -224,6 +259,5 @@ void mp_sync() {
  *
  */
 uint8_t* mp_core_map() {
-
 	return shared->mp_cores;
 }

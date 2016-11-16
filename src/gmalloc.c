@@ -30,12 +30,13 @@ uint64_t* bmalloc_pool;
 
 void gmalloc_init() {
 	/* Gmalloc pool area : IDT_END_ADDR */
-	uint64_t start = IDT_END_ADDR;
-	uint64_t end = (uint64_t)shared;
+	uint64_t start = VIRTUAL_TO_PHYSICAL(IDT_END_ADDR);
+	uint64_t end = VIRTUAL_TO_PHYSICAL((uint64_t)shared);
 	
 	init_memory_pool(end - start, (void*)start, 0);
 	
 	gmalloc_pool = (void*)start;
+	printf("Gmalloc : %p %p\n", start, end);
 	printf("Gmalloc area : %lx %x\n", (uint64_t)gmalloc_pool, end - start);
 
 	typedef struct {
@@ -44,15 +45,19 @@ void gmalloc_init() {
 	} Block;
 	
 	//TODO Check array size
-	Block reserved[4 + MP_MAX_CORE_COUNT + 2];
+	Block reserved[3 + MP_MAX_CORE_COUNT];
 	int reserved_count = 0;
 
-	reserved[reserved_count].start = DESC_TABLE_AREA_START;	// Description table
-	reserved[reserved_count].end = DESC_TABLE_AREA_END;
+	reserved[reserved_count].start = VIRTUAL_TO_PHYSICAL(BIOS_AREA_START);
+	reserved[reserved_count].end = VIRTUAL_TO_PHYSICAL(BIOS_AREA_END);
+	reserved_count++;
+
+	reserved[reserved_count].start = VIRTUAL_TO_PHYSICAL(DESC_TABLE_AREA_START);
+	reserved[reserved_count].end = VIRTUAL_TO_PHYSICAL(DESC_TABLE_AREA_END);
 	reserved_count++;
 	
-	reserved[reserved_count].start = KERNEL_TEXT_AREA_START; // Kernel global
-	reserved[reserved_count].end = KERNEL_TEXT_AREA_END;
+	reserved[reserved_count].start = VIRTUAL_TO_PHYSICAL(KERNEL_TEXT_AREA_START);
+	reserved[reserved_count].end = VIRTUAL_TO_PHYSICAL(KERNEL_TEXT_AREA_END);
 	reserved_count++;
 	
 	printf("Reserved AP Space\n");
@@ -61,8 +66,10 @@ void gmalloc_init() {
  		if(core_map[i] == MP_CORE_INVALID)
  			continue;
 
-		reserved[reserved_count].start = KERNEL_DATA_AREA_START + KERNEL_DATA_AREA_SIZE * i;
-		reserved[reserved_count].end = KERNEL_DATA_AREA_START + KERNEL_DATA_AREA_SIZE * (i + 1);
+		reserved[reserved_count].start = VIRTUAL_TO_PHYSICAL(KERNEL_DATA_AREA_START) 
+			+ KERNEL_DATA_AREA_SIZE * i;
+		reserved[reserved_count].end = VIRTUAL_TO_PHYSICAL(KERNEL_DATA_AREA_START) 
+			+ KERNEL_DATA_AREA_SIZE * (i + 1);
 		reserved_count++;
 	}
 
@@ -83,43 +90,44 @@ void gmalloc_init() {
 
 	for(int i = 0; i < reserved_count; i++) {
 		Block* r = &reserved[i];
-		printf("Reserved[%02d] : %p ~ %p\n", i, r->start, r->end);
+		printf("\tReserved[%02d] : %p ~ %p\n", i, r->start, r->end);
 	}
 
 	int count = smap_count;
 	List* blocks = list_create(NULL);
-	//printf("System memory map\n");
+	printf("System memory map\n");
 	for(int i = 0; i < count; i++) {
 		SMAP* entry = &smap[i];
-		//char* type;
+		char* type;
 		switch(entry->type) {
 			case SMAP_TYPE_MEMORY:
 				;
-				//type = "Memory";
+				type = "Memory";
 				Block* block = malloc(sizeof(Block));
 				block->start = entry->base;
 				block->end = entry->base + entry->length;
 				list_add(blocks, block);
 				break;
 			case SMAP_TYPE_RESERVED:
-				//type = "Reserved";
+				type = "Reserved";
 				break;
 			case SMAP_TYPE_ACPI:
-				//type = "ACPI";
+				type = "ACPI";
 				break;
 			case SMAP_TYPE_NVS:
-				//type = "NVS";
+				type = "NVS";
 				break;
 			case SMAP_TYPE_UNUSABLE:
-				//type = "Disabled";
+				type = "Disabled";
 				break;
 			default:
 				break;
-				//type = "Unknown";
+				type = "Unknown";
 		}
-		//printf("\t0x%016lx - 0x%016lx: %s(%d)\n", entry->base, entry->base + entry->length, type, entry->type);
+		printf("\t0x%016lx - 0x%016lx: %s(%d)\n", entry->base, entry->base + entry->length, type, entry->type);
 	}
 	
+
 	// Remove reserved blocks
 	for(size_t i = 0; i < list_size(blocks); i++) {
 		Block* b = list_get(blocks, i);

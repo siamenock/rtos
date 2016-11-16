@@ -6,10 +6,12 @@
 #include "gdt.h"
 #include "elf.h"
 
-#define IDTR_ADDR	TSS_END_ADDR
-#define IDTR_END_ADDR	(IDTR_ADDR + 16)
-#define IDT_ADDR	IDTR_END_ADDR
-#define IDT_END_ADDR	(IDT_ADDR + 16 * 100)
+/*
+ *#define IDTR_ADDR	TSS_END_ADDR
+ *#define IDTR_END_ADDR	(IDTR_ADDR + 16)
+ *#define IDT_ADDR	IDTR_END_ADDR
+ *#define IDT_END_ADDR	(IDT_ADDR + 16 * 100)
+ */
 
 typedef struct {
 	uint16_t limit;

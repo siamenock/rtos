@@ -3,6 +3,7 @@
 #include <sys/mman.h>
 #include <fcntl.h>
 #include "apic.h"
+#include "page.h"
 
 #define HANDLER_SIZE	256
 
@@ -11,19 +12,17 @@ static APIC_Handler handlers[HANDLER_SIZE];
 uint64_t _apic_address;
 
 int apic_init() {
-#define APIC_BASE               0xfee00000l
 	int fd = open("/dev/mem", O_RDWR | O_SYNC);
 	if(fd < 0) {
 		perror("Failed to open memory descriptor\n");
 		return -1;
 	}
 
-	printf("Assuming APIC physical base: %lx \n", APIC_BASE);
+	printf("Assuming APIC physical base: %lx \n", _apic_address & ~(uint64_t)0xfffff);
 
-	_apic_address = (uint64_t)mmap(NULL, 0x1000, PROT_READ|PROT_WRITE,
-			MAP_SHARED, fd, (off_t)APIC_BASE);
+	uint64_t _apic_address_page = (uint64_t)mmap((void*)(_apic_address & ~(uint64_t)0xfffff), PAGE_PAGE_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, fd, (off_t)(_apic_address & ~(uint64_t)0xfffff));
 
-	if(_apic_address == (uint64_t)MAP_FAILED) {
+	if(_apic_address_page == (uint64_t)MAP_FAILED) {
 		perror("Mapping memory for absolute memory access failed.\n");
 		return -1;
 	}

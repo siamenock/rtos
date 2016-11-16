@@ -6,7 +6,6 @@
 #include <sys/stat.h>
 #include <stdint.h>
 #include <fcntl.h>
-#define __USE_MISC
 #include <unistd.h>
 #include <sys/syscall.h>
 
@@ -24,7 +23,7 @@
 #define __NR_get_boot_params_addr 313
 
 static inline unsigned long get_boot_params_addr () {
-  return syscall(__NR_get_boot_params_addr);
+	return syscall(__NR_get_boot_params_addr);
 }
 
 int open_mem(int flag) {

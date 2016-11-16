@@ -5,34 +5,32 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 
-#define	ELF_FILE	"kernel.elf"
-
 Elf64_Ehdr* ehdr;
 Elf64_Shdr* strtab;
 static char* shstrtab;
 Elf64_Shdr* symtab;
 
-int elf_load(void) {
-	int fd = open(ELF_FILE, O_RDONLY);
+int elf_load(char* elf_file) {
+	int fd = open(elf_file, O_RDONLY);
 	if(fd < 0) {
-		printf("Cannot open file: %s\n", ELF_FILE);
+		printf("Cannot open file: %s\n", elf_file);
 		return -1;
 	}
 	
 	struct stat state;
-	if(stat(ELF_FILE, &state) != 0) {
-		printf("Cannot get state of file: %s\n", ELF_FILE);
+	if(stat(elf_file, &state) != 0) {
+		printf("Cannot get state of file: %s\n", elf_file);
 		return -2;
 	}
 	
 	ehdr = mmap(NULL, state.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
 	if(ehdr == (void*)-1) {
-		printf("Cannot open file: %s\n", ELF_FILE);
+		printf("Cannot open file: %s\n", elf_file);
 		return -3;
 	}
 	
 	if(ehdr->e_ident[0] != ELFMAG0 || ehdr->e_ident[1] != ELFMAG1 || ehdr->e_ident[2] != ELFMAG2 || ehdr->e_ident[3] != ELFMAG3) {
-		printf("Illegal file format: %s\n", ELF_FILE);
+		printf("Illegal file format: %s\n", elf_file);
 		return -4;
 	}
 	
@@ -57,7 +55,7 @@ int elf_load(void) {
 	return 0;
 }
 
-unsigned long elf_get_symbol(char* sym_name) {
+uint64_t elf_get_symbol(char* sym_name) {
 	char* name(int offset) {
 		return (char*)ehdr + strtab->sh_offset + offset;
 	}

@@ -1,5 +1,4 @@
 #include <fcntl.h>
-#define __USE_POSIX
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -59,13 +58,13 @@ static void smap_update(uint64_t start, uint64_t end, uint32_t type) {
 
 	for(uint8_t i = 0 ; i < smap_count; i++) {
 		if(smap[i].base < end && smap[i].base + smap[i].length >= end) { 
-			if(start <= smap[i].base) { ///Head cut
-				if(smap[i].base + smap[i].length - end) { //length is not zero
+			if(start <= smap[i].base) { // Head cut
+				if(smap[i].base + smap[i].length - end) { // Length is not zero
 					_smap[_smap_count].base = end;
 					_smap[_smap_count].length = smap[i].base + smap[i].length - end;
 					_smap[_smap_count++].type = smap[i].type;
 				}
-			} else if(start > smap[i].base) { //Include
+			} else if(start > smap[i].base) { // Include
 				_smap[_smap_count].base = smap[i].base;
 				_smap[_smap_count].length = start - smap[i].base;
 				_smap[_smap_count++].type = smap[i].type;
@@ -76,15 +75,15 @@ static void smap_update(uint64_t start, uint64_t end, uint32_t type) {
 					_smap[_smap_count++].type = smap[i].type;
 				}
 			}
-		} else if(smap[i].base <= start && smap[i].base + smap[i].length > start) { //Tail Cut
+		} else if(smap[i].base <= start && smap[i].base + smap[i].length > start) { // Tail Cut
 			if(start - smap[i].base) {
 				_smap[_smap_count].base = smap[i].base;
 				_smap[_smap_count].length = start - smap[i].base;
 				_smap[_smap_count++].type = smap[i].type;
 			}
-		} else if(smap[i].base > start && smap[i].base + smap[i].length < end) { //inner
+		} else if(smap[i].base > start && smap[i].base + smap[i].length < end) { // Inner
 			continue;
-		} else { //out
+		} else { // Out
 			_smap[_smap_count].base = smap[i].base;
 			_smap[_smap_count].length = smap[i].length;
 			_smap[_smap_count++].type = smap[i].type;
@@ -93,7 +92,7 @@ static void smap_update(uint64_t start, uint64_t end, uint32_t type) {
 
 	for(uint8_t i = 0; i < _smap_count; i++) {
 		if(_smap[i].base > start) {
-			//shift
+			// Shift
 			memmove(&_smap[i + 1], &_smap[i], sizeof(SMAP) * (_smap_count - i));
 			_smap_count++;
 
@@ -114,7 +113,7 @@ next:
 		if((_smap[i].type == _smap[i + 1].type) && ((_smap[i].base + _smap[i].length) == _smap[i + 1].base)) {
 			_smap[i].length = _smap[i].length + _smap[i + 1].length;
 			memmove(&_smap[i + 1], &_smap[i + 2], sizeof(SMAP) * (_smap_count - 2 - i));
-			//left shift
+			// Left shift
 			_smap_count--;
 			i--;
 		}
@@ -143,7 +142,7 @@ next:
 		default:
 			_type = "Unknown";
 	}
-	printf("\tsmap update: 0x%lx - 0x%lx: %s(%d)\n", start, end, _type, type);
+	printf("\tSMAP update: 0x%016lx - 0x%016lx: %s(%d)\n", start, end, _type, type);
 }
 
 static uint64_t calculate_byte(char* str) {

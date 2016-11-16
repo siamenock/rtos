@@ -4,13 +4,14 @@
 #include "idt.h"
 
 void idt_init() {
-	IDTR* idtr = (IDTR*)IDTR_ADDR;
+	// NOTE: Although kernel load IDTR reigster by virutal address,
+	//	 we must access IDTR physically to write here.
+	IDTR* idtr = (IDTR*)VIRTUAL_TO_PHYSICAL(IDTR_ADDR);
 	IDTR_INIT(*idtr);
 	idtr->limit = IDT_END_ADDR - IDT_ADDR - 1;
-	idtr->base = PHYSICAL_TO_VIRTUAL(IDT_ADDR);
+	idtr->base = (uint64_t)IDT_ADDR;
 	
-	//TODO Read isr address from elf
-	ID* id = (ID*)IDT_ADDR;
+	ID* id = (ID*)VIRTUAL_TO_PHYSICAL(IDT_ADDR);
 	uint64_t __offset;
  	ID_INIT(id[0], isr_0, 0x08, 1, 0x0e, 0, 1);	// Segment: 0x08, IST: 1, Type: Interrupt, DPL: 0, P: 1
  	ID_INIT(id[1], isr_1, 0x08, 1, 0x0e, 0, 1);

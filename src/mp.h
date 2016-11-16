@@ -20,8 +20,7 @@ uint8_t mp_core_id();
 uint8_t mp_apic_id_to_core_id(uint8_t apic_id);
 uint8_t mp_core_count();
 
-void mp_sync0();
-void mp_sync();
+void mp_sync(int barrier);
 uint8_t* mp_core_map();
 
 #endif /* __MP_H__ */
