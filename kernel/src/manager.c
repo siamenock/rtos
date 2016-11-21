@@ -12,6 +12,7 @@
 #include <net/checksum.h>
 #include <net/udp.h>
 #include <net/tftp.h>
+#include <net/dhcp.h>
 #include <util/list.h>
 #include <util/ring.h>
 #include <util/event.h>
@@ -337,6 +338,9 @@ static err_t manager_accept(void* arg, struct tcp_pcb* pcb, err_t err) {
 static Packet* manage(Packet* packet) {
 	if(shell_process(packet))
 		return NULL;
+
+	if(dhcp_process(packet))
+		return NULL;
 //	else if(rpc_process(packet))
 //		return NULL;
 //	else if(tftp_process(packet))
@@ -458,6 +462,14 @@ static bool manager_timer(void* context) {
 	return true;
 }
 
+bool manager_ip_acked(NIC* nic, uint32_t transaction_id, uint32_t ip, void* _data) {
+	printf("Manager ip leased \n");
+	manager_set_ip(ip);
+	printf("%10sinet addr:%d.%d.%d.%d  ", "", (manager_ip >> 24) & 0xff, (manager_ip >> 16) & 0xff, (manager_ip >> 8) & 0xff, (manager_ip >> 0) & 0xff);
+
+	return true;
+}
+
 void manager_init() {
 	uint64_t attrs[] = { 
 		NIC_MAC, manager_mac, // Physical MAC
@@ -480,6 +492,7 @@ void manager_init() {
 		return;
 	}
 
+	// Default configuraiton
 	manager_ip = DEFAULT_MANAGER_IP;
 	if(!nic_ip_add(manager_nic->nic, DEFAULT_MANAGER_IP)) {
 		printf("\tCan'nt allocate manager ip\n");
@@ -497,6 +510,11 @@ void manager_init() {
 	}
 	manager_port = DEFAULT_MANAGER_PORT;
 	
+	// Dynamic configuration
+	dhcp_init(manager_nic->nic);
+	if(dhcp_lease_ip(manager_nic->nic, NULL, manager_ip_acked, NULL) == 0)
+		printf("Failed to lease Manager IP : %d\n", errno);
+
 	manager_netif = nic_init(manager_nic->nic, manage, NULL);
 	
 	manager_server_open();

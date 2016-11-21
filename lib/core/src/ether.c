@@ -63,8 +63,8 @@ void write_u32(void* buf, uint32_t value, uint32_t* idx) {
 
 void write_u48(void* buf, uint64_t value, uint32_t* idx) {
 	void* p = &value;
-	*(uint16_t*)(buf) = endian16(*(uint16_t*)(p + 4));
-	*(uint32_t*)(buf + 2) = endian32(*(uint32_t*)(p));
+	*(uint16_t*)(buf + *idx) = endian16(*(uint16_t*)(p + 4));
+	*(uint32_t*)(buf + *idx + 2) = endian32(*(uint32_t*)(p));
 	*idx += 6;
 }
 
