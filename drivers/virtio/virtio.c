@@ -14,11 +14,12 @@
 #include "virtio_net.h"
 
 #define VNET_HDR_LEN		12
-#define MAX_BUF_SIZE		1526 // MTU + VNET_HDR_LEN
 #define MAX_DEVICE_COUNT	8
 #define PAGE_SIZE		4096
+#define MAX_BUF_SIZE		1526 // MTU + VNET_HDR_LEN
 
 #define DEBUG			0
+#define BUDGET_SIZE		64
 
 //extern int printf (const char *__restrict __format, ...);
 
@@ -67,7 +68,7 @@ static void kick(VirtQueue* vq) {
 
 	// We force to notify here in that VRING_USED_F_NO_NOTIFY is simply an optimzation
 	port_out16(vq->ioaddr + VIRTIO_PCI_QUEUE_NOTIFY, vq->index);
-}	
+}
 
 /* Add available buffer which host OS can use */
 static int add_buf(VirtQueue* vq, void* buffer, uint32_t len) {
@@ -422,11 +423,6 @@ static int virtnet_receive(int id, void* buf, uint32_t len) {
 	vq->num_added++; 
 
 	// If the number of free descriptors goes beyond half of the maximum buffer, kick it
-	if(vq->num_free > vq->size / 2) {
-		kick(vq);
-		vq->num_free = 0;
-	}
-
 	VirtIONetPacket* vp = (VirtIONetPacket*)buf;
 	nic_process_input(0, vp->data, len - VNET_HDR_LEN, NULL, 0);
 
@@ -460,7 +456,6 @@ static int virtnet_send(int id, Packet* packet) {
 	// Add new buffer and try to send 
 	int len = packet->end - packet->start;
 	add_buf(vq, packet, len);
-	kick(vq);
 
 #if DEBUG
 	printf("Sent : ");
@@ -480,6 +475,7 @@ static int virtnet_send(int id, Packet* packet) {
 int init(void* device, void* data) {
 	int err;
 	int id = vdev_count;
+
 	priv[id] = NULL;
 
 	if(vdev_count >= MAX_DEVICE_COUNT) {
@@ -516,7 +512,7 @@ int init(void* device, void* data) {
 
 	// Set promiscuos mode
 	uint8_t promisc = 1; // 1 means ON for the command
-	if(virtnet_send_command(id, VIRTIO_NET_CTRL_RX, VIRTIO_NET_CTRL_RX_PROMISC, &promisc)) 
+	if(virtnet_send_command(id, VIRTIO_NET_CTRL_RX, VIRTIO_NET_CTRL_RX_PROMISC, &promisc))
 		printf("Promiscuos mode ON\n");
 	else
 		printf("Promiscous mode OFF\n");
@@ -554,20 +550,34 @@ void destroy(int id) {
 int poll(int id) {
 	// Free used buffer
 	void* buf;
+	Packet* packet;
+
 	while((buf = get_buf(priv[id]->svq, NULL))) {
 		nic_free(buf);
 	}
 
 	// TX
-	Packet* packet = nic_process_output(0);
-	if(packet) {
+	int sended = 0;
+	VirtQueue* vq = priv[id]->svq;
+	while((BUDGET_SIZE > sended) && (packet = nic_process_output(0))) {
 		virtnet_send(id, packet);
+		sended++;
 	}
+	if(sended)
+		kick(vq);
 
 	// RX
 	uint32_t len;
-	if((buf = get_buf(priv[id]->rvq, &len))) {
+	int received = 0;
+	vq = priv[id]->rvq;
+	while((BUDGET_SIZE > received) && (buf = get_buf(vq, &len))) {
 		virtnet_receive(id, buf, len);
+		received++;
+	}
+
+	if(vq->num_free > vq->size / 2) {
+		kick(vq);
+		vq->num_free = 0;
 	}
 
 	return 0;
