@@ -55,7 +55,7 @@ void udp_port_free(NIC* nic, uint32_t addr, uint16_t port) {
 void udp_pack(Packet* packet, uint16_t udp_body_len) {
 	Ether* ether = (Ether*)(packet->buffer + packet->start);
 	IP* ip = (IP*)ether->payload;
-	UDP* udp = (UDP*)ip->body;
+	UDP* udp = (UDP*)((uint8_t*)ip->body + ip->ihl * 4);
 	
 	uint16_t udp_len = UDP_LEN + udp_body_len;
 	udp->length = endian16(udp_len);
