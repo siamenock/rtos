@@ -62,9 +62,9 @@ void tcp_port_free(NIC* nic, uint32_t addr, uint16_t port) {
 void tcp_pack(Packet* packet, uint16_t tcp_body_len) {
 	Ether* ether = (Ether*)(packet->buffer + packet->start);
 	IP* ip = (IP*)ether->payload;
-	TCP* tcp = (TCP*)ip->body;
+	TCP* tcp = (TCP*)((uint8_t*)ip + ip->ihl * 4);
 	
-	uint16_t tcp_len = TCP_LEN + tcp_body_len;
+	uint16_t tcp_len = (tcp->offset * 4) + tcp_body_len;
 	
 	TCP_Pseudo pseudo;
 	pseudo.source = ip->source;
