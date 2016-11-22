@@ -92,7 +92,7 @@ typedef struct _DHCPOption {
 	uint8_t data[0];
 } __attribute__ ((packed)) DHCPOption; 
 
-typedef bool(*DHCPCallback)(void* context);
+typedef bool(*DHCPCallback)(NIC* nic, uint32_t transaction_id, uint32_t ip, void* context);
 
 typedef struct _DHCPSession {
 	NIC* nic;
