@@ -61,8 +61,8 @@ bool dhcp_request(DHCPSession* dhcp_session) {
 	ip->flags_offset = 0x00;
 	ip->ttl = endian8(IP_TTL);
 	ip->protocol = endian8(IP_PROTOCOL_UDP);
-	ip->source = endian32(0x00000000);
-//	ip->source = endian32(0x010101fe);
+	//ip->source = endian32(0x00000000);
+	ip->source = endian32(0x010101fe);
 	ip->destination = endian32(0xffffffff);
 	//id
 
@@ -104,13 +104,13 @@ bool dhcp_request(DHCPSession* dhcp_session) {
 	*(uint16_t*)((client_identifier->data) + 1) = endian16((nic->mac)>>32);
 	*(uint32_t*)((client_identifier->data) + 3) = endian32(*(uint32_t*)(&(nic->mac)));
 
-	DHCPOption* dhcp_server = (DHCPOption*)(((client_identifier->data) + 0x07));
-	dhcp_server->code = endian8(DHCP_OPTION_SEVER_IDENTIFIER);
-	dhcp_server->length = endian8(0x04); 
-	*(uint32_t*)((dhcp_server->data)) = endian32(dhcp_session->server_ip);
-
-	DHCPOption* requested_ip = (DHCPOption*)(((dhcp_server->data) + 0x04));
-//	DHCPOption* requested_ip = (DHCPOption*)(((client_identifier->data) + 0x07));
+//	DHCPOption* dhcp_server = (DHCPOption*)(((client_identifier->data) + 0x07));
+//	dhcp_server->code = endian8(DHCP_OPTION_SEVER_IDENTIFIER);
+//	dhcp_server->length = endian8(0x04); 
+//	*(uint32_t*)((dhcp_server->data)) = endian32(dhcp_session->server_ip);
+//
+//	DHCPOption* requested_ip = (DHCPOption*)(((dhcp_server->data) + 0x04));
+	DHCPOption* requested_ip = (DHCPOption*)(((client_identifier->data) + 0x07));
 	requested_ip->code = endian8(DHCP_OPTION_REQUESTED_IP_ADDRESS);
 	requested_ip->length = endian8(0x04);
 	*(uint32_t*)((requested_ip->data)) = endian32(dhcp_session->your_ip);
