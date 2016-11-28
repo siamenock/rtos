@@ -788,7 +788,7 @@ int sprintf(char *str, const char *format, ...) {
 	return len;
 }
 
-int __sprintf_chk(int flag, char *str, const char *format, ...) {
+int __sprintf_chk(char *str, int flag, size_t slen, const char *format, ...) {
 	va_list va;
 	va_start(va, format);
 	int len = vsprintf(str, format, va);

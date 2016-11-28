@@ -6,6 +6,8 @@ workspace "Kernel"
         location "linux/build"
         targetname "linux.ko"
         targetdir "."
+        -- O0 optimziation
+        optimize "On"
         includedirs { "../kernel/src", "../lib/core/include", "./linux" }
         linkoptions { "-r" }
         files { "linux/**.h", "linux/**.c" }
@@ -17,6 +19,8 @@ workspace "Kernel"
         location "virtio/build"
         targetname "virtio.ko"
         targetdir "."
+        -- O0 optimziation
+        optimize "On"
         includedirs { "../kernel/src", "../kernel/src/driver", "../lib/core/include" }
         files { "virtio/**.h", "virtio/**.c" }
         linkoptions { "-r ../../linux.ko" }
@@ -27,6 +31,8 @@ workspace "Kernel"
         location "fat/build"
         targetname "fat.ko"
         targetdir "."
+        -- O0 optimziation
+        optimize "On"
         includedirs { "../kernel/src", "../kernel/src/driver", "../lib/core/include" }
         files { "virtio/**.h", "virtio/**.c" }
         files { "fat/**.h", "fat/**.c" }
