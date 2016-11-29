@@ -14,6 +14,7 @@
 #include <net/packet.h>
 #include <net/ether.h>
 #include <net/arp.h>
+#include <net/dhcp.h>
 
 #include "stdio.h"
 #include "cpu.h"
@@ -1102,6 +1103,23 @@ static int cmd_mount(int argc, char** argv, void(*callback)(char* result, int ex
 	return -2;
 }
 
+static int cmd_dhcp(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	
+	bool manager_ip_acked(NIC* nic, uint32_t transaction_id, uint32_t ip, void* _data) {
+	      printf("Manager ip leased \n");
+	      uint32_t manager_ip = manager_set_ip(ip);
+	      uint32_t gw = (ip & 0xffffff00) | 0x1;
+	      manager_set_gateway(gw);
+	      printf("%10sinet addr:%d.%d.%d.%d  ", "", (manager_ip >> 24) & 0xff, (manager_ip >> 16) & 0xff, (manager_ip >> 8) & 0xff, (manager_ip >> 0) & 0xff);
+	      return true;
+	}
+
+	if(dhcp_lease_ip(manager_nic->nic, NULL, manager_ip_acked, NULL) == 0)
+	        printf("Failed to lease Manager IP : %d\n", errno);
+
+	return -1;
+}
+
 Command commands[] = {
 	{
 		.name = "help",
@@ -1261,6 +1279,12 @@ Command commands[] = {
 		.desc = "Mount file system",
 		.args = "result: bool, [\"-t\" (type)] device: string dir: string",
 		.func = cmd_mount
+	},
+	{
+		.name = "dhcp",
+		.desc = "DHCP get manager ip",
+		.args = "result: bool",
+		.func = cmd_dhcp
 	},
 	{
 		.name = NULL

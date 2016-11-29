@@ -30,7 +30,7 @@
 #define DEFAULT_MANAGER_IP	0xc0a864fe	// 192.168.100.254
 #define DEFAULT_MANAGER_GW	0xc0a864c8	// 192.168.100.200
 #define DEFAULT_MANAGER_NETMASK	0xffffff00	// 255.255.255.0
-#define DEFAULT_MANAGER_PORT	111
+#define DEFAULT_MANAGER_PORT	5000
 
 uint64_t manager_mac;
 static struct netif* manager_netif;
@@ -462,14 +462,6 @@ static bool manager_timer(void* context) {
 	return true;
 }
 
-bool manager_ip_acked(NIC* nic, uint32_t transaction_id, uint32_t ip, void* _data) {
-	printf("Manager ip leased \n");
-	manager_set_ip(ip);
-	printf("%10sinet addr:%d.%d.%d.%d  ", "", (manager_ip >> 24) & 0xff, (manager_ip >> 16) & 0xff, (manager_ip >> 8) & 0xff, (manager_ip >> 0) & 0xff);
-
-	return true;
-}
-
 void manager_init() {
 	uint64_t attrs[] = { 
 		NIC_MAC, manager_mac, // Physical MAC
@@ -512,8 +504,6 @@ void manager_init() {
 	
 	// Dynamic configuration
 	dhcp_init(manager_nic->nic);
-	if(dhcp_lease_ip(manager_nic->nic, NULL, manager_ip_acked, NULL) == 0)
-		printf("Failed to lease Manager IP : %d\n", errno);
 
 	manager_netif = nic_init(manager_nic->nic, manage, NULL);
 	
@@ -529,21 +519,21 @@ uint32_t manager_get_ip() {
 	return manager_ip;
 }
 
-void manager_set_ip(uint32_t ip) {
+uint32_t manager_set_ip(uint32_t ip) {
 	if(manager_nic == NULL)
-		return;
+		return 0;
 
 	IPv4Interface* interface = nic_ip_get(manager_nic->nic, manager_ip);
 	if(!interface)
-		return;
+		return 0;
 
 	if(!nic_ip_add(manager_nic->nic, ip))
-		return;
+		return 0;
 
-	IPv4Interface* _interface = nic_ip_get(manager_nic->nic, ip);
-	_interface->gateway = interface->gateway;
-	_interface->netmask = interface->netmask;
-	_interface->_default = interface->_default;
+//	IPv4Interface* _interface = nic_ip_get(manager_nic->nic, ip);
+//	_interface->gateway = interface->gateway;
+//	_interface->netmask = interface->netmask;
+//	_interface->_default = interface->_default;
 
 	nic_ip_remove(manager_nic->nic, manager_ip);
 	manager_ip = ip;
@@ -554,6 +544,8 @@ void manager_set_ip(uint32_t ip) {
 
 	manager_server_close();
 	manager_server_open();
+
+	return manager_ip;
 }
 
 uint16_t manager_get_port() {
