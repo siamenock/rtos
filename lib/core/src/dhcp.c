@@ -48,7 +48,7 @@ static void return_to_init(DHCPSession* session) {
 	session->next_state[1] = dhcp_init_state;
 }
 
-static bool create_packet(DHCPSession* dhcp_session, uint8_t dhcp_message_type) {
+static bool dhcp_packet_send(DHCPSession* dhcp_session, uint8_t dhcp_message_type) {
 	if(!dhcp_session) {
 		errno = DHCP_ERROR_NO_SESSION;
 		return false;
@@ -220,7 +220,7 @@ static void dhcp_bound_state(DHCPSession* session) {
 static void dhcp_requesting_state(DHCPSession* session) {
 	bool dhcp_resend_callback(void* context) {
 		DHCPSession* state = context;
-		create_packet(state, DHCP_TYPE_REQUEST);
+		dhcp_packet_send(state, DHCP_TYPE_REQUEST);
 		return false;
 	}
 
@@ -261,7 +261,7 @@ static void dhcp_selecting_state(DHCPSession* session) {
 	if(session->offered) {
 		session->offered(session->nic, session->transaction_id, session->your_ip, session->context); 
 	}
-	create_packet(session, DHCP_TYPE_REQUEST);
+	dhcp_packet_send(session, DHCP_TYPE_REQUEST);
 	/* Next transaction states */
 	session->next_state[0] = dhcp_requesting_state;
 	session->next_state[1] = dhcp_init_state;
@@ -274,7 +274,7 @@ static void dhcp_init_state(DHCPSession* session) {
 
 		if(discover_count < 5) {
 			//printf("resend \n\n");
-			create_packet(session, DHCP_TYPE_DISCOVER);
+			dhcp_packet_send(session, DHCP_TYPE_DISCOVER);
 			discover_count++;
 			return true;
 		} else {
@@ -293,7 +293,7 @@ static void dhcp_init_state(DHCPSession* session) {
 	session->current_state = INIT;
 
 	/* Action */
-	create_packet(session, DHCP_TYPE_DISCOVER);
+	dhcp_packet_send(session, DHCP_TYPE_DISCOVER);
 	//dhcp_selecting_state(session);
 	uint64_t timer_id = event_timer_add(dhcp_timercallback, session, 5000000, 5000000);
 	session->discover_timer_id = timer_id;
@@ -365,11 +365,11 @@ bool dhcp_init(NIC* nic) {
 	return true;
 }
 
-static uint32_t dhcp_option_parser(DHCPOption* dop) {
+static uint32_t dhcp_option_parser(DHCPOption* dop, uint8_t option_code) {
 	uint8_t code = dop->code;	
 	uint8_t length = dop->length;	
 	while(dop->code != DHCP_OPTION_END) {		
-		if(code == DHCP_OPTION_LEASE_TIME) {
+		if(code == option_code) {
 			return  endian32(*(uint32_t*)(dop->data));			
 		}
 		dop = (DHCPOption*)(((dop->data) + length));
@@ -428,7 +428,7 @@ bool dhcp_process(Packet* _packet) {
 	dhcp_session->your_ip = endian32(dhcp->yiaddr);
 	dhcp_session->gateway_ip = endian32(dhcp->giaddr);
 	dhcp_session->server_ip = endian32(dhcp->siaddr);
-	lease_time = dhcp_option_parser(dop);
+	lease_time = dhcp_option_parser(dop, DHCP_OPTION_LEASE_TIME);
 	if(lease_time != 0) 
 		dhcp_session->lease_time = lease_time;	
 
