@@ -1458,8 +1458,12 @@ Command commands[] = {
 	},
 	{
 		.name = "lspci",
-		.desc = "Show PCI List",
-		.args = "TODO: Fill here",
+		.desc = "list all PCI Devices",
+		.args = "-t\tShow a tree of bus\n\
+			 -x\tShow hexadeciaml dump of PCI configuration data. (64Bytes)\n\
+			 -xxx\tShow hexademical dump of PCI configuration data. (256Bytes)\n\
+			 -xxxx\tShow hexademical dump of PCI configuration data. (4096Bytes)\n\
+			 -s\tSelect Device [<bus>:][<slot>][.<func>]\n",
 		.func = cmd_lspci
 	},
 	{
