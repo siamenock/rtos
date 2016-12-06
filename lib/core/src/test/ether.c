@@ -9,6 +9,12 @@
 #include <stdio.h>
 
 #define CHAR_SIZE	26
+
+/**
+ * NOTE: There is opinion that this unit test is accomplished by another logic.
+ *		so variable 'comp_buf' is calculated another logic and compared with the returned value of function.
+ */
+
 static char* buffer = "abcdefghijklmnopqrstuvwxyz";	// test string from 'a' to 'z' 
 
 static void read_u8_func(void** state) {
