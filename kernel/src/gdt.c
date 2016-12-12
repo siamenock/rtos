@@ -90,5 +90,5 @@ void tss_init() {
 }
 
 void tss_load() {
-	ltr(0x28 + (mp_apic_id() - BSP_APIC_ID_OFFSET) * 16);		// TSS Segment offset
+	ltr(0x28 + mp_apic_id() * 16);		// TSS Segment offset
 }

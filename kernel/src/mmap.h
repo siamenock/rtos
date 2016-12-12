@@ -25,11 +25,9 @@ extern char DESC_TABLE_AREA_START[];
 extern char DESC_TABLE_AREA_END[];		
 
 extern char GDTR_ADDR[];		
-extern char GDTR_END_ADDR[];	
 extern char GDT_ADDR[];	        
 extern char GDT_END_ADDR[];	
 extern char TSS_ADDR[];	        
-extern char TSS_END_ADDR[];	
 
 extern char IDTR_ADDR[];	
 extern char IDTR_END_ADDR[];	

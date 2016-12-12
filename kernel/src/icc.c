@@ -49,12 +49,12 @@ static bool icc_event(void* context) {
 }
 
 static void icc(uint64_t vector, uint64_t err) {
+	printf("Vector 48 ICC received\n");
 	uint8_t apic_id = mp_apic_id();
 	FIFO* icc_queue = shared->icc_queues[apic_id].icc_queue;
 	ICC_Message* icc_msg = fifo_peek(icc_queue, 0);
 
 	apic_eoi();
-
 
 	if(icc_msg == NULL)
 		return;
@@ -79,8 +79,9 @@ void icc_init() {
 	uint8_t core_count = mp_core_count();
 
 	extern void* gmalloc_pool;
-	uint8_t apic_id = mp_apic_id() - BSP_APIC_ID_OFFSET;
+	uint8_t apic_id = mp_apic_id();
 	if(apic_id == 0) {
+		printf("Auh?\n");
 		int icc_max = core_count * core_count;
 		shared->icc_pool = fifo_create(icc_max, gmalloc_pool);
 
@@ -101,9 +102,10 @@ void icc_init() {
 			}
 		}
 	}
-	
+
 	event_busy_add(icc_event, NULL);
-	
+	printf("ICC init\n");
+
 	apic_register(48, icc);
 }
 

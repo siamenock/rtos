@@ -1,5 +1,8 @@
 #include "entry.h"
 
+#define STACK_SIZE	    512
+#define CORE_COUNT	    16
+
 	.text
 
 	.code64
@@ -17,6 +20,22 @@ startup_64:
 	movq	%rbp, %rdi
 
 	cli
+
+	// Stack setting
+	mov	$0x01, %rax
+	cpuid
+	shrd	$24, %ebx, %ebx
+	and	$0x000000ff, %ebx
+	mov	%rbp, %rsp
+	addq	$stack_top  - __START_KERNEL_map, %rsp
+repeat:
+	sub	$STACK_SIZE, %rsp
+	cmp	$0, %ebx
+	je	next
+
+	sub	$1, %ebx
+	jmp	repeat
+next:
 
 	xorl	%eax, %eax
 	movl	%eax, %ds
@@ -44,6 +63,11 @@ startup_64:
 	pushq	%r14		# target address in negative space
 	lretq
 
+	/* Temporary stack */
+stack_bottom:
+	.fill   STACK_SIZE * CORE_COUNT, 1, 0   # Maximum 16 cores
+stack_top:
+
 	/* Temporary GDT */
 	.section ".data"
 	.balign 16
@@ -61,7 +85,7 @@ gdt_end:
 	/* 
 	 * Description table area 
 	 * */
-	.section ".desc_table", "a", @nobits
+	.section ".desc_table", "w", @nobits
 	.balign 4096 
 	.globl GDTR_ADDR
 GDTR_ADDR:

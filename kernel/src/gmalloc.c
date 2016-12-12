@@ -215,7 +215,6 @@ void gmalloc_init() {
 		printf("\t0x%016lx - 0x%016lx: %s(%d)\n", entry->base, entry->base + entry->length, type, entry->type);
 	}
 
-
 	// Remove reserved blocks
 	for(size_t i = 0; i < list_size(blocks); i++) {
 		Block* b = list_get(blocks, i);

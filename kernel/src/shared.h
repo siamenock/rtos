@@ -14,20 +14,37 @@ typedef struct {
 } Icc;
 
 typedef struct {
-	uint8_t			mp_cores[MP_MAX_CORE_COUNT];
-
-	uint64_t*		gmalloc_pool;
-	uint32_t		bmalloc_count;
-	uint64_t*		bmalloc_pool;
+	volatile uint8_t	mp_cores[MP_MAX_CORE_COUNT];
+		
+    volatile uint8_t    sync[3];
 
 	struct _FIFO*		icc_pool;
 	volatile uint8_t	icc_lock_alloc;
 	volatile uint8_t	icc_lock_free;
+	Icc*			    icc_queues;
 
-	Icc*			icc_queues;
+	uint64_t		    magic;
+} __attribute__ ((packed)) Shared;
 
-	uint64_t		magic;
-} Shared;
+
+/*
+ *typedef struct {
+ *    uint8_t			    mp_cores[MP_MAX_CORE_COUNT];
+ *   
+ *    volatile uint8_t    sync[3];
+ *    uint64_t*           gmalloc_pool;
+ *    uint32_t            bmalloc_count;
+ *    uint64_t*           bmalloc_pool;
+ *
+ *    struct _FIFO*		icc_pool;
+ *    volatile uint8_t	icc_lock_alloc;
+ *    volatile uint8_t	icc_lock_free;
+ *
+ *    Icc*			    icc_queues;
+ *
+ *    uint64_t		    magic;
+ *} Shared;
+ */
 
 Shared* shared;
 

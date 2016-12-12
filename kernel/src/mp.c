@@ -3,6 +3,7 @@
 #include "page.h"
 #include "lock.h"
 #include "mp.h"
+#include "shared.h"
 
 // Ref: http://www.cs.cmu.edu/~410/doc/intel-mp.pdf
 // Ref: http://www.intel.com/design/pentium/datashts/24201606.pdf
@@ -90,25 +91,32 @@ uint8_t mp_core_count() {
 	return core_count;
 }
 
-void mp_sync() {
-	uint32_t map = 1 << apic_id;
-	
-	uint32_t full = 0;
-	for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
-		if(mp_cores[i] != MP_CORE_INVALID)
-			full |= 1 << i;
-	}
-
-	lock_lock(SYNC_LOCK);
-	if(SYNC_MAP == full) {	// The first one
-		SYNC_MAP = map;
-	} else {
-		SYNC_MAP |= map;
-	}
-	lock_unlock(SYNC_LOCK);
-
-	while(SYNC_MAP != full && SYNC_MAP & map)
+void mp_sync(int barrier) {
+//	printf("Sync memory : %p\n", &shared->sync[barrier]);
+	while(!shared->sync[barrier])
 		asm volatile("nop");
+/*
+ *        uint32_t map = 1 << apic_id;
+ *        
+ *        uint32_t full = 0;
+ *        for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
+ *                if(mp_cores[i] != MP_CORE_INVALID)
+ *                        full |= 1 << i;
+ *        }
+ *
+ *        lock_lock(SYNC_LOCK);
+ *        if(SYNC_MAP == full) {	// The first one
+ *                SYNC_MAP = map;
+ *        } else {
+ *                SYNC_MAP |= map;
+ *        }
+ *        lock_unlock(SYNC_LOCK);
+ */
+/*
+ *
+ *        while(SYNC_MAP != full && SYNC_MAP & map)
+ *                asm volatile("nop");
+ */
 }
 
 void mp_parse_fps(MP_Parser* parser, void* context) {

@@ -227,7 +227,8 @@ static void context_switch() {
 	// Send callback message
 	bool is_paused = errno == 0 && task_is_active(1);
 	if(is_paused) {
-		// ICC_TYPE_PAUSE is not a ICC message but a interrupt in fact, So forcely commit the message
+		// ICC_TYPE_PAUSE is not a ICC message but a interrupt in fact, 
+		// so forcely commit the message
 	}
 	
 	ICC_Message* msg3 = icc_alloc(is_paused ? ICC_TYPE_PAUSED : ICC_TYPE_STOPPED);
@@ -418,24 +419,31 @@ static void fixup_page_table(uint8_t apic_id, uint64_t offset) {
 
 	uint64_t pml4 = VIRTUAL_TO_PHYSICAL(PAGE_TABLE_START) + apic_id * 0x200000 + offset;
 	asm volatile("movq %0, %%cr3" : : "r"(pml4));
+	//asm volatile("movq %0, %%rdi" : : "r"(pml4));
 }
 
 void main() {
 	mp_init();
 
-	uint64_t apic_id = mp_apic_id() - BSP_APIC_ID_OFFSET;
+	uint64_t apic_id = mp_apic_id();
 
 	extern uint64_t PHYSICAL_OFFSET;
 	fixup_page_table(apic_id, PHYSICAL_OFFSET);
 	console_init();
 
 	uint64_t vga_buffer = (uint64_t)VGA_BUFFER_START;
-	stdio_init(apic_id, (void*)vga_buffer, 64 * 1024);
+		
+	if(apic_id == 1)
+		stdio_init(0, (void*)vga_buffer, 64 * 1024);
+	else
+		stdio_init(apic_id, (void*)vga_buffer, 64 * 1024);
+
 	malloc_init();
 
 	printf("\nPacketNgin ver 2.0.\n");
 
-	//mp_sync();	// Barrier #1
+	shared_init();
+	mp_sync(0);	// Barrier #1
 	if(apic_id == 0) {
 /*
  *                printf("\x1b""32mOK""\x1b""0m\n");
@@ -452,37 +460,14 @@ void main() {
 		printf("Analyze CPU information...\n");
 		cpu_init();
 		gmalloc_init();
-		shared_init();
+		//shared_init();
 		timer_init(cpu_brand);
 
-
-		void print_pool(char* message, size_t total) {
-			size_t mb = total / 1024 / 1024;
-			size_t kb = total / 1024 - mb * 1024;
-			printf("\n%s: %d.%dMB \n", message, mb, kb);
-		}
-		
-#include "tlsf.h"
-		extern uint64_t* gmalloc_pool;
-		inline size_t gmalloc_total() {
-			return get_total_size(gmalloc_pool);
-		}
-
-
-		printf("Memory pool: ");
-		print_pool("global", gmalloc_total());
 		gdt_init();
-		printf("Memory pool: ");
-		print_pool("global", gmalloc_total());
 		tss_init();
-		printf("Memory pool: ");
-		print_pool("global", gmalloc_total());
 		idt_init();
 
-
-		printf("Memory pool: ");
-		print_pool("global", gmalloc_total());
-		//mp_sync();	// Barrier #2
+		mp_sync(1);	// Barrier #2
 
 		printf("Loading GDT...\n");
 		gdt_load();
@@ -586,8 +571,17 @@ void main() {
 		}
 
 	} else {
-		mp_sync();	// Barrier #2
+		/*
+		 *uint64_t start = VIRTUAL_TO_PHYSICAL(IDT_END_ADDR);
+		 *uint64_t end = VIRTUAL_TO_PHYSICAL((uint64_t)shared);
+		 */
+		/*
+		 *printf("Gmalloc start: %p ~ %p\n", start, end);
+		 */
 		ap_timer_init();
+		printf("Barrier 2\n");
+		mp_sync(1);	// Barrier #2
+		printf("Pass Barrier 2\n");
 
 		gdt_load();
 		tss_load();
@@ -597,8 +591,11 @@ void main() {
 		apic_enable();
 
 		task_init();
-		event_init();
+		int ret;
+		if((ret = event_init()) < 0)
+			printf("Failed to init events %d\n", ret);
 		icc_init();
+		printf("ICC \n");
 		icc_register(ICC_TYPE_START, icc_start);
 		icc_register(ICC_TYPE_RESUME, icc_resume);
 		icc_register(ICC_TYPE_STOP, icc_stop);
@@ -610,14 +607,18 @@ void main() {
 			event_idle_add(idle_hlt_event, NULL);
 	}
 
-/*
- *        mp_sync();
- *
- *        if(apic_id == 0) {
- *                while(exec("/boot/init.psh") > 0)
- *                        event_loop();
- *        }
- */
+	printf("Barrier 3\n");
+	mp_sync(2); // Barrier #3
+	printf("Pass Barrier 3\n");
+
+	printf("Kernel started...\n");
+
+	/*
+	 *if(apic_id == 0) {
+	 *        while(exec("/boot/init.psh") > 0)
+	 *                event_loop();
+	 *}
+	 */
 
 	while(1) {
 		event_loop();

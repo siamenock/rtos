@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define BSP_APIC_ID_OFFSET      1
+#define BSP_APIC_ID_OFFSET  1
 
 #define MP_MAX_CORE_COUNT	16
 #define MP_CORE_INVALID		255
@@ -126,7 +126,7 @@ uint8_t mp_apic_id();
 uint8_t mp_core_id();
 uint8_t mp_apic_id_to_core_id(uint8_t apic_id);
 uint8_t mp_core_count();
-void mp_sync();
+void mp_sync(int barrier);
 void mp_parse_fps(MP_Parser* parser, void* context);
 uint8_t* mp_core_map();
 

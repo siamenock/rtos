@@ -86,17 +86,17 @@ static __always_inline void init_page_tables(uint8_t apic_id, uint64_t offset) {
 	}
 
 	// Kernel global area(code, rodata, modules, gmalloc)
-	int r_base = 1;
-	l4k[1 + r_base].exb = 0;
+	l4k[2].exb = 0;
 
 	// Kernel local area(malloc, TLB, TS, data, bss, stack)
-	l4k[2 + apic_id + r_base] = l4k[2 + r_base];
+	// XXX: is it needed?
+	//l4k[3 + apic_id] = l4k[3];
 
-	l4k[2 + r_base].base = 2 + apic_id + (offset >> 21) + r_base;	// 2 * (2 + apic_id)MB
-	l4k[2 + r_base].p = 1;
-	l4k[2 + r_base].us = 0;
-	l4k[2 + r_base].rw = 1;
-	l4k[2 + r_base].ps = 1;
+	l4k[3].base = 3 + apic_id + (offset >> 21);	// 2 * (2 + apic_id)MB
+	l4k[3].p = 1;
+	l4k[3].us = 0;
+	l4k[3].rw = 1;
+	l4k[3].ps = 1;
 }
 
 static __always_inline void activate_pml4(uint8_t apic_id, uint64_t offset) {
@@ -155,7 +155,7 @@ static __always_inline void init_kernel_stack() {
 	asm volatile("movq %0, %%rbp" : : "m"(kernel_stack_end));
 }
 
-static void copy_bootdata(uint64_t* real_mode_data) {
+static __always_inline void copy_bootdata(uint64_t* real_mode_data) {
 	char* command_line;
 	memcpy(&boot_params, real_mode_data, sizeof(boot_params));
 	if (boot_params.hdr.cmd_line_ptr) {
@@ -212,14 +212,70 @@ static __always_inline void jump_kernel() {
 	asm volatile("lretq" ::);
 }
 
+static __always_inline void copy(void* destination, void* source, uint32_t size) {
+	uint32_t* d = (uint32_t*)destination;
+	uint32_t* s = (uint32_t*)source;
+
+	size = (size + 3) / 4;
+	for(uint32_t i = 0; i < size; i++) {
+		*d++ = *s++;
+	}
+}
+
+static __always_inline void clean(void* addr, uint32_t size) {
+	uint32_t* d = (uint32_t*)addr;
+
+	size = (size + 3) / 4;
+	for(uint32_t i = 0; i < size; i++) {
+		*d++ = 0;
+	}
+}
+
+/*
+ *static __always_inline void copy_kernel_data(uint8_t apic_id) {
+ *        // Clean .data
+ *        //TODO Fix here
+ *        clean((void*)(uint64_t)((KERNEL_DATA_START) 
+ *                                + 0x200000 * (apic_id)), 0x200000);
+ *        // Copy .data
+ *        copy((void*)(uint64_t)((KERNEL_DATA_START) + 0x200000 * (apic_id)), 
+ *                        (void*)(KERNEL_DATA_START), 0x200000);
+ *}
+ */
+
+static __always_inline void copy_kernel_data(uint8_t apic_id, uint64_t offset) {
+	// Clean .data
+	//TODO Fix here
+	clean((void*)(uint64_t)(VIRTUAL_TO_PHYSICAL(KERNEL_DATA_START) 
+				+ 0x200000 * (apic_id)) + offset, 0x200000);
+	// Copy .data
+	copy((void*)(uint64_t)(VIRTUAL_TO_PHYSICAL(KERNEL_DATA_START) 
+				+ 0x200000 * (apic_id)) + offset,
+			(void*)VIRTUAL_TO_PHYSICAL(KERNEL_DATA_START) + offset, 0x200000);
+
+/*
+ *        uint64_t kernel_stack_end = (uint64_t)((VIRTUAL_TO_PHYSICAL(KERNEL_DATA_START) 
+ *                                + 0x200000 * (apic_id)) + offset);
+ *
+ *        uint64_t _kernel_stack_end = (uint64_t)((VIRTUAL_TO_PHYSICAL(KERNEL_DATA_START) 
+ *                                + 0x200000 * (apic_id)) + offset);
+ *
+ *        asm volatile("movq %0, %%rsi" : : "m"(kernel_stack_end));
+ *        asm volatile("movq %0, %%rdi" : : "m"(_kernel_stack_end));
+ */
+}
+		
 /* C entry point of kernel */
 void entry() {
+	// To be deleted
 	uint64_t* real_mode_data;
 	uint64_t offset;
 	save_bootdata(&real_mode_data, &offset);
+	PHYSICAL_OFFSET = offset;
+	// To be deleted
 
-	// APIC ID started with 1, so we have to substract for data structrues
-	uint8_t apic_id = get_apic_id() - BSP_APIC_ID_OFFSET;
+	uint8_t apic_id = get_apic_id();
+	copy_kernel_data(apic_id, offset);
 	init_page_tables(apic_id, offset);
 
 	activate_pae(apic_id);
@@ -227,11 +283,9 @@ void entry() {
 	activate_longmode(apic_id);
 	activate_paging(apic_id);
 
-	copy_bootdata(real_mode_data);
-	PHYSICAL_OFFSET = offset;
-
-	reserve_initrd();
-	reserve_mmap();
+	//copy_bootdata(real_mode_data);
+	//reserve_initrd();
+	//reserve_mmap();
 
 	jump_kernel();
 }
