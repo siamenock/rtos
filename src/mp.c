@@ -98,7 +98,6 @@ uint8_t mp_core_count() {
 
 void mp_sync(int barrier) {
 	shared->sync[barrier] = 1;
-	printf("Sync memory : %p\n", &shared->sync[barrier]);
 /*
  *        uint32_t map = 1 << apic_id;
  *        

@@ -29,6 +29,8 @@ int dispatcher_init() {
 		printf("PacketNgin manager terminated...\n");
 		dispatcher_exit();
 		signal(SIGINT, SIG_DFL);	
+		// Gracefully kill wating for ioctl
+		sleep(1);
 		kill(getpid(), SIGINT);
 	}
 

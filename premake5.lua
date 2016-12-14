@@ -9,7 +9,7 @@ workspace "Penguin"
 
     language "C"
     warnings "Extra"
-    buildoptions { "-std=gnu99", "-mcmodel=large", "-Wno-unused", "-Wno-format", "-Wno-unused-result" }
+    buildoptions { "-DLINUX -std=gnu99", "-mcmodel=large", "-Wno-unused", "-Wno-format", "-Wno-unused-result" }
     linkoptions { "-nostartfiles", "-Wl,-Ttext-segment=0xff00000000" }
 
     project "Manager"

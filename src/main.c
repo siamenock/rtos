@@ -370,9 +370,9 @@ void _timer_init(char* cpu_brand) {
 		printf("Can't Get Symbol Address: \"__timer_ms\"");
 	}
 	uint64_t* ___timer_ms = (uint64_t*)VIRTUAL_TO_PHYSICAL(symbol_addr);
-	printf("Timer symbol : %p - %p\n", symbol_addr, ___timer_ms);
+	printf("\ttimer_ms symbol address: %p - %p\n", symbol_addr, ___timer_ms);
 	*___timer_ms = _frequency / 1000;
-	printf("MS: %x \n", *___timer_ms);
+	printf("\ttimer_ms: %x \n", *___timer_ms);
 
 	symbol_addr = elf_get_symbol("__timer_us");
 	if(!symbol_addr) {
@@ -408,6 +408,10 @@ int main(int argc, char** argv) {
 	if(ret)
 		goto error;
 
+	printf("\nInitializing PacketNgin kernel module...\n");
+	if(dispatcher_init() < 0)
+		goto error;
+
 	 /*
           *"\nMapping Memory to Physical mapping...\n");
           *mapping_physical(smap);
@@ -417,13 +421,17 @@ int main(int argc, char** argv) {
 
 	printf("\nParse Parameter...\n");
 	ret = parse_params(argv[1]);
-	if(ret)
+	if(ret) {
+		printf("\nFailed to parse parameter\n");
 		return ret;
+	}
 
 	printf("\nParse Kernel Arguments...\n");
 	ret = parse_args(kernel_args);
-	if(ret)
+	if(ret) {
+		printf("\nFailed to parse kernel arguments\n");
 		return ret;
+	}
 
 	//TODO mapping memory physical to virtual 1:1
 
@@ -436,10 +444,6 @@ int main(int argc, char** argv) {
 	ret = symbols_init(kernel_elf);
 	if(ret)
 		return ret;
-
-	printf("\nInitializing PacketNgin kernel module...\n");
-	if(dispatcher_init() < 0)
-		goto error;
 
 	/**TODO: Calculate kernel_start_address
 	  * How many memory need for kernel?
@@ -474,19 +478,20 @@ int main(int argc, char** argv) {
 	printf("\nInitializing malloc area...\n");
 	malloc_init();
 
+	printf("\nInitializing timer...\n");
+	_timer_init(cpu_brand);
+
 	printf("\nInitializing mulitiprocessing...\n");
 	mp_init(kernel_start_address);
-	mp_sync(0); // Barrier #1
 
 	printf("\nInitializing cpu...\n");
 	cpu_init();
 
-	//TODO Fix Ramdisk Size
+	// TODO Fix Ramdisk Size
 	printf("\nInitializing gmalloc area...\n");
 	gmalloc_init();
 
-	printf("\nInitializing timer...\n");
-	_timer_init(cpu_brand);
+	mp_sync(0); // Barrier #1
 
 	printf("\nInitilizing GDT...\n");
 	gdt_init();
@@ -506,15 +511,15 @@ int main(int argc, char** argv) {
 	printf("\nInitializing inter-core communications...\n");
 	icc_init();
 
+	printf("\nInitializing VM manager...\n");
+	vm_init();
+
 	printf("\nInitializing linux socket device...\n");
 	socket_init();
 
 	uint16_t nic_count = device_count(DEVICE_TYPE_NIC);
 	printf("\nInitializing NICs: %d\n", nic_count);
 	init_nics(nic_count);
-
-	printf("\nInitializing VM manager...\n");
-	vm_init();
 
 	printf("\nInitializing RPC manager...\n");
 	manager_init();

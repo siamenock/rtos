@@ -833,19 +833,6 @@ static int cmd_vm_delete(int argc, char** argv, void(*callback)(char* result, in
 }
 
 static int cmd_vm_list(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
-//#include "apic.h"
-	/*
-	 *printf("Hello\n");
-	 *apic_write64(APIC_REG_ICR, ((uint64_t)1 << 56) |
-	 *                        APIC_DSH_NONE |
-	 *                        APIC_TM_EDGE |
-	 *                        APIC_LV_DEASSERT |
-	 *                        APIC_DM_PHYSICAL |
-	 *                        APIC_DMODE_FIXED |
-	 *                        48);
-	 *printf("APIC done\n");
-	 */
-	
 	uint32_t vmids[MAX_VM_COUNT];
 	int len = vm_list(vmids, MAX_VM_COUNT);
 
