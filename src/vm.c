@@ -60,9 +60,9 @@ static void icc_started(ICC_Message* msg) {
 		core->stdin_head = msg->data.started.stdin_head;
 		core->stdin_tail = msg->data.started.stdin_tail;
 		core->stdin_size = msg->data.started.stdin_size;
-		core->stdout = (char*)((uint64_t)msg->data.started.stdout - PHYSICAL_OFFSET);
-		core->stdout_head = (size_t*)((uint64_t)msg->data.started.stdout_head - PHYSICAL_OFFSET);
-		core->stdout_tail = (size_t*)((uint64_t)msg->data.started.stdout_tail - PHYSICAL_OFFSET);
+		core->stdout = (char*)((uint64_t)msg->data.started.stdout);
+		core->stdout_head = (size_t*)((uint64_t)msg->data.started.stdout_head);
+		core->stdout_tail = (size_t*)((uint64_t)msg->data.started.stdout_tail);
 		core->stdout_size = msg->data.started.stdout_size;
 		core->stderr = msg->data.started.stderr;
 		core->stderr_head = msg->data.started.stderr_head;
@@ -395,7 +395,6 @@ void vm_init() {
 	}
 
 	event_idle_add(vm_loop, NULL);
-	//event_timer_add(vm_loop, NULL, 0, 1000000);
 }
 
 uint32_t vm_create(VMSpec* vm_spec) {
@@ -734,6 +733,7 @@ void vm_status_set(uint32_t vmid, int status, VM_STATUS_CALLBACK callback, void*
 		} else {
 			cores[vm->cores[i]].error_code = 0;
 			ICC_Message* msg = icc_alloc(icc_type);
+			printf("msg: %p\n", msg);
 			if(status == VM_STATUS_START) {
 				/*
 				 *printf("Hello VM : \n");

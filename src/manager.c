@@ -143,116 +143,118 @@ static List* actives;	/* rpc */
 	/*return ERR_OK;*/
 /*}*/
 
-/*// Handlers*/
-/*static void vm_create_handler(RPC* rpc, VMSpec* vm, void* context, void(*callback)(RPC* rpc, uint32_t id)) {*/
-	/*uint32_t id = vm_create(vm);*/
-	/*callback(rpc, id);*/
-/*}*/
+// Handlers
+static void vm_create_handler(RPC* rpc, VMSpec* vm, void* context, void(*callback)(RPC* rpc, uint32_t id)) {
+	uint32_t id = vm_create(vm);
+	callback(rpc, id);
+}
 
-/*static void vm_get_handler(RPC* rpc, uint32_t vmid, void* context, void(*callback)(RPC* rpc, VMSpec* vm)) {*/
-	/*// TODO: Implement it*/
-	/*callback(rpc, NULL);*/
-/*}*/
+static void vm_get_handler(RPC* rpc, uint32_t vmid, void* context, void(*callback)(RPC* rpc, VMSpec* vm)) {
+	// TODO: Implement it
+	callback(rpc, NULL);
+}
 
-/*static void vm_set_handler(RPC* rpc, VMSpec* vm, void* context, void(*callback)(RPC* rpc, bool result)) {*/
-	/*// TODO: Implement it*/
-	/*callback(rpc, false);*/
-/*}*/
+static void vm_set_handler(RPC* rpc, VMSpec* vm, void* context, void(*callback)(RPC* rpc, bool result)) {
+	// TODO: Implement it
+	callback(rpc, false);
+}
 
-/*static void vm_delete_handler(RPC* rpc, uint32_t vmid, void* context, void(*callback)(RPC* rpc, bool result)) {*/
-	/*bool result = vm_delete(vmid);*/
-	/*callback(rpc, result);*/
-/*}*/
+static void vm_delete_handler(RPC* rpc, uint32_t vmid, void* context, void(*callback)(RPC* rpc, bool result)) {
+	bool result = vm_delete(vmid);
+	callback(rpc, result);
+}
 
-/*static void vm_list_handler(RPC* rpc, int size, void* context, void(*callback)(RPC* rpc, uint32_t* ids, int size)) {*/
-	/*uint32_t ids[16];*/
-	/*size = vm_list(ids, size <= 16 ? size : 16);*/
-	/*callback(rpc, ids, size);*/
-/*}*/
+static void vm_list_handler(RPC* rpc, int size, void* context, void(*callback)(RPC* rpc, uint32_t* ids, int size)) {
+	uint32_t ids[16];
+	size = vm_list(ids, size <= 16 ? size : 16);
+	callback(rpc, ids, size);
+}
 
-/*static void status_get_handler(RPC* rpc, uint32_t vmid, void* context, void(*callback)(RPC* rpc, VMStatus status)) {*/
-	/*VMStatus status = vm_status_get(vmid);*/
-	/*callback(rpc, status);*/
-/*}*/
+static void status_get_handler(RPC* rpc, uint32_t vmid, void* context, void(*callback)(RPC* rpc, VMStatus status)) {
+	//VMStatus status = vm_status_get(vmid);
+	//callback(rpc, status);
+}
 
-/*typedef struct {*/
-	/*RPC* rpc;*/
-	/*struct tcp_pcb*	pcb;*/
-	/*void(*callback)(RPC* rpc, bool result);*/
-/*} Data;*/
+typedef struct {
+	RPC* rpc;
+	struct tcp_pcb*	pcb;
+	void(*callback)(RPC* rpc, bool result);
+} Data;
 
-/*static void status_setted(bool result, void* context) {*/
-	/*Data* data = context;*/
+static void status_setted(bool result, void* context) {
+	Data* data = context;
 	
-	/*if(list_index_of(clients, data->pcb, NULL) >= 0) {*/
-		/*data->callback(data->rpc, result);*/
-	/*}*/
-	/*free(data);*/
-/*}*/
+	if(list_index_of(clients, data->pcb, NULL) >= 0) {
+		data->callback(data->rpc, result);
+	}
+	free(data);
+}
 
-/*static void status_set_handler(RPC* rpc, uint32_t vmid, VMStatus status, void* context, void(*callback)(RPC* rpc, bool result)) {*/
-	/*Data* data = malloc(sizeof(Data));*/
-	/*data->rpc = rpc;*/
-	/*data->pcb = context;*/
-	/*data->callback = callback;*/
+static void status_set_handler(RPC* rpc, uint32_t vmid, VMStatus status, void* context, void(*callback)(RPC* rpc, bool result)) {
+	Data* data = malloc(sizeof(Data));
+	data->rpc = rpc;
+	data->pcb = context;
+	data->callback = callback;
 	
-	/*vm_status_set(vmid, status, status_setted, data);*/
-/*}*/
+	vm_status_set(vmid, status, status_setted, data);
+}
 
-/*static void storage_download_handler(RPC* rpc, uint32_t vmid, uint64_t download_size, uint32_t offset, int32_t size, void* context, void(*callback)(RPC* rpc, void* buf, int32_t size)) {*/
-	/*if(size < 0) {*/
-		/*callback(rpc, NULL, size);*/
-	/*} else {*/
-		/*void* buf;*/
-		/*if(download_size)*/
-			/*size = vm_storage_read(vmid, &buf, offset, (offset + size > download_size) ? (download_size - offset) : (uint32_t)size);*/
-		/*else*/
-			/*size = vm_storage_read(vmid, &buf, offset, (uint32_t)size);*/
+static void storage_download_handler(RPC* rpc, uint32_t vmid, uint64_t download_size, uint32_t offset, int32_t size, void* context, void(*callback)(RPC* rpc, void* buf, int32_t size)) {
+	if(size < 0) {
+		callback(rpc, NULL, size);
+	} else {
+		void* buf;
+		if(download_size)
+			//size = vm_storage_read(vmid, &buf, offset, (offset + size > download_size) ? (download_size - offset) : (uint32_t)size);
+		//else
+			//size = vm_storage_read(vmid, &buf, offset, (uint32_t)size);
 
-		/*callback(rpc, buf, size);*/
-	/*}*/
-/*}*/
+		callback(rpc, buf, size);
+	}
+}
 
-/*static void storage_upload_handler(RPC* rpc, uint32_t vmid, uint32_t offset, void* buf, int32_t size, void* context, void(*callback)(RPC* rpc, int32_t size)) {*/
-	/*if(size < 0) {*/
-		/*callback(rpc, size);*/
-	/*} else {*/
-		/*if(offset == 0) {*/
-			/*ssize_t len;*/
-			/*if((len = vm_storage_clear(vmid)) < 0) {*/
-				/*callback(rpc, len);*/
-				/*return;*/
-			/*}*/
-		/*}*/
+static void storage_upload_handler(RPC* rpc, uint32_t vmid, uint32_t offset, void* buf, int32_t size, void* context, void(*callback)(RPC* rpc, int32_t size)) {
+	if(size < 0) {
+		callback(rpc, size);
+	} else {
+		if(offset == 0) {
+			ssize_t len;
+			/*
+			 *if((len = vm_storage_clear(vmid)) < 0) {
+			 *        callback(rpc, len);
+			 *        return;
+			 *}
+			 */
+		}
 		
-		/*if(size < 0) {*/
-			/*printf(". Aborted: %d\n", size);*/
-			/*callback(rpc, size);*/
-		/*} else {*/
-			/*size = vm_storage_write(vmid, buf, offset, size);*/
-			/*callback(rpc, size);*/
+		if(size < 0) {
+			printf(". Aborted: %d\n", size);
+			callback(rpc, size);
+		} else {
+			size = vm_storage_write(vmid, buf, offset, size);
+			callback(rpc, size);
 			 
-			/*if(size > 0)*/
-				/*printf(".");*/
-			/*else if(size == 0)*/
-				/*printf(". Done\n");*/
-			/*else if(size < 0)*/
-				/*printf(". Error: %d\n", size);*/
-		/*}*/
-	/*}*/
-/*}*/
+			if(size > 0)
+				printf(".");
+			else if(size == 0)
+				printf(". Done\n");
+			else if(size < 0)
+				printf(". Error: %d\n", size);
+		}
+	}
+}
 
-/*static void stdio_handler(RPC* rpc, uint32_t id, uint8_t thread_id, int fd, char* str, uint16_t size, void* context, void(*callback)(RPC* rpc, uint16_t size)) {*/
-	/*ssize_t len = vm_stdio(id, thread_id, fd, str, size);*/
-	/*callback(rpc, len >= 0 ? len : 0);*/
-/*}*/
+static void stdio_handler(RPC* rpc, uint32_t id, uint8_t thread_id, int fd, char* str, uint16_t size, void* context, void(*callback)(RPC* rpc, uint16_t size)) {
+	ssize_t len = vm_stdio(id, thread_id, fd, str, size);
+	callback(rpc, len >= 0 ? len : 0);
+}
 
-/*static void storage_md5_handler(RPC* rpc, uint32_t id, uint64_t size, void* context, void(*callback)(RPC* rpc, bool result, uint32_t md5[])) {*/
-	/*uint32_t md5sum[4];*/
-	/*bool ret = vm_storage_md5(id, size, md5sum);*/
+static void storage_md5_handler(RPC* rpc, uint32_t id, uint64_t size, void* context, void(*callback)(RPC* rpc, bool result, uint32_t md5[])) {
+	uint32_t md5sum[4];
+	//bool ret = vm_storage_md5(id, size, md5sum);
 
-	/*callback(rpc, ret, md5sum);*/
-/*}*/
+	//callback(rpc, ret, md5sum);
+}
 
 /*// PCB utility*/
 /*static int pcb_read(RPC* rpc, void* buf, int size) {*/
@@ -301,17 +303,38 @@ static List* actives;	/* rpc */
 	/*manager_close(data->pcb, rpc, false);*/
 /*}*/
 
-/*
- *static bool manager_accept(void* context) {
- *        return false;
- *}
- *
- */
+
+static bool manager_accept_loop(void* rpc) {
+	// RPC socket is nonblocking 
+	RPC* crpc = rpc_accept((RPC*)rpc);
+	if(!crpc)
+		return true;
+
+	rpc_vm_create_handler(crpc, vm_create_handler, NULL);
+	rpc_vm_get_handler(crpc, vm_get_handler, NULL);
+	rpc_vm_set_handler(crpc, vm_set_handler, NULL);
+	rpc_vm_delete_handler(crpc, vm_delete_handler, NULL);
+	rpc_vm_list_handler(crpc, vm_list_handler, NULL);
+	rpc_status_get_handler(crpc, status_get_handler, NULL);
+	rpc_status_set_handler(crpc, status_set_handler, NULL); //pcb);
+	rpc_storage_download_handler(crpc, storage_download_handler, NULL);
+	rpc_storage_upload_handler(crpc, storage_upload_handler, NULL);
+	rpc_stdio_handler(crpc, stdio_handler, NULL);
+	rpc_storage_md5_handler(crpc, storage_md5_handler, NULL);
+
+	if(list_index_of(actives, crpc, NULL) < 0) 
+		list_add(actives, crpc);
+
+	printf("Manager RPC accepted : %p\n", crpc);
+
+	return true;
+}
+
 static err_t manager_accept(void* arg, struct tcp_pcb* pcb, err_t err) {
-	struct tcp_pcb_listen* server = arg;
-	tcp_accepted(server);
-	printf("Accepted: %p\n", pcb);
 	/*
+	 *struct tcp_pcb_listen* server = arg;
+	 *tcp_accepted(server);
+	 *printf("Accepted: %p\n", pcb);
 	 *
 	 *RPC* rpc = malloc(sizeof(RPC) + sizeof(RPCData));
 	 *memset(rpc, 0x0, sizeof(RPC) + sizeof(RPCData));
@@ -339,10 +362,10 @@ static err_t manager_accept(void* arg, struct tcp_pcb* pcb, err_t err) {
 	 *tcp_recv(pcb, manager_recv);
 	 *tcp_err(pcb, manager_err);
 	 *tcp_poll(pcb, manager_poll, 2);
+	 *
+	 *list_add(clients, pcb);
+	 *
 	 */
-	
-	list_add(clients, pcb);
-	
 	return ERR_OK;
 }
 
@@ -435,7 +458,7 @@ err_t tcp_bind(struct tcp_pcb *pcb, ip_addr_t *ipaddr, u16_t port) {
 	return ERR_OK;
 }
 
-#undef tcp_listen
+#undef tcp_listen  // Invalidate lwip symbol
 struct tcp_pcb * tcp_listen(struct tcp_pcb *pcb) {
 	// Use local_ip for socket descriptor
 	int fd = pcb->local_ip.addr;
@@ -457,36 +480,45 @@ void tcp_accept(struct tcp_pcb *pcb, tcp_accept_fn accept) {
 }
 
 static bool manager_server_open() {
-	struct ip_addr ip;
-	IP4_ADDR(&ip, (manager_ip >> 24) & 0xff, (manager_ip >> 16) & 0xff, (manager_ip >> 8) & 0xff, (manager_ip >> 0) & 0xff);
-	
-	manager_server = tcp_new();
-	if(!manager_server) {
-		printf("ERROR: TCP control block allocation failed\n");
-
+/*
+ *        struct ip_addr ip;
+ *        IP4_ADDR(&ip, (manager_ip >> 24) & 0xff, (manager_ip >> 16) & 0xff, (manager_ip >> 8) & 0xff, (manager_ip >> 0) & 0xff);
+ *        
+ *        manager_server = tcp_new();
+ *        if(!manager_server) {
+ *                printf("ERROR: TCP control block allocation failed\n");
+ *
+ *                return false;
+ *        }
+ *        
+ *        err_t err = tcp_bind(manager_server, &ip, manager_port);
+ *        if(err != ERR_OK) {
+ *                printf("ERROR: Manager cannot bind TCP session: %d\n", err);
+ *
+ *                return false;
+ *        }
+ *        
+ *        manager_server = tcp_listen(manager_server);
+ *        tcp_arg(manager_server, manager_server);
+ *        
+ *        printf("Manager started: %d.%d.%d.%d:%d\n", (manager_ip >> 24) & 0xff, (manager_ip >> 16) & 0xff,
+ *                (manager_ip >> 8) & 0xff, (manager_ip >> 0) & 0xff, manager_port);
+ *        
+ *        tcp_accept(manager_server, manager_accept);
+ */
+	RPC* rpc = rpc_listen(DEFAULT_MANAGER_PORT);
+	if(!rpc) {
+		perror("\tFailed to listen RPC server socket\n");
 		return false;
 	}
-	
-	err_t err = tcp_bind(manager_server, &ip, manager_port);
-	if(err != ERR_OK) {
-		printf("ERROR: Manager cannot bind TCP session: %d\n", err);
 
-		return false;
-	}
-	
-	manager_server = tcp_listen(manager_server);
-	tcp_arg(manager_server, manager_server);
-	
-	printf("Manager started: %d.%d.%d.%d:%d\n", (manager_ip >> 24) & 0xff, (manager_ip >> 16) & 0xff,
-		(manager_ip >> 8) & 0xff, (manager_ip >> 0) & 0xff, manager_port);
-	
-	tcp_accept(manager_server, manager_accept);
-	
 	if(clients == NULL)
 		clients = list_create(NULL);
 
 	if(actives == NULL)
 		actives = list_create(NULL);
+	
+	event_idle_add(manager_accept_loop, (void*)rpc);
 
 	return true;
 }
@@ -510,19 +542,26 @@ static bool manager_server_open() {
 
 	/*return true;*/
 /*}*/
+
 static bool manager_loop(void* context) {
-//	nic_poll();
-	
+//	nic_poll(); 
 	if(!list_is_empty(actives)) {
 		ListIterator iter;
 		list_iterator_init(&iter, actives);
 		while(list_iterator_has_next(&iter)) {
 			RPC* rpc = list_iterator_next(&iter);
-			if(rpc_is_active(rpc)) {
-				rpc_loop(rpc);
-			} else {
-				list_iterator_remove(&iter);
+			//if(rpc_is_active(rpc)) {
+			static bool first = false;
+			if(!first) {
+				printf("RPC : %p\n", rpc);
+				first = true;
 			}
+			rpc_loop(rpc);
+			/*
+			 *} else {
+			 *        list_iterator_remove(&iter);
+			 *}
+			 */
 		}
 	}
 	
@@ -576,7 +615,10 @@ void manager_init() {
 	
 	//manager_netif = nic_init(manager_nic->nic, manage, NULL);
 	
-	manager_server_open();
+	if(!manager_server_open()) {
+		printf("\tFailed to open manager server\n");
+		return;
+	}
 	
 	event_idle_add(manager_loop, NULL);
 	//event_timer_add(manager_timer, NULL, 100000, 100000);

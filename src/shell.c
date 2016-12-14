@@ -36,13 +36,13 @@ static bool script_process() {
 	if(fd == -1)
 		return false;
 
-	command_process(fd);
+ 	command_process(fd);
 
 	return true;
 }
 
 bool shell_init() {
-	cmd_init();
+ 	cmd_init();
 
 	static fd_set stdin;
 	FD_ZERO(&stdin);

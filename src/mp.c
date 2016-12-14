@@ -1,8 +1,11 @@
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
+#include <syscall.h>
 #include "lock.h"
 #include "shared.h"
 #include "mp.h"
+#include "mmap.h"
 
 // Ref: http://www.cs.cmu.edu/~410/doc/intel-mp.pdf
 // Ref: http://www.intel.com/design/pentium/datashts/24201606.pdf
@@ -10,32 +13,50 @@
 // Ref: http://www.bioscentral.com/misc/cmosmap.htm
 // Ref: http://www.singlix.com/trdos/UNIX_V1/xv6/lapic.c
 
-static uint8_t mp_cores[MP_MAX_CORE_COUNT];
+int cpu_start;
+int cpu_end;
 
 static uint8_t apic_id;		// APIC ID
 static uint8_t core_id;
 static uint8_t core_count;
 
-static uint32_t sync_map;
-#define SYNC_MAP	*(uint32_t volatile*)VIRTUAL_TO_PHYSICAL((uint64_t)&sync_map)
-static uint8_t sync_lock;
-#define SYNC_LOCK	(uint8_t volatile*)VIRTUAL_TO_PHYSICAL((uint64_t)&sync_lock)
+//extern uint64_t _ioapic_address;
+extern uint64_t _apic_address;
 
-void mp_init() {
-//	printf("Core address : %p", shared->mp_cores);
-	memcpy(mp_cores, shared->mp_cores, sizeof(mp_cores));
-	
-	/*
-	 *printf("MP Cores : ");
-	 *for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
-	 *        printf("%02x ", mp_cores[i]);
-	 *}
-	 *printf("\n");
-	 */
+#define __NR_multikernel_boot 312
+static void wakeup_ap(long kernel_start_address) {
+	if(!cpu_end)
+		return;
+
+	printf("\tBooting APs : %p\n", kernel_start_address);
+	for(int cpu = cpu_start; cpu < cpu_end + 1; cpu++) {
+		int apicid = syscall(__NR_multikernel_boot, cpu, kernel_start_address);
+		if(apicid < 0) {
+			continue;
+		}
+		shared->mp_cores[apicid] = cpu;
+		core_count++;
+		printf("\t\tAPIC ID: %d CPU ID: %d\n", apicid, cpu);
+	}
+	printf("Done\n");
+}
+
+void mp_init0() {
+	_apic_address = 0xfee00000;
+
+	apic_id = 0;
+}
+
+void mp_init(unsigned long kernel_start_address) {
+	core_id = 0;
+	core_count = 1;
+
+	shared->mp_cores[apic_id] = core_id;
+ 	wakeup_ap(kernel_start_address);
 }
 
 uint8_t mp_apic_id() {
-	return 0; //apic_id;
+	return apic_id;
 }
 
 uint8_t mp_core_id() {
@@ -43,7 +64,7 @@ uint8_t mp_core_id() {
 }
 
 uint8_t mp_apic_id_to_core_id(uint8_t apic_id) {
-	return mp_cores[apic_id];
+	return shared->mp_cores[apic_id];
 }
 
 uint8_t mp_core_count() {
@@ -51,7 +72,33 @@ uint8_t mp_core_count() {
 }
 
 /*
- *void mp_sync() {
+ *void mp_sync0() {
+ *        uint32_t map = 1 << apic_id;
+ *        
+ *        uint32_t full = 0;
+ *        for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
+ *                if(shared->mp_cores[i] != MP_CORE_INVALID)
+ *                        full |= 1 << i;
+ *        }
+ *
+ *        lock_lock(&shared->sync_lock);
+ *        shared->sync_map |= map;
+ *        lock_unlock(&shared->sync_lock);
+ *
+ *        while(shared->sync_map != full && shared->sync_map & map) {
+ *                full = 0;
+ *                for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
+ *                        if(shared->mp_cores[i] != MP_CORE_INVALID)
+ *                                full |= 1 << i;
+ *                }
+ *                __asm volatile("nop");
+ *        }
+ *}
+ */
+
+void mp_sync(int barrier) {
+	shared->sync[barrier] = 1;
+/*
  *        uint32_t map = 1 << apic_id;
  *        
  *        uint32_t full = 0;
@@ -67,11 +114,38 @@ uint8_t mp_core_count() {
  *                SYNC_MAP |= map;
  *        }
  *        lock_unlock(SYNC_LOCK);
+ */
+/*
  *
  *        while(SYNC_MAP != full && SYNC_MAP & map)
  *                asm volatile("nop");
- *}
+ */
+}
+
+/*
+ *void mp_sync() {
+ *        uint32_t map = 1 << apic_id;
+ *        
+ *        uint32_t full = 0;
+ *        for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
+ *                if(shared->mp_cores[i] != MP_CORE_INVALID)
+ *                        full |= 1 << i;
+ *        }
  *
+ *        lock_lock(&shared->sync_lock);
+ *        if(shared->sync_map == full) {	// The first one
+ *                shared->sync_map = map;
+ *        } else {
+ *                shared->sync_map |= map;
+ *        }
+ *        lock_unlock(&shared->sync_lock);
+ *
+ *        while(shared->sync_map != full && shared->sync_map & map)
+ *                __asm volatile("nop");
+ *}
+ */
+
+/*
  *void mp_parse_fps(MP_Parser* parser, void* context) {
  *        MP_FloatingPointerStructure* find_FloatingPointerStructure() {
  *                bool is_FloatingPointerStructure(uint8_t* p) {
@@ -184,5 +258,5 @@ uint8_t mp_core_count() {
  *
  */
 uint8_t* mp_core_map() {
-	return mp_cores;
+	return shared->mp_cores;
 }

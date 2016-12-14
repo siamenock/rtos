@@ -13,12 +13,14 @@
 
 #define MP_CORE(ptr, id)        (void*)((uint64_t)(ptr) + id * 0x200000)
 
-void mp_init();
+void mp_init0();
+void mp_init(unsigned long kernel_start_address);
 uint8_t mp_apic_id();
 uint8_t mp_core_id();
 uint8_t mp_apic_id_to_core_id(uint8_t apic_id);
 uint8_t mp_core_count();
-void mp_sync();
+
+void mp_sync(int barrier);
 uint8_t* mp_core_map();
 
 #endif /* __MP_H__ */
