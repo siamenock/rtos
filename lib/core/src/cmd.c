@@ -45,14 +45,19 @@ int cmd_help(int argc, char** argv, void(*callback)(char* result, int exit_statu
 		}
 		printf("no help topics match '%s'\n", argv[1]);
 		if(callback != NULL)
-			callback("false", 0);
+			callback("", 0);
 
+		return 0;
+	} else if(argc >= 3) {
+		printf("Too much arguments");
+		if(callback != NULL)
+			callback("", 0);
 		return 0;
 	}
 
 end:
 	if(callback != NULL)
-		callback("true", 0);
+		callback("", 0);
 
         return 0;
 }
