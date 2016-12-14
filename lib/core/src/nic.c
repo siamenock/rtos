@@ -26,7 +26,7 @@ NIC* nic_get(int i) {
 Packet* nic_alloc(NIC* nic, uint16_t size) {
 	Packet* packet = __malloc(sizeof(Packet) + size + 4 /* VLAN padding */ + ALIGN - 1, nic->pool);
 	if(packet) {
-		bzero(packet, sizeof(Packet));
+		memset(packet, 0x0, sizeof(Packet));
 		packet->nic = nic;
 		packet->size = size + ALIGN - 1;
 		packet->start = (((uintptr_t)packet->buffer + 4 /* VLAN padding */ + ALIGN - 1) & ~(ALIGN - 1)) - (uintptr_t)packet->buffer;

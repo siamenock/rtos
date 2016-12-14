@@ -14,7 +14,7 @@
 
 #define VERSION		"0.1.0"
 #define DEFAULT_HOST	"192.168.100.254"
-#define DEFAULT_PORT	111
+#define DEFAULT_PORT	1111
 #define MAX_LINE_SIZE	2048
 
 #define ERROR_RPC_DISCONNECTED	-10000
@@ -892,7 +892,7 @@ int main(int _argc, char** _argv) {
 
 		if(exit_status != 0) {
 			if(exit_status == CMD_STATUS_WRONG_NUMBER) {
-				printf("wrong number of arguments\n");
+				printf("Wrong number of arguments\n");
 
 				return ERROR_CMD_EXECUTE;
 			} else if(exit_status == CMD_STATUS_NOT_FOUND) {

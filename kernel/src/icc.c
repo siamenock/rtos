@@ -81,7 +81,6 @@ void icc_init() {
 	extern void* gmalloc_pool;
 	uint8_t apic_id = mp_apic_id();
 	if(apic_id == 0) {
-		printf("Auh?\n");
 		int icc_max = core_count * core_count;
 		shared->icc_pool = fifo_create(icc_max, gmalloc_pool);
 
@@ -104,7 +103,6 @@ void icc_init() {
 	}
 
 	event_busy_add(icc_event, NULL);
-	printf("ICC init\n");
 
 	apic_register(48, icc);
 }

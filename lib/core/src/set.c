@@ -27,7 +27,7 @@ Set* set_create(size_t initial_capacity, uint64_t(*hash)(void*), bool(*equals)(v
 		return NULL;
 	}
 
-	bzero(set->table, sizeof(List*) * capacity);
+	memset(set->table, 0x0, sizeof(List*) * capacity);
 	set->capacity = capacity;
 	set->threshold = THRESHOLD(capacity);
 	set->size = 0;
@@ -74,7 +74,7 @@ bool set_put(Set* set, void* data) {
 		set2.table = __malloc(sizeof(List*) * capacity, set->pool);
 		if(!set2.table)
 			return false;
-		bzero(set2.table, sizeof(List*) * capacity);
+		memset(set2.table, 0x0, sizeof(List*) * capacity);
 		set2.capacity = capacity;
 		set2.threshold = THRESHOLD(capacity);
 		set2.size = 0;

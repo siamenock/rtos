@@ -11,9 +11,6 @@ Shared* shared;
 
 void shared_init() {
 	shared = (Shared*)(DESC_TABLE_AREA_END - sizeof(Shared));
-//	memset(shared, 0x0, sizeof(Shared));
-	printf("Shared : %p\n",shared);
-	printf("Shared magic : %p\n", shared->magic);
 
 /*
  *        // Core mapping info

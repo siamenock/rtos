@@ -8,7 +8,7 @@ IPv4Interface* interface_alloc(void* pool) {
 	if(!interface)
 		return NULL;
 
-	bzero(interface, size);
+	memset(interface, 0x0, size);
 
 	return interface;
 }

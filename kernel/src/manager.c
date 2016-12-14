@@ -433,6 +433,7 @@ static bool manager_server_close() {
 
 	return true;
 }
+
 static bool manager_loop(void* context) {
 	nic_poll();
 	

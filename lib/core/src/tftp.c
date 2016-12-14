@@ -50,7 +50,7 @@ static Session* create(Packet* packet, IP* ip, UDP* udp, TFTPCallback* callback)
 	index++;
 	
 	Session* session = malloc(sizeof(Session));
-	bzero(session, sizeof(Session));
+	memset(session, 0x0, sizeof(Session));
 	session->nic = packet->nic;
 	session->saddr = endian32(ip->destination);
 	session->sport = udp_port_alloc(session->nic, session->saddr);

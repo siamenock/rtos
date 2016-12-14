@@ -24,8 +24,9 @@ int cmd_help(int argc, char** argv, void(*callback)(char* result, int exit_statu
 			       putchar(' ');
 			if(commands[i].args != NULL) {
 				printf("%s  %s\n", commands[i].desc, commands[i].args);
-			} else
+			} else {
 				printf("%s\n", commands[i].desc);
+			}
 		}
 	} else if(argc == 2) {
 		for(int i = 0; commands[i].name != NULL; i++) {

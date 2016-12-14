@@ -442,8 +442,8 @@ void main() {
 
 	printf("\nPacketNgin ver 2.0.\n");
 
-	shared_init();
 	mp_sync(0);	// Barrier #1
+	shared_init();
 	if(apic_id == 0) {
 /*
  *                printf("\x1b""32mOK""\x1b""0m\n");
@@ -591,11 +591,8 @@ void main() {
 		apic_enable();
 
 		task_init();
-		int ret;
-		if((ret = event_init()) < 0)
-			printf("Failed to init events %d\n", ret);
+		event_init();
 		icc_init();
-		printf("ICC \n");
 		icc_register(ICC_TYPE_START, icc_start);
 		icc_register(ICC_TYPE_RESUME, icc_resume);
 		icc_register(ICC_TYPE_STOP, icc_stop);

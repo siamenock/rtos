@@ -38,7 +38,7 @@ static List* idle_events;
 void event_init() {
 #ifndef LINUX
 	extern uint64_t __timer_ms;
-	if(!__timer_ms)
+	if(!__timer_ms) 
 		return;
 #endif
 
@@ -97,13 +97,9 @@ int event_loop() {
 	
 	// Trigger events
 	while(list_size(triggers) > 0) {
-		printf("Trigger event\n");
 		Trigger* trigger = list_remove_first(triggers);
-		printf("Trigger select\n");
 		fire(trigger->event_id, trigger->event, trigger->last, trigger->last_context);
-		printf("Fired\n");
 		free(trigger);
-		printf("Freed\n");
 		
 		count++;
 	}

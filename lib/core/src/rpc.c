@@ -1,6 +1,7 @@
 #include <string.h>
 #include <strings.h>
 #include <malloc.h>
+#include <fcntl.h>
 #include "control/rpc.h"
 
 struct {
@@ -253,7 +254,7 @@ static int read_vm(RPC* rpc, VMSpec** vm2) {
 	if(!vm) {
 		return -10;
 	}
-	bzero(vm, sizeof(VMSpec));
+	memset(vm, 0x0, sizeof(VMSpec));
 	
 	void failed() {
 		if(vm)
@@ -278,7 +279,7 @@ static int read_vm(RPC* rpc, VMSpec** vm2) {
 		uint16_t len2;
 		READ2(read_string(rpc, &ch, &len2), failed);
 		vm->nics[i].dev = (char*)malloc(len2 + 1);
-		bzero(vm->nics[i].dev, len2 + 1);
+		memset(vm->nics[i].dev, 0x0, len2 + 1);
 		memcpy(vm->nics[i].dev, ch, len2);
 
 		READ2(read_uint32(rpc, &vm->nics[i].input_buffer_size), failed);
@@ -306,7 +307,7 @@ static int read_vm(RPC* rpc, VMSpec** vm2) {
 		failed();
 		return -2;
 	}
-	bzero(vm->argv, argv_size);
+	memset(vm->argv, 0x0, argv_size);
 	char* str = (void*)vm->argv + sizeof(char**) * vm->argc;
 	
 	rpc->rbuf_read = rbuf_read;
@@ -1360,7 +1361,7 @@ RPC* rpc_open(const char* host, int port, int timeout) {
 	}
 	
 	struct sockaddr_in addr;
-	bzero(&addr, sizeof(struct sockaddr_in));
+	memset(&addr, 0x0, sizeof(struct sockaddr_in));
 	addr.sin_family = AF_INET;
 	addr.sin_addr.s_addr = inet_addr(host);
 	addr.sin_port = htons(port);
@@ -1402,7 +1403,7 @@ RPC* rpc_listen(int port) {
 	setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
 	
 	struct sockaddr_in addr;
-	bzero(&addr, sizeof(struct sockaddr_in));
+	memset(&addr, 0x0, sizeof(struct sockaddr_in));
 	addr.sin_family = AF_INET;
 	addr.sin_addr.s_addr = htonl(INADDR_ANY);
 	addr.sin_port = htons(port);
@@ -1412,7 +1413,7 @@ RPC* rpc_listen(int port) {
 	}
 	
 	RPC* rpc = malloc(sizeof(RPC) + sizeof(RPCData));
-	bzero(rpc, sizeof(RPC));
+	memset(rpc, 0x0, sizeof(RPC));
 	RPCData* data = (RPCData*)rpc->data;
 	data->fd = fd;
 	
@@ -1421,13 +1422,19 @@ RPC* rpc_listen(int port) {
 
 RPC* rpc_accept(RPC* srpc) {
 	RPCData* data = (RPCData*)srpc->data;
-	
 	if(listen(data->fd, 5) < 0) {
 		return NULL;
 	}
 	
 	struct sockaddr_in caddr;
 	socklen_t len = sizeof(struct sockaddr_in);
+
+	// TODO: would rather change to nonblock socket
+	int rc = fcntl(data->fd, F_SETFL, fcntl(data->fd, F_GETFL, 0) | O_NONBLOCK);
+	if(rc < 0) {
+		perror("Failed to modifiy socket to nonblock\n");
+	}
+		    
 	int fd = accept(data->fd, (struct sockaddr*)&caddr, &len);
 	if(fd < 0) {
 		return NULL;
