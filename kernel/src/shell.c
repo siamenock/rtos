@@ -40,7 +40,7 @@
 #define MAX_VM_COUNT	128
 #define MAX_VNIC_COUNT	32
 
-bool cmd_async;
+bool cmd_sync;
 
 #ifdef TEST
 #include "test.h"
@@ -950,7 +950,7 @@ static int cmd_status_set(int argc, char** argv, void(*callback)(char* result, i
 		return -1;
 	}
 	
-	cmd_async = true;
+	cmd_sync = true;
 	vm_status_set(vmid, status, status_setted, callback);
 	
 	return 0;
@@ -1264,7 +1264,7 @@ Command commands[] = {
 
 static void cmd_callback(char* result, int exit_status) {
 	cmd_update_var(result, exit_status);
-	cmd_async = false;
+	cmd_sync = false;
 	printf("%s\n", result);
 }
 
@@ -1273,7 +1273,7 @@ void shell_callback() {
 	static int cmd_idx = 0;
 	extern Device* device_stdout;
 
-	if(cmd_async)
+	if(cmd_sync)
 		return;
 
 	int ch = stdio_getchar();
@@ -1330,7 +1330,7 @@ void shell_callback() {
 					putchar(ch);
 				}
 		}
-		if(cmd_async)
+		if(cmd_sync)
 			break;
 		
 		ch = stdio_getchar();
@@ -1343,7 +1343,7 @@ void shell_init() {
 	
 	extern Device* device_stdin;
 	((CharIn*)device_stdin->driver)->set_callback(device_stdin->id, shell_callback);
-	cmd_async = false;
+	cmd_sync = false;
 	cmd_init();
 }
 
