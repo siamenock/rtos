@@ -89,7 +89,7 @@ void icc_init() {
 			fifo_push(shared->icc_pool, icc_message);
 		}
 
-		shared->icc_queues = __malloc(MP_MAX_CORE_COUNT * sizeof(Icc), gmalloc_pool);
+		shared->icc_queues = __malloc(MP_MAX_CORE_COUNT * sizeof(ICC), gmalloc_pool);
 
 		lock_init(&shared->icc_lock_alloc);
 

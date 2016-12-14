@@ -11,7 +11,7 @@ struct _FIFO;
 typedef struct {
 	struct _FIFO*		icc_queue;
 	volatile uint8_t 	icc_queue_lock;
-} Icc;
+} ICC;
 
 typedef struct {
 	volatile uint8_t	mp_cores[MP_MAX_CORE_COUNT];
@@ -21,7 +21,7 @@ typedef struct {
 	struct _FIFO*		icc_pool;
 	volatile uint8_t	icc_lock_alloc;
 	volatile uint8_t	icc_lock_free;
-	Icc*			    icc_queues;
+	ICC*			    icc_queues;
 
 	uint64_t		    magic;
 } __attribute__ ((packed)) Shared;
@@ -40,7 +40,7 @@ typedef struct {
  *    volatile uint8_t	icc_lock_alloc;
  *    volatile uint8_t	icc_lock_free;
  *
- *    Icc*			    icc_queues;
+ *    ICC*			    icc_queues;
  *
  *    uint64_t		    magic;
  *} Shared;
