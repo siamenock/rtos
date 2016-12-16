@@ -757,7 +757,7 @@ static int cmd_md5(int argc, char** argv, void(*callback)(char* result, int exit
 
 	if(ret) {
 		printf("%s\n", cmd_result);
-		callback("", 0);
+		callback("true", 0);
 	}
 	return 0;
 }
@@ -889,7 +889,7 @@ static int cmd_create(int argc, char** argv, void(*callback)(char* result, int e
 	} else {
 		sprintf(cmd_result, "%d", vmid);
 		printf("%s\n", cmd_result);
-		callback("", 0);
+		callback("ture", 0);
 	}
 	for(int i = 0; i < vm->nic_count; i++) {
 		free(vm->nics[i].dev);
@@ -912,10 +912,13 @@ static int cmd_vm_delete(int argc, char** argv, void(*callback)(char* result, in
 	uint32_t vmid = parse_uint32(argv[1]);
 	bool ret = vm_delete(vmid);
 
-	if(ret)
+	if(ret) {
+		printf("vm delete success");
 		callback("true", 0);
-	else
+	} else {
+		printf("vm delete fail");
 		callback("false", -1);
+	}
 
 	return 0;
 }
@@ -925,6 +928,13 @@ static int cmd_vm_list(int argc, char** argv, void(*callback)(char* result, int 
 	int len = vm_list(vmids, MAX_VM_COUNT);
 
 	char* p = cmd_result;
+
+	if(len <= 0) {
+		printf("VM not found\n");
+		callback("false", 0);
+		return 0;
+	}
+	
 	for(int i = 0; i < len; i++) {
 		p += sprintf(p, "%lu", vmids[i]) - 1;
 		if(i + 1 < len) {
@@ -935,7 +945,7 @@ static int cmd_vm_list(int argc, char** argv, void(*callback)(char* result, int 
 	}
 
 	printf("%s\n", cmd_result);
-	callback("", 0);
+	callback("true", 0);
 	return 0;
 }
 
@@ -975,7 +985,7 @@ static int cmd_upload(int argc, char** argv, void(*callback)(char* result, int e
 	}
 
 	printf("upload success : %d\n", vmid);
-	callback("", 0);
+	callback("true", 0);
 	return 0;
 }
 
@@ -1529,7 +1539,6 @@ static void cmd_callback(char* result, int exit_status) {
 		return;
 	cmd_update_var(result, exit_status);
 	cmd_async = false;
-	printf("%s\n", result);
 }
 
 void shell_callback() {
@@ -1546,7 +1555,20 @@ void shell_callback() {
 			case '\n':
 				cmd[cmd_idx] = '\0';
 				putchar(ch);
-				cmd_exec(cmd, cmd_callback);
+
+				int exit_status = cmd_exec(cmd, cmd_callback);
+				if(exit_status != 0) { 
+					if(exit_status == CMD_STATUS_WRONG_NUMBER) {
+						printf("wrong number of arguments\n");
+					} else if(exit_status == CMD_STATUS_NOT_FOUND) {
+						printf("Can not found command\n");
+					} else if(exit_status == CMD_VARIABLE_NOT_FOUND) {
+						printf("Variable not found\n");
+					} else if(exit_status < 0) { 
+						printf("Wrong value of argument : %d\n", -exit_status);
+					}
+				}
+
 				printf("# ");
 				cmd_idx = 0;
 				break;

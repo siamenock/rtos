@@ -641,6 +641,12 @@ void vm_status_set(uint32_t vmid, int status, VM_STATUS_CALLBACK callback, void*
 	uint64_t event_type = 0;
 	switch(status) {
 		case VM_STATUS_START:
+			if(vm->used_size <= 0) {
+				printf("File size is 0. File is not uploaded on RTVM storage.\n");
+				callback(false, context);
+				//callback("File size is 0. File is not uploaded on RTVM storage.", context);
+				return;
+			}
 			if(vm->status != VM_STATUS_STOP) {
 				callback(false, context);
 				return;
@@ -770,10 +776,13 @@ ssize_t vm_storage_write(uint32_t vmid, void* buf, size_t offset, size_t size) {
 			_size = 0;
 		}
 
-		if(_size == 0)
+		if(_size == 0) {
+			vm->used_size = size;
 			break;
+		}
 		offset = 0;
 	}
+
 
 	if(_size != 0)
 		return -1;
