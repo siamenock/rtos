@@ -9,7 +9,7 @@ Shared* shared;
 
 int shared_init() {
 	shared = (Shared*)(VIRTUAL_TO_PHYSICAL((uint64_t)DESC_TABLE_AREA_END) - sizeof(Shared));
-	printf("Shared space: %p\n", shared);
+	printf("\tShared space: %p\n", shared);
 	if(!mp_apic_id()) {
 		memset(shared, 0x0, sizeof(Shared));
 		shared->magic = SHARED_MAGIC;
@@ -18,7 +18,7 @@ int shared_init() {
 		printf("Wrong Shared Magic Number\n");
 		return -1;
 	}
-	printf("Shared magic: %p\n", shared->magic);
+	printf("\tShared magic: %p\n", shared->magic);
 
 	return 0;
 }

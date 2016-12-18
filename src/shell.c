@@ -22,6 +22,11 @@ static bool shell_process(void* context) {
 
 		return false;
 	} else if(ret) {
+		// FIXME: async control should be refactored not using global flag.
+		extern bool cmd_sync;
+		if(cmd_sync)
+			return true;
+
 		if(FD_ISSET(STDIN_FILENO, (fd_set*)&temp) != 0) {
 			// Process input command
 			command_process(STDIN_FILENO);

@@ -36,8 +36,6 @@ void gmalloc_init() {
 	init_memory_pool(end - start, (void*)start, 0);
 	
 	gmalloc_pool = (void*)start;
-	printf("Gmalloc : %p %p\n", start, end);
-	printf("Gmalloc area : %lx %x\n", (uint64_t)gmalloc_pool, end - start);
 
 	typedef struct {
 		uintptr_t start;
@@ -60,7 +58,7 @@ void gmalloc_init() {
 	reserved[reserved_count].end = VIRTUAL_TO_PHYSICAL(KERNEL_TEXT_AREA_END);
 	reserved_count++;
 	
-	printf("Reserved AP Space\n");
+	printf("\tReserved AP Space\n");
 	uint8_t* core_map = mp_core_map();
 	for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
  		if(core_map[i] == MP_CORE_INVALID)
@@ -90,12 +88,12 @@ void gmalloc_init() {
 
 	for(int i = 0; i < reserved_count; i++) {
 		Block* r = &reserved[i];
-		printf("\tReserved[%02d] : %p ~ %p\n", i, r->start, r->end);
+		printf("\t\tReserved[%02d] : %p ~ %p\n", i, r->start, r->end);
 	}
 
 	int count = smap_count;
 	List* blocks = list_create(NULL);
-	printf("System memory map\n");
+	printf("\tSystem memory map\n");
 	for(int i = 0; i < count; i++) {
 		SMAP* entry = &smap[i];
 		char* type;
@@ -124,7 +122,7 @@ void gmalloc_init() {
 				break;
 				type = "Unknown";
 		}
-		printf("\t0x%016lx - 0x%016lx: %s(%d)\n", entry->base, entry->base + entry->length, type, entry->type);
+		printf("\t\t0x%016lx - 0x%016lx: %s(%d)\n", entry->base, entry->base + entry->length, type, entry->type);
 	}
 	
 
@@ -156,7 +154,7 @@ void gmalloc_init() {
 		}
 	}
 
-	printf("Extend gmalloc pool\n");
+	printf("\tExtend gmalloc pool\n");
 	ListIterator iter;
 	list_iterator_init(&iter, blocks);
 	while(list_iterator_has_next(&iter)) {
@@ -191,7 +189,7 @@ void gmalloc_init() {
 		}
 	}
 
-	printf("Extend bmallc pool\n");
+	printf("\tExtend bmallc pool\n");
 	Block* pop() {
 		uintptr_t last_start = UINTPTR_MAX;
 		int last_index = -1;
@@ -240,11 +238,9 @@ void gmalloc_init() {
 		printf("%s: %d.%dMB ", message, mb, kb);
 	}
 
-	printf("Bmalloc area : %lx [%d] \n", (uint64_t)bmalloc_pool, bmalloc_count);
-
-	printf("Memory pool: ");
-	printf("global %lx", gmalloc_total());
-	printf("block %lx", bmalloc_total());
+	printf("\tMemory pool: ");
+	print_pool("global", gmalloc_total());
+	print_pool("block", bmalloc_total());
 	printf("\n");
 }
 

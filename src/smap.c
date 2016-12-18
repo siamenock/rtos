@@ -19,7 +19,7 @@ int smap_init() {
 	unmap_boot_param(boot_params);
 	close_mem(mem_fd);
 
-	printf("System Memory Map\n");
+	printf("\tSystem Memory Map\n");
 	smap_dump();
 
 	return 0;
@@ -48,7 +48,7 @@ void smap_dump() {
 			default:
 				type = "Unknown";
 		}
-		printf("\t0x%016lx - 0x%016lx: %s(%d)\n", entry->base, entry->base + entry->length, type, entry->type);
+		printf("\t\t0x%016lx - 0x%016lx: %s(%d)\n", entry->base, entry->base + entry->length, type, entry->type);
 	}
 }
 

@@ -73,7 +73,7 @@ static void init_nics(int count) {
 			Map* vnics = map_create(16, NULL, NULL, gmalloc_pool);
 			map_put(nic_priv->nics, (void*)(uint64_t)port, vnics);
 			
-			printf("NICs in physical NIC(%s): %p\n", name_buf, nic_priv->nics);
+			printf("\tNICs in physical NIC(%s): %p\n", name_buf, nic_priv->nics);
                         dispatcher_register_nic((void*)nic_priv->nics);
 			printf("\t%s : [%02lx:%02lx:%02lx:%02lx:%02lx:%02lx] [%c]\n", name_buf,
 					(info.mac[j] >> 40) & 0xff,
@@ -192,15 +192,14 @@ static int parse_params(char* params) {
 	param = strtok_r(next, " ", &next);
 	start_core = strtol(param, NULL, 10);
 
-	//TODO: check alignment 2Mbyte
+	// TODO: check alignment 2Mbyte
 	param = strtok_r(next, " ", &next);
 	kernel_start_address = strtol(param, NULL, 16);
 
-	//TODO: NO Need ramdisk
+	// TODO: NO Need ramdisk
 	param = strtok_r(next, " ", &next);
 	rd_start_address = strtol(param, NULL, 16);
 
-	printf("\n");
 	printf("\tPenguinNgin ELF File:\t%s\n", kernel_elf);
 	printf("\tArgument File:\t\t%s\n", kernel_args);
 	printf("\tStart Core:\t\t%d\n", start_core);
@@ -260,7 +259,7 @@ static int symbols_init() {
 			return -1;
 		}
 		*(char**)mmap_symbols[i][0] = (char*)symbol_addr;
-		printf("\tSymbol \"%s\" : %p\n", mmap_symbols[i][1], symbol_addr);
+		//printf("\tSymbol \"%s\" : %p\n", mmap_symbols[i][1], symbol_addr);
 	}
 
 	return 0;
@@ -307,9 +306,9 @@ static int dummy_entry() {
 	return 0;
 }
 
-//TODO Fix Timer init libary
-//How to get frequency per second in linux?
-void _timer_init(char* cpu_brand) {
+// TODO: Fix Timer init libary
+// How to get frequency per second in linux?
+static void _timer_init(char* cpu_brand) {
 	uint64_t _frequency;
 	if(strstr(cpu_brand, "Intel") != NULL && strstr(cpu_brand, "@ ") != NULL) {
 		int number = 0;
@@ -403,7 +402,8 @@ int main(int argc, char** argv) {
 	}
 
 	printf("\nPacketNgin 2.0 Manager\n");
-	printf("\nLoad E820 Memory Map...\n");
+
+	printf("\nLoading E820 memory map...\n");
 	ret = smap_init();
 	if(ret)
 		goto error;
@@ -412,72 +412,53 @@ int main(int argc, char** argv) {
 	if(dispatcher_init() < 0)
 		goto error;
 
-	 /*
-          *"\nMapping Memory to Physical mapping...\n");
-          *mapping_physical(smap);
-          *
-          * ret;
-	  */
-
-	printf("\nParse Parameter...\n");
+	printf("\nParsing parameter...\n");
 	ret = parse_params(argv[1]);
 	if(ret) {
 		printf("\nFailed to parse parameter\n");
 		return ret;
 	}
 
-	printf("\nParse Kernel Arguments...\n");
+	printf("\nParsing kernel arguments...\n");
 	ret = parse_args(kernel_args);
 	if(ret) {
 		printf("\nFailed to parse kernel arguments\n");
 		return ret;
 	}
 
-	//TODO mapping memory physical to virtual 1:1
+	// TODO: mapping memory physical to virtual 1:1
 
 	printf("\nLoading %s...\n", kernel_elf);
 	ret = elf_load(kernel_elf);
 	if(ret)
 		return ret;
 
-	printf("\nInitiliazing symbols...\n");
+	printf("\nInitiliazing mmap symbols...\n");
 	ret = symbols_init(kernel_elf);
 	if(ret)
 		return ret;
 
-	/**TODO: Calculate kernel_start_address
-	  * How many memory need for kernel?
-	 **/
-	//TODO Read and Copy(kexec -l) Elf to kernel_start_address
-	//TODO Copy RamDisk (need?)
-	//TODO: munmap
+	// TODO: Calculate kernel_start_address. How many memory need for kernel?
+	// TODO: Read and Copy(kexec -l) Elf to kernel_start_address
+	// TODO: Copy RamDisk (need?)
+	// TODO: munmap
 
-	printf("\nInitializing Memory mapping...\n");
+	printf("\nInitializing memory mapping...\n");
 	PHYSICAL_OFFSET = kernel_start_address - 0x400000;
-
-	printf("PHYSICAL OFFSET : %p\n", PHYSICAL_OFFSET);
 	ret = mapping_memory();
 	if(ret)
 		return ret;
 
-	/**
-	 * PacketNgin 2.0 Manager Dummy Entry function
-	 * To set boot_params, boot_command_line, kernel_start_address
-	 **/
-	printf("\nDummy Entry Initialization\n");
+	printf("\nInitializing dummy entry\n");
 	ret = dummy_entry();
 	if(ret)
 		return ret;
 
 	printf("\nMP initializing...\n");
-	mp_init0(); //get apic address
+	mp_init0(); 
 
 	printf("\nInitializing shared memory area...\n");
 	if(shared_init() < 0)
-		goto error;
-
-	printf("\nInitializing PacketNgin kernel module...\n");
-	if(dispatcher_init() < 0)
 		goto error;
 
 	printf("\nInitializing malloc area...\n");
@@ -504,6 +485,7 @@ int main(int argc, char** argv) {
 	tss_init();
 	printf("\nInitilizing IDT...\n");
 	idt_init();
+
 	mp_sync(1); // Barrier #2
 
 	printf("\nInitailizing local APIC...\n");

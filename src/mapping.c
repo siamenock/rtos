@@ -170,7 +170,8 @@ int mapping_memory() {
 	}
 	mapping_area_size = 0;
 
-	printf("Assuming physical mapping area : %lx\n", MAPPING_AREA);
+	printf("\tPhysical offset : %p\n", PHYSICAL_OFFSET);
+	printf("\tAssuming physical mapping area : %lx\n", MAPPING_AREA);
 
 	/* Mapping area : 1 MB */
 	mapping = mmap((void*)VIRTUAL_TO_PHYSICAL(DESC_TABLE_AREA_START),
@@ -178,17 +179,17 @@ int mapping_memory() {
 			MAP_SHARED, fd, (off_t)MAPPING_AREA);
 
 	if(mapping == MAP_FAILED) {
-		perror("Mapping memory for absolute memory access failed.\n");
+		perror("\tMapping memory for absolute memory access failed.\n");
 		return -1;
 	} else if(mapping != (void*)VIRTUAL_TO_PHYSICAL(DESC_TABLE_AREA_START)) {
-		printf("Mapping memory (%p) is not same as dedicated memory (%p).\n",
+		printf("\tMapping memory (%p) is not same as dedicated memory (%p).\n",
 				mapping, (void*)VIRTUAL_TO_PHYSICAL(DESC_TABLE_AREA_START));
 
 		munmap(mapping, MAPPING_AREA_SIZE);
 		return -1;
 	}
 
-	printf("Memory mapped area : %lx ~ %lx\n", (uint64_t)mapping,
+	printf("\tMemory mapped area : %lx ~ %lx\n", (uint64_t)mapping,
 			(uint64_t)mapping + MAPPING_AREA_SIZE);
 
 /*

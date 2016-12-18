@@ -18,16 +18,16 @@ int apic_init() {
 		return -1;
 	}
 
-	printf("Assuming APIC physical base: %lx \n", _apic_address & ~(uint64_t)0xfffff);
+	printf("\tAssuming APIC physical base: %lx \n", _apic_address & ~(uint64_t)0xfffff);
 
 	uint64_t _apic_address_page = (uint64_t)mmap((void*)(_apic_address & ~(uint64_t)0xfffff), PAGE_PAGE_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, fd, (off_t)(_apic_address & ~(uint64_t)0xfffff));
 
 	if(_apic_address_page == (uint64_t)MAP_FAILED) {
-		perror("Mapping memory for absolute memory access failed.\n");
+		perror("\tMapping memory for absolute memory access failed.\n");
 		return -1;
 	}
 
-	printf("Memory mapped APIC physcial base: %lx \n", _apic_address);
+	printf("\tMemory mapped APIC physcial base: %lx \n", _apic_address);
 
 	return 0;
 }

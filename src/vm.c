@@ -19,7 +19,7 @@
 #include "mmap.h"
 
 static uint32_t	last_vmid = 1;
-//static Map*	vms;
+// FIXME: change to static
 Map*	vms;
 
 // Core status
@@ -205,7 +205,7 @@ static void icc_stopped(ICC_Message* msg) {
 		ICC_Message* msg2 = icc_alloc(ICC_TYPE_STOP);
 		icc_send(msg2, msg->apic_id);
 		icc_free(msg);
-		// resend stop icc
+		// Resend stop icc
 		return;
 	}
 
@@ -527,20 +527,6 @@ uint32_t vm_create(VMSpec* vm_spec) {
 		}
 	}
 
-	/*
-	 *printf("MP Cores : \n");
-	 *for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
-	 *        printf("%02x ", mp_core_map()[i]);
-	 *}
-	 *printf("\nAPIC Cores : \n");
-	 *for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
-	 *        printf("%02x ", vm->cores[i]);
-	 *}
-	 *printf("\nLinear Cores : \n");
-	 *for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
-	 *        printf("%02x ", mp_apic_id_to_core_id(vm->cores[i]));
-	 *}
-	 */
 	// Dump info
 	printf("Manager: VM[%d] created(cores [", vmid);
 	for(int i = 0; i < vm->core_size; i++) {
@@ -579,14 +565,11 @@ uint32_t vm_create(VMSpec* vm_spec) {
 
 bool vm_delete(uint32_t vmid) {
 	VM* vm = map_get(vms, (void*)(uint64_t)vmid);
-	if(!vm) {
-		printf("No VMID : %d\n", vmid);
+	if(!vm)
 		return false;
-	}
 	
 	for(int i = 0; i < vm->core_size; i++) {
 		if(cores[vm->cores[i]].status == VM_STATUS_START) {
-			printf("No Core started: %d\n", i);
 			return false;
 		}
 	}
@@ -733,73 +716,57 @@ void vm_status_set(uint32_t vmid, int status, VM_STATUS_CALLBACK callback, void*
 		} else {
 			cores[vm->cores[i]].error_code = 0;
 			ICC_Message* msg = icc_alloc(icc_type);
-			printf("msg: %p\n", msg);
 			if(status == VM_STATUS_START) {
-				/*
-				 *printf("Hello VM : \n");
-				 *printf("ID : %d\n", vm->id);
-				 *printf("Core size : %d\n", vm->core_size);
-				 *printf("Storage : %d\n", vm->storage.count);
-				 *printf("Memory : %d\n", vm->memory.count);
-				 *printf("NIC : %d\n",  vm->nic_count);
-				 *printf("Argc : %d\n",  vm->argc);
-				 *printf("Argv: %p\n",  vm->argv);
-				 *printf("Status : %d\n",  vm->status);
-				 */
-
 				msg->data.start.vm = vm;
 			}
 			icc_send(msg, vm->cores[i]);
-			printf("Sending done\n");
 		}
 	}
 }
 
-/*int vm_status_get(uint32_t vmid) {*/
-	/*VM* vm = map_get(vms, (void*)(uint64_t)vmid);*/
-	/*if(!vm)*/
-		/*return -1;*/
+int vm_status_get(uint32_t vmid) {
+	VM* vm = map_get(vms, (void*)(uint64_t)vmid);
+	if(!vm)
+		return -1;
 	
-	/*return vm->status;*/
-/*}*/
+	return vm->status;
+}
 
-/*VM* vm_get(uint32_t vmid) {*/
-	/*VM* vm = map_get(vms, (void*)(uint64_t)vmid);*/
-	/*if(!vm)*/
-		/*return NULL;*/
+VM* vm_get(uint32_t vmid) {
+	VM* vm = map_get(vms, (void*)(uint64_t)vmid);
+	if(!vm)
+		return NULL;
 	
-	/*return vm;*/
-/*}*/
+	return vm;
+}
 
-/*ssize_t vm_storage_read(uint32_t vmid, void** buf, size_t offset, size_t size) {*/
-	/*VM* vm = map_get(vms, (void*)(uint64_t)vmid);*/
-	/*if(!vm)*/
-		/*return -1;*/
+ssize_t vm_storage_read(uint32_t vmid, void** buf, size_t offset, size_t size) {
+	VM* vm = map_get(vms, (void*)(uint64_t)vmid);
+	if(!vm)
+		return -1;
 
-	/*if(offset > vm->storage.count * VM_STORAGE_SIZE_ALIGN) {*/
-		/**buf = NULL;*/
-		/*return 0;*/
-	/*}*/
+	if(offset > vm->storage.count * VM_STORAGE_SIZE_ALIGN) {
+		*buf = NULL;
+		return 0;
+	}
 
-	/*int index = offset / VM_STORAGE_SIZE_ALIGN;*/
-	/*offset %= VM_STORAGE_SIZE_ALIGN;*/
-	/**buf = vm->storage.blocks[index] + offset;*/
+	int index = offset / VM_STORAGE_SIZE_ALIGN;
+	offset %= VM_STORAGE_SIZE_ALIGN;
+	*buf = vm->storage.blocks[index] + offset;
 	
-	/*if(offset + size > VM_STORAGE_SIZE_ALIGN)*/
-		/*return VM_STORAGE_SIZE_ALIGN - offset;*/
-	/*else*/
-		/*return size;*/
-/*}*/
+	if(offset + size > VM_STORAGE_SIZE_ALIGN)
+		return VM_STORAGE_SIZE_ALIGN - offset;
+	else
+		return size;
+}
 
 ssize_t vm_storage_write(uint32_t vmid, void* buf, size_t offset, size_t size) {
 	VM* vm = map_get(vms, (void*)(uint64_t)vmid);
 	if(!vm)
 		return -1;
 
-	if(!size) {
-		printf("WARN: file size is zero\n");
+	if(!size)
 		return 0;
-	}
 	
 	if((uint64_t)offset + size > (uint64_t)vm->storage.count * VM_STORAGE_SIZE_ALIGN)
 		return -1;
@@ -831,19 +798,19 @@ ssize_t vm_storage_write(uint32_t vmid, void* buf, size_t offset, size_t size) {
 	return size;
 }
 
-/*ssize_t vm_storage_clear(uint32_t vmid) {*/
-	/*VM* vm = map_get(vms, (void*)(uint64_t)vmid);*/
-	/*if(!vm)*/
-		/*return -1;*/
+ssize_t vm_storage_clear(uint32_t vmid) {
+	VM* vm = map_get(vms, (void*)(uint64_t)vmid);
+	if(!vm)
+		return -1;
 	
-	/*ssize_t size = 0;*/
-	/*for(uint32_t i = 0; i < vm->storage.count; i++) {*/
-		/*bzero(vm->storage.blocks[i], VM_STORAGE_SIZE_ALIGN);*/
-		/*size += VM_STORAGE_SIZE_ALIGN;*/
-	/*}*/
+	ssize_t size = 0;
+	for(uint32_t i = 0; i < vm->storage.count; i++) {
+		memset(vm->storage.blocks[i], 0x0, VM_STORAGE_SIZE_ALIGN);
+		size += VM_STORAGE_SIZE_ALIGN;
+	}
 	
-	/*return size;*/
-/*}*/
+	return size;
+}
 
 bool vm_storage_md5(uint32_t vmid, uint32_t size, uint32_t digest[4]) {
 	VM* vm = map_get(vms, (void*)(uint64_t)vmid);

@@ -20,8 +20,8 @@
 #include <util/list.h>
 #include <util/ring.h>
 #include <util/event.h>
-#undef BYTE_ORDER
-#include <lwip/tcp.h>
+//#undef BYTE_ORDER
+//#include <lwip/tcp.h>
 #include <control/rpc.h>
 #include "malloc.h"
 #include "mp.h"
@@ -42,14 +42,24 @@ static struct tcp_pcb* manager_server;
 static uint32_t manager_ip;
 static uint16_t manager_port;
 
-// LwIP TCP callbacks
 typedef struct {
-	struct tcp_pcb*	pcb;
-	List*		pbufs;
-	int		poll_count;
+	union {
+		// LwIP TCP callbacks. FIXME: this should be deleted
+		struct {
+			struct tcp_pcb*	pcb;
+			List*		pbufs;
+			int		poll_count;
+		};
+
+		// Linux TCP callbacks
+		struct {
+			int     fd;
+			struct  sockaddr_in caddr;
+		};
+	};
 } RPCData;
 
-static List* clients;	/* pcb */
+//static List* clients;	/* pcb */
 static List* actives;	/* rpc */
 
 /*static err_t manager_poll(void* arg, struct tcp_pcb* pcb);*/
@@ -171,29 +181,29 @@ static void vm_list_handler(RPC* rpc, int size, void* context, void(*callback)(R
 }
 
 static void status_get_handler(RPC* rpc, uint32_t vmid, void* context, void(*callback)(RPC* rpc, VMStatus status)) {
-	//VMStatus status = vm_status_get(vmid);
-	//callback(rpc, status);
+	VMStatus status = vm_status_get(vmid);
+	callback(rpc, status);
 }
 
 typedef struct {
 	RPC* rpc;
-	struct tcp_pcb*	pcb;
+//	struct tcp_pcb*	pcb;
 	void(*callback)(RPC* rpc, bool result);
 } Data;
 
 static void status_setted(bool result, void* context) {
 	Data* data = context;
 	
-	if(list_index_of(clients, data->pcb, NULL) >= 0) {
+//	if(list_index_of(clients, data->pcb, NULL) >= 0) {
 		data->callback(data->rpc, result);
-	}
+//	}
 	free(data);
 }
 
 static void status_set_handler(RPC* rpc, uint32_t vmid, VMStatus status, void* context, void(*callback)(RPC* rpc, bool result)) {
 	Data* data = malloc(sizeof(Data));
 	data->rpc = rpc;
-	data->pcb = context;
+	//data->pcb = context;
 	data->callback = callback;
 	
 	vm_status_set(vmid, status, status_setted, data);
@@ -205,9 +215,9 @@ static void storage_download_handler(RPC* rpc, uint32_t vmid, uint64_t download_
 	} else {
 		void* buf;
 		if(download_size)
-			//size = vm_storage_read(vmid, &buf, offset, (offset + size > download_size) ? (download_size - offset) : (uint32_t)size);
-		//else
-			//size = vm_storage_read(vmid, &buf, offset, (uint32_t)size);
+			size = vm_storage_read(vmid, &buf, offset, (offset + size > download_size) ? (download_size - offset) : (uint32_t)size);
+		else
+			size = vm_storage_read(vmid, &buf, offset, (uint32_t)size);
 
 		callback(rpc, buf, size);
 	}
@@ -219,12 +229,10 @@ static void storage_upload_handler(RPC* rpc, uint32_t vmid, uint32_t offset, voi
 	} else {
 		if(offset == 0) {
 			ssize_t len;
-			/*
-			 *if((len = vm_storage_clear(vmid)) < 0) {
-			 *        callback(rpc, len);
-			 *        return;
-			 *}
-			 */
+			if((len = vm_storage_clear(vmid)) < 0) {
+				callback(rpc, len);
+				return;
+			}
 		}
 		
 		if(size < 0) {
@@ -325,61 +333,11 @@ static bool manager_accept_loop(void* rpc) {
 	if(list_index_of(actives, crpc, NULL) < 0) 
 		list_add(actives, crpc);
 
-	printf("Manager RPC accepted : %p\n", crpc);
+	RPCData* data = (RPCData*)crpc->data;
+	printf("Connection opened : %s\n", inet_ntoa(data->caddr.sin_addr));
 
 	return true;
 }
-
-static err_t manager_accept(void* arg, struct tcp_pcb* pcb, err_t err) {
-	/*
-	 *struct tcp_pcb_listen* server = arg;
-	 *tcp_accepted(server);
-	 *printf("Accepted: %p\n", pcb);
-	 *
-	 *RPC* rpc = malloc(sizeof(RPC) + sizeof(RPCData));
-	 *memset(rpc, 0x0, sizeof(RPC) + sizeof(RPCData));
-	 *rpc->read = pcb_read;
-	 *rpc->write = pcb_write;
-	 *rpc->close = pcb_close;
-	 *
-	 *rpc_vm_create_handler(rpc, vm_create_handler, NULL);
-	 *rpc_vm_get_handler(rpc, vm_get_handler, NULL);
-	 *rpc_vm_set_handler(rpc, vm_set_handler, NULL);
-	 *rpc_vm_delete_handler(rpc, vm_delete_handler, NULL);
-	 *rpc_vm_list_handler(rpc, vm_list_handler, NULL);
-	 *rpc_status_get_handler(rpc, status_get_handler, NULL);
-	 *rpc_status_set_handler(rpc, status_set_handler, pcb);
-	 *rpc_storage_download_handler(rpc, storage_download_handler, NULL);
-	 *rpc_storage_upload_handler(rpc, storage_upload_handler, NULL);
-	 *rpc_stdio_handler(rpc, stdio_handler, NULL);
-	 *rpc_storage_md5_handler(rpc, storage_md5_handler, NULL);
-	 *
-	 *RPCData* data = (RPCData*)rpc->data;
-	 *data->pcb = pcb;
-	 *data->pbufs = list_create(NULL);
-	 *
-	 *tcp_arg(pcb, rpc);
-	 *tcp_recv(pcb, manager_recv);
-	 *tcp_err(pcb, manager_err);
-	 *tcp_poll(pcb, manager_poll, 2);
-	 *
-	 *list_add(clients, pcb);
-	 *
-	 */
-	return ERR_OK;
-}
-
-/*// RPC Manager*/
-/*static Packet* manage(Packet* packet) {*/
-	/*if(shell_process(packet))*/
-		/*return NULL;*/
-/*//	else if(rpc_process(packet))*/
-/*//		return NULL;*/
-/*//	else if(tftp_process(packet))*/
-/*//		return NULL;*/
-	
-	/*return packet;*/
-/*}*/
 
 static void stdio_callback(uint32_t vmid, int thread_id, int fd, char* buffer, volatile size_t* head, volatile size_t* tail, size_t size) {
 	printf("Application > ");
@@ -429,56 +387,6 @@ static void stdio_callback(uint32_t vmid, int thread_id, int fd, char* buffer, v
 	}
 }
 
-struct tcp_pcb* tcp_new() {
-	return malloc(sizeof(struct tcp_pcb));
-}
-
-err_t tcp_bind(struct tcp_pcb *pcb, ip_addr_t *ipaddr, u16_t port) {
-	int fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, IPPROTO_TCP);
-	if(fd < 0) {
-		perror("Manager TCP socket error: ");
-		return -1;
-	}
-
-	// Use local_ip for socket descriptor
-	pcb->local_ip.addr = fd;
-
-	struct sockaddr_in addr;
-	memset(&addr, 0x0, sizeof(struct sockaddr_in));
-
-	addr.sin_family = AF_INET;
-	addr.sin_addr.s_addr = htonl(INADDR_ANY);//htonl(ipaddr->addr);
-	addr.sin_port = htons(port);
-
-	if(bind(fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-		perror("Manager TCP socket bind error: ");
-		return -1;
-	}
-
-	return ERR_OK;
-}
-
-#undef tcp_listen  // Invalidate lwip symbol
-struct tcp_pcb * tcp_listen(struct tcp_pcb *pcb) {
-	// Use local_ip for socket descriptor
-	int fd = pcb->local_ip.addr;
-
-	if(listen(fd, 0) < 0) {
-		perror("Manager TCP socket listen error: ");
-		return NULL;
-	}
-
-	return pcb;
-}
-
-void tcp_arg(struct tcp_pcb *pcb, void *arg) {
-	// TCP callback argument does not required
-}
-
-void tcp_accept(struct tcp_pcb *pcb, tcp_accept_fn accept) {
-	//event_busy_add(
-}
-
 static bool manager_server_open() {
 /*
  *        struct ip_addr ip;
@@ -508,17 +416,41 @@ static bool manager_server_open() {
  */
 	RPC* rpc = rpc_listen(DEFAULT_MANAGER_PORT);
 	if(!rpc) {
-		perror("\tFailed to listen RPC server socket\n");
+		perror("\tFailed to listen RPC server socket");
 		return false;
 	}
 
-	if(clients == NULL)
-		clients = list_create(NULL);
+	/*
+	 *if(clients == NULL)
+	 *        clients = list_create(NULL);
+	 */
 
 	if(actives == NULL)
 		actives = list_create(NULL);
 	
 	event_idle_add(manager_accept_loop, (void*)rpc);
+
+	return true;
+}
+
+static bool manager_server_close() {
+	ListIterator iter;
+/*
+ *        list_iterator_init(&iter, clients);
+ *
+ *        while(list_iterator_has_next(&iter)) {
+ *                struct tcp_pcb* pcb = list_iterator_next(&iter);
+ *                RPC* rpc = pcb->callback_arg;
+ *                manager_close(pcb, rpc, true);
+ *        }
+ *
+ *        if(tcp_close(manager_server) != ERR_OK) {
+ *                printf("Cannot close manager server: %p", manager_server);
+ *
+ *                return false;
+ *        }
+ *        manager_server = NULL;
+ */
 
 	return true;
 }
@@ -550,18 +482,10 @@ static bool manager_loop(void* context) {
 		list_iterator_init(&iter, actives);
 		while(list_iterator_has_next(&iter)) {
 			RPC* rpc = list_iterator_next(&iter);
-			//if(rpc_is_active(rpc)) {
-			static bool first = false;
-			if(!first) {
-				printf("RPC : %p\n", rpc);
-				first = true;
-			}
-			rpc_loop(rpc);
-			/*
-			 *} else {
-			 *        list_iterator_remove(&iter);
-			 *}
-			 */
+			if(!rpc_is_closed(rpc))
+				rpc_loop(rpc);
+			else
+				list_remove_data(actives, rpc);
 		}
 	}
 	
@@ -619,6 +543,7 @@ void manager_init() {
 		printf("\tFailed to open manager server\n");
 		return;
 	}
+	printf("\tManager RPC server opened\n");
 	
 	event_idle_add(manager_loop, NULL);
 	//event_timer_add(manager_timer, NULL, 100000, 100000);
