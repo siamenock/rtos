@@ -9,7 +9,7 @@ workspace "Utility"
     warnings "Extra"
     buildoptions { "-DLINUX -std=gnu99", "-Wno-unused", "-Wno-format", "-Wno-unused-result", "-Wno-unused-parameter" }
 
-    targetdir "."
+    targetdir "bin"
     includedirs { "$(HOME)/penguin/include", "$(HOME)/penguin/include/ipv4" }
     libdirs { "../" }
     links { "umpn" }
@@ -46,8 +46,19 @@ workspace "Utility"
         files { "src/start.c" }
         -- FIXME: Start, Pause, Resume, Stop commands are same. Need to be refactored
         postbuildcommands { 
-            "cp ../start ../pause",
-            "cp ../start ../resume",
-            "cp ../start ../stop",
+            "cp ../bin/start ../bin/pause",
+            "cp ../bin/start ../bin/resume",
+            "cp ../bin/start ../bin/stop",
         }
 
+    project "upload"
+        kind "ConsoleApp"
+        location "build"
+        targetname "upload"
+        files { "src/upload.c" }
+
+    project "download"
+        kind "ConsoleApp"
+        location "build"
+        targetname "download"
+        files { "src/download.c" }

@@ -11,3 +11,8 @@ cscope*
 
 # Binary
 manager
+util/bin/*
+
+# Generated
+Makefile
+version.h

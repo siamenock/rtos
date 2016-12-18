@@ -74,9 +74,9 @@ int main(int argc, char *argv[]) {
 
 	// We should have basename for argv[0] for command parsing
 	argv[0] = basename(argv[0]);
-	int rc;	
-	if(rc = status_set(argc, argv)) {
-		printf("Failed to %s VM. Error Code: %d\n", argv[0], rc);
+	int rc;
+	if((rc = status_set(argc, argv))) {
+		printf("Failed to %s VM. Error code : %d\n", argv[0], rc);
 		rpc_disconnect(rpc);
 		return ERROR_CMD_EXECUTE;
 	}

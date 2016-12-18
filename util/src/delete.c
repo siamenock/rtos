@@ -54,8 +54,9 @@ int main(int argc, char *argv[]) {
 		return ERROR_RPC_DISCONNECTED;
 	}
 	
-	if(vm_delete(argc, argv)) {
-		printf("Failed to delete VM\n");
+	int rc;
+	if((rc = vm_delete(argc, argv))) {
+		printf("Failed to delete VM. Error code : %d\n", rc);
 		rpc_disconnect(rpc);
 		return ERROR_CMD_EXECUTE;
 	}

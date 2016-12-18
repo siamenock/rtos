@@ -269,8 +269,9 @@ int main(int argc, char *argv[]) {
 		return ERROR_RPC_DISCONNECTED;
 	}
 	
-	if(vm_create(argc, argv)) {
-		printf("Failed to create VM\n");
+	int rc;
+	if((rc = vm_create(argc, argv))) {
+		printf("Failed to create VM. Error code : %d\n", rc);
 		rpc_disconnect(rpc);
 		return ERROR_CMD_EXECUTE;
 	}

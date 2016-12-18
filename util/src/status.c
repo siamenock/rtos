@@ -60,8 +60,9 @@ int main(int argc, char *argv[]) {
 		return ERROR_RPC_DISCONNECTED;
 	}
 	
-	if(status_get(argc, argv)) {
-		printf("Failed to get VM status\n");
+	int rc;
+	if((rc = status_get(argc, argv))) {
+		printf("Failed to get VM status. Error code : %d\n", rc);
 		rpc_disconnect(rpc);
 		return ERROR_CMD_EXECUTE;
 	}
