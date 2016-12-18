@@ -3,42 +3,48 @@
 #include <stdint.h>
 #include <sys/time.h>
 #include <control/rpc.h>
-#include "rpc.h"
 
-#define DEFAULT_HOST		"192.168.100.254"
-#define DEFAULT_PORT		1111
-#define DEFAULT_TIMEOUT		3
-
-typedef struct {
-	uint16_t count;
-	uint64_t current;
-	RPC* rpc;
-} HelloContext;
-
-static bool callback_hello(void* context) {
-	HelloContext* context_hello = context;
-
-	struct timeval tv;
-	gettimeofday(&tv, NULL);
-	uint64_t current = tv.tv_sec * 1000 * 1000 + tv.tv_usec;
-
-	printf("Ping PacketNgin time = %0.3f ms\n", (float)(current - context_hello->current) / (float)1000);
-	context_hello->current = current;
-	context_hello->count--;
-	RPC* rpc = context_hello->rpc;
-
-	if(context_hello->count == 0) {
-		free(context_hello);
-
-		return false;
-	}
-
-	rpc_hello(rpc, callback_hello, context_hello);
-
-	return true;
+void rpc_disconnect(RPC* rpc) {
+	if(!rpc_is_closed(rpc))
+		rpc_close(rpc);	
 }
 
-RPC* rpc_connect(char* host, int port, int timeout) {
+bool rpc_connected(RPC* rpc) {
+	return !rpc_is_closed(rpc);
+}
+
+RPC* rpc_connect(char* host, int port, int timeout, bool keep_session) {
+	typedef struct {
+		bool keep_session;
+		uint16_t count;
+		uint64_t current;
+		RPC* rpc;
+	} HelloContext;
+
+	bool callback_hello(void* context) {
+		HelloContext* context_hello = context;
+
+		struct timeval tv;
+		gettimeofday(&tv, NULL);
+		uint64_t current = tv.tv_sec * 1000 * 1000 + tv.tv_usec;
+
+		printf("Ping PacketNgin time = %0.3f ms\n", (float)(current - context_hello->current) / (float)1000);
+		context_hello->current = current;
+		context_hello->count--;
+		RPC* rpc = context_hello->rpc;
+
+		if(context_hello->count == 0) {
+			free(context_hello);
+			if(!context_hello->keep_session)
+				rpc_disconnect(rpc);
+
+			return false;
+		}
+
+		rpc_hello(rpc, callback_hello, context_hello);
+
+		return true;
+	}
 	RPC* rpc = rpc_open(host, port, timeout);
 	if(rpc == NULL) {
 		printf("Unable to connect RPC server\n");
@@ -57,55 +63,10 @@ RPC* rpc_connect(char* host, int port, int timeout) {
 	context_hello->current = tv.tv_sec * 1000 * 1000 + tv.tv_usec;
 	context_hello->count = 1;
 	context_hello->rpc = rpc;
+	context_hello->keep_session = keep_session;
 
 	rpc_hello(rpc, callback_hello, context_hello);
 
 	return rpc;
 }
 
-void rpc_disconnect(RPC* rpc) {
-	if(!rpc_is_closed(rpc))
-		rpc_close(rpc);	
-}
-
-bool rpc_is_disconnected(RPC* rpc) {
-	return rpc_is_closed(rpc);
-}
-
-static RPCFunc rpc_func;
-
-void rpc_register(int (*func)(int, char**)) {
-	rpc_func = func;
-}
-
-int rpc_process(int argc, char** argv) {
-	char* host = DEFAULT_HOST;
-	int port = DEFAULT_PORT;
-	int timeout = DEFAULT_TIMEOUT;
-
-	RPC* rpc = rpc_connect(host, port, timeout);
-	if(rpc == NULL) {
-		printf("Failed to connect\n");
-		return ERROR_RPC_DISCONNECTED;
-	}
-	
-	if(!rpc_func) {
-		printf("Register RPC function first\n");
-		return ERROR_CMD_UNREGISTERED;
-	}
-
-	if(rpc_func(argc, argv)) {
-		printf("Failed to execute RPC command\n");
-		rpc_disconnect(rpc);
-		return ERROR_CMD_EXECUTE;
-	}
-
-	while(1) {
-		if(!rpc_is_disconnected(rpc))
-			rpc_loop(rpc);
-		else
-			return 0;
-	}
-
-	return 0;
-}

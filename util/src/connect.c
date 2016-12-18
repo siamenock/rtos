@@ -1,68 +1,44 @@
 #include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <sys/time.h>
-#include <control/rpc.h>
+#include <util/types.h>
+#include "rpc.h"
 
-typedef struct {
-	uint16_t count;
-	uint64_t current;
-	RPC* rpc;
-} HelloContext;
+static RPC* rpc;
 
-static bool callback_hello(void* context) {
-	HelloContext* context_hello = context;
-
-	struct timeval tv;
-	gettimeofday(&tv, NULL);
-	uint64_t current = tv.tv_sec * 1000 * 1000 + tv.tv_usec;
-
-	printf("Ping PacketNgin time = %0.3f ms\n", (float)(current - context_hello->current) / (float)1000);
-	context_hello->current = current;
-	context_hello->count--;
-	RPC* rpc = context_hello->rpc;
-
-	if(context_hello->count == 0) {
-		free(context_hello);
-
-		return false;
-	}
-
-	rpc_hello(rpc, callback_hello, context_hello);
-
-	return true;
+static void help() {
+	printf("Usage: connect [IP] [PORT]\n");
 }
 
-RPC* rpc_connect(char* host, int port, int timeout) {
-	RPC* rpc = rpc_open(host, port, timeout);
-	if(rpc == NULL) {
-		printf("Unable to connect RPC server\n");
-		return NULL;
-	}
+static int connect(int argc, char** argv) {
+	char* host = DEFAULT_HOST;
+	int port = DEFAULT_PORT;
+	int timeout = DEFAULT_TIMEOUT;
 
-	struct timeval tv;
-	gettimeofday(&tv, NULL);
+	if(argc >= 2)
+		host = argv[1];
 
-	HelloContext* context_hello = malloc(sizeof(HelloContext));
-	if(context_hello == NULL) {
-		rpc_close(rpc);
-		return NULL;
-	}
+	if(argc >= 3 && is_uint16(argv[2]))
+		port = parse_uint16(argv[2]);
 
-	context_hello->current = tv.tv_sec * 1000 * 1000 + tv.tv_usec;
-	context_hello->count = 1;
-	context_hello->rpc = rpc;
+	rpc = rpc_connect(host, port, timeout, false);
+	if(rpc == NULL)
+		return -1;
 
-	rpc_hello(rpc, callback_hello, context_hello);
-
-	return rpc;
+	return 0;
 }
 
-void rpc_disconnect(RPC* rpc) {
-	if(!rpc_is_closed(rpc))
-		rpc_close(rpc);	
-}
+int main(int argc, char *argv[]) {
+	int rc;
+	if((rc = connect(argc, argv))) {
+		printf("Failed to connect. Error code : %d\n", rc);
+		return ERROR_RPC_DISCONNECTED;
+	}
 
-bool rpc_is_disconnected(RPC* rpc) {
-	return rpc_is_closed(rpc);
+	while(1) {
+		if(rpc_connected(rpc)) {
+			rpc_loop(rpc);
+		} else
+			break;
+	}
+
+	return 0;
 }

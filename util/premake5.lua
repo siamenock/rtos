@@ -13,7 +13,13 @@ workspace "Utility"
     includedirs { "$(HOME)/penguin/include", "$(HOME)/penguin/include/ipv4" }
     libdirs { "../" }
     links { "umpn" }
-    files { "src/connect.c" }
+    files { "src/rpc.c" }
+
+    project "connect"
+        kind "ConsoleApp"
+        location "build"
+        targetname "connect"
+        files { "src/connect.c" }
 
     project "create"
         kind "ConsoleApp"

@@ -8,7 +8,7 @@
 #include <util/types.h>
 #include <control/rpc.h>
 
-#include "connect.h"
+#include "rpc.h"
 
 static RPC* rpc;
 
@@ -146,7 +146,7 @@ int main(int argc, char *argv[]) {
 	int port = DEFAULT_PORT;
 	int timeout = DEFAULT_TIMEOUT;
 
-	rpc = rpc_connect(host, port, timeout);
+	rpc = rpc_connect(host, port, timeout, true);
 	if(rpc == NULL) {
 		printf("Failed to connect\n");
 		return ERROR_RPC_DISCONNECTED;
@@ -160,7 +160,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	while(1) {
-		if(!rpc_is_disconnected(rpc))
+		if(rpc_connected(rpc))
 			rpc_loop(rpc);
 		else
 			break;
