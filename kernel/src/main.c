@@ -443,6 +443,7 @@ void main() {
 	printf("\nPacketNgin ver 2.0.\n");
 
 	mp_sync(0);	// Barrier #1
+
 	shared_init();
 	if(apic_id == 0) {
 /*
@@ -579,9 +580,8 @@ void main() {
 		 *printf("Gmalloc start: %p ~ %p\n", start, end);
 		 */
 		ap_timer_init();
-		printf("Barrier 2\n");
+
 		mp_sync(1);	// Barrier #2
-		printf("Pass Barrier 2\n");
 
 		gdt_load();
 		tss_load();
@@ -604,9 +604,7 @@ void main() {
 			event_idle_add(idle_hlt_event, NULL);
 	}
 
-	printf("Barrier 3\n");
 	mp_sync(2); // Barrier #3
-	printf("Pass Barrier 3\n");
 
 	printf("Kernel started...\n");
 

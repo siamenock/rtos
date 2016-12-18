@@ -49,7 +49,6 @@ static bool icc_event(void* context) {
 }
 
 static void icc(uint64_t vector, uint64_t err) {
-	printf("Vector 48 ICC received\n");
 	uint8_t apic_id = mp_apic_id();
 	FIFO* icc_queue = shared->icc_queues[apic_id].icc_queue;
 	ICC_Message* icc_msg = fifo_peek(icc_queue, 0);

@@ -40,7 +40,7 @@
 #define MAX_VM_COUNT	128
 #define MAX_VNIC_COUNT	32
 
-bool cmd_sync;
+static bool cmd_sync;
 
 #ifdef TEST
 #include "test.h"
@@ -976,20 +976,16 @@ static int cmd_status_get(int argc, char** argv, void(*callback)(char* result, i
 	void print_vm_status(int status) {
 		switch(status) {
 			case VM_STATUS_START:
-				printf("start");
-				//callback("start", 0);
+				callback("start", 0);
 				break;
 			case VM_STATUS_PAUSE:
-				printf("pause");
-				//callback("pause", 0);
+				callback("pause", 0);
 				break;
 			case VM_STATUS_STOP:
-				printf("stop");
-				//callback("stop", 0);
+				callback("stop", 0);
 				break;
 			default:
-				printf("invalid");
-				//callback("invalid", -1);
+				callback("invalid", -1);
 				break;
 		}
 	}

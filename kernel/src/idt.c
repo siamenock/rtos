@@ -83,6 +83,5 @@ void idt_init() {
 
 void idt_load() {
 	IDTR* idtr = (IDTR*)IDTR_ADDR;
-	printf("IDTR : %p\n", idtr);
 	lidt(idtr);
 }

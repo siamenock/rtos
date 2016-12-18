@@ -38,7 +38,6 @@ void malloc_init() {
 	__malloc_pool = (void*)start;
 	init_memory_pool((uint32_t)(end - start), __malloc_pool, 0);
 
-	printf("Local malloc pool: %p\n", start);
 	#if DEBUG
 	statistics = map_create(512, map_uint64_hash, map_uint64_equals, NULL);
 	tracing = map_create(8192, map_uint64_hash, map_uint64_equals, NULL);
