@@ -1278,7 +1278,7 @@ void rpc_vm_dump(VMSpec* vm) {
 }
 
 #ifdef LINUX
-#define DEBUG 0
+#define DEBUG 1
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -1286,8 +1286,10 @@ void rpc_vm_dump(VMSpec* vm) {
 #include <arpa/inet.h>
 #include <signal.h>
 
+// Posix socket RPC data
 typedef struct {
 	int	fd;
+	struct	sockaddr_in caddr;
 } RPCData;
 
 static int sock_read(RPC* rpc, void* buf, int size) {
@@ -1302,6 +1304,7 @@ static int sock_read(RPC* rpc, void* buf, int size) {
 		printf("\n");
 	}
 	#endif /* DEBUG */
+	printf("read done %d\n", len);
 	
 	if(len == -1) {
 		return 0;
@@ -1338,13 +1341,13 @@ static void sock_close(RPC* rpc) {
 	RPCData* data = (RPCData*)rpc->data;
 	close(data->fd);
 	data->fd = -1;
+	printf("Connection closed : %s\n", inet_ntoa(data->caddr.sin_addr));
 }
 
 RPC* rpc_open(const char* host, int port, int timeout) {
 	int fd = socket(AF_INET, SOCK_STREAM, 0);
-	if(fd < 0) {
+	if(fd < 0)
 		return NULL;
-	}
 	
 	void handler(int signo) {
 		// Do nothing just interrupt
@@ -1393,14 +1396,23 @@ RPC* rpc_open(const char* host, int port, int timeout) {
 	return rpc;
 }
 
+void rpc_close(RPC* rpc) {
+	if(rpc->close)
+		rpc->close(rpc);
+
+	free(rpc);
+	rpc = NULL;
+}
+
 RPC* rpc_listen(int port) {
 	int fd = socket(AF_INET, SOCK_STREAM, 0);
 	if(fd < 0) {
 		return NULL;
 	}
 	
-	bool reuse = true;
-	setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
+	int reuse = 1;
+	if(setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0)
+		perror("Failed to set socket option - SO_REUSEADDR\n");
 	
 	struct sockaddr_in addr;
 	memset(&addr, 0x0, sizeof(struct sockaddr_in));
@@ -1426,19 +1438,16 @@ RPC* rpc_accept(RPC* srpc) {
 		return NULL;
 	}
 	
-	struct sockaddr_in caddr;
-	socklen_t len = sizeof(struct sockaddr_in);
-
 	// TODO: would rather change to nonblock socket
 	int rc = fcntl(data->fd, F_SETFL, fcntl(data->fd, F_GETFL, 0) | O_NONBLOCK);
-	if(rc < 0) {
+	if(rc < 0)
 		perror("Failed to modifiy socket to nonblock\n");
-	}
 		    
-	int fd = accept(data->fd, (struct sockaddr*)&caddr, &len);
-	if(fd < 0) {
+	socklen_t len = sizeof(struct sockaddr_in);
+	struct sockaddr_in addr;
+	int fd = accept(data->fd, (struct sockaddr*)&addr, &len);
+	if(fd < 0)
 		return NULL;
-	}
 	
 	RPC* rpc = malloc(sizeof(RPC) + sizeof(RPCData));
 	memcpy(rpc, srpc, sizeof(RPC));
@@ -1451,6 +1460,7 @@ RPC* rpc_accept(RPC* srpc) {
 	rpc->close = sock_close;
 	
 	data = (RPCData*)rpc->data;
+	memcpy(&data->caddr, &addr, sizeof(struct sockaddr_in));
 	data->fd = fd;
 	
 	return rpc;
