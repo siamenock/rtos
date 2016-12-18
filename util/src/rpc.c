@@ -3,6 +3,11 @@
 #include <stdint.h>
 #include <sys/time.h>
 #include <control/rpc.h>
+#include "rpc.h"
+
+#define DEFAULT_HOST		"192.168.100.254"
+#define DEFAULT_PORT		1111
+#define DEFAULT_TIMEOUT		3
 
 typedef struct {
 	uint16_t count;
@@ -65,4 +70,42 @@ void rpc_disconnect(RPC* rpc) {
 
 bool rpc_is_disconnected(RPC* rpc) {
 	return rpc_is_closed(rpc);
+}
+
+static RPCFunc rpc_func;
+
+void rpc_register(int (*func)(int, char**)) {
+	rpc_func = func;
+}
+
+int rpc_process(int argc, char** argv) {
+	char* host = DEFAULT_HOST;
+	int port = DEFAULT_PORT;
+	int timeout = DEFAULT_TIMEOUT;
+
+	RPC* rpc = rpc_connect(host, port, timeout);
+	if(rpc == NULL) {
+		printf("Failed to connect\n");
+		return ERROR_RPC_DISCONNECTED;
+	}
+	
+	if(!rpc_func) {
+		printf("Register RPC function first\n");
+		return ERROR_CMD_UNREGISTERED;
+	}
+
+	if(rpc_func(argc, argv)) {
+		printf("Failed to execute RPC command\n");
+		rpc_disconnect(rpc);
+		return ERROR_CMD_EXECUTE;
+	}
+
+	while(1) {
+		if(!rpc_is_disconnected(rpc))
+			rpc_loop(rpc);
+		else
+			return 0;
+	}
+
+	return 0;
 }
