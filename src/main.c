@@ -165,8 +165,8 @@ error:
 	return -2;
 }
 
-unsigned long kernel_start_address; //Kenrel Start address
-unsigned long rd_start_address; 	//Ramdisk Start address
+unsigned long kernel_start_address;	// Kernel Start address
+unsigned long rd_start_address; 	// Ramdisk Start address
 uint8_t	start_core;
 char kernel_elf[256];
 char kernel_args[256];
@@ -188,7 +188,7 @@ static int parse_params(char* params) {
 	param = strtok_r(next, " ", &next);
 	strcpy(kernel_args, param);
 
-	//TODO: NO Need start core
+	// TODO: No need start core
 	param = strtok_r(next, " ", &next);
 	start_core = strtol(param, NULL, 10);
 
@@ -426,10 +426,13 @@ int main(int argc, char** argv) {
 		return ret;
 	}
 
-	// TODO: mapping memory physical to virtual 1:1
-
 	printf("\nLoading %s...\n", kernel_elf);
 	ret = elf_load(kernel_elf);
+	if(ret)
+		return ret;
+
+	printf("\nCopying kernel image...\n");
+	ret = elf_copy(kernel_elf, kernel_start_address);
 	if(ret)
 		return ret;
 
@@ -437,11 +440,6 @@ int main(int argc, char** argv) {
 	ret = symbols_init(kernel_elf);
 	if(ret)
 		return ret;
-
-	// TODO: Calculate kernel_start_address. How many memory need for kernel?
-	// TODO: Read and Copy(kexec -l) Elf to kernel_start_address
-	// TODO: Copy RamDisk (need?)
-	// TODO: munmap
 
 	printf("\nInitializing memory mapping... \n");
 	PHYSICAL_OFFSET = kernel_start_address - 0x400000;

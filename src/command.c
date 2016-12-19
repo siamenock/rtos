@@ -591,7 +591,7 @@ static int cmd_version(int argc, char** argv, void(*callback)(char* result, int 
 static int cmd_shutdown(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	printf("Shutting down\n");
 	dispatcher_exit();
-	exit(0);
+	exit(EXIT_SUCCESS);
 //	acpi_shutdown();
 	
 	return 0;

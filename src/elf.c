@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
+#include <stdlib.h>
 #include <fcntl.h>
 #include <elf.h>
 #include <sys/stat.h>
@@ -16,24 +18,24 @@ int elf_load(char* elf_file) {
 		printf("Cannot open file: %s\n", elf_file);
 		return -1;
 	}
-	
+
 	struct stat state;
 	if(stat(elf_file, &state) != 0) {
 		printf("Cannot get state of file: %s\n", elf_file);
 		return -2;
 	}
-	
+
 	ehdr = mmap(NULL, state.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
 	if(ehdr == (void*)-1) {
 		printf("Cannot open file: %s\n", elf_file);
 		return -3;
 	}
-	
+
 	if(ehdr->e_ident[0] != ELFMAG0 || ehdr->e_ident[1] != ELFMAG1 || ehdr->e_ident[2] != ELFMAG2 || ehdr->e_ident[3] != ELFMAG3) {
 		printf("Illegal file format: %s\n", elf_file);
 		return -4;
 	}
-	
+
 	Elf64_Shdr* shdr = (Elf64_Shdr*)((uint8_t*)ehdr + ehdr->e_shoff);
 	shstrtab = (char*)ehdr + shdr[ehdr->e_shstrndx].sh_offset;
 	Elf64_Shdr* get_shdr(char* name) {
@@ -43,7 +45,7 @@ int elf_load(char* elf_file) {
 		}
 		return NULL;
 	}
-	
+
 	strtab = get_shdr(".strtab");
 	if(!strtab)
 		return -5;
@@ -53,6 +55,20 @@ int elf_load(char* elf_file) {
 		return -6;
 
 	return 0;
+}
+
+int elf_copy(char* elf_file, unsigned long kernel_start_address) {
+	int fd = open(elf_file, O_RDONLY);
+	if(fd < 0) {
+		printf("Cannot open file: %s\n", elf_file);
+		return -1;
+	}
+
+	char command[256];
+	sprintf(command, "kexec -a 0x%x -l %s -t elf-x86_64 --args-none", 
+			kernel_start_address, elf_file);
+	printf("\tExecute command : %s\n", command);
+	return system(command);
 }
 
 uint64_t elf_get_symbol(char* sym_name) {
@@ -73,3 +89,4 @@ uint64_t elf_get_symbol(char* sym_name) {
 	}
 	return 0;
 }
+

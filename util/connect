@@ -3,7 +3,7 @@
 ## This file is for PacketNgin Bash Wrapper. 
 ## Usage: source connect [IP] [PORT]
 
-DEFAULT_MANAGER_IP="192.168.100.254"
+DEFAULT_MANAGER_IP="10.0.0.2"
 DEFAULT_MANAGER_PORT="1111"
 
 IP=${1:-${DEFAULT_MANAGER_IP}}
