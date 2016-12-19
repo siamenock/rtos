@@ -151,7 +151,7 @@ static int parse_args(char* args) {
 	}
 
 	if(smap_fixed) {
-		printf("\nSystem Memory Map Updated\n");
+		printf("\tSystem Memory Map Updated\n");
 		smap_dump();
 	}
 
@@ -443,7 +443,7 @@ int main(int argc, char** argv) {
 	// TODO: Copy RamDisk (need?)
 	// TODO: munmap
 
-	printf("\nInitializing memory mapping...\n");
+	printf("\nInitializing memory mapping... \n");
 	PHYSICAL_OFFSET = kernel_start_address - 0x400000;
 	ret = mapping_memory();
 	if(ret)
@@ -454,7 +454,7 @@ int main(int argc, char** argv) {
 	if(ret)
 		return ret;
 
-	printf("\nMP initializing...\n");
+	printf("\ninitializing multicore processor...\n");
 	mp_init0(); 
 
 	printf("\nInitializing shared memory area...\n");

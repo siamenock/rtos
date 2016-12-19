@@ -36,6 +36,7 @@ void gmalloc_init() {
 	init_memory_pool(end - start, (void*)start, 0);
 	
 	gmalloc_pool = (void*)start;
+	printf("Start : %p\n", start);
 
 	typedef struct {
 		uintptr_t start;
@@ -46,9 +47,11 @@ void gmalloc_init() {
 	Block reserved[3 + MP_MAX_CORE_COUNT];
 	int reserved_count = 0;
 
-	reserved[reserved_count].start = VIRTUAL_TO_PHYSICAL(BIOS_AREA_START);
-	reserved[reserved_count].end = VIRTUAL_TO_PHYSICAL(BIOS_AREA_END);
-	reserved_count++;
+	/*
+	 *reserved[reserved_count].start = VIRTUAL_TO_PHYSICAL(BIOS_AREA_START);
+	 *reserved[reserved_count].end = VIRTUAL_TO_PHYSICAL(BIOS_AREA_END);
+	 *reserved_count++;
+	 */
 
 	reserved[reserved_count].start = VIRTUAL_TO_PHYSICAL(DESC_TABLE_AREA_START);
 	reserved[reserved_count].end = VIRTUAL_TO_PHYSICAL(DESC_TABLE_AREA_END);
@@ -71,20 +74,15 @@ void gmalloc_init() {
 		reserved_count++;
 	}
 
-// 	/* Relocate */
-// 	void relocate(Block* blocks, int count) {
-// 		// TODO: need to set physical end
-// 		for(int i = 0; i < count; i++) {
-// 			Block* r = &reserved[i];
-// 			r->start += (PHYSICAL_OFFSET - 0x400000);
-// 			r->end += (PHYSICAL_OFFSET - 0x400000);
-// 		}
-// 	}
-// 	relocate(reserved, reserved_count);
-
-// 	reserved[reserved_count].start = 0x0;
-// 	reserved[reserved_count].end = 0x200000;
-// 	reserved_count++;
+	// Relocate to physical to determine physical memory map
+	void relocate(Block* blocks, int count) {
+		for(int i = 0; i < count; i++) {
+			Block* r = &reserved[i];
+			r->start += PHYSICAL_OFFSET;
+			r->end += PHYSICAL_OFFSET;
+		}
+	}
+	relocate(reserved, reserved_count);
 
 	for(int i = 0; i < reserved_count; i++) {
 		Block* r = &reserved[i];
@@ -160,22 +158,26 @@ void gmalloc_init() {
 	while(list_iterator_has_next(&iter)) {
 		Block* b = list_iterator_next(&iter);
 
+		// Relocate to virtual to acually set malloc pool
+		b->start -= PHYSICAL_OFFSET;
+		b->end -= PHYSICAL_OFFSET;
+
 		uintptr_t start = (b->start + 0x200000 - 1) & ~((uintptr_t)0x200000 - 1);
 		uintptr_t end = b->end & ~((uintptr_t)0x200000 - 1);
 		
 		if(start >= end) {
-			printf("\t0x%016lx - 0x%016lx\n", b->start, b->end - b->start);
+			printf("\t\t0x%016lx - 0x%016lx\n", b->start, b->end - b->start);
 			add_new_area((void*)b->start, b->end - b->start, gmalloc_pool);
 			b->start = b->end = 0;
 		} else {
 			if(start > b->start) {
-				printf("\t0x%016lx - 0x%016lx\n", b->start, start - b->start);
+				printf("\t\t0x%016lx - 0x%016lx\n", b->start, start - b->start);
 				add_new_area((void*)b->start, start - b->start, gmalloc_pool);
 				b->start = start;
 			}
 			
 			if(end < b->end) {
-				printf("\t0x%016lx - 0x%016lx\n", end, b->end - end);
+				printf("\t\t0x%016lx - 0x%016lx\n", end, b->end - end);
 				add_new_area((void*)end, b->end - end, gmalloc_pool);
 				b->end = end;
 			}
@@ -218,7 +220,7 @@ void gmalloc_init() {
 	while(block) {
 		uintptr_t start = block->start;
 		uintptr_t end = block->end;
-		printf("\t0x%016lx - 0x%016lx\n", start, end);
+		printf("\t\t0x%016lx - 0x%016lx\n", start, end);
 		
 		while(start < end) {
 			bmalloc_pool[bmalloc_index++] = start;
