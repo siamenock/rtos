@@ -499,43 +499,43 @@ static bool manager_loop(void* context) {
 /*}*/
 
 void manager_init() {
-	uint64_t attrs[] = {
-		NIC_MAC, manager_mac, // Physical MAC
-		NIC_DEV, (uint64_t)"eth0",
-		NIC_POOL_SIZE, 0x400000,
-		NIC_INPUT_BANDWIDTH, 1000000000L,
-		NIC_OUTPUT_BANDWIDTH, 1000000000L,
-		NIC_INPUT_BUFFER_SIZE, 1024,
-		NIC_OUTPUT_BUFFER_SIZE, 1024,
-		NIC_PADDING_HEAD, 32,
-		NIC_PADDING_TAIL, 32,
-		NIC_INPUT_ACCEPT_ALL, 1,
-		NIC_OUTPUT_ACCEPT_ALL, 1,
-		NIC_NONE
-	};
-	
-	manager_nic = vnic_create(attrs);
-	if(!manager_nic) {
-		printf("\tCannot create manager : %d\n", errno);
-		return;
-	}
-
-	manager_ip = DEFAULT_MANAGER_IP;
-	if(!nic_ip_add(manager_nic->nic, DEFAULT_MANAGER_IP)) {
-		printf("\tCan'nt allocate manager ip\n");
-		return;
-	}
-
-	IPv4Interface* interface = nic_ip_get(manager_nic->nic, DEFAULT_MANAGER_IP);
-	interface->gateway = DEFAULT_MANAGER_GW;
-	interface->netmask = DEFAULT_MANAGER_NETMASK;
-	interface->_default = true;
-
-	if(!udp_port_alloc0(manager_nic->nic, DEFAULT_MANAGER_IP, manager_port)) {
-		printf("\tCan'nt allocate manager port\n");
-		return;
-	}
-	manager_port = DEFAULT_MANAGER_PORT;
+// 	uint64_t attrs[] = {
+// 		NIC_MAC, manager_mac, // Physical MAC
+// 		NIC_DEV, (uint64_t)"eth0",
+// 		NIC_POOL_SIZE, 0x400000,
+// 		NIC_INPUT_BANDWIDTH, 1000000000L,
+// 		NIC_OUTPUT_BANDWIDTH, 1000000000L,
+// 		NIC_INPUT_BUFFER_SIZE, 1024,
+// 		NIC_OUTPUT_BUFFER_SIZE, 1024,
+// 		NIC_PADDING_HEAD, 32,
+// 		NIC_PADDING_TAIL, 32,
+// 		NIC_INPUT_ACCEPT_ALL, 1,
+// 		NIC_OUTPUT_ACCEPT_ALL, 1,
+// 		NIC_NONE
+// 	};
+// 	
+// 	manager_nic = vnic_create(attrs);
+// 	if(!manager_nic) {
+// 		printf("\tCannot create manager : %d\n", errno);
+// 		return;
+// 	}
+// 
+// 	manager_ip = DEFAULT_MANAGER_IP;
+// 	if(!nic_ip_add(manager_nic->nic, DEFAULT_MANAGER_IP)) {
+// 		printf("\tCan'nt allocate manager ip\n");
+// 		return;
+// 	}
+// 
+// 	IPv4Interface* interface = nic_ip_get(manager_nic->nic, DEFAULT_MANAGER_IP);
+// 	interface->gateway = DEFAULT_MANAGER_GW;
+// 	interface->netmask = DEFAULT_MANAGER_NETMASK;
+// 	interface->_default = true;
+// 
+// 	if(!udp_port_alloc0(manager_nic->nic, DEFAULT_MANAGER_IP, manager_port)) {
+// 		printf("\tCan'nt allocate manager port\n");
+// 		return;
+// 	}
+// 	manager_port = DEFAULT_MANAGER_PORT;
 	
 	//manager_netif = nic_init(manager_nic->nic, manage, NULL);
 	
