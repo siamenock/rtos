@@ -267,7 +267,6 @@ dropped:
 
 			if(input(vnic)) {
 				nic_rx++;
-				return true;
 			}
 		}
 	} else {
