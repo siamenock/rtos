@@ -1,0 +1,24 @@
+## This file is for PacketNgin Bash Wrapper
+
+#!/bin/bash
+DEFAULT_MANAGER_IP="192.168.100.254"
+DEFAULT_MANAGER_PORT="1111"
+
+IP=${1:-${DEFAULT_MANAGER_IP}}
+PORT=${2:-${DEFAULT_MANAGER_PORT}}
+
+./connect $IP $PORT
+
+PROMPT="PacketNgin Bash"
+PATH="$PATH:."
+PS1="(`basename \"$PROMPT\"`) $PS1"
+
+if [ $? -eq 0 ]; then
+    echo "PacketNgin Manager Connected"
+    export MANAGER_IP=${IP}
+    export MANAGER_PORT=${PORT}
+    export PATH
+    export PS1
+else
+    echo "PacketNgin Manager Unconnected"
+fi
