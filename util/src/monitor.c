@@ -35,7 +35,7 @@ static void stdio_handler(RPC* rpc, uint32_t id, uint8_t thread_id, int fd, char
 }
 
 static int vm_monitor(int argc, char** argv) {
-	bool callback_vm_delete(bool result, void* context) {
+	bool callback_vm_destroy(bool result, void* context) {
 		if(result)
 			printf("true\n");
 		else

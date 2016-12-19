@@ -13,11 +13,11 @@ static void help() {
 
 #define UNDERLINE(OPTION) ANSI_UNDERLINED_PRE #OPTION ANSI_UNDERLINED_POST
 
-	printf("Usage: delete " UNDERLINE(VM ID) "\n");
+	printf("Usage: destroy " UNDERLINE(VM ID) "\n");
 }
 
-static int vm_delete(int argc, char** argv) {
-	bool callback_vm_delete(bool result, void* context) {
+static int vm_destroy(int argc, char** argv) {
+	bool callback_vm_destroy(bool result, void* context) {
 		if(result)
 			printf("true\n");
 		else
@@ -38,7 +38,7 @@ static int vm_delete(int argc, char** argv) {
 	}
 
 	uint32_t vmid = parse_uint32(argv[1]);
-	rpc_vm_delete(rpc, vmid, callback_vm_delete, NULL);
+	rpc_vm_delete(rpc, vmid, callback_vm_destroy, NULL);
 
 	return 0;
 }
@@ -57,8 +57,8 @@ int main(int argc, char *argv[]) {
 	}
 	
 	int rc;
-	if((rc = vm_delete(argc, argv))) {
-		printf("Failed to delete VM. Error code : %d\n", rc);
+	if((rc = vm_destroy(argc, argv))) {
+		printf("Failed to destroy VM. Error code : %d\n", rc);
 		rpc_disconnect(rpc);
 		return ERROR_CMD_EXECUTE;
 	}

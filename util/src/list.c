@@ -38,7 +38,7 @@ int main(int argc, char *argv[]) {
 	}
 	
 	if(vm_list(argc, argv)) {
-		printf("Failed to delete VM\n");
+		printf("Failed to destroy VM\n");
 		rpc_disconnect(rpc);
 		return ERROR_CMD_EXECUTE;
 	}

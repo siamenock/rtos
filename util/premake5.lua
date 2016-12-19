@@ -27,11 +27,11 @@ workspace "Utility"
         targetname "create"
         files { "src/create.c" }
 
-    project "delete"
+    project "destroy"
         kind "ConsoleApp"
         location "build"
-        targetname "delete"
-        files { "src/delete.c" }
+        targetname "destroy"
+        files { "src/destroy.c" }
 
     project "list"
         kind "ConsoleApp"
