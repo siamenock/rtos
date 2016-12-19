@@ -340,10 +340,10 @@ static bool manager_accept_loop(void* rpc) {
 }
 
 static void stdio_callback(uint32_t vmid, int thread_id, int fd, char* buffer, volatile size_t* head, volatile size_t* tail, size_t size) {
-	printf("Application > ");
+	//printf("Application > ");
 	fflush(stdout);
-//	ListIterator iter;
-//	list_iterator_init(&iter, clients);
+	ListIterator iter;
+	list_iterator_init(&iter, actives);
 	size_t len0, len1, len2;
 	bool wrapped;
 
@@ -358,27 +358,26 @@ static void stdio_callback(uint32_t vmid, int thread_id, int fd, char* buffer, v
 		len2 = *tail;
 	}
 
-	/*
-	 *while(list_iterator_has_next(&iter)) {
-	 *        struct tcp_pcb* pcb = list_iterator_next(&iter);
-	 *        RPC* rpc = pcb->callback_arg;
-	 */
+	while(list_iterator_has_next(&iter)) {
+		/*
+		 *struct tcp_pcb* pcb = list_iterator_next(&iter);
+		 *RPC* rpc = pcb->callback_arg;
+		 */
+		RPC* rpc = list_iterator_next(&iter);
 	
 		if(wrapped) {
-			write(STDOUT_FILENO, buffer + *head, len1);
-			write(STDOUT_FILENO, buffer, len2);
-			//rpc_stdio(rpc, vmid, thread_id, fd, buffer + *head, len1, NULL, NULL);
-			//rpc_stdio(rpc, vmid, thread_id, fd, buffer, len2, NULL, NULL);
+			//write(STDOUT_FILENO, buffer + *head, len1);
+			//write(STDOUT_FILENO, buffer, len2);
+			rpc_stdio(rpc, vmid, thread_id, fd, buffer + *head, len1, NULL, NULL);
+			rpc_stdio(rpc, vmid, thread_id, fd, buffer, len2, NULL, NULL);
 
 		} else {
-			write(STDOUT_FILENO, buffer + *head, len0);
-			//rpc_stdio(rpc, vmid, thread_id, fd, buffer + *head, len0, NULL, NULL);
+			//write(STDOUT_FILENO, buffer + *head, len0);
+			rpc_stdio(rpc, vmid, thread_id, fd, buffer + *head, len0, NULL, NULL);
 		}	
-	/*
-	 *        
-	 *        rpc_loop(rpc);
-	 *}
-	 */
+		
+		rpc_loop(rpc);
+	}
 	
 	if(wrapped) {
 		*head = (*head + len1 + len2) % size;
