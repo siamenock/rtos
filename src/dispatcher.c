@@ -29,6 +29,7 @@ int dispatcher_init() {
 		printf("PacketNgin manager terminated...\n");
 		dispatcher_exit();
 		signal(SIGINT, SIG_DFL);	
+		signal(SIGTERM, SIG_DFL);	
 		// Gracefully kill wating for ioctl
 		sleep(1);
 		kill(getpid(), SIGINT);
@@ -36,7 +37,8 @@ int dispatcher_init() {
 
 	struct sigaction act;
 	act.sa_handler = __handler;
-	sigaction(SIGINT | SIGTERM, &act, NULL);
+	sigaction(SIGINT, &act, NULL);
+	sigaction(SIGTERM, &act, NULL);
 	
 	close(fd);
 	return 0;
