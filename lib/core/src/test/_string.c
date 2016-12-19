@@ -7,7 +7,7 @@
 #include <stdint.h>
 #include <limits.h>
 #include <malloc.h>
-#include <string.h>
+//#include <string.h>
 
 #include <_string.h>
 

@@ -15,7 +15,7 @@ typedef struct {
 	uint64_t	timeout;
 } ARPEntity;
 
-uint32_t ARP_TIMEOUT = 14400;	// 4 hours
+uint64_t ARP_TIMEOUT = 14400 * 1000000;	// 4 hours  (us)
 
 bool arp_process(Packet* packet) {
 #ifndef	LINUX
@@ -33,7 +33,7 @@ bool arp_process(Packet* packet) {
 	
 	if(!nic_ip_get(packet->nic, addr))
 		return false;
-	
+
 	Map* arp_table = nic_config_get(packet->nic, ARP_TABLE);
 	if(!arp_table) {
 		arp_table = map_create(32, map_uint64_hash, map_uint64_equals, packet->nic->pool);
@@ -54,7 +54,7 @@ bool arp_process(Packet* packet) {
 		if(!nic_config_put(packet->nic, ARP_TABLE_GC, (void*)(uintptr_t)gc_time))
 			return false;
 	}
-	
+
 	if(gc_time < current) {
 		MapIterator iter;
 		map_iterator_init(&iter, arp_table);

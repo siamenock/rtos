@@ -28,6 +28,7 @@
 #include "vm.h"
 #include "asm.h"
 #include "file.h"
+#include "pci.h"
 #include "driver/charout.h"
 #include "driver/charin.h"
 #include "driver/disk.h"
@@ -1102,6 +1103,199 @@ static int cmd_mount(int argc, char** argv, void(*callback)(char* result, int ex
 	return -2;
 }
 
+/*
+   * Basic display modes:
+   -mm		Produce machine-readable output (single -m for an obsolete format)
+   -t		Show bus tree
+
+   * Display options:
+   -v		Be verbose (-vv for very verbose)
+   -k		Show kernel drivers handling each device
+   -x		Show hex-dump of the standard part of the config space
+   -xxx		Show hex-dump of the whole config space (dangerous; root only)
+   -xxxx		Show hex-dump of the 4096-byte extended config space (root only)
+   -b		Bus-centric view (addresses and IRQ's as seen by the bus)
+   -D		Always show domain numbers
+
+   * Resolving of device ID's to names:
+   -n		Show numeric ID's
+   -nn		Show both textual and numeric ID's (names & numbers)
+   -q		Query the PCI ID database for unknown ID's via DNS
+   -qq		As above, but re-query locally cached entries
+   -Q		Query the PCI ID database for all ID's via DNS
+
+   * Selection of devices:
+   -s [[[[<domain>]:]<bus>]:][<slot>][.[<func>]]	Show only devices in selected slots
+   -d [<vendor>]:[<device>]			Show only devices with specified ID's
+
+   * Other options:
+   -i <file>	Use specified ID database instead of /usr/share/misc/pci.ids.gz
+   -p <file>	Look up kernel modules in a given file instead of default modules.pcimap
+   -M		Enable `bus mapping' mode (dangerous; root only)
+
+   * PCI access options:
+   -A <method>	Use the specified PCI access method (see `-A help' for a list)
+   -O <par>=<val>	Set PCI access parameter (see `-O help' for a list)
+   -G		Enable PCI access debugging
+   -H <mode>	Use direct hardware access (<mode> = 1 or 2)
+   -F <file>	Read PCI configuration dump from a given file
+ */
+static int cmd_lspci(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+/* Basic display modes:*/
+	bool m = false;
+	bool t = false;
+
+/* Display options: */
+	bool v = false;		// show verbose
+	bool k = false;		// show drivers
+	uint8_t x = 0;	// hex-dump
+	bool b = false;		// kbus-centric view
+	bool D = false;	// show domain
+
+/* Resolving of device ID's to names: */
+	uint8_t n = 0;	// show numeric id's
+// 	uint8_t q;	// query the pci id databse
+	uint16_t s_bus = 0xffff;	// selected slots.
+	uint8_t s_slot = 0xff;
+	uint8_t s_function = 0xff;
+
+	bool d = false;	// selected ids.
+
+	for(int i = 1; i < argc; i++) {
+		if(*argv[i] == '-') {
+			for(int j = 1; j < strlen(argv[i]); j++) {
+				if(!strncmp(&argv[i][j], "mm", 1)) {
+					m = true;
+				} else if(!strncmp(&argv[i][j], "t", 1)) {
+					t = true;
+				} else if(!strncmp(&argv[i][j], "v", 1)) {
+					v = true;
+				} else if(!strncmp(&argv[i][j], "k", 1)) {
+					k = true;
+				} else if(!strncmp(&argv[i][j], "x", 1)) {
+					if(!strncmp(&argv[i][j], "xxxx", 4)) {
+						x = PCI_DUMP_LEVEL_XXXX;
+						j+= 3;
+					} else if(!strncmp(&argv[i][j], "xxx", 3)) {
+						x = PCI_DUMP_LEVEL_XXX;
+						x = 3;
+						j+= 2;
+					} else if(!strncmp(&argv[i][j], "xx", 2)) {
+						x = PCI_DUMP_LEVEL_XX;
+						j+= 1;
+					} else {// "x"
+						x = PCI_DUMP_LEVEL_X;
+					}
+				} else if(!strncmp(&argv[i][j], "b", 1)) {
+					b = true;
+				} else if(!strncmp(&argv[i][j], "D", 1)) {
+					D = true;
+				} else if(!strncmp(&argv[i][j], "n", 1)) {
+					if(!strncmp(&argv[i][j], "nn", 2)) {
+						n = 2;
+						j++;
+					} else {
+						n = 1;
+					}
+				} else if(!strncmp(&argv[i][j], "s", 1)) {
+					i++;
+					char* next;
+					uint16_t ret = strtol(argv[i], &next, 16);
+					if(*next == ':') {
+						s_bus = ret;
+						next++;
+						ret = strtol(next, &next, 16);
+					}
+					s_slot = ret;
+
+					if(*next == '.') {
+						next++;
+						s_function = strtol(next, NULL, 16);
+					}
+
+					break;
+				} else if(!strncmp(&argv[i][j], "d", 1)) {
+					i++;
+
+					break;
+				} else {
+					//TODO print lspci help
+					return -2;
+				}
+			}
+		}
+	}
+
+	if(t) {
+		PCI_Bus_Entry* bus_entrys = gmalloc(sizeof(PCI_Bus_Entry) * PCI_MAX_BUS);
+		memset(bus_entrys, 0, sizeof(PCI_Bus_Entry) * PCI_MAX_BUS);
+		uint8_t bus_count = pci_get_entrys(bus_entrys);
+
+		for(uint32_t bus_index = 0; bus_index < bus_count; bus_index++) {
+			PCI_Bus_Entry* bus_entry = &bus_entrys[bus_index];
+			printf("-[%04x:%02x]-", 0, bus_entry->bus); // domain:bus
+			for(uint32_t slot_index = 0; slot_index < bus_entry->slot_count; slot_index++) {
+				PCI_Slot_Entry* slot_entry = &bus_entry->slot_entry[slot_index];
+				for(uint32_t function_index = 0; function_index < slot_entry->function_count; function_index++) {
+					PCI_Function_Entry* function_entry = &slot_entry->function_entry[function_index];
+					if(!(function_index == 0 && slot_index == 0))
+						printf("           ");
+
+					if(function_index == (slot_entry->function_count - 1) && slot_index == (bus_entry->slot_count - 1)) 
+						printf("\\"); // Last function entry
+					else
+						printf("+");
+
+					printf("-%02x.%x", slot_entry->slot, function_entry->function);
+
+					//TODO Brdige
+					// 				if() {
+					// 					printf("-[%02x]--");
+					// 					if(0)
+					// 						printf("--%02x.%x");
+					// 				}
+					printf("\n");
+				}
+			}
+		}
+
+		gfree(bus_entrys);
+	} else {
+		PCI_Bus_Entry* bus_entrys = gmalloc(sizeof(PCI_Bus_Entry) * PCI_MAX_BUS);
+		memset(bus_entrys, 0, sizeof(PCI_Bus_Entry) * PCI_MAX_BUS);
+		uint8_t bus_count = pci_get_entrys(bus_entrys);
+
+		for(uint32_t bus_index = 0; bus_index < bus_count; bus_index++) {
+			PCI_Bus_Entry* bus_entry = &bus_entrys[bus_index];
+			if(s_bus != 0xffff) {
+				if(bus_entry->bus != s_bus)
+					continue;
+			}
+			for(uint32_t slot_index = 0; slot_index < bus_entry->slot_count; slot_index++) {
+				PCI_Slot_Entry* slot_entry = &bus_entry->slot_entry[slot_index];
+				if(s_slot != 0xff) {
+					if(slot_entry->slot != s_slot)
+						continue;
+				}
+				for(uint32_t function_index = 0; function_index < slot_entry->function_count; function_index++) {
+					PCI_Function_Entry* function_entry = &slot_entry->function_entry[function_index];
+					if(s_function != 0xff) {
+						if(function_entry->function != s_function)
+							continue;
+					}
+					//TODO Query to DNS PCI information
+					printf("%02x:%02x.%x\n", bus_entry->bus, slot_entry->slot, function_entry->function);
+					if(x)
+						pci_data_dump(bus_entry->bus, slot_entry->slot, function_entry->function, x);
+				}
+			}
+		}
+		gfree(bus_entrys);
+	}
+
+	return 0;
+}
+
 Command commands[] = {
 	{
 		.name = "help",
@@ -1261,6 +1455,16 @@ Command commands[] = {
 		.desc = "Mount file system",
 		.args = "result: bool, [\"-t\" (type)] device: string dir: string",
 		.func = cmd_mount
+	},
+	{
+		.name = "lspci",
+		.desc = "list all PCI Devices",
+		.args = "-t\tShow a tree of bus\n\
+			 -x\tShow hexadeciaml dump of PCI configuration data. (64Bytes)\n\
+			 -xxx\tShow hexademical dump of PCI configuration data. (256Bytes)\n\
+			 -xxxx\tShow hexademical dump of PCI configuration data. (4096Bytes)\n\
+			 -s\tSelect Device [<bus>:][<slot>][.<func>]\n",
+		.func = cmd_lspci
 	},
 	{
 		.name = NULL
