@@ -2,7 +2,7 @@ workspace "Utility"
     configurations { "Debug", "Release" }
 
     configurations "Debug"
-    symbols "On" 
+    flags "symbols" 
 
     language "C"
 
@@ -68,3 +68,9 @@ workspace "Utility"
         location "build"
         targetname "download"
         files { "src/download.c" }
+
+    project "monitor"
+        kind "ConsoleApp"
+        location "build"
+        targetname "monitor"
+        files { "src/monitor.c" }

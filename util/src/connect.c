@@ -2,6 +2,10 @@
 #include <util/types.h>
 #include "rpc.h"
 
+#define DEFAULT_HOST		"192.168.100.254"
+#define DEFAULT_PORT		1111
+#define DEFAULT_TIMEOUT		3
+
 static RPC* rpc;
 
 static void help() {
@@ -29,7 +33,7 @@ static int connect(int argc, char** argv) {
 int main(int argc, char *argv[]) {
 	int rc;
 	if((rc = connect(argc, argv))) {
-		printf("Failed to connect. Error code : %d\n", rc);
+		printf("Failed to connect RPC server. Error code : %d\n", rc);
 		return ERROR_RPC_DISCONNECTED;
 	}
 

@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <sys/time.h>
 #include <control/rpc.h>
+#include "rpc.h"
 
 void rpc_disconnect(RPC* rpc) {
 	if(!rpc_is_closed(rpc))
@@ -34,9 +35,10 @@ RPC* rpc_connect(char* host, int port, int timeout, bool keep_session) {
 		RPC* rpc = context_hello->rpc;
 
 		if(context_hello->count == 0) {
-			free(context_hello);
-			if(!context_hello->keep_session)
+			if(!context_hello->keep_session) {
 				rpc_disconnect(rpc);
+			}
+			free(context_hello);
 
 			return false;
 		}
@@ -46,10 +48,8 @@ RPC* rpc_connect(char* host, int port, int timeout, bool keep_session) {
 		return true;
 	}
 	RPC* rpc = rpc_open(host, port, timeout);
-	if(rpc == NULL) {
-		printf("Unable to connect RPC server\n");
+	if(rpc == NULL)
 		return NULL;
-	}
 
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
@@ -68,5 +68,22 @@ RPC* rpc_connect(char* host, int port, int timeout, bool keep_session) {
 	rpc_hello(rpc, callback_hello, context_hello);
 
 	return rpc;
+}
+
+RPCSession* rpc_session() {
+	RPCSession* session = malloc(sizeof(RPCSession));
+	if(!session)
+		return NULL;
+
+	session->host = getenv("MANAGER_IP");
+	if(!session->host)
+		return NULL;
+
+	char* port = getenv("MANAGER_PORT");
+	if(!port)
+		return NULL;
+	session->port = atoi(port);
+
+	return session;
 }
 

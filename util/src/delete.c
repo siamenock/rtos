@@ -44,13 +44,15 @@ static int vm_delete(int argc, char** argv) {
 }
 
 int main(int argc, char *argv[]) {
-	char* host = DEFAULT_HOST;
-	int port = DEFAULT_PORT;
-	int timeout = DEFAULT_TIMEOUT;
+	RPCSession* session = rpc_session();
+	if(!session) {
+		printf("RPC server not connected\n");
+		return ERROR_RPC_DISCONNECTED;
+	}
 
-	rpc = rpc_connect(host, port, timeout, true);
+	rpc = rpc_connect(session->host, session->port, 3, true);
 	if(rpc == NULL) {
-		printf("Failed to connect\n");
+		printf("Failed to connect RPC server\n");
 		return ERROR_RPC_DISCONNECTED;
 	}
 	
@@ -62,7 +64,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	while(1) {
-		if(!rpc_connected(rpc))
+		if(rpc_connected(rpc))
 			rpc_loop(rpc);
 		else
 			break;
