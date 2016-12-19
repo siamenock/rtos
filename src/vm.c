@@ -56,18 +56,21 @@ static void icc_started(ICC_Message* msg) {
 
 	if(msg->result == 0) {
 		core->error_code = 0;
-		core->stdin = msg->data.started.stdin;
-		core->stdin_head = msg->data.started.stdin_head;
-		core->stdin_tail = msg->data.started.stdin_tail;
-		core->stdin_size = msg->data.started.stdin_size;
+
+		core->stdin = (char*)((uint64_t)msg->data.started.stdin - PHYSICAL_OFFSET);
+		core->stdin_head = (char*)((uint64_t)msg->data.started.stdin_head - PHYSICAL_OFFSET);
+		core->stdin_tail = (char*)((uint64_t)msg->data.started.stdin_tail - PHYSICAL_OFFSET);
+		core->stdin_size = (char*)((uint64_t)msg->data.started.stdin_size - PHYSICAL_OFFSET);
+
 		core->stdout = (char*)((uint64_t)msg->data.started.stdout - PHYSICAL_OFFSET);
 		core->stdout_head = (size_t*)((uint64_t)msg->data.started.stdout_head - PHYSICAL_OFFSET);
 		core->stdout_tail = (size_t*)((uint64_t)msg->data.started.stdout_tail - PHYSICAL_OFFSET);
 		core->stdout_size = msg->data.started.stdout_size;
-		core->stderr = msg->data.started.stderr;
+
+		core->stderr = (char*)((uint64_t)msg->data.started.stderr - PHYSICAL_OFFSET);
 		core->stderr_head = (char*)((uint64_t)msg->data.started.stderr_head - PHYSICAL_OFFSET);
 		core->stderr_tail = (char*)((uint64_t)msg->data.started.stderr_tail - PHYSICAL_OFFSET);
-		core->stderr_size = (char*)((uint64_t)msg->data.started.stderr_size - PHYSICAL_OFFSET);
+		core->stderr_size = msg->data.started.stderr_size;
 		
 		core->status = VM_STATUS_START;
 		

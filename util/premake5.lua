@@ -74,3 +74,9 @@ workspace "Utility"
         location "build"
         targetname "monitor"
         files { "src/monitor.c" }
+
+    project "stdin"
+        kind "ConsoleApp"
+        location "build"
+        targetname "stdin"
+        files { "src/stdin.c" }
