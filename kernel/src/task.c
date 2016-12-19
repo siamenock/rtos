@@ -100,7 +100,6 @@ static uint32_t last_fpu_task = (uint32_t)-1;
 
 
 static void device_not_available_handler(uint64_t vector, uint64_t error_code) {
-	//printf("Vector 7 occured\n");
 	ts_clear();
 	
 	if(last_fpu_task != (uint32_t)-1) {
@@ -305,7 +304,7 @@ void task_destroy(uint32_t id) {
 					uint64_t vaddr = (uint64_t)list_iterator_next(&iter);
 					uint64_t idx = vaddr >> 21;
 					
-					PAGE_L4U[idx].base = idx;
+					PAGE_L4U[idx].base = idx + (PHYSICAL_OFFSET >> 21);;
 					PAGE_L4U[idx].us = 0;
 					PAGE_L4U[idx].rw = 1;
 					PAGE_L4U[idx].exb = 0;
