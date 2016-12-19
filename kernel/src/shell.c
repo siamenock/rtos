@@ -913,10 +913,10 @@ static int cmd_vm_destroy(int argc, char** argv, void(*callback)(char* result, i
 	bool ret = vm_destroy(vmid);
 
 	if(ret) {
-		printf("vm delete success\n");
+		printf("Vm destroy success\n");
 		callback("true", 0);
 	} else {
-		printf("vm delete fail\n");
+		printf("Vm destroy fail\n");
 		callback("false", -1);
 	}
 
@@ -1454,8 +1454,8 @@ Command commands[] = {
 		.func = cmd_create 
 	},
 	{
-		.name = "delete",
-		.desc = "Delete VM",
+		.name = "destroy",
+		.desc = "Destroy VM",
 		.args = "result: bool, vmid: uint32",
 		.func = cmd_vm_destroy
 	},

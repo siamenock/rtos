@@ -448,8 +448,8 @@ Command commands[] = {
 		.func = cmd_vm_create
 	},
 	{ 
-		.name = "delete",
-		.desc = "Delete Virtual Machine",
+		.name = "destroy",
+		.desc = "Destroy Virtual Machine",
 		.func = cmd_vm_destroy
 	},
 	{ 
