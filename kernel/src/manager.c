@@ -155,8 +155,8 @@ static void vm_set_handler(RPC* rpc, VMSpec* vm, void* context, void(*callback)(
 	callback(rpc, false);
 }
 
-static void vm_delete_handler(RPC* rpc, uint32_t vmid, void* context, void(*callback)(RPC* rpc, bool result)) {
-	bool result = vm_delete(vmid);
+static void vm_destroy_handler(RPC* rpc, uint32_t vmid, void* context, void(*callback)(RPC* rpc, bool result)) {
+	bool result = vm_destroy(vmid);
 	callback(rpc, result);
 }
 
@@ -311,7 +311,7 @@ static err_t manager_accept(void* arg, struct tcp_pcb* pcb, err_t err) {
 	rpc_vm_create_handler(rpc, vm_create_handler, NULL);
 	rpc_vm_get_handler(rpc, vm_get_handler, NULL);
 	rpc_vm_set_handler(rpc, vm_set_handler, NULL);
-	rpc_vm_delete_handler(rpc, vm_delete_handler, NULL);
+	rpc_vm_destroy_handler(rpc, vm_destroy_handler, NULL);
 	rpc_vm_list_handler(rpc, vm_list_handler, NULL);
 	rpc_status_get_handler(rpc, status_get_handler, NULL);
 	rpc_status_set_handler(rpc, status_set_handler, pcb);

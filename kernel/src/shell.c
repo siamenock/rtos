@@ -900,7 +900,7 @@ static int cmd_create(int argc, char** argv, void(*callback)(char* result, int e
 	return 0;
 }
 
-static int cmd_vm_delete(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+static int cmd_vm_destroy(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	if(argc < 1) {
 		return CMD_STATUS_WRONG_NUMBER;
 	}
@@ -910,13 +910,13 @@ static int cmd_vm_delete(int argc, char** argv, void(*callback)(char* result, in
 	}
 
 	uint32_t vmid = parse_uint32(argv[1]);
-	bool ret = vm_delete(vmid);
+	bool ret = vm_destroy(vmid);
 
 	if(ret) {
-		printf("vm delete success");
+		printf("vm delete success\n");
 		callback("true", 0);
 	} else {
-		printf("vm delete fail");
+		printf("vm delete fail\n");
 		callback("false", -1);
 	}
 
@@ -1457,7 +1457,7 @@ Command commands[] = {
 		.name = "delete",
 		.desc = "Delete VM",
 		.args = "result: bool, vmid: uint32",
-		.func = cmd_vm_delete
+		.func = cmd_vm_destroy
 	},
 	{
 		.name = "list",

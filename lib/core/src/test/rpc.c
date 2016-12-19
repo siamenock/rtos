@@ -384,7 +384,7 @@ static void rpc_vm_set_func() {
 	pthread_join(tcp_server, (void**)&status);
 }
 
-static void rpc_vm_delete_func() {
+static void rpc_vm_destroy_func() {
 	server_open = 0;
 	int port = 1029;
 	pthread_t tcp_server;
@@ -399,7 +399,7 @@ static void rpc_vm_delete_func() {
 
 	RPC* rpc = rpc_open(ip, port, 1);
 	
-	rpc_vm_delete(rpc, 1, NULL, NULL);
+	rpc_vm_destroy(rpc, 1, NULL, NULL);
 
 	assert_int_equal(*(uint16_t*)(rpc->wbuf), RPC_TYPE_VM_DELETE_REQ);
 	assert_int_equal(*(uint32_t*)(rpc->wbuf + 2), 1);
@@ -665,7 +665,7 @@ static void rpc_vm_set_handler_func() {
 	pthread_join(tcp_server, (void**)&status);
 }
 
-static void rpc_vm_delete_handler_func() {
+static void rpc_vm_destroy_handler_func() {
 	server_open = 0;
 	int port = 1034;
 	pthread_t tcp_server;
@@ -685,10 +685,10 @@ static void rpc_vm_delete_handler_func() {
 	}
 
 	char* context = "Context";
-	rpc_vm_delete_handler(rpc, handler, (void*)context);	
+	rpc_vm_destroy_handler(rpc, handler, (void*)context);	
 
-	assert_int_equal(handler, rpc->vm_delete_handler);
-	assert_memory_equal(context, rpc->vm_delete_handler_context, strlen(context));
+	assert_int_equal(handler, rpc->vm_destroy_handler);
+	assert_memory_equal(context, rpc->vm_destroy_handler_context, strlen(context));
 
 	server_open = 1;
 
@@ -1056,7 +1056,7 @@ int main(void) {
 //		cmocka_unit_test(rpc_vm_create_func),
 //		cmocka_unit_test(rpc_vm_get_func),
 //		cmocka_unit_test(rpc_vm_set_func),
-//		cmocka_unit_test(rpc_vm_delete_func),
+//		cmocka_unit_test(rpc_vm_destroy_func),
 //		cmocka_unit_test(rpc_vm_list_func),
 //		cmocka_unit_test(rpc_status_get_func),
 //		cmocka_unit_test(rpc_storage_download_func),
@@ -1066,7 +1066,7 @@ int main(void) {
 //		cmocka_unit_test(rpc_vm_create_handler_func),
 //		cmocka_unit_test(rpc_vm_get_handler_func),
 //		cmocka_unit_test(rpc_vm_set_handler_func),
-//		cmocka_unit_test(rpc_vm_delete_handler_func),
+//		cmocka_unit_test(rpc_vm_destroy_handler_func),
 //		cmocka_unit_test(rpc_vm_list_handler_func),
 //		cmocka_unit_test(rpc_vm_get_handler_func),
 //		cmocka_unit_test(rpc_vm_set_handler_func),

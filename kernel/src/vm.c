@@ -238,7 +238,7 @@ static void icc_stopped(ICC_Message* msg) {
 	printf("]\n");
 }
 
-static bool vm_destroy(VM* vm, int core) {
+static bool vm_delete(VM* vm, int core) {
 	bool is_destroy = true;
 	
 	if(core == -1) {
@@ -415,7 +415,7 @@ uint32_t vm_create(VMSpec* vm_spec) {
 	
 	if(j < vm->core_size) {
 		printf("Manager: Not enough core to allocate.\n");
-		vm_destroy(vm, -1);
+		vm_delete(vm, -1);
 		return 0;
 	}
 	
@@ -429,7 +429,7 @@ uint32_t vm_create(VMSpec* vm_spec) {
 		vm->memory.blocks[i] = bmalloc();
 		if(!vm->memory.blocks[i]) {
 			printf("Manager: Not enough memory to allocate.\n");
-			vm_destroy(vm, -1);
+			vm_delete(vm, -1);
 			return 0;
 		}
 	}
@@ -444,7 +444,7 @@ uint32_t vm_create(VMSpec* vm_spec) {
 		vm->storage.blocks[i] = bmalloc();
 		if(!vm->storage.blocks[i]) {
 			printf("Manager: Not enough storage to allocate.\n");
-			vm_destroy(vm, -1);
+			vm_delete(vm, -1);
 			return 0;
 		}
 	}
@@ -478,13 +478,13 @@ uint32_t vm_create(VMSpec* vm_spec) {
 		} else if(mac & NICSPEC_DEVICE_MAC) {
 			mac = vnic_get_device_mac(nics[i].dev);
 			if(vnic_contains(nics[i].dev, mac)) {
-				vm_destroy(vm, -1);
+				vm_delete(vm, -1);
 				return 0;
 			}
 		} else if(vnic_contains(nics[i].dev, mac)) {
 			printf("Manager: The mac address already in use: %012x.\n", mac);
 			map_remove(vms, (void*)(uint64_t)vmid);
-			vm_destroy(vm, -1);
+			vm_delete(vm, -1);
 			return 0;
 		}
 		
@@ -508,7 +508,7 @@ uint32_t vm_create(VMSpec* vm_spec) {
 		if(!vm->nics[i]) {
 			printf("Manager: Not enough VNIC to allocate: errno=%d.\n", errno);
 			map_remove(vms, (void*)(uint64_t)vmid);
-			vm_destroy(vm, -1);
+			vm_delete(vm, -1);
 			return 0;
 		}
 	}
@@ -549,7 +549,7 @@ uint32_t vm_create(VMSpec* vm_spec) {
 	return vmid;
 }
 
-bool vm_delete(uint32_t vmid) {
+bool vm_destroy(uint32_t vmid) {
 	VM* vm = map_get(vms, (void*)(uint64_t)vmid);
 	if(!vm)
 		return false;
@@ -570,7 +570,7 @@ bool vm_delete(uint32_t vmid) {
 	}
 	printf("]\n");
 	
-	vm_destroy(vm, -1);
+	vm_delete(vm, -1);
 	
 	return true;
 }
