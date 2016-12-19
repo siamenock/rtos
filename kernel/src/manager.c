@@ -30,7 +30,7 @@
 #define DEFAULT_MANAGER_IP	0xc0a864fe	// 192.168.100.254
 #define DEFAULT_MANAGER_GW	0xc0a864c8	// 192.168.100.200
 #define DEFAULT_MANAGER_NETMASK	0xffffff00	// 255.255.255.0
-#define DEFAULT_MANAGER_PORT	111
+#define DEFAULT_MANAGER_PORT	1111
 
 uint64_t manager_mac;
 static struct netif* manager_netif;
