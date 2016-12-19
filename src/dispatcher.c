@@ -36,7 +36,7 @@ int dispatcher_init() {
 
 	struct sigaction act;
 	act.sa_handler = __handler;
-	sigaction(SIGINT, &act, NULL);
+	sigaction(SIGINT | SIGTERM, &act, NULL);
 	
 	close(fd);
 	return 0;
