@@ -70,10 +70,10 @@ struct _RPC {
 	void* vm_set_context;
 	void(*vm_set_handler)(RPC* rpc, VMSpec* vm, void* context, void(*callback)(RPC* rpc, bool result));
 	void* vm_set_handler_context;
-	bool(*vm_delete_callback)(bool result, void* context);
-	void* vm_delete_context;
-	void(*vm_delete_handler)(RPC* rpc, uint32_t id, void* context, void(*callback)(RPC* rpc, bool result));
-	void* vm_delete_handler_context;
+	bool(*vm_destroy_callback)(bool result, void* context);
+	void* vm_destroy_context;
+	void(*vm_destroy_handler)(RPC* rpc, uint32_t id, void* context, void(*callback)(RPC* rpc, bool result));
+	void* vm_destroy_handler_context;
 	bool(*vm_list_callback)(uint32_t* ids, uint16_t count, void* context);
 	void* vm_list_context;
 	void(*vm_list_handler)(RPC* rpc, int size, void* context, void(*callback)(RPC* rpc, uint32_t* ids, int size));
@@ -125,7 +125,7 @@ int rpc_hello(RPC* rpc, bool(*callback)(void* context), void* context);
 int rpc_vm_create(RPC* rpc, VMSpec* vm, bool(*callback)(uint32_t id, void* context), void* context);
 int rpc_vm_get(RPC* rpc, uint32_t id, bool(*callback)(VMSpec* vm, void* context), void* context);
 int rpc_vm_set(RPC* rpc, VMSpec* vm, bool(*callback)(bool result, void* context), void* context);
-int rpc_vm_delete(RPC* rpc, uint32_t id, bool(*callback)(bool result, void* context), void* context);
+int rpc_vm_destroy(RPC* rpc, uint32_t id, bool(*callback)(bool result, void* context), void* context);
 int rpc_vm_list(RPC* rpc, bool(*callback)(uint32_t* ids, uint16_t count, void* context), void* context);
 
 int rpc_status_get(RPC* rpc, uint32_t id, bool(*callback)(VMStatus status, void* context), void* context);
@@ -141,7 +141,7 @@ int rpc_stdio(RPC* rpc, uint32_t id, uint8_t thread_id, int fd, const char* str,
 void rpc_vm_create_handler(RPC* rpc, void(*handler)(RPC* rpc, VMSpec* vm, void* context, void(*callback)(RPC* rpc, uint32_t id)), void* context);
 void rpc_vm_get_handler(RPC* rpc, void(*handler)(RPC* rpc, uint32_t id, void* context, void(*callback)(RPC* rpc, VMSpec* vm)), void* context);
 void rpc_vm_set_handler(RPC* rpc, void(*handler)(RPC* rpc, VMSpec* vm, void* context, void(*callback)(RPC* rpc, bool result)), void* context);
-void rpc_vm_delete_handler(RPC* rpc, void(*handler)(RPC* rpc, uint32_t id, void* context, void(*callback)(RPC* rpc, bool result)), void* context);
+void rpc_vm_destroy_handler(RPC* rpc, void(*handler)(RPC* rpc, uint32_t id, void* context, void(*callback)(RPC* rpc, bool result)), void* context);
 void rpc_vm_list_handler(RPC* rpc, void(*handler)(RPC* rpc, int size, void* context, void(*callback)(RPC* rpc, uint32_t* ids, int size)), void* context);
 
 void rpc_status_get_handler(RPC* rpc, void(*handler)(RPC* rpc, uint32_t id, void* context, void(*callback)(RPC* rpc, VMStatus status)), void* context);

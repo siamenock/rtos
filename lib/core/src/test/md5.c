@@ -1,3 +1,4 @@
+/*
 #include <stdarg.h>
 #include <stddef.h>
 #include <setjmp.h>
@@ -13,10 +14,11 @@
 
 #define ENTRY_CNT		14	//random value
 #define MSG_SIZE		128	//random value
-
+*/
 /**
  * This function uses openssl library for comparing hash return values.
  */
+/*
 static const char* test_message[ENTRY_CNT] = { 
 	"didfdfkfjalkdfkaldfjldjfkldsfklasjlkfajdskljdklafjdklfjkldajfkldfjdvf", 
 	"d41d8ruvyh5",
@@ -95,3 +97,5 @@ int main(void) {
 	};
 	return cmocka_run_group_tests(UnitTest, NULL, NULL);
 }
+
+*/

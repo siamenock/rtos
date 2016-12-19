@@ -48,12 +48,17 @@ int cmd_help(int argc, char** argv, void(*callback)(char* result, int exit_statu
 			callback("false", 0);
 
 		return 0;
+	} else if(argc >= 3) {
+//		printf("Too much arguments");
+		if(callback != NULL)
+			printf("Wrong number of arguments");
+			callback("false", 0);
+		return 0;
 	}
 
 end:
 	if(callback != NULL)
 		callback("true", 0);
-
         return 0;
 }
 
@@ -190,8 +195,9 @@ int cmd_exec(char* line, void(*callback)(char* result, int exit_status)) {
 
 	cmd_parse_var(&argc, argv);
 
-	if(cmd_parse_arg(argc, argv) == false)
+	if(cmd_parse_arg(argc, argv) == false) {
 		return CMD_VARIABLE_NOT_FOUND;
+	}
 
 	Command* cmd = cmd_get(argc, argv);
 	int exit_status = CMD_STATUS_NOT_FOUND;
