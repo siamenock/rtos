@@ -9,22 +9,6 @@
 #include "smap.h"
 #include "idt.h"
 
-/*
- *#include <string.h>
- *#include <util/list.h>
- *#include <tlsf.h>
- *#include <malloc.h>
- *#include <_malloc.h>
- *#include "malloc.h"
- *#include "idt.h"
- *#include "mp.h"
- *#include "shared.h"
- *#include "multiboot2.h"
- *#include "gmalloc.h"
- *#include "entry.h"
- *#include "mmap.h"
- */
-
 uint32_t bmalloc_count;
 uint64_t* bmalloc_pool;
 
@@ -47,11 +31,9 @@ void gmalloc_init() {
 	Block reserved[3 + MP_MAX_CORE_COUNT];
 	int reserved_count = 0;
 
-	/*
-	 *reserved[reserved_count].start = VIRTUAL_TO_PHYSICAL(BIOS_AREA_START);
-	 *reserved[reserved_count].end = VIRTUAL_TO_PHYSICAL(BIOS_AREA_END);
-	 *reserved_count++;
-	 */
+	reserved[reserved_count].start = VIRTUAL_TO_PHYSICAL(BIOS_AREA_START);
+	reserved[reserved_count].end = VIRTUAL_TO_PHYSICAL(BIOS_AREA_END);
+	reserved_count++;
 
 	reserved[reserved_count].start = VIRTUAL_TO_PHYSICAL(DESC_TABLE_AREA_START);
 	reserved[reserved_count].end = VIRTUAL_TO_PHYSICAL(DESC_TABLE_AREA_END);
