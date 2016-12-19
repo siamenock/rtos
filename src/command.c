@@ -408,7 +408,7 @@ static int cmd_vnic(int argc, char** argv, void(*callback)(char* result, int exi
 			printf("\n\n");
 		}
 
-		print_vnic(manager_nic, 0, 0);
+// 		print_vnic(manager_nic, 0, 0);
 
 		extern Map* vms;
 		MapIterator iter;
