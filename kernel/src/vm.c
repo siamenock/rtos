@@ -763,8 +763,10 @@ ssize_t vm_storage_write(uint32_t vmid, void* buf, size_t offset, size_t size) {
 			_size = 0;
 		}
 
-		if(_size == 0)
+		if(_size == 0) {
+			vm->used_size = size;
 			break;
+		}
 		offset = 0;
 	}
 

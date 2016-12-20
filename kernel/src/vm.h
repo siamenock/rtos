@@ -26,6 +26,7 @@ typedef struct _VM {
 	uint8_t		cores[MP_MAX_CORE_COUNT];
 	Block		memory;
 	Block		storage;
+	int		used_size;	// temporary variable for checking upload. TODO: Change FILE structure.
 	int		nic_count;
 	VNIC**		nics;	// gmalloc, ni_create
 	//VFIO*		fio;

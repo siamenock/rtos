@@ -1297,7 +1297,20 @@ void shell_callback() {
 			case '\n':
 				cmd[cmd_idx] = '\0';
 				putchar(ch);
-				cmd_exec(cmd, cmd_callback);
+
+				int exit_status = cmd_exec(cmd, cmd_callback);
+				if(exit_status != 0) { 
+					if(exit_status == CMD_STATUS_WRONG_NUMBER) {
+						printf("Wrong number of arguments\n");
+					} else if(exit_status == CMD_STATUS_NOT_FOUND) {
+						printf("Can not found command\n");
+					} else if(exit_status == CMD_VARIABLE_NOT_FOUND) {
+						printf("Variable not found\n");
+					} else if(exit_status < 0) { 
+						printf("Wrong value of argument : %d\n", -exit_status);
+					}
+				}
+
 				printf("# ");
 				cmd_idx = 0;
 				break;
@@ -1347,7 +1360,7 @@ void shell_callback() {
 		}
 		if(cmd_sync)
 			break;
-		
+
 		ch = stdio_getchar();
 	}
 }
@@ -1355,7 +1368,7 @@ void shell_callback() {
 void shell_init() {
 	printf("\nPacketNgin ver %d.%d.%d-%s\n", VERSION_MAJOR, VERSION_MINOR, VERSION_MICRO, VERSION_TAG);
 	printf("# ");
-	
+
 	extern Device* device_stdin;
 	((CharIn*)device_stdin->driver)->set_callback(device_stdin->id, shell_callback);
 	cmd_sync = false;
@@ -1365,39 +1378,39 @@ void shell_init() {
 bool shell_process(Packet* packet) {
 	if(arping_count == 0)
 		return false;
-	
+
 	Ether* ether = (Ether*)(packet->buffer + packet->start);
 	if(endian16(ether->type) != ETHER_TYPE_ARP)
 		return false;
-	
+
 	ARP* arp = (ARP*)ether->payload;
 	switch(endian16(arp->operation)) {
 		case 2: // Reply
 			;
 			uint64_t smac = endian48(arp->sha);
 			uint32_t sip = endian32(arp->spa);
-			
+
 			if(arping_addr == sip) {
 				uint32_t time = timer_ns() - arping_time;
 				uint32_t ms = time / 1000;
 				uint32_t ns = time - ms * 1000; 
-				
+
 				printf("Reply from %d.%d.%d.%d [%02x:%02x:%02x:%02x:%02x:%02x] %d.%dms\n",
-					(sip >> 24) & 0xff,
-					(sip >> 16) & 0xff,
-					(sip >> 8) & 0xff,
-					(sip >> 0) & 0xff,
-					(smac >> 40) & 0xff,
-					(smac >> 32) & 0xff,
-					(smac >> 24) & 0xff,
-					(smac >> 16) & 0xff,
-					(smac >> 8) & 0xff,
-					(smac >> 0) & 0xff,
-					ms, ns);
-				
+						(sip >> 24) & 0xff,
+						(sip >> 16) & 0xff,
+						(sip >> 8) & 0xff,
+						(sip >> 0) & 0xff,
+						(smac >> 40) & 0xff,
+						(smac >> 32) & 0xff,
+						(smac >> 24) & 0xff,
+						(smac >> 16) & 0xff,
+						(smac >> 8) & 0xff,
+						(smac >> 0) & 0xff,
+						ms, ns);
+
 				event_timer_remove(arping_event);
 				arping_count--;
-				
+
 				if(arping_count > 0) {
 					bool arping(void* context) {
 						arping_time = timer_ns();
@@ -1407,10 +1420,10 @@ bool shell_process(Packet* packet) {
 							arping_count = 0;
 							printf("Cannot send ARP packet\n");
 						}
-						
+
 						return false;
 					}
-					
+
 					event_timer_add(arping, NULL, 1000000, 1000000);
 				} else {
 					printf("Done\n");
@@ -1418,6 +1431,6 @@ bool shell_process(Packet* packet) {
 			}
 			break;
 	}
-	
+
 	return false;
 }
