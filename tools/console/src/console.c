@@ -302,8 +302,8 @@ static int cmd_vm_create(int argc, char** argv, void(*callback)(char* result, in
 	return 0;
 }
 
-static int cmd_vm_delete(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
-	bool callback_vm_delete(bool result, void* context) {
+static int cmd_vm_destroy(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	bool callback_vm_destroy(bool result, void* context) {
 		void(*callback)(char* result, int exit_status) = context;
 
 		if(result)
@@ -325,7 +325,7 @@ static int cmd_vm_delete(int argc, char** argv, void(*callback)(char* result, in
 	
 	uint32_t vmid = parse_uint32(argv[1]);
 
-	rpc_vm_delete(rpc, vmid, callback_vm_delete, callback);
+	rpc_vm_destroy(rpc, vmid, callback_vm_destroy, callback);
 	sync_status = false;
 
 	return 0;
@@ -792,10 +792,10 @@ Command commands[] = {
 		.func = cmd_vm_create
 	},
 	{
-		.name = "delete",
-		.desc = "Delete VM",
+		.name = "destroy",
+		.desc = "Destroy VM",
 		.args = "result: bool, vmid: uint32",
-		.func = cmd_vm_delete
+		.func = cmd_vm_destroy
 	},
 	{
 		.name = "list",
