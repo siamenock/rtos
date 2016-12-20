@@ -17,9 +17,9 @@ static void help() {
 static int vm_stdin(int argc, char** argv) {
 	bool callback_stdin(uint16_t written, void* context) {
 		if(written == 0)
-			printf("false");
+			printf("false\n");
 		else
-			printf("true");
+			printf("true\n");
 
 		rpc_disconnect(rpc);
 		return false;
