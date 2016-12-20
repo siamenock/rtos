@@ -648,42 +648,40 @@ static int cmd_shutdown(int argc, char** argv, void(*callback)(char* result, int
 	/*return 0;*/
 /*}*/
 
-/*
- *static int cmd_md5(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
- *        if(argc < 3) {
- *                return CMD_STATUS_WRONG_NUMBER;
- *        }
- *
- *        if(!is_uint32(argv[1])) {
- *                return -1;
- *        }
- *
- *        if(!is_uint64(argv[2])) {
- *                return -2;
- *        }
- *
- *        uint32_t vmid = parse_uint32(argv[1]);
- *        uint64_t size = parse_uint64(argv[2]);
- *        uint32_t md5sum[4];
- *        bool ret = vm_storage_md5(vmid, size, md5sum);
- *
- *        if(!ret) {
- *                sprintf(cmd_result, "(nil)");
- *                printf("Can'nt md5 checksum\n");
- *        } else {
- *                char* p = (char*)cmd_result;
- *                for(int i = 0; i < 16; i++, p += 2) {
- *                        sprintf(p, "%02x", ((uint8_t*)md5sum)[i]);
- *                }
- *                *p = '\0';
- *        }
- *
- *        if(ret)
- *                callback(cmd_result, 0);
- *        return 0;
- *}
- *
- */
+static int cmd_md5(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	if(argc < 3) {
+		return CMD_STATUS_WRONG_NUMBER;
+	}
+
+	if(!is_uint32(argv[1])) {
+		return -1;
+	}
+
+	if(!is_uint64(argv[2])) {
+		return -2;
+	}
+
+	uint32_t vmid = parse_uint32(argv[1]);
+	uint64_t size = parse_uint64(argv[2]);
+	uint32_t md5sum[4];
+	bool ret = vm_storage_md5(vmid, size, md5sum);
+
+	if(!ret) {
+		sprintf(cmd_result, "(nil)");
+		printf("Can'nt md5 checksum\n");
+	} else {
+		char* p = (char*)cmd_result;
+		for(int i = 0; i < 16; i++, p += 2) {
+			sprintf(p, "%02x", ((uint8_t*)md5sum)[i]);
+		}
+		*p = '\0';
+	}
+
+	if(ret)
+		callback(cmd_result, 0);
+	return 0;
+}
+
 static int cmd_create(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	if(argc < 2) {
 		return CMD_STATUS_WRONG_NUMBER;
@@ -1181,14 +1179,12 @@ Command commands[] = {
 		.args = "result: bool, vmid: uint32 path: string",
 		.func = cmd_upload
 	},
-	/*
-	 *{
-	 *        .name = "md5",
-	 *        .desc = "MD5 storage",
-	 *        .args = "result: hex16 string, vmid: uint32 size: uint64",
-	 *        .func = cmd_md5
-	 *},
-	 */
+	{
+		.name = "md5",
+		.desc = "MD5 storage",
+		.args = "result: hex16 string, vmid: uint32 size: uint64",
+		.func = cmd_md5
+	},
 	{
 		.name = "start",
 		.desc = "Start VM",
