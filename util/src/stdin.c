@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <util/types.h>
 #include <control/rpc.h>
 
@@ -9,32 +11,21 @@
 static RPC* rpc;
 
 static void help() {
-#define ANSI_UNDERLINED_PRE  "\033[4m"
-#define ANSI_UNDERLINED_POST "\033[0m"
-
-#define UNDERLINE(OPTION) ANSI_UNDERLINED_PRE #OPTION ANSI_UNDERLINED_POST
-
-	printf("Usage: status " UNDERLINE(VM ID) "\n");
+	printf("Usage: stdin [VM ID] [THREAD ID] [MESSAGE]\n");
 }
 
-static int status_get(int argc, char** argv) {
-	bool callback_status_get(VMStatus status, void* context) {
-		if(status == VM_STATUS_STOP)
-			printf("stop\n");
-		else if(status == VM_STATUS_PAUSE)
-			printf("pause\n");
-		else if(status == VM_STATUS_START)
-			printf("start\n");
-		else if(status == VM_STATUS_RESUME)
-			printf("resume\n");
-		else if(status == VM_STATUS_INVALID)
-			printf("invalid\n");
+static int vm_stdin(int argc, char** argv) {
+	bool callback_stdin(uint16_t written, void* context) {
+		if(written == 0)
+			printf("false");
+		else
+			printf("true");
 
 		rpc_disconnect(rpc);
 		return false;
 	}
 
-	if(argc < 2) {
+	if(argc < 4) {
 		help();
 		return -1;
 	}
@@ -44,8 +35,17 @@ static int status_get(int argc, char** argv) {
 		return -2;
 	}
 
+	if(!is_uint8(argv[2])) {
+		help();
+		return -3;
+	}
+
 	uint32_t vmid = parse_uint32(argv[1]);
-	rpc_status_get(rpc, vmid, callback_status_get, NULL);
+	uint8_t thread_id = parse_uint8(argv[2]);
+	uint16_t length = strlen(argv[3]);
+	argv[3][length++] = '\0';
+
+	rpc_stdio(rpc, vmid, thread_id, 0, argv[3], length, callback_stdin, NULL);
 
 	return 0;
 }
@@ -64,8 +64,8 @@ int main(int argc, char *argv[]) {
 	}
 	
 	int rc;
-	if((rc = status_get(argc, argv))) {
-		printf("Failed to get VM status. Error code : %d\n", rc);
+	if((rc = vm_stdin(argc, argv))) {
+		printf("Failed to stdin VM. Error code : %d\n", rc);
 		rpc_disconnect(rpc);
 		return ERROR_CMD_EXECUTE;
 	}

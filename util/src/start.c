@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include <libgen.h>	// For "basename" function
 #include <util/types.h>
@@ -84,10 +85,12 @@ int main(int argc, char *argv[]) {
 	}
 
 	while(1) {
-		if(rpc_connected(rpc))
+		if(rpc_connected(rpc)) {
 			rpc_loop(rpc);
-		else
+		} else {
+			free(rpc);
 			break;
+		}
 	}
 }
 

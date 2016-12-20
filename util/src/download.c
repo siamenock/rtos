@@ -162,10 +162,12 @@ int main(int argc, char *argv[]) {
 	}
 
 	while(1) {
-		if(rpc_connected(rpc))
+		if(rpc_connected(rpc)) {
 			rpc_loop(rpc);
-		else
+		} else {
+			free(rpc);
 			break;
+		}
 	}
 }
 

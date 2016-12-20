@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <util/types.h>
 #include "rpc.h"
 
@@ -40,8 +41,10 @@ int main(int argc, char *argv[]) {
 	while(1) {
 		if(rpc_connected(rpc)) {
 			rpc_loop(rpc);
-		} else
+		} else {
+			free(rpc);
 			break;
+		}
 	}
 
 	return 0;
