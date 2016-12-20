@@ -20,7 +20,6 @@ void gmalloc_init() {
 	init_memory_pool(end - start, (void*)start, 0);
 	
 	gmalloc_pool = (void*)start;
-	printf("Start : %p\n", start);
 
 	typedef struct {
 		uintptr_t start;
