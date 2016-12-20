@@ -885,11 +885,11 @@ static int cmd_create(int argc, char** argv, void(*callback)(char* result, int e
 
 	uint32_t vmid = vm_create(vm);
 	if(vmid == 0) {
-		callback("false", -1);
+		callback(NULL, -1);
 	} else {
 		sprintf(cmd_result, "%d", vmid);
 		printf("%s\n", cmd_result);
-		callback("true", 0);
+		callback(cmd_result, 0);
 	}
 	for(int i = 0; i < vm->nic_count; i++) {
 		free(vm->nics[i].dev);
