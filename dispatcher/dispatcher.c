@@ -26,7 +26,6 @@ bool dispatcher_enabled = false;
 
 /* TODO: Will be removed. Configuration variable. It should be allocated by manager */
 Map* nics;
-void* __malloc_pool;
 
 struct dispatcher_work* alloc_dispatcher_work(dispatcher_work_fn_t fn, void* data)
 {
@@ -80,7 +79,7 @@ static int dispatcher_worker(void *data)
 
 	printk("PacketNgin worker thread created\n");
 	use_mm(task->mm);
-	set_user_nice(current, -20);
+	//set_user_nice(current, -20);
 
 	for (;;) {
 		set_current_state(TASK_INTERRUPTIBLE);
@@ -189,14 +188,14 @@ static long dispatcher_ioctl(struct file *f, unsigned int ioctl,
 			dispatcher_enabled = false;
 
 			dispatcher_work_queue_flush();	
-			dispatcher_netdev->netdev_ops->ndo_open(dispatcher_netdev);
-
 			dispatcher_worker_stop();
 
 			printk("Unset promiscuity of Network Device\n");
 			rtnl_lock();
 			dev_set_promiscuity(dispatcher_netdev, -1);
 			rtnl_unlock();
+
+			dispatcher_netdev->netdev_ops->ndo_open(dispatcher_netdev);
 			return 0;
 
 		case DISPATCHER_REGISTER_NIC:
@@ -227,7 +226,7 @@ static long dispatcher_ioctl(struct file *f, unsigned int ioctl,
 			dispatcher_enabled = false;
 
 			dispatcher_work_queue_flush();	
-			dispatcher_netdev->netdev_ops->ndo_open(dispatcher_netdev);
+		//	dispatcher_netdev->netdev_ops->ndo_open(dispatcher_netdev);
 			return 0;
 		default:
 			printk("IOCTL %d does not supported\n", ioctl);

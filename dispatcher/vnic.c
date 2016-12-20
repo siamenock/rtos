@@ -265,9 +265,8 @@ dropped:
 			MapEntry* entry = map_iterator_next(&iter);
 			VNIC* vnic = entry->data;
 
-			if(input(vnic)) {
+			if(input(vnic))
 				nic_rx++;
-			}
 		}
 	} else {
 		VNIC* vnic = map_get(vnics, (void*)dmac);
@@ -290,7 +289,11 @@ dropped:
 Packet* nic_process_output(uint8_t local_port) {
 	uint64_t time = -1; //timer_frequency();
 
-	// Map* nics = nics; //((NICPriv*)nic_current->priv)->nics;
+	//Map* nics = nics; //((NICPriv*)nic_current->priv)->nics;
+	if(!nics) {
+		printf("Something happened\n");
+		return NULL;
+	}
 
 	MapIterator iter0;
 	map_iterator_init(&iter0, nics);
