@@ -83,6 +83,7 @@ static int cmd_echo(int argc, char** argv, void(*callback)(char* result, int exi
 			cmd_result[pos++] = ' ';
 		}
 	}
+	printf("%s\n", cmd_result);
 	callback(cmd_result, 0);
 
 	return 0;
@@ -214,7 +215,7 @@ static int cmd_manager(int argc, char** argv, void(*callback)(char* result, int 
 	}
 
 	if(!manager_nic) {
-		printf("Can'nt found manager\n");
+		printf("Manager not found\n");
 		return -1;
 	}
 
@@ -227,7 +228,7 @@ static int cmd_manager(int argc, char** argv, void(*callback)(char* result, int 
 
 		uint32_t address;
 		if(!parse_addr(argv[2], &address)) {
-			printf("address wrong\n");
+			printf("Address wrong\n");
 			return 0;
 		}
 
@@ -240,7 +241,7 @@ static int cmd_manager(int argc, char** argv, void(*callback)(char* result, int 
 		}
 
 		if(!is_uint16(argv[2])) {
-			printf("port number wrong\n");
+			printf("Port number wrong\n");
 			return -1;
 		}
 
@@ -256,7 +257,7 @@ static int cmd_manager(int argc, char** argv, void(*callback)(char* result, int 
 
 		uint32_t address;
 		if(!parse_addr(argv[2], &address)) {
-			printf("address wrong\n");
+			printf("Address wrong\n");
 			return 0;
 		}
 
@@ -275,7 +276,7 @@ static int cmd_manager(int argc, char** argv, void(*callback)(char* result, int 
 
 		uint32_t address;
 		if(!parse_addr(argv[2], &address)) {
-			printf("address wrong\n");
+			printf("Address wrong\n");
 			return 0;
 		}
 
@@ -307,7 +308,7 @@ static int cmd_manager(int argc, char** argv, void(*callback)(char* result, int 
 		};
 
 		if(vnic_update(manager_nic, attrs)) {
-			printf("Can'nt found device\n");
+			printf("Device not found\n");
 			return -3;
 		}
 		manager_set_interface();
@@ -480,7 +481,7 @@ static int cmd_vlan(int argc, char** argv, void(*callback)(char* result, int exi
 		uint16_t port = 0;
 		Device* dev = nic_parse_index(argv[2], &port);
 		if(!dev) {
-			printf("Can'nt found Device\n");
+			printf("Cannot found Device\n");
 			return -2;
 		}
 
@@ -504,11 +505,11 @@ static int cmd_vlan(int argc, char** argv, void(*callback)(char* result, int exi
 
 		Map* vnics = map_create(8, NULL, NULL, NULL);
 		if(!vnics) {
-			printf("Can'nt allocate vnic map\n");
+			printf("Cannot allocate vnic map\n");
 			return -4;
 		}
 		if(!map_put(nics, (void*)(uint64_t)port, vnics)) {
-			printf("Can'nt add VLAN");
+			printf("Cannot add VLAN");
 			map_destroy(vnics);
 			return -4;
 		}
@@ -531,7 +532,7 @@ static int cmd_vlan(int argc, char** argv, void(*callback)(char* result, int exi
 		}
 
 		if(!map_remove(((NICPriv*)dev->priv)->nics, (void*)(uint64_t)port)) {
-			printf("Can'nt remove VLAN\n");
+			printf("Cannot remove VLAN\n");
 			return -2;
 		}
 	} else
@@ -699,7 +700,7 @@ static int cmd_md5(int argc, char** argv, void(*callback)(char* result, int exit
 
 	if(!ret) {
 		sprintf(cmd_result, "(nil)");
-		printf("Can'nt md5 checksum\n");
+		printf("Cannot md5 checksum\n");
 	} else {
 		char* p = (char*)cmd_result;
 		for(int i = 0; i < 16; i++, p += 2) {
@@ -730,7 +731,7 @@ static int cmd_create(int argc, char** argv, void(*callback)(char* result, int e
 		if(strcmp(argv[i], "core:") == 0) {
 			i++;
 			if(!is_uint8(argv[i])) {
-				printf("core must be uint8\n");
+				printf("Core must be uint8\n");
 				return -1;
 			}
 			
@@ -738,7 +739,7 @@ static int cmd_create(int argc, char** argv, void(*callback)(char* result, int e
 		} else if(strcmp(argv[i], "memory:") == 0) {
 			i++;
 			if(!is_uint32(argv[i])) {
-				printf("memory must be uint32\n");
+				printf("Memory must be uint32\n");
 				return -1;
 			}
 			
@@ -746,7 +747,7 @@ static int cmd_create(int argc, char** argv, void(*callback)(char* result, int e
 		} else if(strcmp(argv[i], "storage:") == 0) {
 			i++;
 			if(!is_uint32(argv[i])) {
-				printf("storage must be uint32\n");
+				printf("Storage must be uint32\n");
 				return -1;
 			}
 			
@@ -759,7 +760,7 @@ static int cmd_create(int argc, char** argv, void(*callback)(char* result, int e
 				if(strcmp(argv[i], "mac:") == 0) {
 					i++;
 					if(!is_uint64(argv[i])) {
-						printf("mac must be uint64\n");
+						printf("Mac must be uint64\n");
 						return -1;
 					}
 					nic->mac = parse_uint64(argv[i]);
@@ -770,49 +771,49 @@ static int cmd_create(int argc, char** argv, void(*callback)(char* result, int e
 				} else if(strcmp(argv[i], "ibuf:") == 0) {
 					i++;
 					if(!is_uint32(argv[i])) {
-						printf("ibuf must be uint32\n");
+						printf("Ibuf must be uint32\n");
 						return -1;
 					}
 					nic->input_buffer_size = parse_uint32(argv[i]);
 				} else if(strcmp(argv[i], "obuf:") == 0) {
 					i++;
 					if(!is_uint32(argv[i])) {
-						printf("obuf must be uint32\n");
+						printf("Obuf must be uint32\n");
 						return -1;
 					}
 					nic->output_buffer_size = parse_uint32(argv[i]);
 				} else if(strcmp(argv[i], "iband:") == 0) {
 					i++;
 					if(!is_uint64(argv[i])) {
-						printf("iband must be uint64\n");
+						printf("Iband must be uint64\n");
 						return -1;
 					}
 					nic->input_bandwidth = parse_uint64(argv[i]);
 				} else if(strcmp(argv[i], "oband:") == 0) {
 					i++;
 					if(!is_uint64(argv[i])) {
-						printf("oband must be uint64\n");
+						printf("Oband must be uint64\n");
 						return -1;
 					}
 					nic->output_bandwidth = parse_uint64(argv[i]);
 				} else if(strcmp(argv[i], "hpad:") == 0) {
 					i++;
 					if(!is_uint16(argv[i])) {
-						printf("iband must be uint16\n");
+						printf("Iband must be uint16\n");
 						return -1;
 					}
 					nic->padding_head = parse_uint16(argv[i]);
 				} else if(strcmp(argv[i], "tpad:") == 0) {
 					i++;
 					if(!is_uint16(argv[i])) {
-						printf("oband must be uint16\n");
+						printf("Oband must be uint16\n");
 						return -1;
 					}
 					nic->padding_tail = parse_uint16(argv[i]);
 				} else if(strcmp(argv[i], "pool:") == 0) {
 					i++;
 					if(!is_uint32(argv[i])) {
-						printf("pool must be uint32\n");
+						printf("Pool must be uint32\n");
 						return -1;
 					}
 					nic->pool_size = parse_uint32(argv[i]);
@@ -834,6 +835,7 @@ static int cmd_create(int argc, char** argv, void(*callback)(char* result, int e
 		callback(NULL, -1);
 	} else {
 		sprintf(cmd_result, "%d", vmid);
+		printf("%s\n", cmd_result);
 		callback(cmd_result, 0);
 	}
 	for(int i = 0; i < vm->nic_count; i++) {
@@ -845,7 +847,7 @@ static int cmd_create(int argc, char** argv, void(*callback)(char* result, int e
 	return 0;
 }
 
-static int cmd_vm_delete(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+static int cmd_vm_destroy(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	if(argc < 1) {
 		return CMD_STATUS_WRONG_NUMBER;
 	}
@@ -855,13 +857,15 @@ static int cmd_vm_delete(int argc, char** argv, void(*callback)(char* result, in
 	}
 
 	uint32_t vmid = parse_uint32(argv[1]);
-	bool ret = vm_delete(vmid);
+	bool ret = vm_destroy(vmid);
 
-	if(ret)
+	if(ret) {
+		printf("Vm destroy success\n");
 		callback("true", 0);
-	else
+	} else {
+		printf("Vm destroy success\n");
 		callback("false", -1);
-
+	}
 	return 0;
 }
 
@@ -870,6 +874,13 @@ static int cmd_vm_list(int argc, char** argv, void(*callback)(char* result, int 
 	int len = vm_list(vmids, MAX_VM_COUNT);
 
 	char* p = cmd_result;
+
+	if(len <= 0) {
+		printf("VM not found\n");
+		callback("false", 0);
+		return 0;
+	}
+
 	for(int i = 0; i < len; i++) {
 		p += sprintf(p, "%lu", vmids[i]) - 1;
 		if(i + 1 < len) {
@@ -879,6 +890,7 @@ static int cmd_vm_list(int argc, char** argv, void(*callback)(char* result, int 
 		}
 	}
 
+	printf("%s\n", cmd_result);
 	callback(cmd_result, 0);
 	return 0;
 }
@@ -910,6 +922,7 @@ static int cmd_upload(int argc, char** argv, void(*callback)(char* result, int e
 	char buf[4096];
 	while((len = read(fd, buf, 4096)) > 0) {
 		if(vm_storage_write(vmid, buf, offset, len) != len) {
+			printf("Upload fail : %s\n", file_name);
 			callback("false", -1);
 			return -1;
 		}
@@ -917,6 +930,7 @@ static int cmd_upload(int argc, char** argv, void(*callback)(char* result, int e
 		offset += len;
 	}
 
+	printf("Upload success : %s\n", vmid);
 	callback("true", 0);
 	return 0;
 }
@@ -946,6 +960,7 @@ static int cmd_status_set(int argc, char** argv, void(*callback)(char* result, i
 	} else if(strcmp(argv[0], "stop") == 0) {
 		status = VM_STATUS_STOP;
 	} else {
+		printf("%s\n: command not found\n", argv[0]);
 		callback("invalid", -1);
 		return -1;
 	}
@@ -969,22 +984,26 @@ static int cmd_status_get(int argc, char** argv, void(*callback)(char* result, i
 	extern Map* vms;
 	VM* vm = map_get(vms, (void*)(uint64_t)vmid);
 	if(!vm) {
-		printf("Can'nt found VM\n");
+		printf("Cannot found VM\n");
 		return -1;
 	}
 
 	void print_vm_status(int status) {
 		switch(status) {
 			case VM_STATUS_START:
+				printf("start");
 				callback("start", 0);
 				break;
 			case VM_STATUS_PAUSE:
+				printf("pause");
 				callback("pause", 0);
 				break;
 			case VM_STATUS_STOP:
+				printf("stop");
 				callback("stop", 0);
 				break;
 			default:
+				printf("invalid");
 				callback("invalid", -1);
 				break;
 		}
@@ -1188,10 +1207,10 @@ Command commands[] = {
 		.func = cmd_create 
 	},
 	{
-		.name = "delete",
-		.desc = "Delete VM",
+		.name = "destroy",
+		.desc = "Destroy VM",
 		.args = "result: bool, vmid: uint32",
-		.func = cmd_vm_delete
+		.func = cmd_vm_destroy
 	},
 	{
 		.name = "list",
@@ -1261,7 +1280,7 @@ Command commands[] = {
 static void cmd_callback(char* result, int exit_status) {
 	cmd_update_var(result, exit_status);
 	cmd_sync = false;
-	printf("%s\n", result);
+//	printf("%s\n", result);
 }
 
 void shell_callback() {
@@ -1278,7 +1297,20 @@ void shell_callback() {
 			case '\n':
 				cmd[cmd_idx] = '\0';
 				putchar(ch);
-				cmd_exec(cmd, cmd_callback);
+
+				int exit_status = cmd_exec(cmd, cmd_callback);
+				if(exit_status != 0) { 
+					if(exit_status == CMD_STATUS_WRONG_NUMBER) {
+						printf("Wrong number of arguments\n");
+					} else if(exit_status == CMD_STATUS_NOT_FOUND) {
+						printf("Can not found command\n");
+					} else if(exit_status == CMD_VARIABLE_NOT_FOUND) {
+						printf("Variable not found\n");
+					} else if(exit_status < 0) { 
+						printf("Wrong value of argument : %d\n", -exit_status);
+					}
+				}
+
 				printf("# ");
 				cmd_idx = 0;
 				break;
@@ -1328,7 +1360,7 @@ void shell_callback() {
 		}
 		if(cmd_sync)
 			break;
-		
+
 		ch = stdio_getchar();
 	}
 }
@@ -1336,7 +1368,7 @@ void shell_callback() {
 void shell_init() {
 	printf("\nPacketNgin ver %d.%d.%d-%s\n", VERSION_MAJOR, VERSION_MINOR, VERSION_MICRO, VERSION_TAG);
 	printf("# ");
-	
+
 	extern Device* device_stdin;
 	((CharIn*)device_stdin->driver)->set_callback(device_stdin->id, shell_callback);
 	cmd_sync = false;
@@ -1346,39 +1378,39 @@ void shell_init() {
 bool shell_process(Packet* packet) {
 	if(arping_count == 0)
 		return false;
-	
+
 	Ether* ether = (Ether*)(packet->buffer + packet->start);
 	if(endian16(ether->type) != ETHER_TYPE_ARP)
 		return false;
-	
+
 	ARP* arp = (ARP*)ether->payload;
 	switch(endian16(arp->operation)) {
 		case 2: // Reply
 			;
 			uint64_t smac = endian48(arp->sha);
 			uint32_t sip = endian32(arp->spa);
-			
+
 			if(arping_addr == sip) {
 				uint32_t time = timer_ns() - arping_time;
 				uint32_t ms = time / 1000;
 				uint32_t ns = time - ms * 1000; 
-				
+
 				printf("Reply from %d.%d.%d.%d [%02x:%02x:%02x:%02x:%02x:%02x] %d.%dms\n",
-					(sip >> 24) & 0xff,
-					(sip >> 16) & 0xff,
-					(sip >> 8) & 0xff,
-					(sip >> 0) & 0xff,
-					(smac >> 40) & 0xff,
-					(smac >> 32) & 0xff,
-					(smac >> 24) & 0xff,
-					(smac >> 16) & 0xff,
-					(smac >> 8) & 0xff,
-					(smac >> 0) & 0xff,
-					ms, ns);
-				
+						(sip >> 24) & 0xff,
+						(sip >> 16) & 0xff,
+						(sip >> 8) & 0xff,
+						(sip >> 0) & 0xff,
+						(smac >> 40) & 0xff,
+						(smac >> 32) & 0xff,
+						(smac >> 24) & 0xff,
+						(smac >> 16) & 0xff,
+						(smac >> 8) & 0xff,
+						(smac >> 0) & 0xff,
+						ms, ns);
+
 				event_timer_remove(arping_event);
 				arping_count--;
-				
+
 				if(arping_count > 0) {
 					bool arping(void* context) {
 						arping_time = timer_ns();
@@ -1388,10 +1420,10 @@ bool shell_process(Packet* packet) {
 							arping_count = 0;
 							printf("Cannot send ARP packet\n");
 						}
-						
+
 						return false;
 					}
-					
+
 					event_timer_add(arping, NULL, 1000000, 1000000);
 				} else {
 					printf("Done\n");
@@ -1399,6 +1431,6 @@ bool shell_process(Packet* packet) {
 			}
 			break;
 	}
-	
+
 	return false;
 }

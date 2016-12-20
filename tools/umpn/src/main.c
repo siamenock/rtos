@@ -259,7 +259,7 @@ error:
 	return -2;
 }
 
-static int cmd_vm_delete(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+static int cmd_vm_destroy(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	if(vm == NULL) {
 		printf("Virtual Machine is not created\n");
 		return -1;
@@ -415,7 +415,7 @@ static int cmd_exit(int argc, char** argv, void(*callback)(char* result, int exi
 	if(!cmd_vm_stop(0, NULL, NULL))
 		return -1;
 
-	if(!cmd_vm_delete(0, NULL, NULL))
+	if(!cmd_vm_destroy(0, NULL, NULL))
 		return -2;
 
 	printf("Exit\n");
@@ -441,9 +441,9 @@ Command commands[] = {
 		.func = cmd_vm_create
 	},
 	{ 
-		.name = "delete",
-		.desc = "Delete Virtual Machine",
-		.func = cmd_vm_delete
+		.name = "destroy",
+		.desc = "Destroy Virtual Machine",
+		.func = cmd_vm_destroy
 	},
 	{ 
 		.name = "status",
