@@ -309,7 +309,6 @@ static void icc_resume(ICC_Message* msg) {
 }
 
 static void icc_pause(uint64_t vector, uint64_t error_code) {
-	printf("Interrupt occured!\n");
 	apic_eoi();
 	task_switch(0);
 }
