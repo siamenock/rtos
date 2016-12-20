@@ -12,6 +12,19 @@ PORT=${2:-${DEFAULT_MANAGER_PORT}}
 OLD_PATH="$PATH"
 OLD_PS1="$PS1"
 
+version() {
+    MAJOR=`git tag | head -1 | awk '{split($0,a,"."); print a[1]}'`
+    MINOR=`git tag | head -1 | awk '{split($0,a,"."); print a[2]}'`
+    MICRO=`git rev-list HEAD --count`
+    TAG=`git log | head -1 | awk '{printf("%s", substr($2, 0, 7))}'`
+
+    if [ "$MAJOR" == "" ]; then
+        MAJOR=0
+        MINOR=0
+    fi
+    echo "PacketNgin bash, version $MAJOR.$MINOR.$MICRO-$TAG"
+}
+
 disconnect() {
     if ! [ -z "${PATH}" ]; then
         PATH="$OLD_PATH"
@@ -28,6 +41,9 @@ disconnect() {
     unset MANAGER_IP
     unset MANAGER_PORT
     unset disconnect
+    unset version
+
+    echo "PacketNgin Manager disconnected $IP:$PORT"
 }
 
 connect() {
@@ -35,13 +51,13 @@ connect() {
     if [ $? -eq 0 ]; then
         echo "PacketNgin Manager Connected to $IP:$PORT"
         PATH="./bin:$PATH"
-        PS1="PacketNgin Bash > "
+        PS1="(PacketNgin) $PS1"
         export MANAGER_IP=${IP}
         export MANAGER_PORT=${PORT}
         export PATH
         export PS1
     else
-        echo "PacketNgin Manager Disconnected"
+        echo "Unable to connect PacketNgin Manager $IP:$PORT"
     fi
 }
 
