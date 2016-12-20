@@ -580,40 +580,40 @@ static int vm_set_req_handler(RPC* rpc) {
 	RETURN();
 }
 
-// vm_delete client API
-int rpc_vm_delete(RPC* rpc, uint32_t id, bool(*callback)(bool result, void* context), void* context) {
+// vm_destroy client API
+int rpc_vm_destroy(RPC* rpc, uint32_t id, bool(*callback)(bool result, void* context), void* context) {
 	INIT();
 	
 	WRITE(write_uint16(rpc, RPC_TYPE_VM_DELETE_REQ));
 	WRITE(write_uint32(rpc, id));
 	
-	rpc->vm_delete_callback = callback;
-	rpc->vm_delete_context = context;
+	rpc->vm_destroy_callback = callback;
+	rpc->vm_destroy_context = context;
 	
 	RETURN();
 }
 
-static int vm_delete_res_handler(RPC* rpc) {
+static int vm_destroy_res_handler(RPC* rpc) {
 	INIT();
 	
 	bool result = false;
 	READ(read_bool(rpc, &result));
 	
-	if(rpc->vm_delete_callback && !rpc->vm_delete_callback(result, rpc->vm_delete_context)) {
-		rpc->vm_delete_callback = NULL;
-		rpc->vm_delete_context = NULL;
+	if(rpc->vm_destroy_callback && !rpc->vm_destroy_callback(result, rpc->vm_destroy_context)) {
+		rpc->vm_destroy_callback = NULL;
+		rpc->vm_destroy_context = NULL;
 	}
 	
 	RETURN();
 }
 
-// vm_delete server API
-void rpc_vm_delete_handler(RPC* rpc, void(*handler)(RPC* rpc, uint32_t id, void* context, void(*callback)(RPC* rpc, bool result)), void* context) {
-	rpc->vm_delete_handler = handler;
-	rpc->vm_delete_handler_context = context;
+// vm_destroy server API
+void rpc_vm_destroy_handler(RPC* rpc, void(*handler)(RPC* rpc, uint32_t id, void* context, void(*callback)(RPC* rpc, bool result)), void* context) {
+	rpc->vm_destroy_handler = handler;
+	rpc->vm_destroy_handler_context = context;
 }
 
-static void vm_delete_handler_callback(RPC* rpc, bool result) {
+static void vm_destroy_handler_callback(RPC* rpc, bool result) {
 	INIT2();
 	
 	WRITE2(write_uint16(rpc, RPC_TYPE_VM_DELETE_RES));
@@ -622,16 +622,16 @@ static void vm_delete_handler_callback(RPC* rpc, bool result) {
 	RETURN2();
 }
 
-static int vm_delete_req_handler(RPC* rpc) {
+static int vm_destroy_req_handler(RPC* rpc) {
 	INIT();
 	
 	uint32_t id;
 	READ(read_uint32(rpc, &id));
 	
-	if(rpc->vm_delete_handler) {
-		rpc->vm_delete_handler(rpc, id, rpc->vm_delete_handler_context, vm_delete_handler_callback);
+	if(rpc->vm_destroy_handler) {
+		rpc->vm_destroy_handler(rpc, id, rpc->vm_destroy_handler_context, vm_destroy_handler_callback);
 	} else {
-		vm_delete_handler_callback(rpc, false);
+		vm_destroy_handler_callback(rpc, false);
 	}
 	
 	RETURN();
@@ -1146,8 +1146,8 @@ static Handler handlers[] = {
 	vm_get_res_handler,
 	vm_set_req_handler,
 	vm_set_res_handler,
-	vm_delete_req_handler,
-	vm_delete_res_handler,
+	vm_destroy_req_handler,
+	vm_destroy_res_handler,
 	vm_list_req_handler,
 	vm_list_res_handler,
 	status_get_req_handler,
