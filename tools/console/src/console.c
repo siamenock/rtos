@@ -352,7 +352,7 @@ static int cmd_vm_list(int argc, char** argv, void(*callback)(char* result, int 
 	return 0;
 }	
 
-//size's size & success or fail
+// Size's size & success or fail
 typedef struct {
 	char path[256];
 	int fd;
@@ -896,7 +896,7 @@ int main(int _argc, char** _argv) {
 
 				return ERROR_CMD_EXECUTE;
 			} else if(exit_status == CMD_STATUS_NOT_FOUND) {
-				printf("Can not found command\n");
+				printf("Command not found\n");
 
 				return ERROR_CMD_EXECUTE;
 			} else if(exit_status == CMD_VARIABLE_NOT_FOUND) {
@@ -904,7 +904,7 @@ int main(int _argc, char** _argv) {
 
 				return ERROR_CMD_EXECUTE;
 			} else if(exit_status == ERROR_MALLOC_NULL) {
-				printf("Can not Malloc\n");
+				printf("Malloc failed\n");
 
 				return ERROR_MALLOC_NULL;
 			}else if(exit_status == ERROR_RPC_DISCONNECTED) {
