@@ -334,7 +334,7 @@ static bool manager_accept_loop(void* rpc) {
 		list_add(actives, crpc);
 
 	RPCData* data = (RPCData*)crpc->data;
-	printf("Connection opened : %s\n", inet_ntoa(data->caddr.sin_addr));
+	//printf("Connection opened : %s\n", inet_ntoa(data->caddr.sin_addr));
 
 	return true;
 }
