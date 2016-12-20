@@ -39,7 +39,7 @@ typedef struct _VM {
 void vm_init();
 
 uint32_t vm_create(VMSpec* vm_spec);
-bool vm_delete(uint32_t vmid);
+bool vm_destroy(uint32_t vmid);
 int vm_count();
 bool vm_contains(uint32_t vmid);
 int vm_list(uint32_t* vmids, int size);
