@@ -1278,7 +1278,7 @@ void rpc_vm_dump(VMSpec* vm) {
 }
 
 #ifdef LINUX
-#define DEBUG 1
+#define DEBUG 0
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -1304,7 +1304,6 @@ static int sock_read(RPC* rpc, void* buf, int size) {
 		printf("\n");
 	}
 	#endif /* DEBUG */
-	printf("read done %d\n", len);
 	
 	if(len == -1) {
 		return 0;
@@ -1341,7 +1340,9 @@ static void sock_close(RPC* rpc) {
 	RPCData* data = (RPCData*)rpc->data;
 	close(data->fd);
 	data->fd = -1;
+#if DEBUG
 	printf("Connection closed : %s\n", inet_ntoa(data->caddr.sin_addr));
+#endif
 }
 
 RPC* rpc_open(const char* host, int port, int timeout) {
@@ -1399,9 +1400,6 @@ RPC* rpc_open(const char* host, int port, int timeout) {
 void rpc_close(RPC* rpc) {
 	if(rpc->close)
 		rpc->close(rpc);
-
-	free(rpc);
-	rpc = NULL;
 }
 
 RPC* rpc_listen(int port) {
