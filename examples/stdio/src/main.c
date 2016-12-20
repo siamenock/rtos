@@ -2,6 +2,7 @@
 #include <thread.h>
 #include <string.h>
 #include <readline.h>
+
 void ginit(int argc, char** argv) {
 }
 
@@ -30,13 +31,15 @@ int main(int argc, char** argv) {
 	//fflush(stdout);
 	while(1) {
 		//int len = scanf("%s", name);
+		int len = 0;
 		name = readline();
 		printf("readline()\n");
-		if(name){
+		if(name) {
 			printf("%s\n", name);
+			len = strlen(name);
+			//printf("%s\n", name);
 		}
-		int len = strlen(name);
-		printf("%s\n", name);
+
 		if(len > 0) {
 			printf("%d out> Hello %s from thread %d\n", len, name, thread_id());
 			//fprintf(stdout, "%d out> Hello %s from thread %d\n", len, name, thread_id());
