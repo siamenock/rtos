@@ -85,7 +85,7 @@ static int cmd_echo(int argc, char** argv, void(*callback)(char* result, int exi
 		}
 	}
 	printf("%s\n", cmd_result);
-	callback("", 0);
+	callback(cmd_result, 0);
 
 	return 0;
 }
@@ -229,7 +229,7 @@ static int cmd_manager(int argc, char** argv, void(*callback)(char* result, int 
 
 		uint32_t address;
 		if(!parse_addr(argv[2], &address)) {
-			printf("address wrong\n");
+			printf("Address wrong\n");
 			return 0;
 		}
 
@@ -242,7 +242,7 @@ static int cmd_manager(int argc, char** argv, void(*callback)(char* result, int 
 		}
 
 		if(!is_uint16(argv[2])) {
-			printf("port number wrong\n");
+			printf("Port number wrong\n");
 			return -1;
 		}
 
@@ -258,7 +258,7 @@ static int cmd_manager(int argc, char** argv, void(*callback)(char* result, int 
 
 		uint32_t address;
 		if(!parse_addr(argv[2], &address)) {
-			printf("address wrong\n");
+			printf("Address wrong\n");
 			return 0;
 		}
 
@@ -277,7 +277,7 @@ static int cmd_manager(int argc, char** argv, void(*callback)(char* result, int 
 
 		uint32_t address;
 		if(!parse_addr(argv[2], &address)) {
-			printf("address wrong\n");
+			printf("Address wrong\n");
 			return 0;
 		}
 
@@ -746,7 +746,7 @@ static int cmd_md5(int argc, char** argv, void(*callback)(char* result, int exit
 
 	if(!ret) {
 		sprintf(cmd_result, "(nil)");
-		printf("Can't md5 checksum\n");
+		printf("Cannot md5 checksum\n");
 	} else {
 		char* p = (char*)cmd_result;
 		for(int i = 0; i < 16; i++, p += 2) {
@@ -779,7 +779,7 @@ static int cmd_create(int argc, char** argv, void(*callback)(char* result, int e
 		if(strcmp(argv[i], "core:") == 0) {
 			i++;
 			if(!is_uint8(argv[i])) {
-				printf("core must be uint8\n");
+				printf("Core must be uint8\n");
 				return -1;
 			}
 
@@ -787,7 +787,7 @@ static int cmd_create(int argc, char** argv, void(*callback)(char* result, int e
 		} else if(strcmp(argv[i], "memory:") == 0) {
 			i++;
 			if(!is_uint32(argv[i])) {
-				printf("memory must be uint32\n");
+				printf("Memory must be uint32\n");
 				return -1;
 			}
 
@@ -795,7 +795,7 @@ static int cmd_create(int argc, char** argv, void(*callback)(char* result, int e
 		} else if(strcmp(argv[i], "storage:") == 0) {
 			i++;
 			if(!is_uint32(argv[i])) {
-				printf("storage must be uint32\n");
+				printf("Storage must be uint32\n");
 				return -1;
 			}
 
@@ -812,7 +812,7 @@ static int cmd_create(int argc, char** argv, void(*callback)(char* result, int e
 							nic->mac = NICSPEC_DEVICE_MAC;
 							continue;
 						} else {
-							printf("mac must be uint64\n");
+							printf("Mac must be uint64\n");
 							return i;
 						}
 					} else 
@@ -824,49 +824,49 @@ static int cmd_create(int argc, char** argv, void(*callback)(char* result, int e
 				} else if(strcmp(argv[i], "ibuf:") == 0) {
 					i++;
 					if(!is_uint32(argv[i])) {
-						printf("ibuf must be uint32\n");
+						printf("Ibuf must be uint32\n");
 						return -1;
 					}
 					nic->input_buffer_size = parse_uint32(argv[i]);
 				} else if(strcmp(argv[i], "obuf:") == 0) {
 					i++;
 					if(!is_uint32(argv[i])) {
-						printf("obuf must be uint32\n");
+						printf("Obuf must be uint32\n");
 						return -1;
 					}
 					nic->output_buffer_size = parse_uint32(argv[i]);
 				} else if(strcmp(argv[i], "iband:") == 0) {
 					i++;
 					if(!is_uint64(argv[i])) {
-						printf("iband must be uint64\n");
+						printf("Iband must be uint64\n");
 						return -1;
 					}
 					nic->input_bandwidth = parse_uint64(argv[i]);
 				} else if(strcmp(argv[i], "oband:") == 0) {
 					i++;
 					if(!is_uint64(argv[i])) {
-						printf("oband must be uint64\n");
+						printf("Oband must be uint64\n");
 						return -1;
 					}
 					nic->output_bandwidth = parse_uint64(argv[i]);
 				} else if(strcmp(argv[i], "hpad:") == 0) {
 					i++;
 					if(!is_uint16(argv[i])) {
-						printf("iband must be uint16\n");
+						printf("Iband must be uint16\n");
 						return -1;
 					}
 					nic->padding_head = parse_uint16(argv[i]);
 				} else if(strcmp(argv[i], "tpad:") == 0) {
 					i++;
 					if(!is_uint16(argv[i])) {
-						printf("oband must be uint16\n");
+						printf("Oband must be uint16\n");
 						return -1;
 					}
 					nic->padding_tail = parse_uint16(argv[i]);
 				} else if(strcmp(argv[i], "pool:") == 0) {
 					i++;
 					if(!is_uint32(argv[i])) {
-						printf("pool must be uint32\n");
+						printf("Pool must be uint32\n");
 						return -1;
 					}
 					nic->pool_size = parse_uint32(argv[i]);
@@ -889,7 +889,7 @@ static int cmd_create(int argc, char** argv, void(*callback)(char* result, int e
 	} else {
 		sprintf(cmd_result, "%d", vmid);
 		printf("%s\n", cmd_result);
-		callback("ture", 0);
+		callback("true", 0);
 	}
 	for(int i = 0; i < vm->nic_count; i++) {
 		free(vm->nics[i].dev);
@@ -976,7 +976,7 @@ static int cmd_upload(int argc, char** argv, void(*callback)(char* result, int e
 	char buf[4096];
 	while((len = read(fd, buf, 4096)) > 0) {
 		if(vm_storage_write(vmid, buf, offset, len) != len) {
-			printf("upload fail : %s\n", file_name);
+			printf("Upload fail : %s\n", file_name);
 			callback("false", -1);
 			return -1;
 		}
@@ -984,7 +984,7 @@ static int cmd_upload(int argc, char** argv, void(*callback)(char* result, int e
 		offset += len;
 	}
 
-	printf("upload success : %d\n", vmid);
+	printf("Upload success : %d\n", vmid);
 	callback("true", 0);
 	return 0;
 }
@@ -1103,7 +1103,7 @@ static int cmd_stdio(int argc, char** argv, void(*callback)(char* result, int ex
 		printf("%s\n", argv[i]);
 		ssize_t len = vm_stdio(id, thread_id, 0, argv[i], strlen(argv[i]) + 1);
 		if(!len) {
-			printf("stdio fail\n");
+			printf("Stdio fail\n");
 			return -i;
 		}
 	}
