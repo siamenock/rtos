@@ -15,6 +15,7 @@
 #include "dispatcher.h"
 #include "version.h"
 #include "manager.h"
+#include "gmalloc.h"
 #include "driver/nic.h"
 
 bool cmd_sync;
@@ -467,7 +468,7 @@ static int cmd_vlan(int argc, char** argv, void(*callback)(char* result, int exi
 			return -3;
 		}
 
-		Map* vnics = map_create(8, NULL, NULL, NULL);
+		Map* vnics = map_create(8, NULL, NULL, gmalloc_pool);
 		if(!vnics) {
 			printf("Can'nt allocate vnic map\n");
 			return -4;
@@ -491,14 +492,25 @@ static int cmd_vlan(int argc, char** argv, void(*callback)(char* result, int exi
 			return -2;
 
 		if(!(port & 0xfff)) { //vid == 0
-			printf("VLan ID is 0\n");
+			printf("VLAN ID is 0\n");
 			return -2;
 		}
 
-		if(!map_remove(((NICPriv*)dev->priv)->nics, (void*)(uint64_t)port)) {
-			printf("Can'nt remove VLAN\n");
-			return -2;
+		Map* nics = ((NICPriv*)dev->priv)->nics;
+		Map* vnics = map_get(nics, (void*)(uint64_t)port);
+		if(!vnics) {
+			printf("Cannot find VLAN\n");
+			return -3;
 		}
+
+		if(!map_remove(nics, (void*)(uint64_t)port)) {
+			printf("Cannot remove VLAN\n");
+			return -4;
+		}
+
+		if(map_is_empty(vnics))
+			map_destroy(vnics);
+
 	} else
 		return -1;
 
