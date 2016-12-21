@@ -895,9 +895,9 @@ static int cmd_upload(int argc, char** argv, void(*callback)(char* result, int e
 		offset += len;
 	}
 
-	printf("%d\n", len);
-	close(fd);
+	printf("Upload success : %d Total size : %d\n", vmid, offset);
 	callback("true", 0);
+	close(fd);
 	return 0;
 }
 
