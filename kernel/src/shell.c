@@ -576,11 +576,25 @@ static int cmd_vlan(int argc, char** argv, void(*callback)(char* result, int exi
 			printf("VLan ID is 0\n");
 			return -2;
 		}
-
-		if(!map_remove(((NICPriv*)dev->priv)->nics, (void*)(uint64_t)port)) {
-			printf("Cannot remove VLAN\n");
-			return -2;
+		
+		Map* nics = ((NICPriv*)dev->priv)->nics;
+		Map* vnics = map_get(nics, (void*)(uint64_t)port);
+		if(!vnics) {
+			printf("Cannot find VLAN\n");
+			return -3;
 		}
+
+		if(!map_is_empty(vnics)) {
+			printf("VLAN interface are busy\n");
+			return -4;
+		}
+
+		if(!map_remove(nics, (void*)(uint64_t)port)) {
+			printf("Cannot remove VLAN\n");
+			return -5;
+		}
+		
+		map_destroy(vnics);
 	} else
 		return -1;
 
