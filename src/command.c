@@ -503,13 +503,17 @@ static int cmd_vlan(int argc, char** argv, void(*callback)(char* result, int exi
 			return -3;
 		}
 
-		if(!map_remove(nics, (void*)(uint64_t)port)) {
-			printf("Cannot remove VLAN\n");
+		if(!map_is_empty(vnics)) {
+			printf("VLAN interface are busy\n");
 			return -4;
 		}
 
-		if(map_is_empty(vnics))
-			map_destroy(vnics);
+		if(!map_remove(nics, (void*)(uint64_t)port)) {
+			printf("Cannot remove VLAN\n");
+			return -5;
+		}
+
+		map_destroy(vnics);
 
 	} else
 		return -1;
