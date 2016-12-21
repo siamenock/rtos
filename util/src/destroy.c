@@ -39,7 +39,7 @@ static int vm_destroy(int argc, char** argv) {
 	}
 
 	uint32_t vmid = parse_uint32(argv[1]);
-	rpc_vm_delete(rpc, vmid, callback_vm_destroy, NULL);
+	rpc_vm_destroy(rpc, vmid, callback_vm_destroy, NULL);
 
 	return 0;
 }
