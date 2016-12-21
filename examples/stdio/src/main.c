@@ -33,7 +33,6 @@ int main(int argc, char** argv) {
 		//int len = scanf("%s", name);
 		int len = 0;
 		name = readline();
-		printf("readline()\n");
 		if(name) {
 			printf("%s\n", name);
 			len = strlen(name);
