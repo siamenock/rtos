@@ -60,10 +60,10 @@ static int vm_create(int argc, char* argv[]) {
 				vm.core_size = atoi(optarg);
 				break;
 			case 'm' : 
-				vm.memory_size = atol(optarg);
+				vm.memory_size = strtol(optarg, NULL, 16);
 				break;
 			case 's' : 
-				vm.storage_size = atol(optarg);
+				vm.storage_size = strtol(optarg, NULL, 16);
 				break;
 			case 'n' : 
 				;
@@ -76,6 +76,7 @@ static int vm_create(int argc, char* argv[]) {
 					[MAC]   = "mac",
 					[DEV]   = "dev",
 					[IBUF]	= "ibuf",
+					[OBUF]	= "obuf",
 					[IBAND]	= "iband",
 					[OBAND]	= "oband",
 					[HPAD]	= "hpad",
@@ -115,7 +116,7 @@ static int vm_create(int argc, char* argv[]) {
 							nic->padding_tail = atoi(value);
 							break;
 						case POOL:
-							nic->pool_size = atol(value);
+							nic->pool_size = strtol(value, NULL, 16);
 							break;
 						default:
 							printf("No match found for token : /%s/\n", value);
