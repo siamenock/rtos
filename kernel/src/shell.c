@@ -984,8 +984,9 @@ static int cmd_upload(int argc, char** argv, void(*callback)(char* result, int e
 		offset += len;
 	}
 
-	printf("Upload success : %d\n", vmid);
+	printf("Upload success : %d Total size : %d\n", vmid, offset);
 	callback("true", 0);
+	close(fd);
 	return 0;
 }
 
@@ -1574,7 +1575,6 @@ void shell_callback() {
 				putchar(ch);
 				if(!cmd_history.using())
 					cmd_history.save(cmd);
-				cmd_exec(cmd, cmd_callback);
 
 				int exit_status = cmd_exec(cmd, cmd_callback);
 				if(exit_status != 0) { 
