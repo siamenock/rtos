@@ -1558,16 +1558,18 @@ Command commands[] = {
 		.args = "result: bool",
 		.func = cmd_dhcp
 	},
-	{
-		.name = "lspci",
-		.desc = "list all PCI Devices",
-		.args = "-t\tShow a tree of bus\n\
-			 -x\tShow hexadeciaml dump of PCI configuration data. (64Bytes)\n\
-			 -xxx\tShow hexademical dump of PCI configuration data. (256Bytes)\n\
-			 -xxxx\tShow hexademical dump of PCI configuration data. (4096Bytes)\n\
-			 -s\tSelect Device [<bus>:][<slot>][.<func>]\n",
-		.func = cmd_lspci
-	},
+	/*
+	 *{
+	 *        .name = "lspci",
+	 *        .desc = "list all PCI Devices",
+	 *        .args = "-t\tShow a tree of bus\n\
+	 *                 -x\tShow hexadeciaml dump of PCI configuration data. (64Bytes)\n\
+	 *                 -xxx\tShow hexademical dump of PCI configuration data. (256Bytes)\n\
+	 *                 -xxxx\tShow hexademical dump of PCI configuration data. (4096Bytes)\n\
+	 *                 -s\tSelect Device [<bus>:][<slot>][.<func>]\n",
+	 *        .func = cmd_lspci
+	 *},
+	 */
 	{
 		.name = NULL
 	},
