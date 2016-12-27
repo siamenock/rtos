@@ -1,4 +1,4 @@
-# Object files
+# object files
 *.o
 *.ko
 *.elf
@@ -41,3 +41,9 @@ cscope.files
 *.make
 build
 
+# Generated
+./kernel/test/*
+./include
+loader/src/entry_tmp.asm
+lib/expat-2.1.0/*
+lib/zlib-1.2.8/Makefile
