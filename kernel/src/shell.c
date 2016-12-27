@@ -14,6 +14,7 @@
 #include <net/packet.h>
 #include <net/ether.h>
 #include <net/arp.h>
+#include <net/dhcp.h>
 
 #include "stdio.h"
 #include "cpu.h"
@@ -96,7 +97,7 @@ static int cmd_sleep(int argc, char** argv, void(*callback)(char* result, int ex
 		time = parse_uint32(argv[1]);
 	}
 	timer_mwait(time);
-	
+
 	return 0;
 }
 
@@ -130,10 +131,10 @@ static char* weeks[] = {
 static int cmd_date(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	uint32_t date = rtc_date();
 	uint32_t time = rtc_time();
-	
+
 	printf("%s %s %d %02d:%02d:%02d UTC %d\n", weeks[RTC_WEEK(date)], months[RTC_MONTH(date)], RTC_DATE(date), 
-		RTC_HOUR(time), RTC_MINUTE(time), RTC_SECOND(time), 2000 + RTC_YEAR(date));
-	
+			RTC_HOUR(time), RTC_MINUTE(time), RTC_SECOND(time), 2000 + RTC_YEAR(date));
+
 	return 0;
 }
 
@@ -197,12 +198,12 @@ static int cmd_manager(int argc, char** argv, void(*callback)(char* result, int 
 
 	if(argc == 1) {
 		printf("HWaddr %02x:%02x:%02x:%02x:%02x:%02x\n",
-			(manager_nic->mac >> 40) & 0xff,
-			(manager_nic->mac >> 32) & 0xff,
-			(manager_nic->mac >> 24) & 0xff,
-			(manager_nic->mac >> 16) & 0xff,
-			(manager_nic->mac >> 8) & 0xff,
-			(manager_nic->mac >> 0) & 0xff);
+				(manager_nic->mac >> 40) & 0xff,
+				(manager_nic->mac >> 32) & 0xff,
+				(manager_nic->mac >> 24) & 0xff,
+				(manager_nic->mac >> 16) & 0xff,
+				(manager_nic->mac >> 8) & 0xff,
+				(manager_nic->mac >> 0) & 0xff);
 		uint32_t ip = manager_get_ip();
 		printf("%10sinet addr:%d.%d.%d.%d  ", "", (ip >> 24) & 0xff, (ip >> 16) & 0xff, (ip >> 8) & 0xff, (ip >> 0) & 0xff);
 		uint16_t port = manager_get_port();
@@ -265,8 +266,8 @@ static int cmd_manager(int argc, char** argv, void(*callback)(char* result, int 
 		manager_set_netmask(address);
 
 		printf("Manager's Gateway changed from %d.%d.%d.%d to %d.%d.%d.%d\n",
-			(old >> 24) & 0xff, (old >> 16) & 0xff, (old >> 8) & 0xff, (old >> 0) & 0xff,
-			(address >> 24) & 0xff, (address >> 16) & 0xff, (address >> 8) & 0xff, (address >> 0) & 0xff);
+				(old >> 24) & 0xff, (old >> 16) & 0xff, (old >> 8) & 0xff, (old >> 0) & 0xff,
+				(address >> 24) & 0xff, (address >> 16) & 0xff, (address >> 8) & 0xff, (address >> 0) & 0xff);
 
 	} else if(!strcmp("gateway", argv[1])) {
 		uint32_t old = manager_get_gateway();
@@ -284,8 +285,8 @@ static int cmd_manager(int argc, char** argv, void(*callback)(char* result, int 
 		manager_set_gateway(address);
 
 		printf("Manager's Gateway changed from %d.%d.%d.%d to %d.%d.%d.%d\n",
-			(old >> 24) & 0xff, (old >> 16) & 0xff, (old >> 8) & 0xff, (old >> 0) & 0xff,
-			(address >> 24) & 0xff, (address >> 16) & 0xff, (address >> 8) & 0xff, (address >> 0) & 0xff);
+				(old >> 24) & 0xff, (old >> 16) & 0xff, (old >> 8) & 0xff, (old >> 0) & 0xff,
+				(address >> 24) & 0xff, (address >> 16) & 0xff, (address >> 8) & 0xff, (address >> 0) & 0xff);
 	} else if(!strcmp("nic", argv[1])) {
 		if(argc == 2) {
 			printf("Network Interface name required\n");
@@ -350,12 +351,12 @@ static int cmd_nic(int argc, char** argv, void(*callback)(char* result, int exit
 				}
 				printf("%12s", name_buf);
 				printf("HWaddr %02x:%02x:%02x:%02x:%02x:%02x\n",
-					(nicpriv->mac[port_num] >> 40) & 0xff,
-					(nicpriv->mac[port_num] >> 32) & 0xff,
-					(nicpriv->mac[port_num] >> 24) & 0xff,
-					(nicpriv->mac[port_num] >> 16) & 0xff,
-					(nicpriv->mac[port_num] >> 8) & 0xff,
-					(nicpriv->mac[port_num] >> 0) & 0xff);
+						(nicpriv->mac[port_num] >> 40) & 0xff,
+						(nicpriv->mac[port_num] >> 32) & 0xff,
+						(nicpriv->mac[port_num] >> 24) & 0xff,
+						(nicpriv->mac[port_num] >> 16) & 0xff,
+						(nicpriv->mac[port_num] >> 8) & 0xff,
+						(nicpriv->mac[port_num] >> 0) & 0xff);
 			}
 			nic_device_index += nicpriv->port_count;
 		}
@@ -383,7 +384,7 @@ static int cmd_nic(int argc, char** argv, void(*callback)(char* result, int exit
 				} else {
 					sprintf(name_buf, "eth%d.%d", nic_device_index + port_num, vlan_id);
 				}
-				
+
 				if(!strncmp(name_buf, argv[1], sizeof(argv[1]))) {
 					printf("%12s", name_buf);
 					printf("HWaddr %02x:%02x:%02x:%02x:%02x:%02x\n",
@@ -576,7 +577,7 @@ static int cmd_vlan(int argc, char** argv, void(*callback)(char* result, int exi
 			printf("VLan ID is 0\n");
 			return -2;
 		}
-		
+
 		Map* nics = ((NICPriv*)dev->priv)->nics;
 		Map* vnics = map_get(nics, (void*)(uint64_t)port);
 		if(!vnics) {
@@ -593,7 +594,7 @@ static int cmd_vlan(int argc, char** argv, void(*callback)(char* result, int exi
 			printf("Cannot remove VLAN\n");
 			return -5;
 		}
-		
+
 		map_destroy(vnics);
 	} else
 		return -1;
@@ -948,7 +949,7 @@ static int cmd_vm_list(int argc, char** argv, void(*callback)(char* result, int 
 		callback("false", 0);
 		return 0;
 	}
-	
+
 	for(int i = 0; i < len; i++) {
 		p += sprintf(p, "%lu", vmids[i]) - 1;
 		if(i + 1 < len) {
@@ -1179,6 +1180,23 @@ static int cmd_mount(int argc, char** argv, void(*callback)(char* result, int ex
 	fs_mount(disk << 16 | number, partition, type, argv[4]);
 
 	return -2;
+}
+
+static int cmd_dhcp(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+
+	bool manager_ip_acked(NIC* nic, uint32_t transaction_id, uint32_t ip, void* _data) {
+		printf("Manager ip leased \n");
+		uint32_t manager_ip = manager_set_ip(ip);
+		uint32_t gw = (ip & 0xffffff00) | 0x1;
+		manager_set_gateway(gw);
+		printf("%10sinet addr:%d.%d.%d.%d  ", "", (manager_ip >> 24) & 0xff, (manager_ip >> 16) & 0xff, (manager_ip >> 8) & 0xff, (manager_ip >> 0) & 0xff);
+		return true;
+	}
+
+	if(dhcp_lease_ip(manager_nic->nic, NULL, manager_ip_acked, NULL) == 0)
+		printf("Failed to lease Manager IP : %d\n", errno);
+
+	return -1;
 }
 
 /*
@@ -1535,13 +1553,19 @@ Command commands[] = {
 		.func = cmd_mount
 	},
 	{
+		.name = "dhcp",
+		.desc = "DHCP get manager ip",
+		.args = "result: bool",
+		.func = cmd_dhcp
+	},
+	{
 		.name = "lspci",
 		.desc = "list all PCI Devices",
 		.args = "-t\tShow a tree of bus\n\
-				 -x\tShow hexadeciaml dump of PCI configuration data. (64Bytes)\n\
-				 -xxx\tShow hexademical dump of PCI configuration data. (256Bytes)\n\
-				 -xxxx\tShow hexademical dump of PCI configuration data. (4096Bytes)\n\
-				 -s\tSelect Device [<bus>:][<slot>][.<func>]\n",
+			 -x\tShow hexadeciaml dump of PCI configuration data. (64Bytes)\n\
+			 -xxx\tShow hexademical dump of PCI configuration data. (256Bytes)\n\
+			 -xxxx\tShow hexademical dump of PCI configuration data. (4096Bytes)\n\
+			 -s\tSelect Device [<bus>:][<slot>][.<func>]\n",
 		.func = cmd_lspci
 	},
 	{
