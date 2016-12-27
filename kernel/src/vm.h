@@ -26,6 +26,7 @@ typedef struct _VM {
 	uint8_t		cores[MP_MAX_CORE_COUNT];
 	Block		memory;
 	Block		storage;
+	int			used_size;			// temporary variable for checking upload.
 	int		    nic_count;
 	VNIC**		nics;	// gmalloc, ni_create
 	VFIO*		fio;
@@ -39,7 +40,7 @@ typedef struct _VM {
 void vm_init();
 
 uint32_t vm_create(VMSpec* vm_spec);
-bool vm_delete(uint32_t vmid);
+bool vm_destroy(uint32_t vmid);
 int vm_count();
 bool vm_contains(uint32_t vmid);
 int vm_list(uint32_t* vmids, int size);

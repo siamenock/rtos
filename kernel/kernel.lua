@@ -21,7 +21,7 @@ workspace "Kernel"
         -- Name of genrated file is 
         targetname "kernel.elf"
         -- O0 optimziation
-        optimize "Off"
+        optimize "On"
         -- Force to make symbol table
         flags { "Symbols" }
 

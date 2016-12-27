@@ -364,4 +364,28 @@ uint8_t pci_pcie_ver(PCI_Device* device);
 
 int pci_probe(DeviceType type, PCI_DEVICE_PROBE probe, Driver* driver);
 
+typedef struct _PCI_Function_Entry {
+	uint8_t function;
+} PCI_Function_Entry;
+
+typedef struct _PCI_Slot_Entry {
+	uint8_t slot;
+	uint8_t function_count;
+	PCI_Function_Entry function_entry[PCI_MAX_FUNCTION];
+} PCI_Slot_Entry;
+
+typedef struct _PCI_Bus_Entry {
+	uint8_t bus;
+	uint8_t slot_count;
+	PCI_Slot_Entry slot_entry[PCI_MAX_SLOT];
+} PCI_Bus_Entry;
+
+int pci_get_entrys(PCI_Bus_Entry* bus_entry);
+
+#define PCI_DUMP_LEVEL_X		1
+#define PCI_DUMP_LEVEL_XX		2
+#define PCI_DUMP_LEVEL_XXX		3
+#define PCI_DUMP_LEVEL_XXXX		4
+void pci_data_dump(uint8_t bus, uint8_t slot, uint8_t function, uint8_t level);
+
 #endif /* __PCI_H__ */

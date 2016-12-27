@@ -23,7 +23,7 @@ workspace "Build"
 
             'bin/smap kernel/build/kernel.elf kernel.smap',
             'bin/pnkc kernel/build/kernel.elf kernel.smap kernel.bin',
-            'sudo bin/mkinitrd initrd.img 1 drivers/*.ko firmware/*',
+            'sudo bin/mkinitrd initrd.img 2 drivers/*.ko firmware/*',
             'dd if=/dev/zero of=system.img bs=512 count=131072',	-- 64MB
             'bin/mkimage system.img 3 12 fat32 fat32 ext2 loader/build/loader.bin kernel.bin initrd.img',
         }

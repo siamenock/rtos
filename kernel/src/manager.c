@@ -30,7 +30,7 @@
 #define DEFAULT_MANAGER_IP	0xc0a864fe	// 192.168.100.254
 #define DEFAULT_MANAGER_GW	0xc0a864c8	// 192.168.100.200
 #define DEFAULT_MANAGER_NETMASK	0xffffff00	// 255.255.255.0
-#define DEFAULT_MANAGER_PORT	5000
+#define DEFAULT_MANAGER_PORT	1111
 
 uint64_t manager_mac;
 static struct netif* manager_netif;
@@ -52,7 +52,7 @@ static err_t manager_poll(void* arg, struct tcp_pcb* pcb);
 
 static void rpc_free(RPC* rpc) {
 	RPCData* data = (RPCData*)rpc->data;
-	
+
 	ListIterator iter;
 	list_iterator_init(&iter, data->pbufs);
 	while(list_iterator_has_next(&iter)) {
@@ -63,7 +63,7 @@ static void rpc_free(RPC* rpc) {
 	list_destroy(data->pbufs);
 	list_remove_data(actives, rpc);
 	free(rpc);
-	
+
 	list_remove_data(clients, data->pcb);
 }
 
@@ -74,13 +74,13 @@ static void manager_close(struct tcp_pcb* pcb, RPC* rpc, bool is_force) {
 	tcp_recv(pcb, NULL);
 	tcp_err(pcb, NULL);
 	tcp_poll(pcb, NULL, 0);
-	
+
 	if(rpc) {
 		rpc_free(rpc);
 	} else {
 		list_remove_data(clients, pcb);
 	}
-	
+
 	if(is_force) {
 		tcp_abort(pcb);
 	} else if(tcp_close(pcb) != ERR_OK) {
@@ -91,7 +91,7 @@ static void manager_close(struct tcp_pcb* pcb, RPC* rpc, bool is_force) {
 
 static err_t manager_recv(void* arg, struct tcp_pcb* pcb, struct pbuf* p, err_t err) {
 	RPC* rpc = arg;
-	
+
 	if(p == NULL) {	// Remote host closed the connection
 		manager_close(pcb, rpc, false);
 	} else if(err != ERR_OK) {
@@ -108,7 +108,7 @@ static err_t manager_recv(void* arg, struct tcp_pcb* pcb, struct pbuf* p, err_t 
 			}
 		}
 	}
-	
+
 	return ERR_OK;
 }
 
@@ -123,19 +123,19 @@ static void manager_err(void* arg, err_t err) {
 
 static err_t manager_poll(void* arg, struct tcp_pcb* pcb) {
 	RPC* rpc = arg;
-	
+
 	if(rpc == NULL) {
 		manager_close(pcb, NULL, true);
 	} else {
 		RPCData* data = (RPCData*)rpc->data;
 		data->poll_count++;
-		
+
 		if(rpc->ver == 0 && data->poll_count++ >= 4) {	// 2 seconds
 			printf("Close connection: not receiving hello in 2 secs.\n");
 			manager_close(pcb, rpc, false);
 		}
 	}
-	
+
 	return ERR_OK;
 }
 
@@ -155,8 +155,8 @@ static void vm_set_handler(RPC* rpc, VMSpec* vm, void* context, void(*callback)(
 	callback(rpc, false);
 }
 
-static void vm_delete_handler(RPC* rpc, uint32_t vmid, void* context, void(*callback)(RPC* rpc, bool result)) {
-	bool result = vm_delete(vmid);
+static void vm_destroy_handler(RPC* rpc, uint32_t vmid, void* context, void(*callback)(RPC* rpc, bool result)) {
+	bool result = vm_destroy(vmid);
 	callback(rpc, result);
 }
 
@@ -179,7 +179,7 @@ typedef struct {
 
 static void status_setted(bool result, void* context) {
 	Data* data = context;
-	
+
 	if(list_index_of(clients, data->pcb, NULL) >= 0) {
 		data->callback(data->rpc, result);
 	}
@@ -191,7 +191,7 @@ static void status_set_handler(RPC* rpc, uint32_t vmid, VMStatus status, void* c
 	data->rpc = rpc;
 	data->pcb = context;
 	data->callback = callback;
-	
+
 	vm_status_set(vmid, status, status_setted, data);
 }
 
@@ -210,6 +210,7 @@ static void storage_download_handler(RPC* rpc, uint32_t vmid, uint64_t download_
 }
 
 static void storage_upload_handler(RPC* rpc, uint32_t vmid, uint32_t offset, void* buf, int32_t size, void* context, void(*callback)(RPC* rpc, int32_t size)) {
+	static int total_size = 0;
 	if(size < 0) {
 		callback(rpc, size);
 	} else {
@@ -220,20 +221,24 @@ static void storage_upload_handler(RPC* rpc, uint32_t vmid, uint32_t offset, voi
 				return;
 			}
 		}
-		
+
 		if(size < 0) {
 			printf(". Aborted: %d\n", size);
 			callback(rpc, size);
 		} else {
 			size = vm_storage_write(vmid, buf, offset, size);
 			callback(rpc, size);
-			 
-			if(size > 0)
+
+			if(size > 0) {
 				printf(".");
-			else if(size == 0)
-				printf(". Done\n");
-			else if(size < 0)
+				total_size += size;
+			} else if(size == 0) {
+				printf(". Done. Total size: %d\n", total_size);
+				total_size = 0;
+			} else if(size < 0) {
 				printf(". Error: %d\n", size);
+				total_size = 0;
+			}
 		}
 	}
 }
@@ -311,7 +316,7 @@ static err_t manager_accept(void* arg, struct tcp_pcb* pcb, err_t err) {
 	rpc_vm_create_handler(rpc, vm_create_handler, NULL);
 	rpc_vm_get_handler(rpc, vm_get_handler, NULL);
 	rpc_vm_set_handler(rpc, vm_set_handler, NULL);
-	rpc_vm_delete_handler(rpc, vm_delete_handler, NULL);
+	rpc_vm_destroy_handler(rpc, vm_destroy_handler, NULL);
 	rpc_vm_list_handler(rpc, vm_list_handler, NULL);
 	rpc_status_get_handler(rpc, status_get_handler, NULL);
 	rpc_status_set_handler(rpc, status_set_handler, pcb);

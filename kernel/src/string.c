@@ -1,5 +1,5 @@
 #include <_string.h>
-#include <string.h>
+//#include <string.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
@@ -37,6 +37,10 @@ static bool is_sse_allow() {
 	return true;
 }
 #endif
+
+void* __strcpy_chk(char* dest, const char* src) {
+	return __memcpy(dest, src, __strlen(src) + 1);
+}
 
 void* __memcpy_chk(void* dest, const void* src, size_t size, size_t bos) {
 	return __memcpy(dest, src, size);
@@ -135,7 +139,7 @@ int memcmp(const void* v1, const void* v2, size_t size) {
 }
 
 void bzero(void* dest, size_t size) {
-	return __bzero(dest, size);
+	__bzero(dest, size);
 }
 
 size_t strlen(const char* s) {

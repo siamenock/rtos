@@ -1,4 +1,4 @@
-#include <string.h>
+//#include <string.h>
 #include <stdint.h>
 #include <malloc.h>
 #include <stdio.h>
@@ -446,6 +446,7 @@ void * __attribute__ (( noinline )) __memcpy_reverse ( void *dest,
 			       : "memory" );
 	return dest;
 }
+
 void * __memmove( void *dest, const void *src, size_t len ) {
 
 	if ( dest <= src ) {
@@ -453,6 +454,10 @@ void * __memmove( void *dest, const void *src, size_t len ) {
 	} else {
 		return __memcpy_reverse ( dest, src, len );
 	}
+}
+
+void* __memmove_chk(void* dest, const void* src, size_t size, size_t bos) {
+	return __memmove(dest, src, size);
 }
 
 int __memcmp_sse(const void *dst, const void *src, size_t len) {

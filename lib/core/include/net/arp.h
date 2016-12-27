@@ -28,7 +28,7 @@ typedef struct _ARP {
 	uint32_t tpa;			///< Target protocol address (endian32)
 } __attribute__ ((packed)) ARP;
 
-extern uint32_t ARP_TIMEOUT;		///< ARP timeout of ARP table
+extern uint64_t ARP_TIMEOUT;		///< ARP timeout of ARP table
 
 /**
  * Process ARP packet.
