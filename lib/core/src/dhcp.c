@@ -361,7 +361,7 @@ bool dhcp_init(NIC* nic) {
 		errno = DHCP_ERROR_NIC_CONFIG_FAIL;
 		return false;
 	}
-	event_init();
+
 	return true;
 }
 
