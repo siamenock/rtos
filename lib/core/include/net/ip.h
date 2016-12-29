@@ -9,7 +9,7 @@
  */
 
 #define IP_LEN			20	///< IPv4 header length
-#define IP_TTL			64	///< Default IPv4 TTL value
+#define IPDEFTTL		64	///< Default IPv4 TTL value
 
 #define IP_PROTOCOL_ICMP	0x01	///< IP protocol number for ICMP
 #define IP_PROTOCOL_IP          0x04	///< IP protocol number for IP

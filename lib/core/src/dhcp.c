@@ -86,7 +86,7 @@ static bool dhcp_packet_send(DHCPSession* dhcp_session, uint8_t dhcp_message_typ
 	ip->dscp = endian8(0);
 	ip->id = endian16(0);
 	ip->flags_offset = 0x00;
-	ip->ttl = endian8(IP_TTL);
+	ip->ttl = endian8(IPDEFTTL);
 	ip->protocol = endian8(IP_PROTOCOL_UDP);
 	ip->source = endian32(0x00000000);
 	ip->destination = endian32(0xffffffff);

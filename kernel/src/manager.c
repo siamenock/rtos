@@ -5,7 +5,6 @@
 #include <malloc.h>
 #include <errno.h>
 #include <net/ether.h>
-#undef IP_TTL
 #include <net/ip.h>
 #include <net/arp.h>
 #include <net/icmp.h>
