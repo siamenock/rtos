@@ -8,54 +8,80 @@ static Map* variables = NULL;
 static char* variable = NULL;
 char cmd_result[CMD_RESULT_SIZE];
 
-int cmd_help(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
-        int command_len = 0;
-	if(argc == 1) {
-		for(int i = 0; commands[i].name != NULL; i++) {
-			int len = strlen(commands[i].name);
-			command_len = len > command_len ? len : command_len;
-		}
-
-		for(int i = 0; commands[i].name != NULL; i++) {
-			printf("%s", commands[i].name);
-			int len = strlen(commands[i].name);
-			len = command_len - len + 2;
-			for(int j = 0; j < len; j++)
-			       putchar(' ');
-			if(commands[i].args != NULL) {
-				printf("%s  %s\n", commands[i].desc, commands[i].args);
-			} else {
-				printf("%s\n", commands[i].desc);
-			}
-		}
-	} else if(argc == 2) {
-		for(int i = 0; commands[i].name != NULL; i++) {
-			if(!strcmp(commands[i].name, argv[1])) {
-				printf("%s", commands[i].name);
-				int len = strlen(commands[i].name);
-				len = len + 2;
-				for(int j = 0; j < len; j++)
-				       putchar(' ');
-				if(commands[i].args != NULL) {
-					printf("%s  %s\n", commands[i].desc, commands[i].args);
-				} else
-					printf("%s\n", commands[i].desc);
-
-				goto end;
-			}
-		}
-		printf("no help topics match '%s'\n", argv[1]);
-		if(callback != NULL)
-			callback("false", 0);
-
-		return 0;
+static int cmd_print(char* cmd) {
+	int command_len = 0;
+	for(int i = 0; commands[i].name != NULL; i++) {
+		int len = strlen(commands[i].name);
+		command_len = len > command_len ? len : command_len;
 	}
 
-end:
+	if(command_len == 0)
+		// No commands at all
+		return -1;
+
+	bool found = false;
+	for(int i = 0; commands[i].name != NULL; i++) {
+		if(cmd)
+			if(strcmp(commands[i].name, cmd))
+				continue;
+
+		// Name
+		printf("%s", commands[i].name);
+		int len = strlen(commands[i].name);
+		len = command_len - len + 2;
+		for(int j = 0; j < len; j++)
+			putchar(' ');
+
+		// Description
+			printf("%s\n", commands[i].desc);
+
+		// Arguments
+		if(commands[i].args != NULL) {
+			for(int j = 0; j < command_len + 2; j++)
+				putchar(' ');
+
+			printf("%s\n", commands[i].args);
+		}
+
+		if(!found)
+			found = true;
+	}
+
+	if(!found)
+		// Requested command not found
+		return -2;
+
+	return 0;
+
+}
+
+int cmd_help(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	if(argc == 1) {
+		// NULL prints all commands
+		cmd_print(NULL);
+
+	} else if(argc == 2) {
+		if(cmd_print(argv[1]) < 0) {
+			printf("No help topic matched '%s'\n", argv[1]);
+			goto fail;
+		}
+
+	} else if(argc >= 3) {
+		printf("Wrong number of arguments");
+		goto fail;
+	}
+
+success:
 	if(callback != NULL)
 		callback("true", 0);
 
-        return 0;
+	return 0;
+
+fail:
+	if(callback != NULL)
+		callback("false", 0);
+
+	return 0;
 }
 
 static int cmd_parse_line(char* line, char** argv) {
@@ -136,8 +162,6 @@ static Command* cmd_get(int argc, char** argv) {
                         return &commands[i];
                 }
         }
-        if(argc > 0)
-                printf("%s : command not found\n", argv[0]);
 
         return NULL;
 }
@@ -178,9 +202,6 @@ void cmd_init(void) {
 	map_put(variables, strdup("$nil"), strdup("(nil)"));
 }
 
-//1. check argument
-//2. get variable
-//3. 
 int cmd_exec(char* line, void(*callback)(char* result, int exit_status)) {
 	int argc;
 	char* argv[CMD_MAX_ARGC];
