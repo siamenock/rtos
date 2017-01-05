@@ -30,7 +30,7 @@ workspace "Kernel"
         includedirs { "core/include", "TLSF/src", "jsmn/", "../cmocka/include" }
         files { "core/**.asm", "core/**.S", "core/**.h", "core/**.c" }
         -- Exclude test sources and standard C library functions
-        removefiles { "core/src/test/*" , "core/src/malloc.c" }
+        removefiles { "core/src/test/*" , "core/src/malloc.c", "core/src/errno.c" }
         -- Memory model needs to be large rather than kernel
         buildoptions { "-fno-common -msse4.1 -fno-stack-protector -mcmodel=large" }
         -- Define "LINUX" to make core library for Linux OS

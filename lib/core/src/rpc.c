@@ -1286,6 +1286,7 @@ void rpc_vm_dump(VMSpec* vm) {
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <signal.h>
+#include <errno.h>
 
 // Posix socket RPC data
 typedef struct {
@@ -1307,7 +1308,10 @@ static int sock_read(RPC* rpc, void* buf, int size) {
 	#endif /* DEBUG */
 	
 	if(len == -1) {
-		return 0;
+		if(errno == EAGAIN)
+			return 0;
+				
+		return -1;
 	} else if(len == 0) {
 		return -1;
 	} else {
@@ -1329,7 +1333,10 @@ static int sock_write(RPC* rpc, void* buf, int size) {
 	#endif /* DEBUG */
 	
 	if(len == -1) {
-		return 0;
+		if(errno == EAGAIN)
+			return 0;
+				
+		return -1;
 	} else if(len == 0) {
 		return -1;
 	} else {
