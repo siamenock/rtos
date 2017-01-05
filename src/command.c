@@ -885,7 +885,9 @@ static int cmd_vm_list(int argc, char** argv, void(*callback)(char* result, int 
 		}
 	}
 
+	printf("%s\n", cmd_result);
 	callback(cmd_result, 0);
+
 	return 0;
 }
 
