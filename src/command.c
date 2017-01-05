@@ -707,20 +707,10 @@ static int cmd_create(int argc, char** argv, void(*callback)(char* result, int e
 	vm->core_size = 1;
 	vm->memory_size = 0x1000000;		/* 16MB */
 	vm->storage_size = 0x1000000;		/* 16MB */
-	vm->nic_count = 1;
+	vm->nic_count = 0;
 	vm->nics = malloc(sizeof(NICSpec) * MAX_VNIC_COUNT);
 	vm->argc = 0;
 	vm->argv = malloc(sizeof(char*) * CMD_MAX_ARGC);
-	
-	NICSpec* nic = &vm->nics[0]; 
-	nic->mac = 0;
-	nic->dev = malloc(strlen("eth0") + 1);
-	nic->dev = strcpy(nic->dev, "eth0");
-	nic->input_buffer_size = 1024;
-	nic->output_buffer_size = 1024;
-	nic->input_bandwidth = 1000000000;	/* 1 GB */
-	nic->output_bandwidth = 1000000000;	/* 1 GB */
-	nic->pool_size = 0x400000;		/* 4 MB */
 
 	for(int i = 1; i < argc; i++) {
 		if(strcmp(argv[i], "core:") == 0) {
@@ -751,17 +741,14 @@ static int cmd_create(int argc, char** argv, void(*callback)(char* result, int e
 			i++;
 			
 			NICSpec* nic = &(vm->nics[vm->nic_count++]);
-			
-			// Default value
 			nic->mac = 0;
 			nic->dev = malloc(strlen("eth0") + 1);
 			nic->dev = strcpy(nic->dev, "eth0");
 			nic->input_buffer_size = 1024;
 			nic->output_buffer_size = 1024;
-			nic->input_bandwidth = 1000000000; /* 1 GB */
-			nic->output_bandwidth = 1000000000; /* 1 GB */
-			nic->pool_size = 0x400000; /* 4 MB */
-
+			nic->input_bandwidth = 1000000000;	/* 1 GB */
+			nic->output_bandwidth = 1000000000;	/* 1 GB */
+			nic->pool_size = 0x400000;		/* 4 MB */
 			for( ; i < argc; i++) {
 				if(strcmp(argv[i], "mac:") == 0) {
 					i++;
@@ -772,6 +759,9 @@ static int cmd_create(int argc, char** argv, void(*callback)(char* result, int e
 					nic->mac = parse_uint64(argv[i]);
 				} else if(strcmp(argv[i], "dev:") == 0) {
 					i++;
+					if(nic->dev)
+						free(nic->dev);
+
 					nic->dev = malloc(strlen(argv[i] + 1));
 					strcpy(nic->dev, argv[i]);
 					printf("Device alloc %s \n", argv[i]);
@@ -837,6 +827,19 @@ static int cmd_create(int argc, char** argv, void(*callback)(char* result, int e
 		}
 	}
 	
+	if(vm->nic_count == 0) {
+		NICSpec* nic = &vm->nics[0]; 
+		nic->mac = 0;
+		nic->dev = malloc(strlen("eth0") + 1);
+		nic->dev = strcpy(nic->dev, "eth0");
+		nic->input_buffer_size = 1024;
+		nic->output_buffer_size = 1024;
+		nic->input_bandwidth = 1000000000;	/* 1 GB */
+		nic->output_bandwidth = 1000000000;	/* 1 GB */
+		nic->pool_size = 0x400000;		/* 4 MB */
+		vm->nic_count = 1;
+	}
+
 	uint32_t vmid = vm_create(vm);
 	if(vmid == 0) {
 		callback("false", -1);
