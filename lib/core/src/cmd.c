@@ -61,7 +61,6 @@ int cmd_help(int argc, char** argv, void(*callback)(char* result, int exit_statu
 		// NULL prints all commands
 		cmd_print(NULL);
 
-		printf("All command\n");
 	} else if(argc == 2) {
 		if(cmd_print(argv[1]) < 0) {
 			printf("No help topic matched '%s'\n", argv[1]);
