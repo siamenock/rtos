@@ -699,18 +699,26 @@ static int cmd_md5(int argc, char** argv, void(*callback)(char* result, int exit
 }
 
 static int cmd_create(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
-	if(argc < 2) {
-		return CMD_STATUS_WRONG_NUMBER;
-	}
+	// Default value
 	VMSpec* vm = malloc(sizeof(VMSpec));
 	vm->core_size = 1;
-	vm->memory_size = 0x1000000;	// 16MB
-	vm->storage_size = 0x1000000;	// 16MB
-	vm->nic_count = 0;
+	vm->memory_size = 0x1000000;		/* 16MB */
+	vm->storage_size = 0x1000000;		/* 16MB */
+	vm->nic_count = 1;
 	vm->nics = malloc(sizeof(NICSpec) * MAX_VNIC_COUNT);
 	vm->argc = 0;
 	vm->argv = malloc(sizeof(char*) * CMD_MAX_ARGC);
 	
+	NICSpec* nic = &vm->nics[0]; 
+	nic->mac = 0;
+	nic->dev = malloc(strlen("eth0") + 1);
+	nic->dev = strcpy(nic->dev, "eth0");
+	nic->input_buffer_size = 1024;
+	nic->output_buffer_size = 1024;
+	nic->input_bandwidth = 1000000000;	/* 1 GB */
+	nic->output_bandwidth = 1000000000;	/* 1 GB */
+	nic->pool_size = 0x400000;		/* 4 MB */
+
 	for(int i = 1; i < argc; i++) {
 		if(strcmp(argv[i], "core:") == 0) {
 			i++;
@@ -1253,7 +1261,6 @@ static void cmd_callback(char* result, int exit_status) {
 		return;
 	cmd_update_var(result, exit_status);
 	cmd_sync = false;
-	printf("%s\n", result);
 }
 
 static int execute_cmd(char* line, bool is_dump) {
@@ -1268,11 +1275,13 @@ static int execute_cmd(char* line, bool is_dump) {
 		if(exit_status == CMD_STATUS_WRONG_NUMBER) {
 			printf("Wrong number of arguments\n"); 
 		} else if(exit_status == CMD_STATUS_NOT_FOUND) {
-			printf("Wrong name of command\n");
+			printf("Command not found: %s\n", line);
 		} else if(exit_status < 0) {
 			printf("Error code : %d\n", exit_status);
-		} else {
-			printf("%02d'std Argument type wrong\n", exit_status); 
+		} else if(exit_status == CMD_VARIABLE_NOT_FOUND) {
+			printf("Variable not found\n");
+		} else if(exit_status < 0) { 
+			printf("Wrong value of argument: %d\n", -exit_status);
 		}
 	}
 	printf("> ");
