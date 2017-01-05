@@ -163,8 +163,6 @@ static Command* cmd_get(int argc, char** argv) {
                         return &commands[i];
                 }
         }
-        if(argc > 0)
-                printf("%s : command not found\n", argv[0]);
 
         return NULL;
 }
