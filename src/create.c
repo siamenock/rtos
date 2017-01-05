@@ -33,23 +33,13 @@ static int vm_create(int argc, char* argv[]) {
 	vm.core_size = 1;
 	vm.memory_size = 0x1000000;	// 16MB
 	vm.storage_size = 0x1000000;	// 16MB
-	vm.nic_count = 1;
+	vm.nic_count = 0;
 	NICSpec nics[VM_MAX_NIC_COUNT];
 	memset(nics, 0, sizeof(NICSpec) * VM_MAX_NIC_COUNT);
 	vm.nics = nics;
 	vm.argc = 0;
 	//char* _args[VM_MAX_ARGC];
 	vm.argv = NULL; //_args;
-
-	NICSpec* nic = &vm.nics[0]; 
-	nic->mac = 0;
-	nic->dev = malloc(strlen("eth0") + 1);
-	nic->dev = strcpy(nic->dev, "eth0");
-	nic->input_buffer_size = 1024;
-	nic->output_buffer_size = 1024;
-	nic->input_bandwidth = 1000000000; /* 1 GB */
-	nic->output_bandwidth = 1000000000; /* 1 GB */
-	nic->pool_size = 0x400000; /* 4 MB */
 
 	// Main options
 	static struct option options[] = {
@@ -96,9 +86,15 @@ static int vm_create(int argc, char* argv[]) {
 
 				char* subopts = optarg;
 				char* value;
-				static int nic_count = 0;
 
-				NICSpec* nic = &vm.nics[nic_count]; 
+				NICSpec* nic = &vm.nics[vm.nic_count];
+				nic->mac = 0;
+				nic->dev = "eth0";
+				nic->input_buffer_size = 1024;
+				nic->output_buffer_size = 1024;
+				nic->input_bandwidth = 1000000000; /* 1 GB */
+				nic->output_bandwidth = 1000000000; /* 1 GB */
+				nic->pool_size = 0x400000; /* 4 MB */
 				while(*subopts != '\0') {
 					switch(getsubopt(&subopts, token, &value)) {
 						case MAC:
@@ -136,7 +132,7 @@ static int vm_create(int argc, char* argv[]) {
 					}
 				}
 
-				vm.nic_count = ++nic_count;
+				vm.nic_count++;
 				break;
 			case 'a' :
 				vm.argv = &optarg;
@@ -253,7 +249,17 @@ static int vm_create(int argc, char* argv[]) {
  *                }
  *        }
  */
-
+	if(vm.nic_count == 0) {
+		NICSpec* nic = &vm.nics[0];
+		nic->mac = 0;
+		nic->dev = "eth0";
+		nic->input_buffer_size = 1024;
+		nic->output_buffer_size = 1024;
+		nic->input_bandwidth = 1000000000; /* 1 GB */
+		nic->output_bandwidth = 1000000000; /* 1 GB */
+		nic->pool_size = 0x400000; /* 4 MB */
+		vm.nic_count = 1;
+	}
 	rpc_vm_create(rpc, &vm, callback_vm_create, NULL);
 
 	return 0;
