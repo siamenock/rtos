@@ -778,17 +778,25 @@ static int cmd_md5(int argc, char** argv, void(*callback)(char* result, int exit
 }
 
 static int cmd_create(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
-	if(argc < 2) {
-		return CMD_STATUS_WRONG_NUMBER;
-	}
+	// Default value
 	VMSpec* vm = malloc(sizeof(VMSpec));
 	vm->core_size = 1;
-	vm->memory_size = 0x1000000;	// 16MB
-	vm->storage_size = 0x1000000;	// 16MB
-	vm->nic_count = 0;
+	vm->memory_size = 0x1000000;		/* 16MB */
+	vm->storage_size = 0x1000000;		/* 16MB */
+	vm->nic_count = 1;
 	vm->nics = malloc(sizeof(NICSpec) * MAX_VNIC_COUNT);
 	vm->argc = 0;
 	vm->argv = malloc(sizeof(char*) * CMD_MAX_ARGC);
+
+	NICSpec* nic = &vm->nics[0]; 
+	nic->mac = 0;
+	nic->dev = malloc(strlen("eth0") + 1);
+	nic->dev = strcpy(nic->dev, "eth0");
+	nic->input_buffer_size = 1024;
+	nic->output_buffer_size = 1024;
+	nic->input_bandwidth = 1000000000;	/* 1 GB */
+	nic->output_bandwidth = 1000000000;	/* 1 GB */
+	nic->pool_size = 0x400000;		/* 4 MB */
 
 	for(int i = 1; i < argc; i++) {
 		if(strcmp(argv[i], "core:") == 0) {
@@ -819,6 +827,17 @@ static int cmd_create(int argc, char** argv, void(*callback)(char* result, int e
 			i++;
 
 			NICSpec* nic = &(vm->nics[vm->nic_count++]);
+
+			// Default value
+			nic->mac = 0;
+			nic->dev = malloc(strlen("eth0") + 1);
+			nic->dev = strcpy(nic->dev, "eth0");
+			nic->input_buffer_size = 1024;
+			nic->output_buffer_size = 1024;
+			nic->input_bandwidth = 1000000000; /* 1 GB */
+			nic->output_bandwidth = 1000000000; /* 1 GB */
+			nic->pool_size = 0x400000; /* 4 MB */
+
 			for( ; i < argc; i++) {
 				if(strcmp(argv[i], "mac:") == 0) {
 					i++;
@@ -1048,7 +1067,7 @@ static int cmd_status_get(int argc, char** argv, void(*callback)(char* result, i
 	extern Map* vms;
 	VM* vm = map_get(vms, (void*)(uint64_t)vmid);
 	if(!vm) {
-		printf("Cannot found VM\n");
+		printf("VM not found\n");
 		return -1;
 	}
 
@@ -1615,11 +1634,11 @@ void shell_callback() {
 					if(exit_status == CMD_STATUS_WRONG_NUMBER) {
 						printf("Wrong number of arguments\n");
 					} else if(exit_status == CMD_STATUS_NOT_FOUND) {
-						printf("Can not found command\n");
+						printf("Command not found: %s\n", cmd);
 					} else if(exit_status == CMD_VARIABLE_NOT_FOUND) {
 						printf("Variable not found\n");
 					} else if(exit_status < 0) { 
-						printf("Wrong value of argument : %d\n", -exit_status);
+						printf("Wrong value of argument: %d\n", -exit_status);
 					}
 				}
 
