@@ -693,8 +693,11 @@ static int cmd_md5(int argc, char** argv, void(*callback)(char* result, int exit
 		*p = '\0';
 	}
 
-	if(ret)
+	if(ret) {
+		printf("%s\n", cmd_result);
 		callback(cmd_result, 0);
+	}
+
 	return 0;
 }
 
@@ -839,6 +842,7 @@ static int cmd_create(int argc, char** argv, void(*callback)(char* result, int e
 		callback("false", -1);
 	} else {
 		sprintf(cmd_result, "%d", vmid);
+		printf("%d\n", vmid);
 		callback(cmd_result, 0);
 	}
 
