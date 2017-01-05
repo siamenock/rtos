@@ -209,6 +209,11 @@ bool nic_process_input(uint8_t local_port, uint8_t* buf1, uint32_t size1, uint8_
 			goto dropped;
 		}
 
+		packet->time = time;
+		packet->start = (((uint64_t)packet->buffer + vnic->padding_head + (_ALIGN - 1)) & ~(_ALIGN - 1)) - (uint64_t)packet->buffer;
+		packet->end = packet->start + size;
+		packet->size = buffer_size;
+
 		// Copy
 		if(size1 > 0)
 			memcpy(packet->buffer + packet->start, buf1, size1);
