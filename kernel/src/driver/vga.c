@@ -244,7 +244,7 @@ static int write(int id, const char* buf, int len) {
 				// TODO: Beep
 				break;
 			case '\b':
-				if(row != 0 && col != 0) {
+				if(row != 0 || col != 0) {
 					s[-2] = 0;
 					s[-1] = attr;
 					
