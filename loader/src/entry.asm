@@ -90,9 +90,10 @@ start:
 	mov	esp, stack_top
 
 repeat:
-	sub	esp, STACK_SIZE
 	cmp	ebx, 0
 	je	next
+
+	sub	esp, STACK_SIZE
 
 	sub	ebx, 1
 	jmp	repeat
@@ -104,7 +105,7 @@ next:
 	push	eax
 	extern	main
 	call	main
-	
+
 	jmp	0x08:0x200000   ; Jump to kernel64
 	
 .loop:
