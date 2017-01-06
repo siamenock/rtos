@@ -29,14 +29,14 @@ startup_64:
 	mov	%rbp, %rsp
 	addq	$stack_top  - __START_KERNEL_map, %rsp
 repeat:
-	sub	$STACK_SIZE, %rsp
 	cmp	$0, %ebx
 	je	next
+
+	sub	$STACK_SIZE, %rsp
 
 	sub	$1, %ebx
 	jmp	repeat
 next:
-
 	xorl	%eax, %eax
 	movl	%eax, %ds
 	movl	%eax, %ss
