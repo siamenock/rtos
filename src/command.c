@@ -981,7 +981,7 @@ static int cmd_status_get(int argc, char** argv, void(*callback)(char* result, i
 	uint32_t vmid = parse_uint32(argv[1]);
 	VM* vm = vm_get(vmid); 
 	if(!vm) {
-		printf("Can'nt found VM\n");
+		printf("VM not found\n");
 		return -1;
 	}
 
@@ -989,15 +989,19 @@ static int cmd_status_get(int argc, char** argv, void(*callback)(char* result, i
 		switch(status) {
 			case VM_STATUS_START:
 				callback("start", 0);
+				printf("start\n");
 				break;
 			case VM_STATUS_PAUSE:
 				callback("pause", 0);
+				printf("pause\n");
 				break;
 			case VM_STATUS_STOP:
 				callback("stop", 0);
+				printf("stop\n");
 				break;
 			default:
 				callback("invalid", -1);
+				printf("invalid\n");
 				break;
 		}
 	}
