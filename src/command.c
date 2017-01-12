@@ -289,7 +289,7 @@ static int cmd_nic(int argc, char** argv, void(*callback)(char* result, int exit
 	extern Device* nic_devices[];
 	uint16_t nic_device_index = 0;
 
-	if(argc == 1 || (argc == 2 && !strcmp(argv[1], "list"))) {
+	if(argc == 1) {
 		for(int i = 0; i < MAX_NIC_DEVICE_COUNT; i++) {
 			Device* dev = nic_devices[i];
 			if(!dev) {
@@ -305,27 +305,72 @@ static int cmd_nic(int argc, char** argv, void(*callback)(char* result, int exit
 				uint16_t port_num = (port >> 12) & 0xf;
 				uint16_t vlan_id = port & 0xfff;
 
-				char name_buf[32];
+				char name_buf[32]= {};
 				if(!vlan_id) {
 					sprintf(name_buf, "eth%d", nic_device_index + port_num);
 				} else {
 					sprintf(name_buf, "eth%d.%d", nic_device_index + port_num, vlan_id);
 				}
+
 				printf("%-12s", name_buf);
 				printf("HWaddr %02x:%02x:%02x:%02x:%02x:%02x\n",
-					(nicpriv->mac[port_num] >> 40) & 0xff,
-					(nicpriv->mac[port_num] >> 32) & 0xff,
-					(nicpriv->mac[port_num] >> 24) & 0xff,
-					(nicpriv->mac[port_num] >> 16) & 0xff,
-					(nicpriv->mac[port_num] >> 8) & 0xff,
-					(nicpriv->mac[port_num] >> 0) & 0xff);
+						(nicpriv->mac[port_num] >> 40) & 0xff,
+						(nicpriv->mac[port_num] >> 32) & 0xff,
+						(nicpriv->mac[port_num] >> 24) & 0xff,
+						(nicpriv->mac[port_num] >> 16) & 0xff,
+						(nicpriv->mac[port_num] >> 8) & 0xff,
+						(nicpriv->mac[port_num] >> 0) & 0xff);
 			}
 			nic_device_index += nicpriv->port_count;
 		}
 
 		return 0;
-	} else
+	} else if(argc == 2) {
+		for(int i = 0; i < MAX_NIC_DEVICE_COUNT; i++) {
+			Device* dev = nic_devices[i];
+			if(!dev) {
+				break;
+			}
+
+			NICPriv* nicpriv = dev->priv;
+			MapIterator iter;
+			map_iterator_init(&iter, nicpriv->nics);
+			while(map_iterator_has_next(&iter)) {
+				MapEntry* entry = map_iterator_next(&iter);
+				uint16_t port = (uint16_t)(uint64_t)entry->key;
+				uint16_t port_num = (port >> 12) & 0xf;
+				uint16_t vlan_id = port & 0xfff;
+
+				char name_buf[32]= {};
+				if(!vlan_id) {
+					sprintf(name_buf, "eth%d", nic_device_index + port_num);
+				} else {
+					sprintf(name_buf, "eth%d.%d", nic_device_index + port_num, vlan_id);
+				}
+
+				if(!strncmp(name_buf, argv[1], sizeof(argv[1]))) {
+					printf("%-12s", name_buf);
+					printf("HWaddr %02x:%02x:%02x:%02x:%02x:%02x\n",
+							(nicpriv->mac[port_num] >> 40) & 0xff,
+							(nicpriv->mac[port_num] >> 32) & 0xff,
+							(nicpriv->mac[port_num] >> 24) & 0xff,
+							(nicpriv->mac[port_num] >> 16) & 0xff,
+							(nicpriv->mac[port_num] >> 8) & 0xff,
+							(nicpriv->mac[port_num] >> 0) & 0xff);
+					return 0;
+				} else
+					continue;
+			}
+			nic_device_index += nicpriv->port_count;
+		}
+		printf("Device not found\n");
+
+		return -3;
+
+	} else {
+		printf("Too many arguments\n");
 		return -1;
+	}
 }
 
 static int cmd_vnic(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
