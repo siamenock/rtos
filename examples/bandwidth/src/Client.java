@@ -129,7 +129,7 @@ public class Client {
 		for(int i = 0; i < clients.length; i++)
 			clients[i].start();
 
-		System.out.printf("%7s %10s %10s %15s %15s\n", 
+		System.out.printf("%-7s\t%-10s\t%-10s\t%-15s\t%-15s\n", 
 				"Count", "TX PPS", "RX PPS", "TX BPS", "RX BPS");
 
 		int count = 0;
@@ -154,14 +154,14 @@ public class Client {
 			totalReceived += received;
 			count++;
 
-			System.out.printf("%5d - %,10d %,10d %,15d %,15d\n", count, sent, received, 
+			System.out.printf("%-7d\t%-,10d\t%-,10d\t%-,15d\t%-,15d\n", count, sent, received, 
 					(sent * size * 8), (received * size * 8));
 
 			if(count == maxCount) {
 				for(int i = 0; i < 62; i++)
 					System.out.print("=");
 
-				System.out.printf("\n%5s - %,10d %,10d %,15d %,15d\n", 
+				System.out.printf("\n%-7s\t%-,10d\t%-,10d\t%-,15d\t%-,15d\n", 
 						"Avg", totalSent / count, totalReceived / count, 
 						(totalSent * size * 8) / count, (totalReceived * size * 8) / count);
 
