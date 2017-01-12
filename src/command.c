@@ -868,7 +868,7 @@ static int cmd_vm_destroy(int argc, char** argv, void(*callback)(char* result, i
 	}
 
 	uint32_t vmid = parse_uint32(argv[1]);
-	bool ret = vm_delete(vmid);
+	bool ret = vm_destroy(vmid);
 
 	if(ret)
 		callback("true", 0);
