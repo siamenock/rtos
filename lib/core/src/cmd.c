@@ -109,6 +109,7 @@ static int cmd_parse_line(char* line, char** argv) {
 					break;
 				case ' ':
 				case '\0':
+				case '\t':
 					if(is_start == false) {
 						line[i] = '\0';
 						argv[argc++] = start;
