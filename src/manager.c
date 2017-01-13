@@ -170,7 +170,7 @@ static void vm_set_handler(RPC* rpc, VMSpec* vm, void* context, void(*callback)(
 }
 
 static void vm_destroy_handler(RPC* rpc, uint32_t vmid, void* context, void(*callback)(RPC* rpc, bool result)) {
-	bool result = vm_delete(vmid);
+	bool result = vm_destroy(vmid);
 	callback(rpc, result);
 }
 
