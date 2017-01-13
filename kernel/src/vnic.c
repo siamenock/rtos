@@ -793,13 +793,17 @@ void nic_process_input(uint8_t local_port, uint8_t* buf1, uint32_t size1, uint8_
 uint16_t size = size1 + size2;
 
 		if(vnic->input_closed - vnic->input_wait_grace > time) {
+#if DEBUG
 			printf("closed dropped %016lx ", vnic->mac);
+#endif /* DEBUG */
 			goto dropped;
 		}
 
 		uint16_t buffer_size = vnic->padding_head + size + vnic->padding_tail + (ALIGN - 1);
 		if(buffer_size > vnic->max_buffer_size) {
+#if DEBUG
 			printf("buffer dropped %016lx ", vnic->mac);
+#endif /* DEBUG */
 			goto dropped;
 		}
 
@@ -807,14 +811,18 @@ uint16_t size = size1 + size2;
 			buffer_size = vnic->min_buffer_size;
 
 		if(!fifo_available(vnic->nic->input_buffer)) {
+#if DEBUG
 			printf("fifo dropped %016lx ", vnic->mac);
+#endif /* DEBUG */
 			goto dropped;
 		}
 
 		// Packet
 		Packet* packet = nic_alloc(vnic->nic, buffer_size);
 		if(!packet) {
+#if DEBUG
 			printf("memory dropped %016lx ", vnic->mac);
+#endif /* DEBUG */
 			goto dropped;
 		}
 
@@ -849,7 +857,9 @@ uint16_t size = size1 + size2;
 		// Push
 		if(!fifo_push(vnic->nic->input_buffer, packet)) {
 			nic_free(packet);
+#if DEBUG
 			printf("fifo dropped %016lx ", vnic->mac);
+#endif /* DEBUG */
 			goto dropped;
 		}
 
@@ -919,7 +929,9 @@ Packet* nic_process_output(uint8_t local_port) {
 			VNIC* vnic = entry1->data;
 
 			if(vnic->output_closed - vnic->output_wait_grace > time) {
+#if DEBUG
 				printf("output closed: %016lx\n", vnic->mac);
+#endif /* DEBUG */
 				continue;
 			}
 
