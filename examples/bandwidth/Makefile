@@ -10,7 +10,7 @@ bin/Listener.class: src/Listener.java
 	javac -d bin src/Listener.java
 
 client:
-	java -cp bin Client 2 64 localhost 2000
+	java -cp bin Client 1 1500 192.168.200.10 7 2
 
 server:
 	java -cp bin Server 2000
