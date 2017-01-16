@@ -786,6 +786,7 @@ ssize_t vm_storage_write(uint32_t vmid, void* buf, size_t offset, size_t size) {
 			size_t write_size = VM_STORAGE_SIZE_ALIGN - offset;
 			memcpy(vm->storage.blocks[index] + offset, buf, write_size);
 			_size -= write_size;
+			buf += write_size;
 		} else {
 			memcpy(vm->storage.blocks[index] + offset, buf, _size);
 			_size = 0;
