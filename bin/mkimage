@@ -22,22 +22,23 @@ function check_number() {
 		:
 	else
 		echo "$1 must be a number: $2"
-		exit
+		exit -1
 	fi
 }
 
 if [ $# -lt 8 ]; then
-	echo "mkimage [image name] [boot part size] [boot part type] [root part size] [root part type] [user part type] [boot files]"
-	exit
+	echo "mkimage [image name] [boot part size] [root part size] [boot part type] [root part type] [user part type] [boot files]"
+	exit -1
 fi
 
 IMAGE=$1		# system.img
-BOOT=$2			# 3
+BOOT=$2		    # 4
 ROOT=$3			# 12
-			# Rest of space will be user parition
-BOOT_TYPE=$4		# fat32
-ROOT_TYPE=$5		# fat32
-USER_TYPE=$6		# ext2
+
+# Rest of space will be user parition
+BOOT_TYPE=$4	# fat32
+ROOT_TYPE=$5	# fat32
+USER_TYPE=$6	# ext2
 
 BOOT_FS=$(part_to_fs $BOOT_TYPE)
 ROOT_FS=$(part_to_fs $ROOT_TYPE)
@@ -65,8 +66,8 @@ HDD1=`echo $KPARTX | awk 'BEGIN { RS=""; FS=" "} {print $3 }'`
 HDD2=`echo $KPARTX | awk 'BEGIN { RS=""; FS=" "} {print $12 }'`
 HDD3=`echo $KPARTX | awk 'BEGIN { RS=""; FS=" "} {print $21 }'`
 
-sudo mkfs.$ROOT_FS -F32 /dev/mapper/$HDD1
-sudo mkfs.$BOOT_FS -F32 /dev/mapper/$HDD2
+sudo mkfs.$BOOT_FS -F32 /dev/mapper/$HDD1
+sudo mkfs.$ROOT_FS -F32 /dev/mapper/$HDD2
 sudo mkfs.$USER_FS /dev/mapper/$HDD3
 
 sudo $BASE/grub-bios-setup -d $BASE/grub-core -b boot.img -c core.img $HDD
