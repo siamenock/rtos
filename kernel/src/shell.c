@@ -1213,7 +1213,7 @@ static int cmd_dhcp(int argc, char** argv, void(*callback)(char* result, int exi
 	if(dhcp_lease_ip(manager_nic->nic, NULL, manager_ip_acked, NULL) == 0)
 		printf("Failed to lease Manager IP : %d\n", errno);
 
-	return -1;
+	return 0;
 }
 
 /*
@@ -1563,12 +1563,14 @@ Command commands[] = {
 		.args = "result: bool, vmid: uint32 thread_id: uint8 msg: string",
 		.func = cmd_stdio
 	},
+/*
 	{
 		.name = "mount",
 		.desc = "Mount file system",
 		.args = "result: bool, [\"-t\" (type)] device: string dir: string",
 		.func = cmd_mount
 	},
+*/
 	{
 		.name = "dhcp",
 		.desc = "DHCP get manager ip",
