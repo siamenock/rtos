@@ -1213,7 +1213,7 @@ static int cmd_dhcp(int argc, char** argv, void(*callback)(char* result, int exi
 	if(dhcp_lease_ip(manager_nic->nic, NULL, manager_ip_acked, NULL) == 0)
 		printf("Failed to lease Manager IP : %d\n", errno);
 
-	return true;
+	return 0;
 }
 
 /*
