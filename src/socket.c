@@ -10,9 +10,9 @@
 #include <arpa/inet.h>
 
 #include <net/packet.h>
+#include "driver/nic.h"
 #include "vnic.h"
 #include "socket.h"
-#include "driver/nic.h"
 
 #define DEBUG	1
 
@@ -28,7 +28,7 @@ static int request_socket(int fd, int request, struct ifreq* ifr) {
 		perror("Socket request error");
 		return -1;
 	}
-	
+
 	return 0;
 }
 

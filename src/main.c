@@ -2,11 +2,15 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <fcntl.h>
+#include <libgen.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <fcntl.h>
+#include <linux/limits.h>
+
 #include <util/event.h>
 #include <timer.h>
+
 #include "apic.h"
 #include "icc.h"
 #include "mapping.h"
@@ -24,6 +28,7 @@
 #include "smap.h"
 #include "elf.h"
 #include "popcorn.h"
+#include "netlink.h"
 #include "dispatcher.h"
 #include "driver/nic.h"
 
@@ -66,16 +71,18 @@ static void init_nics(int count) {
 		for(int j = 0; j < info.port_count; j++) {
 			nic_priv->mac[j] = info.mac[j];
 
-			char name_buf[64];
-			sprintf(name_buf, "eth%d", index);
+			/*
+			 *char name_buf[64];
+			 *sprintf(name_buf, "eth%d", index);
+			 */
 			uint16_t port = j << 12;
 
 			Map* vnics = map_create(16, NULL, NULL, gmalloc_pool);
 			map_put(nic_priv->nics, (void*)(uint64_t)port, vnics);
-			
-			printf("\tNICs in physical NIC(%s): %p\n", name_buf, nic_priv->nics);
-                        dispatcher_register_nic((void*)nic_priv->nics);
-			printf("\t%s : [%02lx:%02lx:%02lx:%02lx:%02lx:%02lx] [%c]\n", name_buf,
+
+			printf("\tNICs in physical NIC(%s): %p\n", info.name, nic_priv->nics);
+                        //dispatcher_register_nic((void*)nic_priv->nics);
+			printf("\t%s : [%02lx:%02lx:%02lx:%02lx:%02lx:%02lx] [%c]\n", info.name,
 					(info.mac[j] >> 40) & 0xff,
 					(info.mac[j] >> 32) & 0xff,
 					(info.mac[j] >> 24) & 0xff,
@@ -116,12 +123,15 @@ static int parse_present_mask(char* present_mask) {
 
 static char _boot_command_line[1024] = {0,};
 static int parse_args(char* args) {
+	printf("%s\n", args);
 	int fd = open(args, O_RDONLY);
-	if(fd < 0)
+	if(fd < 0) {
+		perror("Failed to open ");
 		return -1;
+	}
 
 	ssize_t len = read(fd, _boot_command_line, 1023);
-	if(!len) 
+	if(!len)
 		goto error;
 
 	close(fd);
@@ -147,7 +157,7 @@ static int parse_args(char* args) {
 			if(ret)
 				goto error;
 			smap_fixed = true;
-		}	
+		}
 	}
 
 	if(smap_fixed) {
@@ -227,9 +237,9 @@ static int symbols_init() {
 		{ &KERNEL_TEXT_AREA_END, "KERNEL_TEXT_AREA_END" },
 
 		{ &KERNEL_DATA_AREA_START, "KERNEL_DATA_AREA_START" },
-		{ &KERNEL_DATA_AREA_END, "KERNEL_DATA_AREA_END" }, 
+		{ &KERNEL_DATA_AREA_END, "KERNEL_DATA_AREA_END" },
 
-		{ &KERNEL_DATA_START, "KERNEL_DATA_START" }, 
+		{ &KERNEL_DATA_START, "KERNEL_DATA_START" },
 		{ &KERNEL_DATA_END, "KERNEL_DATA_END" },
 
 		{ &VGA_BUFFER_START, "VGA_BUFFER_START" },
@@ -280,7 +290,7 @@ static int dummy_entry() {
 	}
 	struct boot_params* boot_params = (struct boot_params*)VIRTUAL_TO_PHYSICAL(symbol_addr);
 	printf("\tboot_params: %p\n", boot_params);
-	memcpy(boot_params, _boot_params, sizeof(struct boot_params)); 
+	memcpy(boot_params, _boot_params, sizeof(struct boot_params));
 	unmap_boot_param(_boot_params);
 	close_mem(fd);
 
@@ -415,14 +425,14 @@ int main(int argc, char** argv) {
 	printf("\nParsing parameter...\n");
 	ret = parse_params(argv[1]);
 	if(ret) {
-		printf("\nFailed to parse parameter\n");
+		printf("\tFailed to parse parameter\n");
 		return ret;
 	}
 
 	printf("\nParsing kernel arguments...\n");
 	ret = parse_args(kernel_args);
 	if(ret) {
-		printf("\nFailed to parse kernel arguments\n");
+		printf("\tFailed to parse kernel arguments : %d\n", ret);
 		return ret;
 	}
 
@@ -453,7 +463,7 @@ int main(int argc, char** argv) {
 		return ret;
 
 	printf("\ninitializing multicore processor...\n");
-	mp_init0(); 
+	mp_init0();
 
 	printf("\nInitializing shared memory area...\n");
 	if(shared_init() < 0)
@@ -499,8 +509,11 @@ int main(int argc, char** argv) {
 	printf("\nInitializing VM manager...\n");
 	vm_init();
 
-	printf("\nInitializing linux socket device...\n");
-	socket_init();
+	//printf("\nInitializing linux socket device...\n");
+	//socket_init();
+
+	printf("\nInitializing linux netlink devices...\n");
+	netlink_init();
 
 	uint16_t nic_count = device_count(DEVICE_TYPE_NIC);
 	printf("\nInitializing NICs: %d\n", nic_count);
