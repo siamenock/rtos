@@ -65,7 +65,7 @@ int elf_copy(char* elf_file, unsigned long kernel_start_address) {
 	}
 
 	char command[256];
-	sprintf(command, "kexec -a 0x%x -l %s -t elf-x86_64 --args-none", 
+	sprintf(command, "kexec -a 0x%x -l %s -t elf-x86_64 --args-none >/dev/null 2>&1", 
 			kernel_start_address, elf_file);
 	printf("\tExecute command : %s\n", command);
 	return system(command);
