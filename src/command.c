@@ -348,7 +348,7 @@ static int cmd_nic(int argc, char** argv, void(*callback)(char* result, int exit
 					sprintf(name_buf, "eth%d.%d", nic_device_index + port_num, vlan_id);
 				}
 
-				if(!strncmp(name_buf, argv[1], sizeof(argv[1]))) {
+				if(!strncmp(name_buf, argv[1], sizeof(name_buf))) {
 					printf("%-12s", name_buf);
 					printf("HWaddr %02x:%02x:%02x:%02x:%02x:%02x\n",
 							(nicpriv->mac[port_num] >> 40) & 0xff,
