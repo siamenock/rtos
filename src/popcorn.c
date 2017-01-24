@@ -20,7 +20,7 @@
 #define SETUP_HDR_SIGN  "HdrS"
 #define SETUP_HDR_MINVER 0x0202
 
-#define __NR_get_boot_params_addr 313
+#define __NR_get_boot_params_addr 327
 
 static inline unsigned long get_boot_params_addr () {
 	return syscall(__NR_get_boot_params_addr);

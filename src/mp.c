@@ -23,7 +23,8 @@ static uint8_t core_count;
 //extern uint64_t _ioapic_address;
 extern uint64_t _apic_address;
 
-#define __NR_multikernel_boot 312
+#define __NR_multikernel_boot 326
+
 static void wakeup_ap(long kernel_start_address) {
 	if(!cpu_end)
 		return;
