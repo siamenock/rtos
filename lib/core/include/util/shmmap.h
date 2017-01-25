@@ -1,5 +1,5 @@
-#ifndef __UTIL_MAP_H__
-#define __UTIL_MAP_H__
+#ifndef __UTIL_SHMMAP_H__
+#define __UTIL_SHMMAP_H__
 
 #include <stdint.h>
 #include "list.h"
@@ -177,4 +177,4 @@ ShmmapEntry* shmmap_iterator_remove(ShmmapIterator* iter);
 #define SHMMAP_EQUALS_TYPE_UINT64	1
 #define SHMMAP_EQUALS_TYPE_STRING	2
 
-#endif /* __UTIL_MAP_H__ */
+#endif /* __UTIL_SHMMAP_H__ */
