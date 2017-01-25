@@ -282,6 +282,8 @@ static void icc_start(ICC_Message* msg) {
 	msg2->data.started.stderr_head = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)task_addr(id, SYM_STDERR_HEAD));
 	msg2->data.started.stderr_tail = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)task_addr(id, SYM_STDERR_TAIL));
 	msg2->data.started.stderr_size = *(int*)task_addr(id, SYM_STDERR_SIZE);
+
+	msg2->data.started.global_heap_idx = TRANSLATE_TO_PHYSICAL((uint64_t)*(uint64_t*)task_addr(id, SYM_GMALLOC_POOL)) >> 21;
 	
 	icc_send(msg2, msg->apic_id);
 
