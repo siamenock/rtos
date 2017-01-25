@@ -20,4 +20,4 @@ clean:
 	rm -f main
 
 run: all
-	../../bin/console script
+	./run.sh
