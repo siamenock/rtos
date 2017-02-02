@@ -16,6 +16,7 @@
   * node.js
   * autoconf
   * dcfldd
+  * openjdk-8-jdk
 
 * Disable automount-open
 gsettings set org.gnome.desktop.media-handling automount-open false

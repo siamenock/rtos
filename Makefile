@@ -6,7 +6,8 @@ all: build
 prepare:
 	@echo "Prepare all requirement packages for PacketNgin build"
 	sudo apt-get install -y git nasm multiboot libcurl4-gnutls-dev qemu-kvm bridge-utils \
-		libc6-dev-i386 doxygen graphviz kpartx bison flex cmake nodejs autoconf dcfldd
+		libc6-dev-i386 doxygen graphviz kpartx bison flex cmake nodejs autoconf dcfldd \
+		openjdk-8-jdk
 
 Build.make:
 	@echo "Create all Makefiles by premake"
