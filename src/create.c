@@ -94,11 +94,13 @@ static int vm_create(int argc, char* argv[]) {
 				nic->output_buffer_size = 1024;
 				nic->input_bandwidth = 1000000000; /* 1 GB */
 				nic->output_bandwidth = 1000000000; /* 1 GB */
+				nic->padding_head = 32;
+				nic->padding_tail = 32;
 				nic->pool_size = 0x400000; /* 4 MB */
 				while(*subopts != '\0') {
 					switch(getsubopt(&subopts, token, &value)) {
 						case MAC:
-							nic->mac = atoll(value);		
+							nic->mac = strtoll(value, NULL, 16);
 							break;
 						case DEV:
 							nic->dev = value;
