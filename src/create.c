@@ -69,7 +69,7 @@ static int vm_create(int argc, char* argv[]) {
 				;
 				// Suboptions for NIC
 				enum {
-					MAC, DEV, IBUF, OBUF, IBAND, OBAND, HPAD, TPAD, POOL, 
+					MAC, DEV, IBUF, OBUF, IBAND, OBAND, HPAD, TPAD, POOL, SLOWPATH,
 				};
 
 				char* const token[] = {
@@ -82,6 +82,7 @@ static int vm_create(int argc, char* argv[]) {
 					[HPAD]	= "hpad",
 					[TPAD]	= "tpad",
 					[POOL]	= "pool",
+					[SLOWPATH]	= "slowpath",
 				};
 
 				char* subopts = optarg;
@@ -97,6 +98,7 @@ static int vm_create(int argc, char* argv[]) {
 				nic->padding_head = 32;
 				nic->padding_tail = 32;
 				nic->pool_size = 0x400000; /* 4 MB */
+				nic->slowpath = true;	//Enable
 				while(*subopts != '\0') {
 					switch(getsubopt(&subopts, token, &value)) {
 						case MAC:
@@ -125,6 +127,17 @@ static int vm_create(int argc, char* argv[]) {
 							break;
 						case POOL:
 							nic->pool_size = strtol(value, NULL, 16);
+							break;
+						case SLOWPATH:
+							if(!strcmp(value, "y")) {
+								nic->slowpath = true;
+							} else if(!strcmp(value, "n")) {
+								nic->slowpath = false;
+							} else {
+								printf("No match found for token : /%s/\n", value);
+								help();
+								exit(EXIT_FAILURE);
+							}
 							break;
 						default:
 							printf("No match found for token : /%s/\n", value);
@@ -260,6 +273,7 @@ static int vm_create(int argc, char* argv[]) {
 		nic->input_bandwidth = 1000000000; /* 1 GB */
 		nic->output_bandwidth = 1000000000; /* 1 GB */
 		nic->pool_size = 0x400000; /* 4 MB */
+		nic->slowpath = true;
 		vm.nic_count = 1;
 	}
 	rpc_vm_create(rpc, &vm, callback_vm_create, NULL);
