@@ -27,6 +27,11 @@ int apic_init() {
 		return -1;
 	}
 
+	if(_apic_address_page != _apic_address) {
+		perror("\tMapping memory is not same as APIC address.\n");
+		return -1;
+	}
+
 	printf("\tMemory mapped APIC physcial base: %lx \n", _apic_address);
 
 	return 0;
@@ -50,7 +55,7 @@ inline void apic_write32(int reg, uint32_t v) {
 inline uint64_t apic_read64(int reg) {
 	uint64_t v = *(uint32_t volatile*)(_apic_address + reg);
 	v |= (uint64_t)*(uint32_t volatile*)(_apic_address + reg + 0x10) << 32;
-	
+
 	return v;
 }
 

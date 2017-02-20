@@ -91,7 +91,7 @@ static void rtnl_link(struct nlmsghdr *h, NetDevice* device) {
 			case IFLA_IFNAME:
 				;
 				char* name = RTA_DATA(attribute);
-				printf("%d: ", iface->ifi_index);
+				printf("\t%d: ", iface->ifi_index);
 				printf("%s:\n", name);
 				strncpy(device->info.name, name, sizeof(device->info.name));
 				break;
@@ -99,12 +99,8 @@ static void rtnl_link(struct nlmsghdr *h, NetDevice* device) {
 			case IFLA_MTU:
 				;
 				int mtu = *(int *)RTA_DATA(attribute);
-				printf("\tMTU %u\n", mtu);
+				printf("\t\tMTU %u\n", mtu);
 				device->status.mtu = mtu;
-				break;
-
-			case IFLA_LINK:
-				printf("\tLink %s\n", (char *) RTA_DATA(attribute));
 				break;
 
 			case IFLA_ADDRESS:
@@ -118,7 +114,7 @@ static void rtnl_link(struct nlmsghdr *h, NetDevice* device) {
 						(uint64_t)mac[i] << (ETH_ALEN - i - 1) * 8;
 				}
 
-				printf("\tAddress %s\n",
+				printf("\t\tAddress %s\n",
 						ll_addr_n2a(RTA_DATA(attribute),
 							RTA_PAYLOAD(attribute),
 							iface->ifi_type,
@@ -129,6 +125,20 @@ static void rtnl_link(struct nlmsghdr *h, NetDevice* device) {
 				break;
 		}
 	}
+}
+
+static bool interface_filtered(struct ifinfomsg *iface) {
+	if((iface->ifi_flags & IFF_UP) != IFF_UP) {
+		printf("\tInterface filtered : not available\n");
+		return true;
+	}
+
+	if((iface->ifi_flags & IFF_LOOPBACK) == IFF_LOOPBACK) {
+		printf("\tInterface filtered : loopback interface\n");
+		return true;
+	}
+
+	return false;
 }
 
 // FIXME: refactor netlink function
@@ -199,8 +209,7 @@ int netlink_init() {
 
 		len = recvmsg(fd, &rtnl_reply, 0);
 		if(len) {
-			for(msg_ptr = (struct nlmsghdr *) reply;
-					NLMSG_OK(msg_ptr, len);
+			for(msg_ptr = (struct nlmsghdr *) reply; NLMSG_OK(msg_ptr, len);
 					msg_ptr = NLMSG_NEXT(msg_ptr, len)) {
 				switch(msg_ptr->nlmsg_type) {
 					case 3:		/* NLMSG_DONE */
@@ -208,6 +217,12 @@ int netlink_init() {
 						break;
 					case 16:	/* RTM_NEWLINK */
 						;
+						struct ifinfomsg *iface;
+						iface = NLMSG_DATA(msg_ptr);
+
+						if(interface_filtered(iface))
+							break;
+
 						devices[netdev_count] = malloc(sizeof(NetDevice));
 						NetDevice* device = devices[netdev_count];
 

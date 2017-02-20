@@ -66,7 +66,7 @@ static List* actives;	/* rpc */
 
 /*static void rpc_free(RPC* rpc) {*/
 	/*RPCData* data = (RPCData*)rpc->data;*/
-	
+
 	/*ListIterator iter;*/
 	/*list_iterator_init(&iter, data->pbufs);*/
 	/*while(list_iterator_has_next(&iter)) {*/
@@ -77,7 +77,7 @@ static List* actives;	/* rpc */
 	/*list_destroy(data->pbufs);*/
 	/*list_remove_data(actives, rpc);*/
 	/*free(rpc);*/
-	
+
 	/*list_remove_data(clients, data->pcb);*/
 /*}*/
 
@@ -88,13 +88,13 @@ static List* actives;	/* rpc */
 	/*tcp_recv(pcb, NULL);*/
 	/*tcp_err(pcb, NULL);*/
 	/*tcp_poll(pcb, NULL, 0);*/
-	
+
 	/*if(rpc) {*/
 		/*rpc_free(rpc);*/
 	/*} else {*/
 		/*list_remove_data(clients, pcb);*/
 	/*}*/
-	
+
 	/*if(is_force) {*/
 		/*tcp_abort(pcb);*/
 	/*} else if(tcp_close(pcb) != ERR_OK) {*/
@@ -105,7 +105,7 @@ static List* actives;	/* rpc */
 
 /*static err_t manager_recv(void* arg, struct tcp_pcb* pcb, struct pbuf* p, err_t err) {*/
 	/*RPC* rpc = arg;*/
-	
+
 	/*if(p == NULL) {	// Remote host closed the connection*/
 		/*manager_close(pcb, rpc, false);*/
 	/*} else if(err != ERR_OK) {*/
@@ -122,7 +122,7 @@ static List* actives;	/* rpc */
 			/*}*/
 		/*}*/
 	/*}*/
-	
+
 	/*return ERR_OK;*/
 /*}*/
 
@@ -137,19 +137,19 @@ static List* actives;	/* rpc */
 
 /*static err_t manager_poll(void* arg, struct tcp_pcb* pcb) {*/
 	/*RPC* rpc = arg;*/
-	
+
 	/*if(rpc == NULL) {*/
 		/*manager_close(pcb, NULL, true);*/
 	/*} else {*/
 		/*RPCData* data = (RPCData*)rpc->data;*/
 		/*data->poll_count++;*/
-		
+
 		/*if(rpc->ver == 0 && data->poll_count++ >= 4) {	// 2 seconds*/
 			/*printf("Close connection: not receiving hello in 2 secs.\n");*/
 			/*manager_close(pcb, rpc, false);*/
 		/*}*/
 	/*}*/
-	
+
 	/*return ERR_OK;*/
 /*}*/
 
@@ -193,7 +193,7 @@ typedef struct {
 
 static void status_setted(bool result, void* context) {
 	Data* data = context;
-	
+
 //	if(list_index_of(clients, data->pcb, NULL) >= 0) {
 		data->callback(data->rpc, result);
 //	}
@@ -205,7 +205,7 @@ static void status_set_handler(RPC* rpc, uint32_t vmid, VMStatus status, void* c
 	data->rpc = rpc;
 	//data->pcb = context;
 	data->callback = callback;
-	
+
 	vm_status_set(vmid, status, status_setted, data);
 }
 
@@ -235,14 +235,14 @@ static void storage_upload_handler(RPC* rpc, uint32_t vmid, uint32_t offset, voi
 				return;
 			}
 		}
-		
+
 		if(size < 0) {
 			printf(". Aborted: %d\n", size);
 			callback(rpc, size);
 		} else {
 			size = vm_storage_write(vmid, buf, offset, size);
 			callback(rpc, size);
-			 
+
 			if(size > 0) {
 				printf(".");
 				total_size += size;
@@ -272,7 +272,7 @@ static void storage_md5_handler(RPC* rpc, uint32_t id, uint64_t size, void* cont
 /*// PCB utility*/
 /*static int pcb_read(RPC* rpc, void* buf, int size) {*/
 	/*RPCData* data = (RPCData*)rpc->data;*/
-	
+
 	/*int idx = 0;*/
 	/*ListIterator iter;*/
 	/*list_iterator_init(&iter, data->pbufs);*/
@@ -294,7 +294,7 @@ static void storage_md5_handler(RPC* rpc, uint32_t id, uint64_t size, void* cont
 
 /*static int pcb_write(RPC* rpc, void* buf, int size) {*/
 	/*RPCData* data = (RPCData*)rpc->data;*/
-	
+
 	/*int len = tcp_sndbuf(data->pcb);*/
 	/*len = len > size ? size : len;*/
 
@@ -318,7 +318,7 @@ static void storage_md5_handler(RPC* rpc, uint32_t id, uint64_t size, void* cont
 
 
 static bool manager_accept_loop(void* rpc) {
-	// RPC socket is nonblocking 
+	// RPC socket is nonblocking
 	RPC* crpc = rpc_accept((RPC*)rpc);
 	if(!crpc)
 		return true;
@@ -335,7 +335,7 @@ static bool manager_accept_loop(void* rpc) {
 	rpc_stdio_handler(crpc, stdio_handler, NULL);
 	rpc_storage_md5_handler(crpc, storage_md5_handler, NULL);
 
-	if(list_index_of(actives, crpc, NULL) < 0) 
+	if(list_index_of(actives, crpc, NULL) < 0)
 		list_add(actives, crpc);
 
 	RPCData* data = (RPCData*)crpc->data;
@@ -345,7 +345,6 @@ static bool manager_accept_loop(void* rpc) {
 }
 
 static void stdio_callback(uint32_t vmid, int thread_id, int fd, char* buffer, volatile size_t* head, volatile size_t* tail, size_t size) {
-	//printf("Application > ");
 	fflush(stdout);
 	ListIterator iter;
 	list_iterator_init(&iter, actives);
@@ -369,21 +368,27 @@ static void stdio_callback(uint32_t vmid, int thread_id, int fd, char* buffer, v
 		 *RPC* rpc = pcb->callback_arg;
 		 */
 		RPC* rpc = list_iterator_next(&iter);
-	
+
 		if(wrapped) {
-			//write(STDOUT_FILENO, buffer + *head, len1);
-			//write(STDOUT_FILENO, buffer, len2);
+			/*
+			 *write(STDOUT_FILENO, buffer + *head, len1);
+			 *write(STDOUT_FILENO, buffer, len2);
+			 */
+
 			rpc_stdio(rpc, vmid, thread_id, fd, buffer + *head, len1, NULL, NULL);
 			rpc_stdio(rpc, vmid, thread_id, fd, buffer, len2, NULL, NULL);
 
 		} else {
-			//write(STDOUT_FILENO, buffer + *head, len0);
+			/*
+			 *write(STDOUT_FILENO, buffer + *head, len0);
+			 */
+
 			rpc_stdio(rpc, vmid, thread_id, fd, buffer + *head, len0, NULL, NULL);
-		}	
-		
+		}
+
 		rpc_loop(rpc);
 	}
-	
+
 	if(wrapped) {
 		*head = (*head + len1 + len2) % size;
 	} else {
@@ -395,27 +400,27 @@ static bool manager_server_open() {
 /*
  *        struct ip_addr ip;
  *        IP4_ADDR(&ip, (manager_ip >> 24) & 0xff, (manager_ip >> 16) & 0xff, (manager_ip >> 8) & 0xff, (manager_ip >> 0) & 0xff);
- *        
+ *
  *        manager_server = tcp_new();
  *        if(!manager_server) {
  *                printf("ERROR: TCP control block allocation failed\n");
  *
  *                return false;
  *        }
- *        
+ *
  *        err_t err = tcp_bind(manager_server, &ip, manager_port);
  *        if(err != ERR_OK) {
  *                printf("ERROR: Manager cannot bind TCP session: %d\n", err);
  *
  *                return false;
  *        }
- *        
+ *
  *        manager_server = tcp_listen(manager_server);
  *        tcp_arg(manager_server, manager_server);
- *        
+ *
  *        printf("Manager started: %d.%d.%d.%d:%d\n", (manager_ip >> 24) & 0xff, (manager_ip >> 16) & 0xff,
  *                (manager_ip >> 8) & 0xff, (manager_ip >> 0) & 0xff, manager_port);
- *        
+ *
  *        tcp_accept(manager_server, manager_accept);
  */
 	RPC* rpc = rpc_listen(DEFAULT_MANAGER_PORT);
@@ -431,7 +436,7 @@ static bool manager_server_open() {
 
 	if(actives == NULL)
 		actives = list_create(NULL);
-	
+
 	event_idle_add(manager_accept_loop, (void*)rpc);
 
 	return true;
@@ -480,7 +485,7 @@ static bool manager_server_close() {
 /*}*/
 
 static bool manager_loop(void* context) {
-//	nic_poll(); 
+//	nic_poll();
 	if(!list_is_empty(actives)) {
 		ListIterator iter;
 		list_iterator_init(&iter, actives);
@@ -492,13 +497,13 @@ static bool manager_loop(void* context) {
 				list_remove_data(actives, rpc);
 		}
 	}
-	
+
 	return true;
 }
 
 /*static bool manager_timer(void* context) {*/
 	/*nic_timer();*/
-	
+
 	/*return true;*/
 /*}*/
 
@@ -517,41 +522,41 @@ void manager_init() {
 // 		NIC_OUTPUT_ACCEPT_ALL, 1,
 // 		NIC_NONE
 // 	};
-// 	
+//
 // 	manager_nic = vnic_create(attrs);
 // 	if(!manager_nic) {
 // 		printf("\tCannot create manager : %d\n", errno);
 // 		return;
 // 	}
-// 
+//
 // 	manager_ip = DEFAULT_MANAGER_IP;
 // 	if(!nic_ip_add(manager_nic->nic, DEFAULT_MANAGER_IP)) {
 // 		printf("\tCan'nt allocate manager ip\n");
 // 		return;
 // 	}
-// 
+//
 // 	IPv4Interface* interface = nic_ip_get(manager_nic->nic, DEFAULT_MANAGER_IP);
 // 	interface->gateway = DEFAULT_MANAGER_GW;
 // 	interface->netmask = DEFAULT_MANAGER_NETMASK;
 // 	interface->_default = true;
-// 
+//
 // 	if(!udp_port_alloc0(manager_nic->nic, DEFAULT_MANAGER_IP, manager_port)) {
 // 		printf("\tCan'nt allocate manager port\n");
 // 		return;
 // 	}
 // 	manager_port = DEFAULT_MANAGER_PORT;
-	
+
 	//manager_netif = nic_init(manager_nic->nic, manage, NULL);
-	
+
 	if(!manager_server_open()) {
 		printf("\tFailed to open manager server\n");
 		return;
 	}
 	printf("\tManager RPC server opened\n");
-	
+
 	event_idle_add(manager_loop, NULL);
 	//event_timer_add(manager_timer, NULL, 100000, 100000);
-	
+
 	vm_stdio_handler(stdio_callback);
 }
 

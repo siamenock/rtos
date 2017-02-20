@@ -11,7 +11,7 @@
 #define MP_MAX_CORE_COUNT	16
 #define MP_CORE_INVALID		255
 
-#define MP_CORE(ptr, id)        (void*)((uint64_t)(ptr) + id * 0x200000)
+#define MP_CORE(ptr, id)        (void*)(((uint64_t)(ptr) & 0xffffffff) + id * 0x200000)
 
 void mp_init0();
 void mp_init(unsigned long kernel_start_address);

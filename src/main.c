@@ -26,6 +26,7 @@
 #include "idt.h"
 #include "socket.h"
 #include "smap.h"
+#include "stdio.h"
 #include "elf.h"
 #include "popcorn.h"
 #include "netlink.h"
@@ -61,7 +62,7 @@ static void init_nics(int count) {
 			continue;
 
 		nic_priv->nics = map_create(8, NULL, NULL, gmalloc_pool);
-
+		nic_priv->__nics = (uint64_t)nic_priv->nics;
 		nic_devices[i]->priv = nic_priv;
 
 		NICInfo info;
@@ -70,6 +71,7 @@ static void init_nics(int count) {
 		nic_priv->port_count = info.port_count;
 		for(int j = 0; j < info.port_count; j++) {
 			nic_priv->mac[j] = info.mac[j];
+			strncpy(nic_priv->name, info.name, sizeof(nic_priv->name));
 
 			/*
 			 *char name_buf[64];
@@ -80,9 +82,12 @@ static void init_nics(int count) {
 			Map* vnics = map_create(16, NULL, NULL, gmalloc_pool);
 			map_put(nic_priv->nics, (void*)(uint64_t)port, vnics);
 
-			printf("\tNICs in physical NIC(%s): %p\n", info.name, nic_priv->nics);
-                        //dispatcher_register_nic((void*)nic_priv->nics);
-			printf("\t%s : [%02lx:%02lx:%02lx:%02lx:%02lx:%02lx] [%c]\n", info.name,
+			int rc = dispatcher_register_nic((void*)nic_priv);
+			if(rc < 0)
+				continue;
+
+			printf("\tNICs in physical NIC(%s): %p\n", nic_priv->name, nic_priv->nics);
+			printf("\t%s : [%02lx:%02lx:%02lx:%02lx:%02lx:%02lx] [%c]\n", nic_priv->name,
 					(info.mac[j] >> 40) & 0xff,
 					(info.mac[j] >> 32) & 0xff,
 					(info.mac[j] >> 24) & 0xff,
@@ -103,7 +108,7 @@ extern int cpu_start;
 extern int cpu_end;
 static int parse_present_mask(char* present_mask) {
 	char* next = present_mask;
-	char* end;
+	char* end = NULL;
 	char* start = strtok_r(next, "-", &end);
 
 	if(start) {
@@ -140,7 +145,7 @@ static int parse_args(char* args) {
 	char* str;
 	bool smap_fixed = false;
 	while((str = strtok_r(next, " ", &next))) {
-		char* value;
+		char* value = NULL;
 		char* key = strtok_r(str, "=", &value);
 
 		if(!strcmp(key, "present_mask")) {
@@ -412,8 +417,6 @@ int main(int argc, char** argv) {
 	}
 
 	printf("\nPacketNgin 2.0 Manager\n");
-
-	printf("\nLoading E820 memory map...\n");
 	ret = smap_init();
 	if(ret)
 		goto error;
@@ -443,8 +446,10 @@ int main(int argc, char** argv) {
 
 	printf("\nCopying kernel image...\n");
 	ret = elf_copy(kernel_elf, kernel_start_address);
-	if(ret)
+	if(ret) {
+		printf("\tFailed to copy kernel image by kexec\n");
 		return ret;
+	}
 
 	printf("\nInitiliazing mmap symbols...\n");
 	ret = symbols_init(kernel_elf);
@@ -508,6 +513,9 @@ int main(int argc, char** argv) {
 
 	printf("\nInitializing VM manager...\n");
 	vm_init();
+
+	printf("\nInitializing standard IO...\n");
+	stdio_init();
 
 	//printf("\nInitializing linux socket device...\n");
 	//socket_init();

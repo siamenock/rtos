@@ -30,7 +30,7 @@ static ICC_Handler icc_events[ICC_EVENTS_COUNT];
 static void context_switch() {
 	/*// Set exception handlers*/
 	/*APIC_Handler old_exception_handlers[32];*/
-	
+
 	/*void exception_handler(uint64_t vector, uint64_t err) {*/
 		/*if(apic_user_rip() == 0 && apic_user_rsp() == task_get_stack(1)) {*/
 			/*// Do nothing*/
@@ -39,35 +39,35 @@ static void context_switch() {
 			/*apic_dump(vector, err);*/
 			/*errno = err;*/
 		/*}*/
-		
+
 		/*apic_eoi();*/
-		
+
 		/*task_destroy(1);*/
 	/*}*/
-	
+
 	/*for(int i = 0; i < 32; i++) {*/
 		/*if(i != 7) {*/
 			/*old_exception_handlers[i] = apic_register(i, exception_handler);*/
 		/*}*/
 	/*}*/
-	
+
 	/*// Context switching*/
 	/*// TODO: Move exception handlers to task resources*/
 	/*task_switch(1);*/
-	
+
 	/*// Restore exception handlers*/
 	/*for(int i = 0; i < 32; i++) {*/
 		/*if(i != 7) {*/
 			/*apic_register(i, old_exception_handlers[i]);*/
 		/*}*/
 	/*}*/
-	
+
 	/*// Send callback message*/
 	/*bool is_paused = errno == 0 && task_is_active(1);*/
 	/*if(is_paused) {*/
 		/*// ICC_TYPE_PAUSE is not a ICC message but a interrupt in fact, So forcely commit the message*/
 	/*}*/
-	
+
 	/*ICC_Message* msg3 = icc_alloc(is_paused ? ICC_TYPE_PAUSED : ICC_TYPE_STOPPED);*/
 	/*msg3->result = errno;*/
 	/*if(!is_paused) {*/
@@ -75,7 +75,7 @@ static void context_switch() {
 	/*}*/
 	/*errno = 0;*/
 	/*icc_send(msg3, 0);*/
-	
+
 	/*printf("VM %s...\n", is_paused ? "paused" : "stopped");*/
 }
 
@@ -103,10 +103,10 @@ static void icc_start(ICC_Message* msg) {
  *                task_resource(id, RESOURCE_NI, vm->nics[i]);
  *                nics[i] = vm->nics[i]->nic;
  *        }
- *                
+ *
  *        printf("Starting VM...\n");
  *        ICC_Message* msg2 = icc_alloc(ICC_TYPE_STARTED);
- *        
+ *
  *        msg2->data.started.stdin = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)*(char**)task_addr(id, SYM_STDIN));
  *        msg2->data.started.stdin_head = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)task_addr(id, SYM_STDIN_HEAD));
  *        msg2->data.started.stdin_tail = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)task_addr(id, SYM_STDIN_TAIL));
@@ -119,11 +119,11 @@ static void icc_start(ICC_Message* msg) {
  *        msg2->data.started.stderr_head = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)task_addr(id, SYM_STDERR_HEAD));
  *        msg2->data.started.stderr_tail = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)task_addr(id, SYM_STDERR_TAIL));
  *        msg2->data.started.stderr_size = *(int*)task_addr(id, SYM_STDERR_SIZE);
- *        
+ *
  *        icc_send(msg2, msg->apic_id);
  *
  *        icc_free(msg);
- *        
+ *
  *        context_switch();
  */
 }
@@ -255,7 +255,7 @@ ICC_Message* icc_alloc(uint8_t type) {
 	lock_lock(&shared->icc_lock_alloc);
 	ICC_Message* icc_message = fifo_pop(shared->icc_pool);
 	lock_unlock(&shared->icc_lock_alloc);
-	
+
 	icc_message->id = icc_id++;
 	icc_message->type = type;
 	icc_message->apic_id = mp_apic_id();

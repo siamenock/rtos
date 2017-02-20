@@ -13,17 +13,17 @@ extern volatile size_t __stdin_head;
 extern volatile size_t __stdin_tail;
 extern size_t __stdin_size;
 
-extern char __stdout[];
-extern volatile size_t __stdout_head;
-extern volatile size_t __stdout_tail;
+extern char* __stdout[];
+extern volatile size_t* __stdout_head;
+extern volatile size_t* __stdout_tail;
 extern size_t __stdout_size;
 
 extern char __stderr[];
 extern volatile size_t __stderr_head;
 extern volatile size_t __stderr_tail;
 extern size_t __stderr_size;
-	
-void stdio_init(uint8_t apic_id, void* buffer, size_t size);
+
+void stdio_init();
 
 void stdio_print(const char* str, int row, int col);
 void stdio_print_32(uint32_t v, int row, int col);

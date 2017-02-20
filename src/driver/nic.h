@@ -21,6 +21,7 @@ typedef struct {
 	 *     value: VNIC
 	 */
 	Map*		nics;
+	uint64_t	__nics;
 } NICPriv;
 
 typedef struct {
