@@ -159,7 +159,7 @@ static void virtual_smap_dump() {
 
 #define MAPPING_AREA		(PHYSICAL_OFFSET + VIRTUAL_TO_PHYSICAL(DESC_TABLE_AREA_START))
 // TODO: gmalloc can be expanded til over 2G when bmalloc area added
-#define MAPPING_AREA_SIZE	0x80000000	/* 2 GB */
+#define MAPPING_AREA_SIZE	0x24000000	/* 2 GB */
 
 int mapping_memory() {
 	void* mapping;
