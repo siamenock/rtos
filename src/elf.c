@@ -81,7 +81,10 @@ uint64_t elf_get_symbol(char* sym_name) {
 	for(int i = 0; i < size; i++) {
 		if(ELF64_ST_BIND(sym[i].st_info) != STB_GLOBAL)
 			continue;
-		
+
+		if(strlen(sym_name) != strlen(name(sym[i].st_name)))
+			continue;
+
 		if(!strncmp(sym_name, name(sym[i].st_name), strlen(sym_name))) {
 			return sym[i].st_value;
 		}
