@@ -25,10 +25,10 @@ typedef struct _Map {
 	size_t		threshold;	///< Threshold to extend the table (internal use only)
 	size_t		capacity;	///< Current capacity (internal use only)
 	size_t		size;		///< Number of elements (internal use only)
-	
+
 	uint64_t(*hash)(void*);		///< hashing function
 	bool(*equals)(void*,void*);	///< comparing function
-	
+
 	void*		pool;		///< Memory pool (internal use only)
 } Map;
 

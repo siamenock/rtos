@@ -13,14 +13,14 @@ typedef struct _NIC NIC;
  */
 typedef struct _Packet {
 	NIC*		nic;		///< Associated NIC which allocated the Packet
-	
+
 	unsigned int	status;		///< Packet status (deprecated)
 	unsigned long	time;		///< Packet in time in CPU clock
-	
+
 	unsigned short	start;		///< Packet payload starting index of payload buffer
 	unsigned short	end;		///< Packet payload ending index of payload buffer
 	unsigned short	size;		///< Packet buffer size
-	
+
 	unsigned char		buffer[0];	///< Packet buffer which contains packet payload itself
 } Packet;
 

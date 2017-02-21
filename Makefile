@@ -1,15 +1,11 @@
-# GNU Makefile for PacketNgin kernel disptacher  
-obj-m			:= virtio_accel.o
+# GNU Makefile for PacketNgin kernel disptacher
+obj-m			:= dispatcher.o
 
-## VirtI/O specific
-VIRTIO_DIR		= virtio
-virtio_accel-objs	+= $(VIRTIO_DIR)/virtio_net.o
-
-## Dispatcher specificcific
+## Dispatcher
 DISPATCHER_DIR		= dispatcher
-virtio_accel-objs	+= $(DISPATCHER_DIR)/dispatcher.o 
-virtio_accel-objs	+= $(DISPATCHER_DIR)/vnic.o
-virtio_accel-objs	+= ../libumpn.a
+dispatcher-objs		+= $(DISPATCHER_DIR)/dispatcher.o
+dispatcher-objs		+= $(DISPATCHER_DIR)/vnic.o
+dispatcher-objs		+= ../penguin/lib/libumpn.a
 
 DISPATCHER_CFLAGS	= -std=gnu99 -Wno-strict-prototypes -Wno-declaration-after-statement -Wno-format
 CFLAGS_vnic.o		:= $(DISPATCHER_CFLAGS)

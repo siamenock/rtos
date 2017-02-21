@@ -15,6 +15,7 @@
  */
 
 typedef struct {
+	char		name[16];
 	uint8_t		port_count;
 	uint64_t	mac[MAX_PORT_COUNT];
 	/***
@@ -26,6 +27,7 @@ typedef struct {
 	 *     value: VNIC
 	 */
 	Map*		nics;
+	uint64_t	__nics;
 } NICPriv;
 
 /**

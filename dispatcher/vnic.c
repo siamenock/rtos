@@ -11,7 +11,7 @@
 #include "nic.h"
 #include "vnic.h"
 
-#define DEBUG		0
+#define DEBUG		1
 #define _ALIGN		16
 
 #define printf printk
@@ -123,7 +123,7 @@ static bool vlan_output_process(VNIC* vnic, Packet* packet) {
 	/*return true;*/
 /*}*/
 
-bool nic_process_input(uint8_t local_port, uint8_t* buf1, uint32_t size1, uint8_t* buf2, uint32_t size2) {
+bool nic_process_input(NICPriv* priv, uint8_t local_port, uint8_t* buf1, uint32_t size1, uint8_t* buf2, uint32_t size2) {
 	// Get dmac, smac
 	uint64_t dmac;
 	uint64_t smac;
@@ -167,14 +167,24 @@ bool nic_process_input(uint8_t local_port, uint8_t* buf1, uint32_t size1, uint8_
 	// TODO: timer setting
 	uint64_t time = (uint64_t)-1; //timer_frequency();
 
-#if DEBUG
-	printf("Input:  [%02d] %02x:%02x:%02x:%02x:%02x:%02x %02x:%02x:%02x:%02x:%02x:%02x\n",
-			local_port,
-			(dmac >> 40) & 0xff, (dmac >> 32) & 0xff, (dmac >> 24) & 0xff,
-			(dmac >> 16) & 0xff, (dmac >> 8) & 0xff, (dmac >> 0) & 0xff,
-			(smac >> 40) & 0xff, (smac >> 32) & 0xff, (smac >> 24) & 0xff,
-			(smac >> 16) & 0xff, (smac >> 8) & 0xff, (smac >> 0) & 0xff);
-#endif /* DEBUG */
+/*
+ *#if DEBUG
+ *        printf("Input:  [%02d] %02x:%02x:%02x:%02x:%02x:%02x %02x:%02x:%02x:%02x:%02x:%02x\n",
+ *                        local_port,
+ *                        (dmac >> 40) & 0xff, (dmac >> 32) & 0xff, (dmac >> 24) & 0xff,
+ *                        (dmac >> 16) & 0xff, (dmac >> 8) & 0xff, (dmac >> 0) & 0xff,
+ *                        (smac >> 40) & 0xff, (smac >> 32) & 0xff, (smac >> 24) & 0xff,
+ *                        (smac >> 16) & 0xff, (smac >> 8) & 0xff, (smac >> 0) & 0xff);
+ *#endif [> DEBUG <]
+ */
+/*
+ *        printf("NICs: %p\n", nics);
+ *        unsigned char* ptr = nics;
+ *        for(int i = 0; i < 8; i++)
+ *                printf("%02x ", ptr[i]);
+ *
+ *        printf("\n");
+ */
 
 	bool input(VNIC* vnic) {
 		if(vnic->input_accept && list_index_of(vnic->input_accept, (void*)smac, NULL) < 0)
@@ -229,6 +239,15 @@ bool nic_process_input(uint8_t local_port, uint8_t* buf1, uint32_t size1, uint8_
 			}
 		}
 
+#if DEBUG
+		printf("Input:  [%02d] %02x:%02x:%02x:%02x:%02x:%02x %02x:%02x:%02x:%02x:%02x:%02x\n",
+				local_port,
+				(dmac >> 40) & 0xff, (dmac >> 32) & 0xff, (dmac >> 24) & 0xff,
+				(dmac >> 16) & 0xff, (dmac >> 8) & 0xff, (dmac >> 0) & 0xff,
+				(smac >> 40) & 0xff, (smac >> 32) & 0xff, (smac >> 24) & 0xff,
+				(smac >> 16) & 0xff, (smac >> 8) & 0xff, (smac >> 0) & 0xff);
+#endif /* DEBUG */
+
 		// Push
 		if(!fifo_push(vnic->nic->input_buffer, packet)) {
 			nic_free(packet);
@@ -257,7 +276,7 @@ dropped:
 	/*
 	 *Map* vnics = map_get(((NICPriv*)nic_current->priv)->nics, (void*)(uint64_t)((local_port << 12) | vid));
 	 */
-	Map* vnics = map_get(nics, (void*)(uint64_t)((local_port << 12) | vid));
+	Map* vnics = map_get(priv->nics, (void*)(uint64_t)((local_port << 12) | vid));
 	if(!vnics) {
 		printf("Could not find VNICs\n");
 		return false;
@@ -275,8 +294,11 @@ dropped:
 		}
 	} else {
 		VNIC* vnic = map_get(vnics, (void*)dmac);
-		if(!vnic)
+		bool broadcast = false;
+		if(!vnic) {
 			vnic = map_get(vnics, (void*)(uint64_t)0xffffffffffff);
+			broadcast = true;
+		}
 
 		if(!vnic) {
 			return false;
@@ -284,6 +306,9 @@ dropped:
 
 		if(input(vnic)) {
 			nic_rx++;
+			if(broadcast)
+				return false;
+
 			return true;
 		}
 	}
@@ -291,14 +316,13 @@ dropped:
 	return false;
 }
 
-Packet* nic_process_output(uint8_t local_port) {
+Packet* nic_process_output(NICPriv* priv, uint8_t local_port) {
 	uint64_t time = -1; //timer_frequency();
 
 	//Map* nics = nics; //((NICPriv*)nic_current->priv)->nics;
-	if(!nics) {
-		printf("Something happened\n");
-		return NULL;
-	}
+	Map* nics = priv->nics;
+
+	BUG_ON(!nics);
 
 	MapIterator iter0;
 	map_iterator_init(&iter0, nics);
@@ -326,9 +350,8 @@ Packet* nic_process_output(uint8_t local_port) {
 			}
 
 			Packet* packet = fifo_pop(vnic->nic->output_buffer);
-			if(!packet) {
+			if(!packet)
 				continue;
-			}
 
 			if(vnic->port & 0xfff) {
 				if(!vlan_output_process(vnic, packet)) {

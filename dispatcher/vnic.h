@@ -37,7 +37,7 @@ typedef struct {
 	uint64_t	output_closed;
 } VNIC;
 
-bool nic_process_input(uint8_t local_port, uint8_t* buf1, uint32_t size1, uint8_t* buf2, uint32_t size2);
-Packet* nic_process_output(uint8_t local_port);
+bool nic_process_input(NICPriv* priv, uint8_t local_port, uint8_t* buf1, uint32_t size1, uint8_t* buf2, uint32_t size2);
+Packet* nic_process_output(NICPriv* priv, uint8_t local_port);
 
 #endif /* __VNIC_H__ */
