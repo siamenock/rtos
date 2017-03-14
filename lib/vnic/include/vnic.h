@@ -110,15 +110,15 @@ Packet* vnic_srx(VNIC* vnic);
 uint32_t vnic_srx_size(VNIC* vnic);
 
 bool vnic_tx(VNIC* vnic, Packet* packet);
-bool vnic_tx_try(VNIC* vnic, Packet* packet);
+bool vnic_try_tx(VNIC* vnic, Packet* packet);
 bool vnic_tx_dup(VNIC* vnic, Packet* packet);
-bool vnic_tx_available(VNIC* vnic);
+bool vnic_has_tx(VNIC* vnic);
 uint32_t vnic_tx_size(VNIC* vnic);
 
 bool vnic_stx(VNIC* vnic, Packet* packet);
-bool vnic_stx_try(VNIC* vnic, Packet* packet);
+bool vnic_try_stx(VNIC* vnic, Packet* packet);
 bool vnic_stx_dup(VNIC* vnic, Packet* packet);
-bool vnic_stx_available(VNIC* vnic);
+bool vnic_has_stx(VNIC* vnic);
 uint32_t vnic_stx_size(VNIC* vnic);
 
 size_t vnic_pool_used(VNIC* vnic);
@@ -145,25 +145,28 @@ uint64_t vnic_config_get(VNIC* vnic, uint32_t key);
  *
  * @param base 2MBs aligned
  * @param size multiples of 2MBs
+ * @return 0 succeed
+ * @return 1 the base address is not aligned in 2MBs
+ * @return 2 the size is not rounded up 2MBs
  */
-void vnic_init(uint32_t id, uint64_t mac, void* base, size_t size, 
+int vnic_driver_init(uint32_t id, uint64_t mac, void* base, size_t size, 
 		uint64_t rx_bandwidth, uint64_t tx_bandwidth, 
 		uint16_t padding_head, uint16_t padding_tail, 
 		uint32_t rx_queue_size, uint32_t tx_queue_size, 
 		uint32_t srx_queue_size, uint32_t stx_queue_size);
 
-bool vnic_receivable(VNIC* vnic);
-bool vnic_received(VNIC* vnic, uint8_t* buf1, size_t size1, uint8_t* buf2, size_t size2);
-bool vnic_received2(VNIC* vnic, Packet* packet);
+bool vnic_driver_has_rx(VNIC* vnic);
+bool vnic_driver_rx(VNIC* vnic, uint8_t* buf1, size_t size1, uint8_t* buf2, size_t size2);
+bool vnic_driver_rx2(VNIC* vnic, Packet* packet);
 
-bool vnic_slow_receivable(VNIC* vnic);
-bool vnic_slow_received(VNIC* vnic, uint8_t* buf1, size_t size1, uint8_t* buf2, size_t size2);
-bool vnic_slow_received2(VNIC* vnic, Packet* packet);
+bool vnic_driver_has_srx(VNIC* vnic);
+bool vnic_driver_srx(VNIC* vnic, uint8_t* buf1, size_t size1, uint8_t* buf2, size_t size2);
+bool vnic_driver_srx2(VNIC* vnic, Packet* packet);
 
-bool vnic_sendable(VNIC* vnic);
-Packet* vnic_send(VNIC* vnic);
+bool vnic_driver_has_tx(VNIC* vnic);
+Packet* vnic_driver_tx(VNIC* vnic);
 
-bool vnic_slow_sendable(VNIC* vnic);
-Packet* vnic_slow_send(VNIC* vnic);
+bool vnic_driver_has_stx(VNIC* vnic);
+Packet* vnic_driver_stx(VNIC* vnic);
 
 #endif /* __VNIC_H__ */
