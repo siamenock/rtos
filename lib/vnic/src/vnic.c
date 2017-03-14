@@ -202,63 +202,63 @@ static bool queue_empty(VNIC_Queue* queue) {
 	return queue->head == queue->tail;
 }
 
-bool vnic_has_input(VNIC* vnic) {
-	return !queue_empty(&vnic->input);
+bool vnic_has_rx(VNIC* vnic) {
+	return !queue_empty(&vnic->rx);
 }
 
-Packet* vnic_input(VNIC* vnic) {
-	lock_lock(&vnic->input.rlock);
-	Packet* packet = queue_pop(vnic, &vnic->input);
-	lock_unlock(&vnic->input.rlock);
+Packet* vnic_rx(VNIC* vnic) {
+	lock_lock(&vnic->rx.rlock);
+	Packet* packet = queue_pop(vnic, &vnic->rx);
+	lock_unlock(&vnic->rx.rlock);
 	
 	return packet;
 }
 
-uint32_t vnic_input_size(VNIC* vnic) {
-	return queue_size(&vnic->input);
+uint32_t vnic_rx_size(VNIC* vnic) {
+	return queue_size(&vnic->rx);
 }
 
-bool vnic_has_slow_input(VNIC* vnic) {
-	return !queue_empty(&vnic->slow_input);
+bool vnic_has_srx(VNIC* vnic) {
+	return !queue_empty(&vnic->srx);
 }
 
-Packet* vnic_slow_input(VNIC* vnic) {
-	lock_lock(&vnic->slow_input.rlock);
-	Packet* packet = queue_pop(vnic, &vnic->slow_input);
-	lock_unlock(&vnic->slow_input.rlock);
+Packet* vnic_srx(VNIC* vnic) {
+	lock_lock(&vnic->srx.rlock);
+	Packet* packet = queue_pop(vnic, &vnic->srx);
+	lock_unlock(&vnic->srx.rlock);
 
 	return packet;
 }
 
-uint32_t vnic_slow_input_size(VNIC* vnic) {
-	return queue_size(&vnic->slow_input);
+uint32_t vnic_srx_size(VNIC* vnic) {
+	return queue_size(&vnic->srx);
 }
 
-bool vnic_output(VNIC* vnic, Packet* packet) {
-	lock_lock(&vnic->output.wlock);
-	if(!queue_push(vnic, &vnic->output, packet)) {
-		lock_unlock(&vnic->output.wlock);
+bool vnic_tx(VNIC* vnic, Packet* packet) {
+	lock_lock(&vnic->tx.wlock);
+	if(!queue_push(vnic, &vnic->tx, packet)) {
+		lock_unlock(&vnic->tx.wlock);
 		
 		vnic_free(packet);
 		return false;
 	} else {
-		lock_unlock(&vnic->output.wlock);
+		lock_unlock(&vnic->tx.wlock);
 		return true;
 	}
 }
 
-bool vnic_output_try(VNIC* vnic, Packet* packet) {
-	lock_lock(&vnic->output.wlock);
-	bool result = queue_push(vnic, &vnic->output, packet);
-	lock_unlock(&vnic->output.wlock);
+bool vnic_tx_try(VNIC* vnic, Packet* packet) {
+	lock_lock(&vnic->tx.wlock);
+	bool result = queue_push(vnic, &vnic->tx, packet);
+	lock_unlock(&vnic->tx.wlock);
 	
 	return result;
 }
 
-bool vnic_output_dup(VNIC* vnic, Packet* packet) {
-	lock_lock(&vnic->output.wlock);
-	if(!queue_available(&vnic->output)) {
-		lock_unlock(&vnic->output.wlock);
+bool vnic_tx_dup(VNIC* vnic, Packet* packet) {
+	lock_lock(&vnic->tx.wlock);
+	if(!queue_available(&vnic->tx)) {
+		lock_unlock(&vnic->tx.wlock);
 		return false;
 	}
 	
@@ -266,7 +266,7 @@ bool vnic_output_dup(VNIC* vnic, Packet* packet) {
 	
 	Packet* packet2 = vnic_alloc(vnic, len);
 	if(!packet2) {
-		lock_unlock(&vnic->output.wlock);
+		lock_unlock(&vnic->tx.wlock);
 		return false;
 	}
 	
@@ -274,50 +274,50 @@ bool vnic_output_dup(VNIC* vnic, Packet* packet) {
 	packet2->end = packet2->start + len;
 	memcpy(packet2->buffer + packet2->start, packet->buffer + packet->start, len);
 	
-	if(!queue_push(vnic, &vnic->output, packet)) {
-		lock_unlock(&vnic->output.wlock);
+	if(!queue_push(vnic, &vnic->tx, packet)) {
+		lock_unlock(&vnic->tx.wlock);
 		
 		vnic_free(packet);
 		return false;
 	} else {
-		lock_unlock(&vnic->output.wlock);
+		lock_unlock(&vnic->tx.wlock);
 		return true;
 	}
 }
 
-bool vnic_output_available(VNIC* vnic) {
-	return queue_available(&vnic->output);
+bool vnic_tx_available(VNIC* vnic) {
+	return queue_available(&vnic->tx);
 }
 
-uint32_t vnic_output_size(VNIC* vnic) {
-	return queue_size(&vnic->output);
+uint32_t vnic_tx_size(VNIC* vnic) {
+	return queue_size(&vnic->tx);
 }
 
-bool vnic_slow_output(VNIC* vnic, Packet* packet) {
-	lock_lock(&vnic->slow_output.wlock);
-	if(!queue_push(vnic, &vnic->slow_output, packet)) {
-		lock_unlock(&vnic->slow_output.wlock);
+bool vnic_stx(VNIC* vnic, Packet* packet) {
+	lock_lock(&vnic->stx.wlock);
+	if(!queue_push(vnic, &vnic->stx, packet)) {
+		lock_unlock(&vnic->stx.wlock);
 		vnic_free(packet);
 		
 		return false;
 	} else {
-		lock_unlock(&vnic->slow_output.wlock);
+		lock_unlock(&vnic->stx.wlock);
 		return true;
 	}
 }
 
-bool vnic_slow_output_try(VNIC* vnic, Packet* packet) {
-	lock_lock(&vnic->slow_output.wlock);
-	bool result = queue_push(vnic, &vnic->slow_output, packet);
-	lock_unlock(&vnic->slow_output.wlock);
+bool vnic_stx_try(VNIC* vnic, Packet* packet) {
+	lock_lock(&vnic->stx.wlock);
+	bool result = queue_push(vnic, &vnic->stx, packet);
+	lock_unlock(&vnic->stx.wlock);
 
 	return result;
 }
 
-bool vnic_slow_output_dup(VNIC* vnic, Packet* packet) {
-	lock_lock(&vnic->slow_output.wlock);
-	if(!queue_available(&vnic->slow_output)) {
-		lock_unlock(&vnic->slow_output.wlock);
+bool vnic_stx_dup(VNIC* vnic, Packet* packet) {
+	lock_lock(&vnic->stx.wlock);
+	if(!queue_available(&vnic->stx)) {
+		lock_unlock(&vnic->stx.wlock);
 		return false;
 	}
 	
@@ -325,7 +325,7 @@ bool vnic_slow_output_dup(VNIC* vnic, Packet* packet) {
 	
 	Packet* packet2 = vnic_alloc(vnic, len);
 	if(!packet2) {
-		lock_unlock(&vnic->slow_output.wlock);
+		lock_unlock(&vnic->stx.wlock);
 		return false;
 	}
 	
@@ -333,23 +333,23 @@ bool vnic_slow_output_dup(VNIC* vnic, Packet* packet) {
 	packet2->end = packet2->start + len;
 	memcpy(packet2->buffer + packet2->start, packet->buffer + packet->start, len);
 	
-	if(!queue_push(vnic, &vnic->slow_output, packet)) {
-		lock_unlock(&vnic->slow_output.wlock);
+	if(!queue_push(vnic, &vnic->stx, packet)) {
+		lock_unlock(&vnic->stx.wlock);
 		vnic_free(packet);
 		
 		return false;
 	} else {
-		lock_unlock(&vnic->slow_output.wlock);
+		lock_unlock(&vnic->stx.wlock);
 		return true;
 	}
 }
 
-bool vnic_slow_output_available(VNIC* vnic) {
-	return queue_available(&vnic->slow_output);
+bool vnic_stx_available(VNIC* vnic) {
+	return queue_available(&vnic->stx);
 }
 
-uint32_t vnic_slow_output_size(VNIC* vnic) {
-	return queue_size(&vnic->slow_output);
+uint32_t vnic_stx_size(VNIC* vnic) {
+	return queue_size(&vnic->stx);
 }
 
 size_t vnic_pool_used(VNIC* vnic) {
@@ -423,10 +423,10 @@ uint64_t vnic_config_get(VNIC* vnic, uint32_t key) {
 
 // Driver API
 void vnic_init(uint32_t id, uint64_t mac, void* base, size_t size, 
-		uint64_t input_bandwidth, uint64_t output_bandwidth, 
+		uint64_t rx_bandwidth, uint64_t tx_bandwidth, 
 		uint16_t padding_head, uint16_t padding_tail, 
-		uint32_t input_queue_size, uint32_t output_queue_size, 
-		uint32_t slow_input_queue_size, uint32_t slow_output_queue_size) {
+		uint32_t rx_queue_size, uint32_t tx_queue_size, 
+		uint32_t srx_queue_size, uint32_t stx_queue_size) {
 	
 	int index = sizeof(VNIC);
 	
@@ -434,46 +434,46 @@ void vnic_init(uint32_t id, uint64_t mac, void* base, size_t size,
 	vnic->magic = VNIC_MAGIC_HEADER;
 	vnic->id = id;
 	vnic->mac = mac;
-	vnic->input_bandwidth = input_bandwidth;
-	vnic->output_bandwidth = output_bandwidth;
+	vnic->rx_bandwidth = rx_bandwidth;
+	vnic->tx_bandwidth = tx_bandwidth;
 	vnic->padding_head = padding_head;
 	vnic->padding_tail = padding_tail;
 	
-	vnic->input.base = index;
-	vnic->input.head = 0;
-	vnic->input.tail = 0;
-	vnic->input.size = input_queue_size;
-	vnic->input.rlock = 0;
-	vnic->input.wlock = 0;
+	vnic->rx.base = index;
+	vnic->rx.head = 0;
+	vnic->rx.tail = 0;
+	vnic->rx.size = rx_queue_size;
+	vnic->rx.rlock = 0;
+	vnic->rx.wlock = 0;
 	
-	index += vnic->input.size * sizeof(uint64_t);
+	index += vnic->rx.size * sizeof(uint64_t);
 	index = ALIGN(index, 8);
-	vnic->output.base = index;
-	vnic->output.head = 0;
-	vnic->output.tail = 0;
-	vnic->output.size = output_queue_size;
-	vnic->output.rlock = 0;
-	vnic->output.wlock = 0;
+	vnic->tx.base = index;
+	vnic->tx.head = 0;
+	vnic->tx.tail = 0;
+	vnic->tx.size = tx_queue_size;
+	vnic->tx.rlock = 0;
+	vnic->tx.wlock = 0;
 	
-	index += vnic->output.size * sizeof(uint64_t);
+	index += vnic->tx.size * sizeof(uint64_t);
 	index = ALIGN(index, 8);
-	vnic->slow_input.base = index;
-	vnic->slow_input.head = 0;
-	vnic->slow_input.tail = 0;
-	vnic->slow_input.size = input_queue_size;
-	vnic->slow_input.rlock = 0;
-	vnic->slow_input.wlock = 0;
+	vnic->srx.base = index;
+	vnic->srx.head = 0;
+	vnic->srx.tail = 0;
+	vnic->srx.size = srx_queue_size;
+	vnic->srx.rlock = 0;
+	vnic->srx.wlock = 0;
 	
-	index += vnic->slow_input.size * sizeof(uint64_t);
+	index += vnic->srx.size * sizeof(uint64_t);
 	index = ALIGN(index, 8);
-	vnic->slow_output.base = index;
-	vnic->slow_output.head = 0;
-	vnic->slow_output.tail = 0;
-	vnic->slow_output.size = output_queue_size;
-	vnic->slow_output.rlock = 0;
-	vnic->slow_output.wlock = 0;
+	vnic->stx.base = index;
+	vnic->stx.head = 0;
+	vnic->stx.tail = 0;
+	vnic->stx.size = stx_queue_size;
+	vnic->stx.rlock = 0;
+	vnic->stx.wlock = 0;
 	
-	index += vnic->slow_output.size * sizeof(uint64_t);
+	index += vnic->stx.size * sizeof(uint64_t);
 	index = ALIGN(index, 8);
 	vnic->pool.bitmap = index;
 	index += (size - index) / VNIC_CHUNK_SIZE;
@@ -491,15 +491,15 @@ void vnic_init(uint32_t id, uint64_t mac, void* base, size_t size,
 }
 
 bool vnic_receivable(VNIC* vnic) {
-	return queue_available(&vnic->input);
+	return queue_available(&vnic->rx);
 }
 
 bool vnic_received(VNIC* vnic, uint8_t* buf1, size_t size1, uint8_t* buf2, size_t size2) {
-	lock_lock(&vnic->input.wlock);
-	if(queue_available(&vnic->input)) {
+	lock_lock(&vnic->rx.wlock);
+	if(queue_available(&vnic->rx)) {
 		Packet* packet = vnic_alloc(vnic, size1 + size2);
 		if(packet == NULL) {
-			lock_unlock(&vnic->input.wlock);
+			lock_unlock(&vnic->rx.wlock);
 			return false;
 		}
 		
@@ -508,42 +508,42 @@ bool vnic_received(VNIC* vnic, uint8_t* buf1, size_t size1, uint8_t* buf2, size_
 		
 		packet->end = packet->start + size1 + size2;
 		
-		if(queue_push(vnic, &vnic->input, packet)) {
-			lock_unlock(&vnic->input.wlock);
+		if(queue_push(vnic, &vnic->rx, packet)) {
+			lock_unlock(&vnic->rx.wlock);
 			return true;
 		} else {
-			lock_unlock(&vnic->input.wlock);
+			lock_unlock(&vnic->rx.wlock);
 			vnic_free(packet);
 			return false;
 		}
 	} else {
-		lock_unlock(&vnic->input.wlock);
+		lock_unlock(&vnic->rx.wlock);
 		return false;
 	}
 }
 
 bool vnic_received2(VNIC* vnic, Packet* packet) {
-	lock_lock(&vnic->input.wlock);
-	if(queue_push(vnic, &vnic->input, packet)) {
-		lock_unlock(&vnic->input.wlock);
+	lock_lock(&vnic->rx.wlock);
+	if(queue_push(vnic, &vnic->rx, packet)) {
+		lock_unlock(&vnic->rx.wlock);
 		return true;
 	} else {
-		lock_unlock(&vnic->input.wlock);
+		lock_unlock(&vnic->rx.wlock);
 		vnic_free(packet);
 		return false;
 	}
 }
 
 bool vnic_slow_receivable(VNIC* vnic) {
-	return queue_available(&vnic->slow_input);
+	return queue_available(&vnic->srx);
 }
 
 bool vnic_slow_received(VNIC* vnic, uint8_t* buf1, size_t size1, uint8_t* buf2, size_t size2) {
-	lock_lock(&vnic->slow_input.wlock);
-	if(queue_available(&vnic->slow_input)) {
+	lock_lock(&vnic->srx.wlock);
+	if(queue_available(&vnic->srx)) {
 		Packet* packet = vnic_alloc(vnic, size1 + size2);
 		if(packet == NULL) {
-			lock_unlock(&vnic->slow_input.wlock);
+			lock_unlock(&vnic->srx.wlock);
 			return false;
 		}
 		
@@ -552,52 +552,52 @@ bool vnic_slow_received(VNIC* vnic, uint8_t* buf1, size_t size1, uint8_t* buf2, 
 		
 		packet->end = packet->start + size1 + size2;
 		
-		if(queue_push(vnic, &vnic->slow_input, packet)) {
-			lock_unlock(&vnic->slow_input.wlock);
+		if(queue_push(vnic, &vnic->srx, packet)) {
+			lock_unlock(&vnic->srx.wlock);
 			return true;
 		} else {
-			lock_unlock(&vnic->slow_input.wlock);
+			lock_unlock(&vnic->srx.wlock);
 			vnic_free(packet);
 			return false;
 		}
 	} else {
-		lock_unlock(&vnic->slow_input.wlock);
+		lock_unlock(&vnic->srx.wlock);
 		return false;
 	}
 }
 
 bool vnic_slow_received2(VNIC* vnic, Packet* packet) {
-	lock_lock(&vnic->slow_input.wlock);
-	if(queue_push(vnic, &vnic->slow_input, packet)) {
-		lock_unlock(&vnic->slow_input.wlock);
+	lock_lock(&vnic->srx.wlock);
+	if(queue_push(vnic, &vnic->srx, packet)) {
+		lock_unlock(&vnic->srx.wlock);
 		return true;
 	} else {
-		lock_unlock(&vnic->slow_input.wlock);
+		lock_unlock(&vnic->srx.wlock);
 		vnic_free(packet);
 		return false;
 	}
 }
 
 bool vnic_sendable(VNIC* vnic) {
-	return !queue_empty(&vnic->output);
+	return !queue_empty(&vnic->tx);
 }
 
 Packet* vnic_send(VNIC* vnic) {
-	lock_lock(&vnic->output.rlock);
-	Packet* packet = queue_pop(vnic, &vnic->output);
-	lock_unlock(&vnic->output.rlock);
+	lock_lock(&vnic->tx.rlock);
+	Packet* packet = queue_pop(vnic, &vnic->tx);
+	lock_unlock(&vnic->tx.rlock);
 
 	return packet;
 }
 
 bool vnic_slow_sendable(VNIC* vnic) {
-	return !queue_empty(&vnic->slow_output);
+	return !queue_empty(&vnic->stx);
 }
 
 Packet* vnic_slow_send(VNIC* vnic) {
-	lock_lock(&vnic->slow_output.rlock);
-	Packet* packet = queue_pop(vnic, &vnic->slow_output);
-	lock_unlock(&vnic->slow_output.rlock);
+	lock_lock(&vnic->stx.rlock);
+	Packet* packet = queue_pop(vnic, &vnic->stx);
+	lock_unlock(&vnic->stx.rlock);
 
 	return packet;
 }
@@ -644,18 +644,18 @@ static void dump(VNIC* vnic) {
 	printf("vnic: %p\n", vnic);
 	printf("magic: %lx\n", vnic->magic);
 	printf("MAC: %lx\n", vnic->mac);
-	printf("input_bandwidth: %ld\n", vnic->input_bandwidth);
-	printf("output_bandwidth: %ld\n", vnic->output_bandwidth);
+	printf("rx_bandwidth: %ld\n", vnic->rx_bandwidth);
+	printf("tx_bandwidth: %ld\n", vnic->tx_bandwidth);
 	printf("padding_head: %d\n", vnic->padding_head);
 	printf("padding_tail: %d\n", vnic->padding_tail);
-	printf("input queue\n");
-	print_queue(&vnic->input);
-	printf("output queue\n");
-	print_queue(&vnic->output);
-	printf("slow_input queue\n");
-	print_queue(&vnic->slow_input);
-	printf("output slow_queue\n");
-	print_queue(&vnic->slow_output);
+	printf("rx queue\n");
+	print_queue(&vnic->rx);
+	printf("tx queue\n");
+	print_queue(&vnic->tx);
+	printf("srx queue\n");
+	print_queue(&vnic->srx);
+	printf("tx slow_queue\n");
+	print_queue(&vnic->stx);
 	printf("pool\n");
 	printf("\tbitmap: %d\n", vnic->pool.bitmap);
 	printf("\tcount: %d\n", vnic->pool.count);
@@ -721,17 +721,17 @@ void fail(const char* format, ...) {
 	
 	VNIC* vnic = (VNIC*)buffer;
 	
-	printf("* Input\n");
-	dump_queue(vnic, &vnic->input);
+	printf("* rx\n");
+	dump_queue(vnic, &vnic->rx);
 	
-	printf("* Output\n");
-	dump_queue(vnic, &vnic->output);
+	printf("* tx\n");
+	dump_queue(vnic, &vnic->tx);
 	
-	printf("* Slow input\n");
-	dump_queue(vnic, &vnic->slow_input);
+	printf("* srx\n");
+	dump_queue(vnic, &vnic->srx);
 	
-	printf("* Slow output\n");
-	dump_queue(vnic, &vnic->slow_output);
+	printf("* stx\n");
+	dump_queue(vnic, &vnic->stx);
 	
 	/*
 	printf("* Bitmap\n");
@@ -908,17 +908,17 @@ int main(int argc, char** argv) {
 		fail("0 chunks must be used");
 	
 	
-	printf("Input queue: Check initial status: ");
-	if(vnic_has_input(vnic))
-		fail("vnic_has_input must be false");
+	printf("rx queue: Check initial status: ");
+	if(vnic_has_rx(vnic))
+		fail("vnic_has_rxmust be false");
 	
-	p1 = vnic_input(vnic);
+	p1 = vnic_rx(vnic);
 	if(p1 != NULL)
-		fail("vnic_input must be NULL: %p", p1);
+		fail("vnic_rx must be NULL: %p", p1);
 
-	uint32_t size = vnic_input_size(vnic);
+	uint32_t size = vnic_rx_size(vnic);
 	if(size != 0)
-		fail("vnic_input_size must be 0: %d", size);
+		fail("vnic_rx_size must be 0: %d", size);
 	
 	if(!vnic_receivable(vnic))
 		fail("vnic_receivable must be true");
@@ -926,60 +926,60 @@ int main(int argc, char** argv) {
 	pass();
 
 
-	printf("Input queue: push one: ");
+	printf("rx queue: push one: ");
 	p1 = vnic_alloc(vnic, 64);
 	if(!vnic_received2(vnic, p1))
 		fail("vnic_received must be return true");
 	
-	if(!vnic_has_input(vnic))
-		fail("vnic_has_input must be true");
+	if(!vnic_has_rx(vnic))
+		fail("vnic_has_rx must be true");
 	
-	size = vnic_input_size(vnic);
+	size = vnic_rx_size(vnic);
 	if(size != 1)
-		fail("vnic_input_size must be 1: %d", size);
+		fail("vnic_rx_size must be 1: %d", size);
 	
 	pass();
 	
 
-	printf("Input queue: pop one: ");
+	printf("rx queue: pop one: ");
 	
-	Packet* p2 = vnic_input(vnic);
+	Packet* p2 = vnic_rx(vnic);
 	if(p2 != p1)
-		fail("vnic_input returned wrong pointer: %p != %p", p1, p2);
+		fail("vnic_rx returned wrong pointer: %p != %p", p1, p2);
 	
-	size = vnic_input_size(vnic);
+	size = vnic_rx_size(vnic);
 	if(size != 0)
-		fail("vnic_input_size must be 0: %d", size);
+		fail("vnic_rx_size must be 0: %d", size);
 	
 	vnic_free(p2);
 	
 	pass();
 	
 
-	printf("Input queue: push full: ");
-	for(i = 0; i < vnic->input.size - 1; i++) {
+	printf("rx queue: push full: ");
+	for(i = 0; i < vnic->rx.size - 1; i++) {
 		ps[i] = vnic_alloc(vnic, 0);
 		if(ps[i] == NULL)
 			fail("cannot alloc packet: count: %d", i);
 		
 		if(!vnic_received2(vnic, ps[i]))
-			fail("cannot push input: count: %d, queue size: %d", i, vnic->input.size);
+			fail("cannot push rx: count: %d, queue size: %d", i, vnic->rx.size);
 	}
 	
 	if(vnic_receivable(vnic))
 		fail("vnic_receivable must return false");
 	
-	size = vnic_input_size(vnic);
-	if(size != vnic->input.size - 1)
-		fail("vnic_input_size must return %d but %d", vnic->input.size - 1, size);
+	size = vnic_rx_size(vnic);
+	if(size != vnic->rx.size - 1)
+		fail("vnic_rx_size must return %d but %d", vnic->rx.size - 1, size);
 	
-	if(!vnic_has_input(vnic))
-		fail("vnic_has_input must return true");
+	if(!vnic_has_rx(vnic))
+		fail("vnic_has_rx must return true");
 	
 	pass();
 	
 
-	printf("Input queue: overflow: ");
+	printf("rx queue: overflow: ");
 
 	used = bitmap_used(vnic);
 	
@@ -988,7 +988,7 @@ int main(int argc, char** argv) {
 		fail("packet allocation failed");
 	
 	if(vnic_received2(vnic, p1))
-		fail("push overflow: count: %d, queue size: %d", i, vnic->input.size);
+		fail("push overflow: count: %d, queue size: %d", i, vnic->rx.size);
 	
 	int used2 = bitmap_used(vnic);
 	if(used != used2)
@@ -997,19 +997,19 @@ int main(int argc, char** argv) {
 	if(vnic_receivable(vnic))
 		fail("vnic_receivable must return false");
 	
-	size = vnic_input_size(vnic);
-	if(size != vnic->input.size - 1)
-		fail("vnic_input_size must return %d but %d", vnic->input.size - 1, size);
+	size = vnic_rx_size(vnic);
+	if(size != vnic->rx.size - 1)
+		fail("vnic_rx_size must return %d but %d", vnic->rx.size - 1, size);
 	
-	if(!vnic_has_input(vnic))
-		fail("vnic_has_input must return true");
+	if(!vnic_has_rx(vnic))
+		fail("vnic_has_rx must return true");
 	
 	pass();
 	
 
-	printf("Input queue: pop: ");
-	for(i = 0; i < vnic->input.size - 1; i++) {
-		Packet* p1 = vnic_input(vnic);
+	printf("rx queue: pop: ");
+	for(i = 0; i < vnic->rx.size - 1; i++) {
+		Packet* p1 = vnic_rx(vnic);
 		if(p1 != ps[i])
 			fail("worong pointer returned: %p, expected: %p", p1, (void*)(uintptr_t)i);
 
@@ -1019,17 +1019,17 @@ int main(int argc, char** argv) {
 	if(!vnic_receivable(vnic))
 		fail("vnic_receivable must return true");
 	
-	size = vnic_input_size(vnic);
+	size = vnic_rx_size(vnic);
 	if(size != 0)
-		fail("vnic_input_size must return 0 but %d", size);
+		fail("vnic_rx_size must return 0 but %d", size);
 	
-	if(vnic_has_input(vnic))
-		fail("vnic_has_input must return false");
+	if(vnic_has_rx(vnic))
+		fail("vnic_has_rx must return false");
 	
 	pass();
 
 
-	printf("Input queue: push one after overflow: ");
+	printf("rx queue: push one after overflow: ");
 	p1 = vnic_alloc(vnic, 0);
 	if(p1 == NULL)
 		fail("cannot alloc packet: %p\n", p1);
@@ -1037,25 +1037,25 @@ int main(int argc, char** argv) {
 	if(!vnic_received2(vnic, p1))
 		fail("vnic_received must be return true");
 	
-	if(!vnic_has_input(vnic))
-		fail("vnic_has_input must be true");
+	if(!vnic_has_rx(vnic))
+		fail("vnic_has_rx must be true");
 	
-	size = vnic_input_size(vnic);
+	size = vnic_rx_size(vnic);
 	if(size != 1)
-		fail("vnic_input_size must be 1: %d", size);
+		fail("vnic_rx_size must be 1: %d", size);
 	
 	pass();
 	
 
-	printf("Input queue: pop one after overflow: ");
+	printf("rx queue: pop one after overflow: ");
 	
-	p2 = vnic_input(vnic);
+	p2 = vnic_rx(vnic);
 	if(p1 != p2)
-		fail("vnic_input returned wrong pointer: %p != %p", p1, p2);
+		fail("vnic_rx returned wrong pointer: %p != %p", p1, p2);
 	
-	size = vnic_input_size(vnic);
+	size = vnic_rx_size(vnic);
 	if(size != 0)
-		fail("vnic_input_size must be 0: %d", size);
+		fail("vnic_rx_size must be 0: %d", size);
 	
 	vnic_free(p2);
 	
@@ -1066,17 +1066,17 @@ int main(int argc, char** argv) {
 	pass();
 
 
-	printf("Slow slow_input queue: Check initial status: ");
-	if(vnic_has_slow_input(vnic))
-		fail("vnic_has_slow_input must be false");
+	printf("srx queue: Check initial status: ");
+	if(vnic_has_srx(vnic))
+		fail("vnic_has_srx must be false");
 	
-	p1 = vnic_slow_input(vnic);
+	p1 = vnic_srx(vnic);
 	if(p1 != NULL)
-		fail("vnic_slow_input must be NULL: %p", p1);
+		fail("vnic_srx must be NULL: %p", p1);
 
-	size = vnic_slow_input_size(vnic);
+	size = vnic_srx_size(vnic);
 	if(size != 0)
-		fail("vnic_slow_input_size must be 0: %d", size);
+		fail("vnic_srx_size must be 0: %d", size);
 	
 	if(!vnic_slow_receivable(vnic))
 		fail("vnic_slow_receivable must be true");
@@ -1084,60 +1084,60 @@ int main(int argc, char** argv) {
 	pass();
 
 
-	printf("Slow slow_input queue: push one: ");
+	printf("srx queue: push one: ");
 	p1 = vnic_alloc(vnic, 64);
 	if(!vnic_slow_received2(vnic, p1))
 		fail("vnic_slow_received must be return true");
 	
-	if(!vnic_has_slow_input(vnic))
-		fail("vnic_has_slow_input must be true");
+	if(!vnic_has_srx(vnic))
+		fail("vnic_has_srx must be true");
 	
-	size = vnic_slow_input_size(vnic);
+	size = vnic_srx_size(vnic);
 	if(size != 1)
-		fail("vnic_slow_input_size must be 1: %d", size);
+		fail("vnic_srx_size must be 1: %d", size);
 	
 	pass();
 	
 
-	printf("Slow slow_input queue: pop one: ");
+	printf("srx queue: pop one: ");
 	
-	p2 = vnic_slow_input(vnic);
+	p2 = vnic_srx(vnic);
 	if(p2 != p1)
-		fail("vnic_slow_input returned wrong pointer: %p != %p", p1, p2);
+		fail("vnic_srx returned wrong pointer: %p != %p", p1, p2);
 	
-	size = vnic_slow_input_size(vnic);
+	size = vnic_srx_size(vnic);
 	if(size != 0)
-		fail("vnic_slow_input_size must be 0: %d", size);
+		fail("vnic_srx_size must be 0: %d", size);
 	
 	vnic_free(p2);
 	
 	pass();
 	
 
-	printf("Slow slow_input queue: push full: ");
-	for(i = 0; i < vnic->slow_input.size - 1; i++) {
+	printf("srx queue: push full: ");
+	for(i = 0; i < vnic->srx.size - 1; i++) {
 		ps[i] = vnic_alloc(vnic, 0);
 		if(ps[i] == NULL)
 			fail("cannot alloc packet: count: %d", i);
 		
 		if(!vnic_slow_received2(vnic, ps[i]))
-			fail("cannot push slow_input: count: %d, queue size: %d", i, vnic->slow_input.size);
+			fail("cannot push srx: count: %d, queue size: %d", i, vnic->srx.size);
 	}
 	
 	if(vnic_slow_receivable(vnic))
 		fail("vnic_slow_receivable must return false");
 	
-	size = vnic_slow_input_size(vnic);
-	if(size != vnic->slow_input.size - 1)
-		fail("vnic_slow_input_size must return %d but %d", vnic->slow_input.size - 1, size);
+	size = vnic_srx_size(vnic);
+	if(size != vnic->srx.size - 1)
+		fail("vnic_srx_size must return %d but %d", vnic->srx.size - 1, size);
 	
-	if(!vnic_has_slow_input(vnic))
-		fail("vnic_has_slow_input must return true");
+	if(!vnic_has_srx(vnic))
+		fail("vnic_has_srx must return true");
 	
 	pass();
 	
 
-	printf("Slow slow_input queue: overflow: ");
+	printf("srx queue: overflow: ");
 
 	used = bitmap_used(vnic);
 	
@@ -1146,7 +1146,7 @@ int main(int argc, char** argv) {
 		fail("packet allocation failed");
 	
 	if(vnic_slow_received2(vnic, p1))
-		fail("push overflow: count: %d, queue size: %d", i, vnic->slow_input.size);
+		fail("push overflow: count: %d, queue size: %d", i, vnic->srx.size);
 	
 	used2 = bitmap_used(vnic);
 	if(used != used2)
@@ -1155,19 +1155,19 @@ int main(int argc, char** argv) {
 	if(vnic_slow_receivable(vnic))
 		fail("vnic_slow_receivable must return false");
 	
-	size = vnic_slow_input_size(vnic);
-	if(size != vnic->slow_input.size - 1)
-		fail("vnic_slow_input_size must return %d but %d", vnic->slow_input.size - 1, size);
+	size = vnic_srx_size(vnic);
+	if(size != vnic->srx.size - 1)
+		fail("vnic_srx_size must return %d but %d", vnic->srx.size - 1, size);
 	
-	if(!vnic_has_slow_input(vnic))
-		fail("vnic_has_slow_input must return true");
+	if(!vnic_has_srx(vnic))
+		fail("vnic_has_srx must return true");
 	
 	pass();
 	
 
-	printf("Slow slow_input queue: pop: ");
-	for(i = 0; i < vnic->slow_input.size - 1; i++) {
-		Packet* p1 = vnic_slow_input(vnic);
+	printf("srx queue: pop: ");
+	for(i = 0; i < vnic->srx.size - 1; i++) {
+		Packet* p1 = vnic_srx(vnic);
 		if(p1 != ps[i])
 			fail("worong pointer returned: %p, expected: %p", p1, (void*)(uintptr_t)i);
 
@@ -1177,17 +1177,17 @@ int main(int argc, char** argv) {
 	if(!vnic_slow_receivable(vnic))
 		fail("vnic_slow_receivable must return true");
 	
-	size = vnic_slow_input_size(vnic);
+	size = vnic_srx_size(vnic);
 	if(size != 0)
-		fail("vnic_slow_input_size must return 0 but %d", size);
+		fail("vnic_srx_size must return 0 but %d", size);
 	
-	if(vnic_has_slow_input(vnic))
-		fail("vnic_has_slow_input must return false");
+	if(vnic_has_srx(vnic))
+		fail("vnic_has_srx must return false");
 	
 	pass();
 
 
-	printf("Slow slow_input queue: push one after overflow: ");
+	printf("srx queue: push one after overflow: ");
 	p1 = vnic_alloc(vnic, 0);
 	if(p1 == NULL)
 		fail("cannot alloc packet: %p\n", p1);
@@ -1195,25 +1195,25 @@ int main(int argc, char** argv) {
 	if(!vnic_slow_received2(vnic, p1))
 		fail("vnic_slow_received must be return true");
 	
-	if(!vnic_has_slow_input(vnic))
-		fail("vnic_has_slow_input must be true");
+	if(!vnic_has_srx(vnic))
+		fail("vnic_has_srx must be true");
 	
-	size = vnic_slow_input_size(vnic);
+	size = vnic_srx_size(vnic);
 	if(size != 1)
-		fail("vnic_slow_input_size must be 1: %d", size);
+		fail("vnic_srx_size must be 1: %d", size);
 	
 	pass();
 	
 
-	printf("Slow slow_input queue: pop one after overflow: ");
+	printf("srx queue: pop one after overflow: ");
 	
-	p2 = vnic_slow_input(vnic);
+	p2 = vnic_srx(vnic);
 	if(p1 != p2)
-		fail("vnic_slow_input returned wrong pointer: %p != %p", p1, p2);
+		fail("vnic_srx returned wrong pointer: %p != %p", p1, p2);
 	
-	size = vnic_slow_input_size(vnic);
+	size = vnic_srx_size(vnic);
 	if(size != 0)
-		fail("vnic_slow_input_size must be 0: %d", size);
+		fail("vnic_srx_size must be 0: %d", size);
 	
 	vnic_free(p2);
 	
@@ -1225,14 +1225,14 @@ int main(int argc, char** argv) {
 
 
 
-	printf("Output queue: Check initial state: ");
+	printf("tx queue: Check initial state: ");
 
-	size = vnic_output_size(vnic);
+	size = vnic_tx_size(vnic);
 	if(size != 0)
-		fail("vnic_output_size must be 0: %d", size);
+		fail("vnic_tx_size must be 0: %d", size);
 	
-	if(!vnic_output_available(vnic))
-		fail("vnic_output_available must be true");
+	if(!vnic_tx_available(vnic))
+		fail("vnic_tx_available must be true");
 	
 	if(vnic_sendable(vnic))
 		fail("vnic_sendable must false");
@@ -1240,18 +1240,18 @@ int main(int argc, char** argv) {
 	pass();
 	
 
-	printf("Output queue: output one: ");
+	printf("tx queue: tx one: ");
 	p1 = vnic_alloc(vnic, 0);
 	
-	if(!vnic_output(vnic, p1))
-		fail("vnic_output must be true");
+	if(!vnic_tx(vnic, p1))
+		fail("vnic_tx must be true");
 	
-	size = vnic_output_size(vnic);
+	size = vnic_tx_size(vnic);
 	if(size != 1)
-		fail("vnic_output_size must be 1: %d", size);
+		fail("vnic_tx_size must be 1: %d", size);
 	
-	if(!vnic_output_available(vnic))
-		fail("vnic_output_available must be true");
+	if(!vnic_tx_available(vnic))
+		fail("vnic_tx_available must be true");
 	
 	if(!vnic_sendable(vnic))
 		fail("vnic_sendable must true");
@@ -1259,7 +1259,7 @@ int main(int argc, char** argv) {
 	pass();
 	
 
-	printf("Output queue: send one: ");
+	printf("tx queue: send one: ");
 	p1 = vnic_send(vnic);
 	vnic_free(p1);
 	
@@ -1267,12 +1267,12 @@ int main(int argc, char** argv) {
 	if(used != 0)
 		fail("cannot free packet: %d", used);
 	
-	size = vnic_output_size(vnic);
+	size = vnic_tx_size(vnic);
 	if(size != 0)
-		fail("vnic_output_size must be 0: %d", size);
+		fail("vnic_tx_size must be 0: %d", size);
 	
-	if(!vnic_output_available(vnic))
-		fail("vnic_output_available must be true");
+	if(!vnic_tx_available(vnic))
+		fail("vnic_tx_available must be true");
 	
 	if(vnic_sendable(vnic))
 		fail("vnic_sendable must false");
@@ -1280,22 +1280,22 @@ int main(int argc, char** argv) {
 	pass();
 
 
-	printf("Output queue: output full: ");
-	for(i = 0; i < vnic->output.size - 1; i++) {
+	printf("tx queue: tx full: ");
+	for(i = 0; i < vnic->tx.size - 1; i++) {
 		ps[i] = vnic_alloc(vnic, 0);
 		if(ps[i] == NULL)
 			fail("cannot alloc packet: count: %d", i + 1);
 		
-		if(!vnic_output(vnic, ps[i]))
-			fail("cannot output packet: index: %d", i);
+		if(!vnic_tx(vnic, ps[i]))
+			fail("cannot tx packet: index: %d", i);
 	}
 
-	size = vnic_output_size(vnic);
-	if(size != vnic->output.size - 1)
-		fail("vnic_output_size must be %d: %d", vnic->output.size - 1, size);
+	size = vnic_tx_size(vnic);
+	if(size != vnic->tx.size - 1)
+		fail("vnic_tx_size must be %d: %d", vnic->tx.size - 1, size);
 	
-	if(vnic_output_available(vnic))
-		fail("vnic_output_available must be false");
+	if(vnic_tx_available(vnic))
+		fail("vnic_tx_available must be false");
 	
 	if(!vnic_sendable(vnic))
 		fail("vnic_sendable must true");
@@ -1303,42 +1303,42 @@ int main(int argc, char** argv) {
 	pass();
 
 
-	printf("Output queue: overflow: ");
+	printf("tx queue: overflow: ");
 	
 	used = bitmap_used(vnic);
 	
 	p1 = vnic_alloc(vnic, 0);
 	
-	if(vnic_output(vnic, p1))
-		fail("vnic_output overflow");
+	if(vnic_tx(vnic, p1))
+		fail("vnic_tx overflow");
 	
 	used2 = bitmap_used(vnic);
 	
 	if(used != used2)
 		fail("packet not freed on overflow %d != %d", used, used2);
 		
-	if(vnic_output_try(vnic, p1))
-		fail("vnic_output_try overflow");
+	if(vnic_tx_try(vnic, p1))
+		fail("vnic_tx_try overflow");
 	
 	used2 = bitmap_used(vnic);
 	
 	if(used != used2)
-		fail("packet freed on output_try %d != %d", used, used2);
+		fail("packet freed on tx_try %d != %d", used, used2);
 	
-	if(vnic_output_dup(vnic, p1))
-		fail("vnic_output_dup overflow");
+	if(vnic_tx_dup(vnic, p1))
+		fail("vnic_tx_dup overflow");
 	
 	used2 = bitmap_used(vnic);
 	
 	if(used != used2)
 		fail("packet allocated on overflow %d != %d", used, used2);
 
-	size = vnic_output_size(vnic);
-	if(size != vnic->output.size - 1)
-		fail("vnic_output_size must be %d: %d", vnic->output.size - 1, size);
+	size = vnic_tx_size(vnic);
+	if(size != vnic->tx.size - 1)
+		fail("vnic_tx_size must be %d: %d", vnic->tx.size - 1, size);
 	
-	if(vnic_output_available(vnic))
-		fail("vnic_output_available must be false");
+	if(vnic_tx_available(vnic))
+		fail("vnic_tx_available must be false");
 	
 	if(!vnic_sendable(vnic))
 		fail("vnic_sendable must true");
@@ -1346,8 +1346,8 @@ int main(int argc, char** argv) {
 	pass();
 	
 	
-	printf("Output queue: send all: ");
-	for(i = 0; i < vnic->output.size - 1; i++) {
+	printf("tx queue: send all: ");
+	for(i = 0; i < vnic->tx.size - 1; i++) {
 		p1 = vnic_send(vnic);
 		if(p1 != ps[i])
 			fail("wrong pointer returned: %p != %p", ps[i], p1);
@@ -1356,12 +1356,12 @@ int main(int argc, char** argv) {
 			fail("cannot free packet: %p", p1);
 	}
 
-	size = vnic_output_size(vnic);
+	size = vnic_tx_size(vnic);
 	if(size != 0)
-		fail("vnic_output_size must be 0: %d", 0, size);
+		fail("vnic_tx_size must be 0: %d", 0, size);
 	
-	if(!vnic_output_available(vnic))
-		fail("vnic_output_available must be true");
+	if(!vnic_tx_available(vnic))
+		fail("vnic_tx_available must be true");
 	
 	if(vnic_sendable(vnic))
 		fail("vnic_sendable must false");
@@ -1373,18 +1373,18 @@ int main(int argc, char** argv) {
 	pass();
 
 
-	printf("Output queue: output one after overflow: ");
+	printf("tx queue: tx one after overflow: ");
 	p1 = vnic_alloc(vnic, 0);
 	
-	if(!vnic_output(vnic, p1))
-		fail("vnic_output must be true");
+	if(!vnic_tx(vnic, p1))
+		fail("vnic_tx must be true");
 	
-	size = vnic_output_size(vnic);
+	size = vnic_tx_size(vnic);
 	if(size != 1)
-		fail("vnic_output_size must be 1: %d", size);
+		fail("vnic_tx_size must be 1: %d", size);
 	
-	if(!vnic_output_available(vnic))
-		fail("vnic_output_available must be true");
+	if(!vnic_tx_available(vnic))
+		fail("vnic_tx_available must be true");
 	
 	if(!vnic_sendable(vnic))
 		fail("vnic_sendable must true");
@@ -1392,7 +1392,7 @@ int main(int argc, char** argv) {
 	pass();
 	
 
-	printf("Output queue: send one after overflow: ");
+	printf("tx queue: send one after overflow: ");
 	p1 = vnic_send(vnic);
 	vnic_free(p1);
 	
@@ -1400,12 +1400,12 @@ int main(int argc, char** argv) {
 	if(used != 0)
 		fail("cannot free packet: %d", used);
 	
-	size = vnic_output_size(vnic);
+	size = vnic_tx_size(vnic);
 	if(size != 0)
-		fail("vnic_output_size must be 0: %d", size);
+		fail("vnic_tx_size must be 0: %d", size);
 	
-	if(!vnic_output_available(vnic))
-		fail("vnic_output_available must be true");
+	if(!vnic_tx_available(vnic))
+		fail("vnic_tx_available must be true");
 	
 	if(vnic_sendable(vnic))
 		fail("vnic_sendable must false");
@@ -1413,14 +1413,14 @@ int main(int argc, char** argv) {
 	pass();
 
 
-	printf("Slow output queue: Check initial state: ");
+	printf("Stx queue: Check initial state: ");
 
-	size = vnic_slow_output_size(vnic);
+	size = vnic_stx_size(vnic);
 	if(size != 0)
-		fail("vnic_slow_output_size must be 0: %d", size);
+		fail("vnic_stx_size must be 0: %d", size);
 	
-	if(!vnic_slow_output_available(vnic))
-		fail("vnic_slow_output_available must be true");
+	if(!vnic_stx_available(vnic))
+		fail("vnic_stx_available must be true");
 	
 	if(vnic_slow_sendable(vnic))
 		fail("vnic_slow_sendable must false");
@@ -1428,18 +1428,18 @@ int main(int argc, char** argv) {
 	pass();
 	
 
-	printf("Slow output queue: slow_output one: ");
+	printf("Stx queue: stx one: ");
 	p1 = vnic_alloc(vnic, 0);
 	
-	if(!vnic_slow_output(vnic, p1))
-		fail("vnic_slow_output must be true");
+	if(!vnic_stx(vnic, p1))
+		fail("vnic_stx must be true");
 	
-	size = vnic_slow_output_size(vnic);
+	size = vnic_stx_size(vnic);
 	if(size != 1)
-		fail("vnic_slow_output_size must be 1: %d", size);
+		fail("vnic_stx_size must be 1: %d", size);
 	
-	if(!vnic_slow_output_available(vnic))
-		fail("vnic_slow_output_available must be true");
+	if(!vnic_stx_available(vnic))
+		fail("vnic_stx_available must be true");
 	
 	if(!vnic_slow_sendable(vnic))
 		fail("vnic_slow_sendable must true");
@@ -1447,7 +1447,7 @@ int main(int argc, char** argv) {
 	pass();
 	
 
-	printf("Slow output queue: send one: ");
+	printf("Stx queue: send one: ");
 	p1 = vnic_slow_send(vnic);
 	vnic_free(p1);
 	
@@ -1455,12 +1455,12 @@ int main(int argc, char** argv) {
 	if(used != 0)
 		fail("cannot free packet: %d", used);
 	
-	size = vnic_slow_output_size(vnic);
+	size = vnic_stx_size(vnic);
 	if(size != 0)
-		fail("vnic_slow_output_size must be 0: %d", size);
+		fail("vnic_stx_size must be 0: %d", size);
 	
-	if(!vnic_slow_output_available(vnic))
-		fail("vnic_slow_output_available must be true");
+	if(!vnic_stx_available(vnic))
+		fail("vnic_stx_available must be true");
 	
 	if(vnic_slow_sendable(vnic))
 		fail("vnic_slow_sendable must false");
@@ -1468,22 +1468,22 @@ int main(int argc, char** argv) {
 	pass();
 
 
-	printf("Slow output queue: slow_output full: ");
-	for(i = 0; i < vnic->slow_output.size - 1; i++) {
+	printf("Stx queue: stx full: ");
+	for(i = 0; i < vnic->stx.size - 1; i++) {
 		ps[i] = vnic_alloc(vnic, 0);
 		if(ps[i] == NULL)
 			fail("cannot alloc packet: count: %d", i + 1);
 		
-		if(!vnic_slow_output(vnic, ps[i]))
-			fail("cannot slow_output packet: index: %d", i);
+		if(!vnic_stx(vnic, ps[i]))
+			fail("cannot stx packet: index: %d", i);
 	}
 
-	size = vnic_slow_output_size(vnic);
-	if(size != vnic->slow_output.size - 1)
-		fail("vnic_slow_output_size must be %d: %d", vnic->slow_output.size - 1, size);
+	size = vnic_stx_size(vnic);
+	if(size != vnic->stx.size - 1)
+		fail("vnic_stx_size must be %d: %d", vnic->stx.size - 1, size);
 	
-	if(vnic_slow_output_available(vnic))
-		fail("vnic_slow_output_available must be false");
+	if(vnic_stx_available(vnic))
+		fail("vnic_stx_available must be false");
 	
 	if(!vnic_slow_sendable(vnic))
 		fail("vnic_slow_sendable must true");
@@ -1491,42 +1491,42 @@ int main(int argc, char** argv) {
 	pass();
 
 
-	printf("Slow output queue: overflow: ");
+	printf("Stx queue: overflow: ");
 	
 	used = bitmap_used(vnic);
 	
 	p1 = vnic_alloc(vnic, 0);
 	
-	if(vnic_slow_output(vnic, p1))
-		fail("vnic_slow_output overflow");
+	if(vnic_stx(vnic, p1))
+		fail("vnic_stx overflow");
 	
 	used2 = bitmap_used(vnic);
 	
 	if(used != used2)
 		fail("packet not freed on overflow %d != %d", used, used2);
 		
-	if(vnic_slow_output_try(vnic, p1))
-		fail("vnic_slow_output_try overflow");
+	if(vnic_stx_try(vnic, p1))
+		fail("vnic_stx_try overflow");
 	
 	used2 = bitmap_used(vnic);
 	
 	if(used != used2)
-		fail("packet freed on slow_output_try %d != %d", used, used2);
+		fail("packet freed on stx_try %d != %d", used, used2);
 	
-	if(vnic_slow_output_dup(vnic, p1))
-		fail("vnic_slow_output_dup overflow");
+	if(vnic_stx_dup(vnic, p1))
+		fail("vnic_stx_dup overflow");
 	
 	used2 = bitmap_used(vnic);
 	
 	if(used != used2)
 		fail("packet allocated on overflow %d != %d", used, used2);
 
-	size = vnic_slow_output_size(vnic);
-	if(size != vnic->slow_output.size - 1)
-		fail("vnic_slow_output_size must be %d: %d", vnic->slow_output.size - 1, size);
+	size = vnic_stx_size(vnic);
+	if(size != vnic->stx.size - 1)
+		fail("vnic_stx_size must be %d: %d", vnic->stx.size - 1, size);
 	
-	if(vnic_slow_output_available(vnic))
-		fail("vnic_slow_output_available must be false");
+	if(vnic_stx_available(vnic))
+		fail("vnic_stx_available must be false");
 	
 	if(!vnic_slow_sendable(vnic))
 		fail("vnic_slow_sendable must true");
@@ -1534,8 +1534,8 @@ int main(int argc, char** argv) {
 	pass();
 	
 	
-	printf("Slow output queue: send all: ");
-	for(i = 0; i < vnic->slow_output.size - 1; i++) {
+	printf("Stx queue: send all: ");
+	for(i = 0; i < vnic->stx.size - 1; i++) {
 		p1 = vnic_slow_send(vnic);
 		if(p1 != ps[i])
 			fail("wrong pointer returned: %p != %p", ps[i], p1);
@@ -1544,12 +1544,12 @@ int main(int argc, char** argv) {
 			fail("cannot free packet: %p", p1);
 	}
 
-	size = vnic_slow_output_size(vnic);
+	size = vnic_stx_size(vnic);
 	if(size != 0)
-		fail("vnic_slow_output_size must be 0: %d", 0, size);
+		fail("vnic_stx_size must be 0: %d", 0, size);
 	
-	if(!vnic_slow_output_available(vnic))
-		fail("vnic_slow_output_available must be true");
+	if(!vnic_stx_available(vnic))
+		fail("vnic_stx_available must be true");
 	
 	if(vnic_slow_sendable(vnic))
 		fail("vnic_slow_sendable must false");
@@ -1561,18 +1561,18 @@ int main(int argc, char** argv) {
 	pass();
 
 
-	printf("Slow output queue: slow_output one after overflow: ");
+	printf("Stx queue: stx one after overflow: ");
 	p1 = vnic_alloc(vnic, 0);
 	
-	if(!vnic_slow_output(vnic, p1))
-		fail("vnic_slow_output must be true");
+	if(!vnic_stx(vnic, p1))
+		fail("vnic_stx must be true");
 	
-	size = vnic_slow_output_size(vnic);
+	size = vnic_stx_size(vnic);
 	if(size != 1)
-		fail("vnic_slow_output_size must be 1: %d", size);
+		fail("vnic_stx_size must be 1: %d", size);
 	
-	if(!vnic_slow_output_available(vnic))
-		fail("vnic_slow_output_available must be true");
+	if(!vnic_stx_available(vnic))
+		fail("vnic_stx_available must be true");
 	
 	if(!vnic_slow_sendable(vnic))
 		fail("vnic_slow_sendable must true");
@@ -1580,7 +1580,7 @@ int main(int argc, char** argv) {
 	pass();
 	
 
-	printf("Slow output queue: send one after overflow: ");
+	printf("Stx queue: send one after overflow: ");
 	p1 = vnic_slow_send(vnic);
 	vnic_free(p1);
 	
@@ -1588,12 +1588,12 @@ int main(int argc, char** argv) {
 	if(used != 0)
 		fail("cannot free packet: %d", used);
 	
-	size = vnic_slow_output_size(vnic);
+	size = vnic_stx_size(vnic);
 	if(size != 0)
-		fail("vnic_slow_output_size must be 0: %d", size);
+		fail("vnic_stx_size must be 0: %d", size);
 	
-	if(!vnic_slow_output_available(vnic))
-		fail("vnic_slow_output_available must be true");
+	if(!vnic_stx_available(vnic))
+		fail("vnic_stx_available must be true");
 	
 	if(vnic_slow_sendable(vnic))
 		fail("vnic_slow_sendable must false");

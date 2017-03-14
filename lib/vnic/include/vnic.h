@@ -53,10 +53,10 @@ typedef struct _VNIC_Pool {
  * VNIC_MAGIC_HEADER (8 bytes)
  * Metadata (bandwidth, pdding, queue, pool)
  * Config
- * Fast path input queue
- * Fast path output queue
- * Slow path input queue
- * Slow path output queue
+ * Fast path rx queue
+ * Fast path tx queue
+ * Slow path rx queue
+ * Slow path tx queue
  * Packet pool bitmap
  * Packet payload pool
  */
@@ -68,17 +68,17 @@ typedef struct _VNIC {
 	
 	uint64_t	mac;
 	
-	uint64_t	input_bandwidth;
-	uint64_t	output_bandwidth;
+	uint64_t	rx_bandwidth;
+	uint64_t	tx_bandwidth;
 	
 	uint16_t	padding_head;
 	uint16_t	padding_tail;
 	
-	VNIC_Queue	input;
-	VNIC_Queue	output;
+	VNIC_Queue	rx;
+	VNIC_Queue	tx;
 	
-	VNIC_Queue	slow_input;
-	VNIC_Queue	slow_output;
+	VNIC_Queue	srx;
+	VNIC_Queue	stx;
 	
 	VNIC_Pool	pool;
 	
@@ -86,10 +86,10 @@ typedef struct _VNIC {
 	uint8_t		config_head[0];
 	uint8_t		config_tail[0] __attribute__((__aligned__(VNIC_HEADER_SIZE)));
 	
-	// input queue (8 bytes aligned)
-	// output queue (8 bytes aligned)
-	// slow_input queue (8 bytes aligned)
-	// slow_output queue (8 bytes aligned)
+	// rx queue (8 bytes aligned)
+	// tx queue (8 bytes aligned)
+	// slow rx queue (8 bytes aligned)
+	// slow tx queue (8 bytes aligned)
 	// pool bitmap (8 bytes aligned)
 	// pool (VNIC_CHUNK_SIZE(64) bytges aligned)
 } VNIC;
@@ -101,25 +101,25 @@ VNIC* vnic_get_by_id(uint32_t id);
 Packet* vnic_alloc(VNIC* vnic, uint16_t size);
 bool vnic_free(Packet* packet);
 
-bool vnic_has_input(VNIC* vnic);
-Packet* vnic_input(VNIC* vnic);
-uint32_t vnic_input_size(VNIC* vnic);
+bool vnic_has_rx(VNIC* vnic);
+Packet* vnic_rx(VNIC* vnic);
+uint32_t vnic_rx_size(VNIC* vnic);
 
-bool vnic_has_slow_input(VNIC* vnic);
-Packet* vnic_slow_input(VNIC* vnic);
-uint32_t vnic_slow_input_size(VNIC* vnic);
+bool vnic_has_srx(VNIC* vnic);
+Packet* vnic_srx(VNIC* vnic);
+uint32_t vnic_srx_size(VNIC* vnic);
 
-bool vnic_output(VNIC* vnic, Packet* packet);
-bool vnic_output_try(VNIC* vnic, Packet* packet);
-bool vnic_output_dup(VNIC* vnic, Packet* packet);
-bool vnic_output_available(VNIC* vnic);
-uint32_t vnic_output_size(VNIC* vnic);
+bool vnic_tx(VNIC* vnic, Packet* packet);
+bool vnic_tx_try(VNIC* vnic, Packet* packet);
+bool vnic_tx_dup(VNIC* vnic, Packet* packet);
+bool vnic_tx_available(VNIC* vnic);
+uint32_t vnic_tx_size(VNIC* vnic);
 
-bool vnic_slow_output(VNIC* vnic, Packet* packet);
-bool vnic_slow_output_try(VNIC* vnic, Packet* packet);
-bool vnic_slow_output_dup(VNIC* vnic, Packet* packet);
-bool vnic_slow_output_available(VNIC* vnic);
-uint32_t vnic_slow_output_size(VNIC* vnic);
+bool vnic_stx(VNIC* vnic, Packet* packet);
+bool vnic_stx_try(VNIC* vnic, Packet* packet);
+bool vnic_stx_dup(VNIC* vnic, Packet* packet);
+bool vnic_stx_available(VNIC* vnic);
+uint32_t vnic_stx_size(VNIC* vnic);
 
 size_t vnic_pool_used(VNIC* vnic);
 size_t vnic_pool_free(VNIC* vnic);
@@ -136,10 +136,10 @@ uint64_t vnic_config_get(VNIC* vnic, uint32_t key);
  * Initialize VNIC memory map
  *
  * VNIC metadata (magic, mac, ...)
- * Input Queue
- * Output Queue
- * Slow path input queue
- * Slow path output queue
+ * Fast path rx queue
+ * Fast path tx queue
+ * Slow path rx queue
+ * Slow path tx queue
  * Malloc bitmap
  * Malloc pool
  *
@@ -147,10 +147,10 @@ uint64_t vnic_config_get(VNIC* vnic, uint32_t key);
  * @param size multiples of 2MBs
  */
 void vnic_init(uint32_t id, uint64_t mac, void* base, size_t size, 
-		uint64_t input_bandwidth, uint64_t output_bandwidth, 
+		uint64_t rx_bandwidth, uint64_t tx_bandwidth, 
 		uint16_t padding_head, uint16_t padding_tail, 
-		uint32_t input_queue_size, uint32_t output_queue_size, 
-		uint32_t slow_input_queue_size, uint32_t slow_output_queue_size);
+		uint32_t rx_queue_size, uint32_t tx_queue_size, 
+		uint32_t srx_queue_size, uint32_t stx_queue_size);
 
 bool vnic_receivable(VNIC* vnic);
 bool vnic_received(VNIC* vnic, uint8_t* buf1, size_t size1, uint8_t* buf2, size_t size2);
