@@ -39,12 +39,28 @@ bool vector_is_empty(Vector* vector) {
 }
 
 bool vector_add(Vector* vector, void* data) {
-	if(vector->index < vector->size) {
-		vector->array[vector->index++] = data;
-		return true;
-	} else {
-		return false;
-	}
+    if(vector->index >= vector->size) {
+        size_t new_size = (vector->size * 1.5) + 1;
+        void** array = __realloc(vector->array, sizeof(void*) * new_size, vector->pool);
+        if (!array)
+            return false;
+
+        vector->array = array;
+        vector->size = new_size;
+    }
+
+    vector->array[vector->index++] = data;
+    return true;
+}
+
+bool vector_pack(Vector* vector) {
+    void** array = __realloc(vector->array, sizeof(void*) * vector->index, vector->pool);
+    if (!array)
+        return false;
+
+    vector->array = array;
+    vector->size = vector->index;
+    return true;
 }
 
 void* vector_get(Vector* vector, size_t index) {
@@ -83,6 +99,20 @@ void* vector_remove(Vector* vector, size_t index) {
 		
 		return data;
 	}
+}
+
+void* vector_remove_last(Vector* vector) {
+    if (vector->index <= 0)
+        return NULL;
+    else
+        return vector->array[--vector->index];
+}
+
+void* vector_get_last(Vector* vector) {
+    if (vector->index <= 0)
+        return NULL;
+    else
+        return vector->array[vector->index - 1];
 }
 
 size_t vector_size(Vector* vector) {
