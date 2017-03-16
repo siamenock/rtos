@@ -60,13 +60,21 @@ bool vector_available(Vector* vector);
 bool vector_is_empty(Vector* vector);
 
 /**
- * Add an element to the Vector.
+ * Add an element to the Vector. automatic reallocation of the allocated storage space is occurred if -and only if- the new vector size surpasses the current vector capacity.
  *
  * @param vector Vector
  * @param data an element to add
  * @return true if the element is added
  */
 bool vector_add(Vector* vector, void* data);
+
+/**
+ * Requests the vector to reduce its capacity to fit its size.
+ *
+ * @param vector Vector
+ * @return true if the vector successfully packed
+ */
+bool vector_pack(Vector* vector);
 
 /**
  * Get an element from the Vector.
@@ -95,6 +103,22 @@ size_t vector_index_of(Vector* vector, void* data, bool(*comp_fn)(void*,void*));
  * @return removed element or NULL if nothing is removed
  */
 void* vector_remove(Vector* vector, size_t index);
+
+/**
+ * Get the last element from the Vector.
+ *
+ * @param vector Vector
+ * @return an element or NULL if there is no element
+ */
+void* vector_remove_last(Vector* vector);
+
+/**
+ * Remove the last element from the Vector.
+ *
+ * @param vector Vector;
+ * @return removed element or NULL if the Vector is empty
+ */
+void* vector_get_last(Vector* vector);
 
 /**
  * Get the number of elements of the Vector.
