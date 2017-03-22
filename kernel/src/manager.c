@@ -491,7 +491,7 @@ void manager_init() {
 	// Default configuraiton
 	manager_ip = DEFAULT_MANAGER_IP;
 	if(!nic_ip_add(manager_nic->nic, DEFAULT_MANAGER_IP)) {
-		printf("\tCan'nt allocate manager ip\n");
+		printf("\tCannot allocate manager ip\n");
 		return;
 	}
 
@@ -501,7 +501,7 @@ void manager_init() {
 	interface->_default = true;
 
 	if(!udp_port_alloc0(manager_nic->nic, DEFAULT_MANAGER_IP, manager_port)) {
-		printf("\tCan'nt allocate manager port\n");
+		printf("\tCannot allocate manager port\n");
 		return;
 	}
 	manager_port = DEFAULT_MANAGER_PORT;
