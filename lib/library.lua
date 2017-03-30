@@ -34,7 +34,7 @@ workspace "Kernel"
          -- O0 optimziation
         optimize "On"
         -- Exclude test sources and standard C library functions
-        removefiles { "core/test/*", "core/src/malloc.c" }
+        removefiles { "core/test/*", "core/src/malloc.c", "core/src/errno.c" }
         buildoptions { "-msse4.1 -fno-stack-protector" }
         -- Define "LINUX" to make core library for Linux OS
         defines { "LINUX" }
