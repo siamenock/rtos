@@ -1,0 +1,18 @@
+# Temp
+*.swp
+*.swo
+
+# Build
+build
+
+# Tag
+tags
+cscope*
+
+# Binary
+manager
+util/bin/*
+
+# Generated
+Makefile
+version.h
