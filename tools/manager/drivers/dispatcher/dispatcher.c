@@ -17,13 +17,13 @@
 #include <linux/etherdevice.h>
 
 #include "dispatcher.h"
-#include "packet.h"
-#include "map.h"
-#include "nic.h"
+//TODO
+#include <util/map.h>
+#include "driver/nic.h"
+#include "core/include/util/map.h"
+#include "vnic.h"
 
-bool nic_process_input(NICPriv* priv, uint8_t local_port,
-		uint8_t* buf1, uint32_t size1, uint8_t* buf2, uint32_t size2);
-Packet* nic_process_output(NICPriv* priv, uint8_t local_port);
+#define ETHER_MULTICAST	0xffffffffff
 
 static struct task_struct *dispatcher_daemon;
 static spinlock_t work_lock;
@@ -234,13 +234,27 @@ rx_handler_result_t dispatcher_handle_frame(struct sk_buff** pskb)
 
 	skb_linearize(skb);
 
-	NICPriv* priv = rcu_dereference(skb->dev->rx_handler_data);
+	NICDevice* nic_device = rcu_dereference(skb->dev->rx_handler_data);
 
-	BUG_ON(!priv);
+	BUG_ON(!nic_device);
 
-	if(nic_process_input(priv, 0, (void*)eth, ETH_HLEN + skb->len, NULL, 0)) {
-		kfree_skb(skb);
-		return RX_HANDLER_CONSUMED;
+	//TODO map_get vnic from vnics
+
+	if(1) {
+		MapIterator iter;
+		map_iterator_init(&iter, nic_device->vnics);
+		while(map_iterator_has_next(&iter)) {
+			VNIC* vnic = (VNIC*)map_iterator_next(&iter);
+			vnic_process_input(vnic, (void*)eth, ETH_HLEN + skb->len, NULL, 0);
+		}
+		//kfree_skb(skb);
+	} else {
+		VNIC* vnic = map_get(nic_device->vnics, eth->h_dest);
+		if(vnic) {
+			vnic_process_input(vnic, (void*)eth, ETH_HLEN + skb->len, NULL, 0);
+			kfree_skb(skb);
+			return RX_HANDLER_CONSUMED;
+		}
 	}
 
 	return RX_HANDLER_PASS;
@@ -468,7 +482,6 @@ static int dispatcher_release(struct inode *inode, struct file *f)
 	/*//}*/
 /*}*/
 
-extern void nic_free(Packet* packet);
 static struct sk_buff* convert_to_skb(struct net_device* dev, Packet* packet)
 {
 	void* buf = packet->buffer + packet->start;
@@ -496,51 +509,58 @@ static inline void dispatcher_tx(struct net_device *dev)
 	 *        "Current PID: %d, Worker PID: %d\n", current->pid, dispatcher_daemon->pid);
 	 */
 
-	NICPriv* priv = rcu_dereference(dev->rx_handler_data);
-	BUG_ON(!priv);
+	NICDevice* nic_device = rcu_dereference(dev->rx_handler_data);
+	BUG_ON(!nic_device);
 
 	/*
 	 *unsigned long flags;
 	 *local_irq_save(flags);
 	 */
 
-	while((packet = nic_process_output(priv, 0)) != NULL) {
-		printk("Fast path %p\n", packet);
-		skb = convert_to_skb(dev, packet);
-		if(!skb) {
-			printk("Failed to convert skb\n");
-			nic_free(packet);
-			continue;
-		}
+	//TODO map_iterator
 
-		//netpoll_send_skb_on_dev(skb, dev);
-		if (!netif_running(dev) || !netif_device_present(dev)) {
-			dev_kfree_skb_irq(skb);
-			printk("not running\n");
-			continue;
-		}
+	MapIterator iter;
+	map_iterator_init(&iter, nic_device->vnics);
+	while(map_iterator_has_next(&iter)) {
+		VNIC* vnic = (VNIC*)map_iterator_next(&iter);
 
-		netdev_features_t features;
-
-		features = netif_skb_features(skb);
-
-		if (skb_vlan_tag_present(skb) &&
-				!vlan_hw_offload_capable(features, skb->vlan_proto)) {
-			skb = __vlan_hwaccel_push_inside(skb);
-			if (unlikely(!skb)) {
-				printk("skb_vlan_tag\n");
+		while((packet = vnic_process_output(vnic)) != NULL) {
+			printk("Fast path %p\n", packet);
+			skb = convert_to_skb(dev, packet);
+			if(!skb) {
+				printk("Failed to convert skb\n");
+				vnic_free(packet);
 				continue;
 			}
-		}
 
-		printk("__netdev_start_xmit\n");
-		if (current->pid != dispatcher_daemon->pid) {
-			printk("Current PID: %d, Worker PID: %d\n", current->pid, dispatcher_daemon->pid);
-			return ;
+			//netpoll_send_skb_on_dev(skb, dev);
+			if (!netif_running(dev) || !netif_device_present(dev)) {
+				dev_kfree_skb_irq(skb);
+				printk("not running\n");
+				continue;
+			}
+
+			netdev_features_t features;
+
+			features = netif_skb_features(skb);
+
+			if (skb_vlan_tag_present(skb) &&
+					!vlan_hw_offload_capable(features, skb->vlan_proto)) {
+				skb = __vlan_hwaccel_push_inside(skb);
+				if (unlikely(!skb)) {
+					printk("skb_vlan_tag\n");
+					continue;
+				}
+			}
+
+			printk("__netdev_start_xmit\n");
+			if (current->pid != dispatcher_daemon->pid) {
+				printk("Current PID: %d, Worker PID: %d\n", current->pid, dispatcher_daemon->pid);
+				return ;
+			}
+			__netdev_start_xmit(dev->netdev_ops, skb, dev, false);
 		}
-		__netdev_start_xmit(dev->netdev_ops, skb, dev, false);
 	}
-
 	//local_irq_restore(flags);
 }
 
@@ -587,19 +607,19 @@ static long dispatcher_ioctl(struct file *f, unsigned int ioctl,
 
 	struct dispatcher_work *work;
 	struct net_device *dev;
-	NICPriv* priv;
+	NICDevice* nic_device;
 
 	switch (ioctl) {
 		case DISPATCHER_REGISTER_NIC:
 			printk("Register NIC on dispatcher device %p\n", argp);
-			priv = (NICPriv *)argp;
-			dev = __dev_get_by_name(&init_net, priv->name);
+			nic_device = (NICDevice *)argp;
+			dev = __dev_get_by_name(&init_net, nic_device->name);
 			if (!dev) {
-				printk("Failed to find net_device for %s\n", priv->name);
+				printk("Failed to find net_device for %s\n", nic_device->name);
 				return -EINVAL;
 			}
 
-			work = alloc_dispatcher_work(dispatcher_worker, dev, (void *)priv);
+			work = alloc_dispatcher_work(dispatcher_worker, dev, (void *)nic_device);
 			if (!work) {
 				printk("Failed to alloc work\n");
 				return -ENOMEM;
@@ -611,23 +631,40 @@ static long dispatcher_ioctl(struct file *f, unsigned int ioctl,
 
 		case DISPATCHER_UNREGISTER_NIC:
 			printk("Unregister NIC on dispatcher device\n");
-			priv = (NICPriv *)argp;
+			nic_device = (NICDevice *)argp;
 
-			dev = __dev_get_by_name(&init_net, priv->name);
+			dev = __dev_get_by_name(&init_net, nic_device->name);
 			if(!dev) {
-				printk("Failed to find net_device for %s\n", priv->name);
+				printk("Failed to find net_device for %s\n", nic_device->name);
 				return -EINVAL;
 			}
 
 			work = dispatcher_work_by_netdev(dev);
 			if (!work) {
-				printk("Failed to find work associated with %s\n", priv->name);
+				printk("Failed to find work associated with %s\n", nic_device->name);
 				return -ENOMEM;
 			}
 
 			dispatcher_work_dequeue(work);
 
 			return 0;
+		case DISPATCHER_CREATE_VNIC:
+			base, size
+			vnic_create();
+			return;
+
+		case DISPATCHER_DESTROY_VNIC:
+			vnic_destroy();
+			return;
+
+		case DISPATCHER_UPDATE_VNIC:
+			return;
+		case DISPATCHER_GET_VNIC:
+			return
+
+		case VNIC_REGIS_:
+			return;
+			
 		default:
 			printk("IOCTL %d does not supported\n", ioctl);
 			return -EFAULT;
