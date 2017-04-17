@@ -6,7 +6,7 @@ CFLAGS = -O2
 all: libnic.a
 
 CC=gcc
-CFLAGS=-I include -O2 -Wall
+CFLAGS=-I include -O2 -Wall -mcmodel=large
 
 SRCS=lock.c nic.c asm.asm
 OBJS=$(addsuffix .o, $(addprefix obj/, $(basename $(SRCS))))

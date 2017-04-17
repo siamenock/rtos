@@ -5,7 +5,7 @@
 
 #define ROUNDUP(x, y)	((((x) + (y) - 1) / (y)) * (y))
 
-NIC* _nics[NIC_MAX_COUNT];
+NIC* __nics[NIC_MAX_COUNT];
 
 static NIC* find_NIC(Packet* packet) {
 	NIC* nic = (void*)((uintptr_t)packet & ~(uintptr_t)(0x200000 - 1)); // 2MB alignment
@@ -22,7 +22,7 @@ static NIC* find_NIC(Packet* packet) {
 int nic_count() {
 	int count = 0;
 	for(int i = 0; i < NIC_MAX_COUNT; i++) {
-		if(_nics[i] != NULL)
+		if(__nics[i] != NULL)
 			count++;
 	}
 
@@ -32,9 +32,9 @@ int nic_count() {
 NIC* nic_get(int index) {
 	int count = 0;
 	for(int i = 0; i < NIC_MAX_COUNT; i++) {
-		if(_nics[i] != NULL) {
+		if(__nics[i] != NULL) {
 			if(index == count)
-				return _nics[i];
+				return __nics[i];
 			else
 				count++;
 		}
@@ -45,8 +45,8 @@ NIC* nic_get(int index) {
 
 NIC* nic_get_by_id(uint32_t id) {
 	for(int i = 0; i < NIC_MAX_COUNT; i++)
-		if(_nics[i] != NULL && _nics[i]->id == id)
-			return _nics[i];
+		if(__nics[i] != NULL && __nics[i]->id == id)
+			return __nics[i];
 
 	return NULL;
 }
@@ -429,10 +429,10 @@ int nic_driver_init(uint32_t id, uint64_t mac, void* base, size_t size,
 		uint32_t srx_queue_size, uint32_t stx_queue_size) {
 
 	if((uintptr_t)base == 0 || (uintptr_t)base % 0x200000 != 0)
-		return 1;
+		return -1;
 
 	if(size % 0x200000 != 0)
-		return 2;
+		return -2;
 
 	int index = sizeof(NIC);
 
