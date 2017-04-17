@@ -16,20 +16,16 @@
 #include <linux/if_vlan.h>
 #include <linux/etherdevice.h>
 
-#include "dispatcher.h"
-//TODO
 #include <util/map.h>
-#include "driver/nic.h"
-#include "core/include/util/map.h"
-#include "vnic.h"
+#include <vnic.h>
 
-#define ETHER_MULTICAST	0xffffffffff
+#include "dispatcher.h"
 
 static struct task_struct *dispatcher_daemon;
 static spinlock_t work_lock;
 static struct list_head work_list;
 
-rx_handler_result_t dispatcher_handle_frame(struct sk_buff** pskb);
+static rx_handler_result_t dispatcher_handle_frame(struct sk_buff** pskb);
 
 struct dispatcher_work* alloc_dispatcher_work(dispatcher_work_fn_t fn,
 		struct net_device *dev, void* data)
@@ -239,8 +235,8 @@ rx_handler_result_t dispatcher_handle_frame(struct sk_buff** pskb)
 	BUG_ON(!nic_device);
 
 	//TODO map_get vnic from vnics
-
-	if(1) {
+	//lock_lock(nic_device->lock);
+	if(eth->h_dest == ETHER_MULTICAST) { //Multi cast
 		MapIterator iter;
 		map_iterator_init(&iter, nic_device->vnics);
 		while(map_iterator_has_next(&iter)) {
@@ -256,6 +252,7 @@ rx_handler_result_t dispatcher_handle_frame(struct sk_buff** pskb)
 			return RX_HANDLER_CONSUMED;
 		}
 	}
+	//lock_unlock(nic_device->lock);
 
 	return RX_HANDLER_PASS;
 }
@@ -495,7 +492,7 @@ static struct sk_buff* convert_to_skb(struct net_device* dev, Packet* packet)
 	memcpy(skb->data, buf, len);
 
 	printk("NIC free in convert to skb\n");
-	nic_free(packet);
+	vnic_free(packet);
 	return skb;
 }
 
@@ -608,6 +605,15 @@ static long dispatcher_ioctl(struct file *f, unsigned int ioctl,
 	struct dispatcher_work *work;
 	struct net_device *dev;
 	NICDevice* nic_device;
+	VNIC _vnic;
+	VNIC* vnic = NULL;
+	int vnic_id;
+	struct mm_struct* mm;
+	pgd_t* pgd;
+	pmd_t* pmd;
+	pte_t* pte;
+	struct page* page;
+	void* phys_addr;
 
 	switch (ioctl) {
 		case DISPATCHER_REGISTER_NIC:
@@ -630,6 +636,7 @@ static long dispatcher_ioctl(struct file *f, unsigned int ioctl,
 			return 0;
 
 		case DISPATCHER_UNREGISTER_NIC:
+			//name
 			printk("Unregister NIC on dispatcher device\n");
 			nic_device = (NICDevice *)argp;
 
@@ -649,22 +656,123 @@ static long dispatcher_ioctl(struct file *f, unsigned int ioctl,
 
 			return 0;
 		case DISPATCHER_CREATE_VNIC:
-			base, size
-			vnic_create();
-			return;
+			if(!argp)
+				return -EFAULT;
+			vnic = kmalloc(sizeof(VNIC));
+			if(!vnic)
+				return -EFAULT;
+
+			if(copy_from_user(vnic, argp, sizeof(VNIC))) {
+				kfree(vnic);
+				return -EFAULT;
+			}
+
+			nic_device = get_nic_device(vnic->parent);
+			if(!nic_device) {
+				kfree(vnic);
+				return -EFAULT;
+			}
+
+			pgd = pgd_offset(mm, vnic->nic);
+			pud = pud_offset(pgd, vnic->nic);
+			pmd = pmd_offset(pud, vnic->nic);
+			pte = pte_offset_map(pmd, address);
+			page = pte_page(*pte);
+			phys_addr = page_to_phys(page);
+			vnic->nic = ioremap_nocache(phys_addr, vnic->nic_size);
+			if(!vnic->nic) {
+				kfree(vnic);
+				return -EFAULT;
+			}
+
+			if(!map_put(nic_device->map, vnic->mac, vnic)) {
+				kfree(vnic);
+				return -EFAULT;
+			}
+
+			return 0;
 
 		case DISPATCHER_DESTROY_VNIC:
-			vnic_destroy();
-			return;
+			if(copy_from_user(&_vnic, argp, sizeof(VNIC))) {
+				return -EFAULT;
+			}
+
+			nic_device = get_nic_device(_vnic->parent);
+			if(!nic_device) {
+				return -EFAULT;
+			}
+
+			vnic = map_remove(nic_device->map, _vnic->mac);
+			if(!vnic) {
+				return -EFAULT;
+			}
+
+			kfree(vnic);
+			return 0;
 
 		case DISPATCHER_UPDATE_VNIC:
-			return;
-		case DISPATCHER_GET_VNIC:
-			return
+			if(copy_from_user(&_vnic, argp, sizeof(VNIC))) {
+				return -EFAULT;
+			}
 
-		case VNIC_REGIS_:
-			return;
-			
+			nic_device = get_nic_device(_vnic->parent);
+			if(!nic_device) {
+				return -EFAULT;
+			}
+
+			//XXX 
+			map_iterator_init(nic_device->map, &iter);
+			while(map_iterator_has_next(&iter)) {
+				MapEntry* entry = map_iterator_next(&iter);
+				if((VNIC*)(entry->data)->id == _vnic.id) {
+					vnic = entry->data;
+					break;
+				}
+			}
+			if(!vnic) {
+				return -EFAULT;
+			}
+
+			if(vnic->mac != _vnic.mac) {
+				if(map_contains(nic_device->map, _vnic.mac)) { //already exist
+					return -EFAULT;
+				}
+
+				map_remove(nic_device->map, _vnic.mac);
+
+				vnic->mac = vnic->nic->mac = _vnic.mac;
+				map_put(nic_device->map, vnic->mac, vnic);
+			}
+
+			vnic->input_bandwidth = vnic->nic->rx_bandwidth = _vnic.input_bandwidth;
+			vnic->output_bandwidth = vnic->nic->tx_bandwidth = _vnic.output_bandwidth;
+			vnic->padding_head = vnic->nic->padding_head = _vnic.padding_head;
+			vnic->paddign_tail = vnic->nic->padding_tail = _vnic.padding_tail;
+			copy_to_user(argp, vnic, sizeof(VNIC));
+
+			return 0;
+
+		case DISPATCHER_GET_VNIC:
+			if(copy_from_user(&_vnic, argp, sizeof(VNIC))) {
+				return -EFAULT;
+			}
+
+			nic_device = get_nic_device(_vnic->parent);
+			if(!nic_device) {
+				return -EFAULT;
+			}
+
+			vnic = map_get(nic_device->map, _vnic->mac);
+			if(!vnic) {
+				return -EFAULT;
+			}
+
+			if(copy_to_user(argp, vnic, sizeof(VNIC))) {
+				return -EFAULT;
+			}
+
+			return 0;
+
 		default:
 			printk("IOCTL %d does not supported\n", ioctl);
 			return -EFAULT;
@@ -687,12 +795,12 @@ struct miscdevice dispatcher_misc = {
 	&dispatcher_fops,
 };
 
-int dispatcher_init()
+static int dispatcher_init()
 {
 	return misc_register(&dispatcher_misc);
 }
 
-void dispatcher_exit(void)
+static void dispatcher_exit(void)
 {
 	misc_deregister(&dispatcher_misc);
 }
