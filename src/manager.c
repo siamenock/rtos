@@ -7,7 +7,7 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <arpa/inet.h>
-#include <net/udp.h>
+//#include <net/udp.h>
 /*
  *#undef IP_TTL
  *#include <net/ip.h>
@@ -16,7 +16,7 @@
  *#include <net/checksum.h>
  *#include <net/tftp.h>
  */
-#include <net/ether.h>
+//#include <net/ether.h>
 #include <util/list.h>
 #include <util/ring.h>
 #include <util/event.h>
