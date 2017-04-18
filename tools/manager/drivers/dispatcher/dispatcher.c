@@ -138,7 +138,7 @@ static int dispatcherd(void *data)
 	struct list_head *pos;
 
 	printk("PacketNgin dispatcher daemon created\n");
-	use_mm(task->mm);
+	//use_mm(task->mm);
 	//set_user_nice(current, -20);
 
 	for (;;) {
@@ -161,7 +161,7 @@ static int dispatcherd(void *data)
 	}
 
 	printk("PacketNgin dispatcher deamon destroyed\n");
-	unuse_mm(task->mm);
+	//unuse_mm(task->mm);
 	return 0;
 }
 
@@ -610,10 +610,12 @@ static long dispatcher_ioctl(struct file *f, unsigned int ioctl,
 	int vnic_id;
 	struct mm_struct* mm;
 	pgd_t* pgd;
+	pud_t* pud;
 	pmd_t* pmd;
 	pte_t* pte;
 	struct page* page;
 	void* phys_addr;
+	MapIterator iter;
 
 	switch (ioctl) {
 		case DISPATCHER_REGISTER_NIC:
@@ -676,7 +678,7 @@ static long dispatcher_ioctl(struct file *f, unsigned int ioctl,
 			pgd = pgd_offset(mm, vnic->nic);
 			pud = pud_offset(pgd, vnic->nic);
 			pmd = pmd_offset(pud, vnic->nic);
-			pte = pte_offset_map(pmd, address);
+			pte = pte_offset_map(pmd, vnic->nic);
 			page = pte_page(*pte);
 			phys_addr = page_to_phys(page);
 			vnic->nic = ioremap_nocache(phys_addr, vnic->nic_size);
@@ -697,12 +699,12 @@ static long dispatcher_ioctl(struct file *f, unsigned int ioctl,
 				return -EFAULT;
 			}
 
-			nic_device = get_nic_device(_vnic->parent);
+			nic_device = get_nic_device(_vnic.parent);
 			if(!nic_device) {
 				return -EFAULT;
 			}
 
-			vnic = map_remove(nic_device->map, _vnic->mac);
+			vnic = map_remove(nic_device->map, _vnic.mac);
 			if(!vnic) {
 				return -EFAULT;
 			}
@@ -744,8 +746,8 @@ static long dispatcher_ioctl(struct file *f, unsigned int ioctl,
 				map_put(nic_device->map, vnic->mac, vnic);
 			}
 
-			vnic->input_bandwidth = vnic->nic->rx_bandwidth = _vnic.input_bandwidth;
-			vnic->output_bandwidth = vnic->nic->tx_bandwidth = _vnic.output_bandwidth;
+			vnic->rx_bandwidth = vnic->nic->rx_bandwidth = _vnic.rx_bandwidth;
+			vnic->tx_bandwidth = vnic->nic->tx_bandwidth = _vnic.tx_bandwidth;
 			vnic->padding_head = vnic->nic->padding_head = _vnic.padding_head;
 			vnic->paddign_tail = vnic->nic->padding_tail = _vnic.padding_tail;
 			copy_to_user(argp, vnic, sizeof(VNIC));
