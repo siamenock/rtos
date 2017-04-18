@@ -58,9 +58,6 @@ typedef struct {
 	NIC_Queue	srx;
 	NIC_Queue	stx;
 
-	List*		rx_accept;
-	List*		tx_accept;
-
 	// Buffer
 	uint64_t	rx_closed;
 	uint64_t	tx_closed;

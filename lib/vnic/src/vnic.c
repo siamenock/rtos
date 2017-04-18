@@ -140,7 +140,7 @@ bool vnic_init(VNIC* vnic, uint64_t* attrs) {
 		return false;
 	}
 
-	nic_init(get_value(VNIC_MAC), vnic->nic, get_value(VNIC_NIC_SIZE),
+	nic_init(get_value(VNIC_MAC), vnic->nic, vnic->nic_size,
 			get_value(VNIC_RX_BANDWIDTH), get_value(VNIC_TX_BANDWIDTH),
 			get_value(VNIC_PADDING_HEAD), get_value(VNIC_PADDING_TAIL),
 			get_value(VNIC_RX_QUEUE_SIZE), get_value(VNIC_TX_QUEUE_SIZE),
