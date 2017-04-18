@@ -42,18 +42,37 @@ int dispatcher_init() {
 }
 
 int dispatcher_exit() {
-	//ioctl(dispatcher_fd, DISPATCHER_UNSET_MANAGER, NULL);
 	printf("PacketNgin manager unset to kernel dispatcher\n");
 	return close(dispatcher_fd);
 }
 
-int dispatcher_register_nic(void* priv) {
-	printf("Register manager NIC to kernel dispatcher\n");
-	return ioctl(dispatcher_fd, DISPATCHER_REGISTER_NIC, priv);
+int dispatcher_create_nic(void* nic) {
+	printf("Create NIC to kernel dispatcher\n");
+	return ioctl(dispatcher_fd, DISPATCHER_CREATE_NIC, nic);
 }
 
-int dispatcher_unregister_nic(void* priv) {
-	printf("Unregister manager NIC to kernel dispatcher\n");
-	return ioctl(dispatcher_fd, DISPATCHER_UNREGISTER_NIC, priv);
+int dispatcher_destroy_nic(void* nic) {
+	printf("Create NIC to kernel dispatcher\n");
+	return ioctl(dispatcher_fd, DISPATCHER_DESTROY_NIC, nic);
+}
+
+int dispatcher_create_vnic(void* vnic) {
+	printf("Create VNIC to kernel dispatcher\n");
+	return ioctl(dispatcher_fd, DISPATCHER_CREATE_VNIC, vnic);
+}
+
+int dispatcher_destroy_vnic(void* vnic) {
+	printf("Destroy VNIC to kernel dispatcher\n");
+	return ioctl(dispatcher_fd, DISPATCHER_CREATE_VNIC, vnic);
+}
+
+int dispatcher_update_vnic(void* vnic) {
+	printf("Update VNIC to kernel dispatcher\n");
+	return ioctl(dispatcher_fd, DISPATCHER_CREATE_VNIC, vnic);
+}
+
+int dispatcher_get_vnic(void* vnic) {
+	printf("Get VNIC to kernel dispatcher\n");
+	return ioctl(dispatcher_fd, DISPATCHER_CREATE_VNIC, vnic);
 }
 

@@ -18,28 +18,28 @@ Device* device_register(DeviceType type, void* driver, void* device, void* data)
 				errno = id;	// Cannot initialize the device
 				return NULL;
 			}
-			
+
 			devices[i].type = type;
 			devices[i].driver = driver;
 			devices[i].device = device;
 			devices[i].id = id;
-			
+
 			return &devices[i];
 		}
 	}
-	
+
 	errno = 2;	// There is no space to register the device
-	
+
 	return NULL;
 }
 
 bool device_deregister(int fd) {
 	Device* device = &devices[fd];
-	
+
 	if(device) {
 		((Driver*)device->driver)->destroy(device->id);
 		memset(device, 0x0, sizeof(Device));
-		
+
 		return true;
 	} else {
 		return false;
@@ -48,21 +48,21 @@ bool device_deregister(int fd) {
 
 int device_count(DeviceType type) {
 	int count = 0;
-	
+
 	for(int i = 0; i < MAX_DEVICE_COUNT; i++)
 		if(devices[i].type == type)
 			count++;
-	
+
 	return count;
 }
 
 Device* device_get(DeviceType type, int idx) {
 	int count = 0;
-	
+
 	for(int i = 0; i < MAX_DEVICE_COUNT; i++)
 		if(devices[i].type == type && count++ == idx)
 			return &devices[i];
-	
+
 	return NULL;
 }
 /*

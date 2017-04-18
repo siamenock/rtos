@@ -3,9 +3,7 @@
 #include "lock.h"
 #include "nic.h"
 
-#define ROUNDUP(x, y)	((((x) + (y) - 1) / (y)) * (y))
-
-NIC* __nics[NIC_MAX_COUNT];
+static NIC* __nics[NIC_MAX_COUNT];
 
 static NIC* find_NIC(Packet* packet) {
 	NIC* nic = (void*)((uintptr_t)packet & ~(uintptr_t)(0x200000 - 1)); // 2MB alignment
@@ -143,7 +141,7 @@ bool nic_free(Packet* packet) {
 	return true;
 }
 
-static bool queue_push(NIC* nic, NIC_Queue* queue, Packet* packet) {
+bool queue_push(NIC* nic, NIC_Queue* queue, Packet* packet) {
 	NIC* nic2 = find_NIC(packet);
 	if(nic2 == NULL)
 		return false;
@@ -160,7 +158,7 @@ static bool queue_push(NIC* nic, NIC_Queue* queue, Packet* packet) {
 	}
 }
 
-static void* queue_pop(NIC* nic, NIC_Queue* queue) {
+void* queue_pop(NIC* nic, NIC_Queue* queue) {
 	uint64_t* array = (void*)nic + queue->base;
 
 	if(queue->head != queue->tail) {
@@ -187,18 +185,18 @@ static void* queue_pop(NIC* nic, NIC_Queue* queue) {
 	}
 }
 
-static uint32_t queue_size(NIC_Queue* queue) {
+uint32_t queue_size(NIC_Queue* queue) {
 	if(queue->tail >= queue->head)
 		return queue->tail - queue->head;
 	else
 		return queue->size + queue->tail - queue->head;
 }
 
-static bool queue_available(NIC_Queue* queue) {
+bool queue_available(NIC_Queue* queue) {
 	return queue->head != (queue->tail + 1) % queue->size;
 }
 
-static bool queue_empty(NIC_Queue* queue) {
+bool queue_empty(NIC_Queue* queue) {
 	return queue->head == queue->tail;
 }
 
@@ -285,7 +283,7 @@ bool nic_tx_dup(NIC* nic, Packet* packet) {
 	}
 }
 
-bool nic_has_tx(NIC* nic) {
+bool nic_tx_available(NIC* nic) {
 	return queue_available(&nic->tx);
 }
 
@@ -419,195 +417,6 @@ bool nic_config_put(NIC* nic, uint32_t key, uint64_t value) {
 
 uint64_t nic_config_get(NIC* nic, uint32_t key) {
 	return *(uint64_t*)(nic->config_tail - key * sizeof(uint64_t));
-}
-
-// Driver API
-int nic_driver_init(uint32_t id, uint64_t mac, void* base, size_t size,
-		uint64_t rx_bandwidth, uint64_t tx_bandwidth,
-		uint16_t padding_head, uint16_t padding_tail,
-		uint32_t rx_queue_size, uint32_t tx_queue_size,
-		uint32_t srx_queue_size, uint32_t stx_queue_size) {
-
-	if((uintptr_t)base == 0 || (uintptr_t)base % 0x200000 != 0)
-		return -1;
-
-	if(size % 0x200000 != 0)
-		return -2;
-
-	int index = sizeof(NIC);
-
-	NIC* nic = base;
-	nic->magic = NIC_MAGIC_HEADER;
-	nic->id = id;
-	nic->mac = mac;
-	nic->rx_bandwidth = rx_bandwidth;
-	nic->tx_bandwidth = tx_bandwidth;
-	nic->padding_head = padding_head;
-	nic->padding_tail = padding_tail;
-
-	nic->rx.base = index;
-	nic->rx.head = 0;
-	nic->rx.tail = 0;
-	nic->rx.size = rx_queue_size;
-	nic->rx.rlock = 0;
-	nic->rx.wlock = 0;
-
-	index += nic->rx.size * sizeof(uint64_t);
-	index = ROUNDUP(index, 8);
-	nic->tx.base = index;
-	nic->tx.head = 0;
-	nic->tx.tail = 0;
-	nic->tx.size = tx_queue_size;
-	nic->tx.rlock = 0;
-	nic->tx.wlock = 0;
-
-	index += nic->tx.size * sizeof(uint64_t);
-	index = ROUNDUP(index, 8);
-	nic->srx.base = index;
-	nic->srx.head = 0;
-	nic->srx.tail = 0;
-	nic->srx.size = srx_queue_size;
-	nic->srx.rlock = 0;
-	nic->srx.wlock = 0;
-
-	index += nic->srx.size * sizeof(uint64_t);
-	index = ROUNDUP(index, 8);
-	nic->stx.base = index;
-	nic->stx.head = 0;
-	nic->stx.tail = 0;
-	nic->stx.size = stx_queue_size;
-	nic->stx.rlock = 0;
-	nic->stx.wlock = 0;
-
-	index += nic->stx.size * sizeof(uint64_t);
-	index = ROUNDUP(index, 8);
-	nic->pool.bitmap = index;
-	index += (size - index) / NIC_CHUNK_SIZE;
-	index = ROUNDUP(index, NIC_CHUNK_SIZE);
-	nic->pool.pool = index;
-	nic->pool.count = (size - index) / NIC_CHUNK_SIZE;
-	nic->pool.index = 0;
-	nic->pool.used = 0;
-	nic->pool.lock = 0;
-
-	nic->config = 0;
-	bzero(nic->config_head, (size_t)((uintptr_t)nic->config_tail - (uintptr_t)nic->config_head));
-
-	bzero(base + nic->pool.bitmap, nic->pool.count);
-
-	return 0;
-}
-
-bool nic_driver_has_rx(NIC* nic) {
-	return queue_available(&nic->rx);
-}
-
-bool nic_driver_rx(NIC* nic, uint8_t* buf1, size_t size1, uint8_t* buf2, size_t size2) {
-	lock_lock(&nic->rx.wlock);
-	if(queue_available(&nic->rx)) {
-		Packet* packet = nic_alloc(nic, size1 + size2);
-		if(packet == NULL) {
-			lock_unlock(&nic->rx.wlock);
-			return false;
-		}
-
-		memcpy(packet->buffer + packet->start, buf1, size1);
-		memcpy(packet->buffer + packet->start + size1, buf2, size2);
-
-		packet->end = packet->start + size1 + size2;
-
-		if(queue_push(nic, &nic->rx, packet)) {
-			lock_unlock(&nic->rx.wlock);
-			return true;
-		} else {
-			lock_unlock(&nic->rx.wlock);
-			nic_free(packet);
-			return false;
-		}
-	} else {
-		lock_unlock(&nic->rx.wlock);
-		return false;
-	}
-}
-
-bool nic_driver_rx2(NIC* nic, Packet* packet) {
-	lock_lock(&nic->rx.wlock);
-	if(queue_push(nic, &nic->rx, packet)) {
-		lock_unlock(&nic->rx.wlock);
-		return true;
-	} else {
-		lock_unlock(&nic->rx.wlock);
-		nic_free(packet);
-		return false;
-	}
-}
-
-bool nic_driver_has_srx(NIC* nic) {
-	return queue_available(&nic->srx);
-}
-
-bool nic_driver_srx(NIC* nic, uint8_t* buf1, size_t size1, uint8_t* buf2, size_t size2) {
-	lock_lock(&nic->srx.wlock);
-	if(queue_available(&nic->srx)) {
-		Packet* packet = nic_alloc(nic, size1 + size2);
-		if(packet == NULL) {
-			lock_unlock(&nic->srx.wlock);
-			return false;
-		}
-
-		memcpy(packet->buffer + packet->start, buf1, size1);
-		memcpy(packet->buffer + packet->start + size1, buf2, size2);
-
-		packet->end = packet->start + size1 + size2;
-
-		if(queue_push(nic, &nic->srx, packet)) {
-			lock_unlock(&nic->srx.wlock);
-			return true;
-		} else {
-			lock_unlock(&nic->srx.wlock);
-			nic_free(packet);
-			return false;
-		}
-	} else {
-		lock_unlock(&nic->srx.wlock);
-		return false;
-	}
-}
-
-bool nic_driver_srx2(NIC* nic, Packet* packet) {
-	lock_lock(&nic->srx.wlock);
-	if(queue_push(nic, &nic->srx, packet)) {
-		lock_unlock(&nic->srx.wlock);
-		return true;
-	} else {
-		lock_unlock(&nic->srx.wlock);
-		nic_free(packet);
-		return false;
-	}
-}
-
-bool nic_driver_has_tx(NIC* nic) {
-	return !queue_empty(&nic->tx);
-}
-
-Packet* nic_driver_tx(NIC* nic) {
-	lock_lock(&nic->tx.rlock);
-	Packet* packet = queue_pop(nic, &nic->tx);
-	lock_unlock(&nic->tx.rlock);
-
-	return packet;
-}
-
-bool nic_driver_has_stx(NIC* nic) {
-	return !queue_empty(&nic->stx);
-}
-
-Packet* nic_driver_stx(NIC* nic) {
-	lock_lock(&nic->stx.rlock);
-	Packet* packet = queue_pop(nic, &nic->stx);
-	lock_unlock(&nic->stx.rlock);
-
-	return packet;
 }
 
 #if TEST
