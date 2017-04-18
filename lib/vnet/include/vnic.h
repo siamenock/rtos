@@ -9,7 +9,6 @@
 typedef enum {
 	VNIC_NONE,			///< End of attributes
 	VNIC_ID,			///< NIC ID
-	VNIC_NIC_SIZE,			///< NIC Base Address
 	VNIC_MAC,			///< MAC address
 	VNIC_DEV,			///< Device of Network Interface
 	VNIC_POOL_SIZE,			///< NI's total memory size
@@ -32,6 +31,7 @@ typedef enum {
 typedef struct {
 	// Management
 	NIC*		nic;
+	uint32_t	nic_size;
 	char		parent[MAX_NIC_NAME_LEN];
 
 	// Information
