@@ -16,13 +16,13 @@ ifeq ($(config),debug)
   TARGET = $(TARGETDIR)/manager
   OBJDIR = obj/Debug
   DEFINES +=
-  INCLUDES += -I../../penguin/include -I../../penguin/include/ipv4
+  INCLUDES += -I../../penguin/lib/nic/include -I../../penguin/include -I../../penguin/include/ipv4
   FORCE_INCLUDE +=
   ALL_CPPFLAGS += $(CPPFLAGS) -MMD -MP $(DEFINES) $(INCLUDES)
   ALL_CFLAGS += $(CFLAGS) $(ALL_CPPFLAGS) -O2 -g -Wall -Wextra -DLINUX -std=gnu99 -mcmodel=large -Wno-unused -Wno-format -Wno-unused-result
   ALL_CXXFLAGS += $(CXXFLAGS) $(ALL_CFLAGS)
   ALL_RESFLAGS += $(RESFLAGS) $(DEFINES) $(INCLUDES)
-  LIBS += -lumpn -lrt
+  LIBS += -lumpn -lrt -lnic
   LDDEPS +=
   ALL_LDFLAGS += $(LDFLAGS) -L.. -nostartfiles -Wl,-Ttext-segment=0xff00000000
   LINKCMD = $(CC) -o "$@" $(OBJECTS) $(RESOURCES) $(ALL_LDFLAGS) $(LIBS)
@@ -45,13 +45,13 @@ ifeq ($(config),release)
   TARGET = $(TARGETDIR)/manager
   OBJDIR = obj/Release
   DEFINES +=
-  INCLUDES += -I../../penguin/include -I../../penguin/include/ipv4
+  INCLUDES += -I../../penguin/lib/nic/include -I../../penguin/include -I../../penguin/include/ipv4
   FORCE_INCLUDE +=
   ALL_CPPFLAGS += $(CPPFLAGS) -MMD -MP $(DEFINES) $(INCLUDES)
   ALL_CFLAGS += $(CFLAGS) $(ALL_CPPFLAGS) -O2 -g -Wall -Wextra -DLINUX -std=gnu99 -mcmodel=large -Wno-unused -Wno-format -Wno-unused-result
   ALL_CXXFLAGS += $(CXXFLAGS) $(ALL_CFLAGS)
   ALL_RESFLAGS += $(RESFLAGS) $(DEFINES) $(INCLUDES)
-  LIBS += -lumpn -lrt
+  LIBS += -lumpn -lrt -lnic
   LDDEPS +=
   ALL_LDFLAGS += $(LDFLAGS) -L.. -nostartfiles -Wl,-Ttext-segment=0xff00000000
   LINKCMD = $(CC) -o "$@" $(OBJECTS) $(RESOURCES) $(ALL_LDFLAGS) $(LIBS)
@@ -74,6 +74,7 @@ OBJECTS := \
 	$(OBJDIR)/cpu.o \
 	$(OBJDIR)/device.o \
 	$(OBJDIR)/dispatcher.o \
+	$(OBJDIR)/nic.o \
 	$(OBJDIR)/elf.o \
 	$(OBJDIR)/entry.o \
 	$(OBJDIR)/gdt.o \
@@ -94,7 +95,6 @@ OBJECTS := \
 	$(OBJDIR)/stdio.o \
 	$(OBJDIR)/task.o \
 	$(OBJDIR)/vm.o \
-	$(OBJDIR)/vnic.o \
 
 RESOURCES := \
 
@@ -167,6 +167,9 @@ $(OBJDIR)/device.o: ../src/device.c
 $(OBJDIR)/dispatcher.o: ../src/dispatcher.c
 	@echo $(notdir $<)
 	$(SILENT) $(CC) $(ALL_CFLAGS) $(FORCE_INCLUDE) -o "$@" -MF "$(@:%.o=%.d)" -c "$<"
+$(OBJDIR)/nic.o: ../src/driver/nic.c
+	@echo $(notdir $<)
+	$(SILENT) $(CC) $(ALL_CFLAGS) $(FORCE_INCLUDE) -o "$@" -MF "$(@:%.o=%.d)" -c "$<"
 $(OBJDIR)/elf.o: ../src/elf.c
 	@echo $(notdir $<)
 	$(SILENT) $(CC) $(ALL_CFLAGS) $(FORCE_INCLUDE) -o "$@" -MF "$(@:%.o=%.d)" -c "$<"
@@ -225,9 +228,6 @@ $(OBJDIR)/task.o: ../src/task.c
 	@echo $(notdir $<)
 	$(SILENT) $(CC) $(ALL_CFLAGS) $(FORCE_INCLUDE) -o "$@" -MF "$(@:%.o=%.d)" -c "$<"
 $(OBJDIR)/vm.o: ../src/vm.c
-	@echo $(notdir $<)
-	$(SILENT) $(CC) $(ALL_CFLAGS) $(FORCE_INCLUDE) -o "$@" -MF "$(@:%.o=%.d)" -c "$<"
-$(OBJDIR)/vnic.o: ../src/vnic.c
 	@echo $(notdir $<)
 	$(SILENT) $(CC) $(ALL_CFLAGS) $(FORCE_INCLUDE) -o "$@" -MF "$(@:%.o=%.d)" -c "$<"
 

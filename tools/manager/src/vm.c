@@ -17,6 +17,7 @@
 #include "stdio.h"
 #include "shared.h"
 #include "mmap.h"
+#include "driver/nic.h"
 
 static uint32_t	last_vmid = 1;
 // FIXME: change to static
@@ -289,7 +290,8 @@ static bool vm_delete(VM* vm, int core) {
 		if(vm->nics) {
 			for(uint16_t i = 0; i < vm->nic_count; i++) {
 				if(vm->nics[i])
-					vnic_destroy(vm->nics[i]);
+					//vnic_destroy(vm->nics[i]);
+					bfree(vm->nics[i]->nic);
 			}
 
 			gfree(vm->nics);
@@ -538,7 +540,7 @@ uint32_t vm_create(VMSpec* vm_spec) {
 	vm->memory.blocks = gmalloc(vm->memory.count * sizeof(void*));
 	memset(vm->memory.blocks, 0x0, vm->memory.count * sizeof(void*));
 	for(uint32_t i = 0; i < vm->memory.count; i++) {
-		vm->memory.blocks[i] = bmalloc();
+		vm->memory.blocks[i] = bmalloc(1);
 		if(!vm->memory.blocks[i]) {
 			printf("Manager: Not enough memory to allocate.\n");
 			vm_delete(vm, -1);
@@ -553,7 +555,7 @@ uint32_t vm_create(VMSpec* vm_spec) {
 	vm->storage.blocks = gmalloc(vm->storage.count * sizeof(void*));
 	memset(vm->storage.blocks, 0x0, vm->storage.count * sizeof(void*));
 	for(uint32_t i = 0; i < vm->storage.count; i++) {
-		vm->storage.blocks[i] = bmalloc();
+		vm->storage.blocks[i] = bmalloc(1);
 		if(i == 0)
 			printf("Storage block : %p\n", vm->storage.blocks[i]);
 
@@ -583,13 +585,21 @@ uint32_t vm_create(VMSpec* vm_spec) {
 	memset(vm->nics, 0x0, sizeof(VNIC) * vm->nic_count);
 
 	for(int i = 0; i < vm->nic_count; i++) {
+		NICDevice* dev = nic_device(nics[i].dev);
+		if(!dev) {
+			printf("Manager: Invalid NIC device: %s.\n", nics[i].dev);
+			map_remove(vms, (void*)(uint64_t)vmid);
+			vm_delete(vm, -1);
+			return 0;
+		}
+
 		uint64_t mac = nics[i].mac;
 		if(mac == 0) {
 			do {
 				mac = timer_frequency() & 0x0fffffffffffL;
 				mac |= 0x02L << 40;	// Locally administrered
-			} while(vnic_contains(nics[i].dev, mac));
-		} else if(vnic_contains(nics[i].dev, mac)) {
+			} while(nic_contains(dev, mac));
+		} else if(nic_contains(dev, mac)) {
 			printf("Manager: The mac address already in use: %012lx.\n", mac);
 			map_remove(vms, (void*)(uint64_t)vmid);
 			vm_delete(vm, -1);
@@ -597,28 +607,46 @@ uint32_t vm_create(VMSpec* vm_spec) {
 		}
 
 		uint64_t attrs[] = {
-			NIC_MAC, mac,
-			NIC_DEV, (uint64_t)nics[i].dev,
-			NIC_INPUT_BUFFER_SIZE, nics[i].input_buffer_size,
-			NIC_OUTPUT_BUFFER_SIZE, nics[i].output_buffer_size,
-			NIC_INPUT_BANDWIDTH, nics[i].input_bandwidth,
-			NIC_OUTPUT_BANDWIDTH, nics[i].output_bandwidth,
-			NIC_PADDING_HEAD, nics[i].padding_head ? nics[i].padding_head : 32,
-			NIC_PADDING_TAIL, nics[i].padding_tail ? nics[i].padding_tail : 32,
-			NIC_POOL_SIZE, nics[i].pool_size,
-			NIC_INPUT_ACCEPT_ALL, 1,
-			NIC_OUTPUT_ACCEPT_ALL, 1,
-			NIC_INPUT_FUNC, 0,
-			NIC_NONE
+			VNIC_MAC, mac,
+			VNIC_DEV, (uint64_t)nics[i].dev,
+			VNIC_POOL_SIZE, nics[i].pool_size,
+			VNIC_INPUT_BANDWIDTH, nics[i].input_bandwidth,
+			VNIC_OUTPUT_BANDWIDTH, nics[i].output_bandwidth,
+			VNIC_PADDING_HEAD, nics[i].padding_head ? nics[i].padding_head : 32,
+			VNIC_PADDING_TAIL, nics[i].padding_tail ? nics[i].padding_tail : 32,
+			VNIC_INPUT_BUFFER_SIZE, nics[i].input_buffer_size,
+			VNIC_OUTPUT_BUFFER_SIZE, nics[i].output_buffer_size,
+			VNIC_SLOW_INPUT_BUFFER_SIZE, nics[i].slow_input_buffer_size,
+			VNIC_SLOW_OUTPUT_BUFFER_SIZE, nics[i].slow_output_buffer_size,
+			VNIC_INPUT_ACCEPT_ALL, 1,
+			VNIC_OUTPUT_ACCEPT_ALL, 1,
+			VNIC_NONE
 		};
 
-		vm->nics[i] = vnic_create(attrs);
-		if(!vm->nics[i]) {
+		VNIC* vnic = gmalloc(sizeof(VNIC));
+		if(!vnic) {
+			printf("Manager: Failed to allocate VNIC\n");
+			map_remove(vms, (void*)(uint64_t)vmid);
+			vm_delete(vm, -1);
+			return 0;
+		}
+
+		vnic->nic = bmalloc(nics[i].pool_size / 0x200000);
+		if(!vnic->nic) {
+			printf("Manager: Failed to allocate NIC in VNIC\n");
+			map_remove(vms, (void*)(uint64_t)vmid);
+			vm_delete(vm, -1);
+			return 0;
+		}
+
+		if(!vnic_init(vnic, attrs)) {
 			printf("Manager: Not enough VNIC to allocate: errno=%d.\n", errno);
 			map_remove(vms, (void*)(uint64_t)vmid);
 			vm_delete(vm, -1);
 			return 0;
 		}
+
+		vm->nics[i] = vnic;
 	}
 
 	// Dump info
@@ -642,7 +670,10 @@ uint32_t vm_create(VMSpec* vm_spec) {
 			else
 				printf(" ");
 		}
-		printf("%ldMbps/%ld, %ldMbps/%ld, %ldMBs\n", nic->input_bandwidth / 1000000, fifo_capacity(nic->nic->input_buffer) + 1, nic->output_bandwidth / 1000000, fifo_capacity(nic->nic->output_buffer) + 1, list_size(nic->pools) * 2); }
+		/*
+		 *printf("%ldMbps/%ld, %ldMbps/%ld, %ldMBs\n", nic->input_bandwidth / 1000000, fifo_capacity(nic->nic->input_buffer) + 1, nic->output_bandwidth / 1000000, fifo_capacity(nic->nic->output_buffer) + 1, list_size(nic->pools) * 2);
+		 */
+	}
 
 	printf("\targs(%d): ", vm->argc);
 	for(int i = 0; i < vm->argc; i++) {
