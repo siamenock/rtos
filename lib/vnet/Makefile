@@ -3,16 +3,16 @@
 CC = gcc
 CFLAGS = -O2
 
-all: libnic.a
+all: libvnet.a
 
 CC=gcc
-CFLAGS=-I include -O2 -Wall -mcmodel=large
+CFLAGS=-I include -I ../core/include -O2 -Wall -mcmodel=large
 
-SRCS=lock.c nic.c asm.asm
+SRCS=lock.c vnic.c nic.c asm.asm
 OBJS=$(addsuffix .o, $(addprefix obj/, $(basename $(SRCS))))
 TESTS=$(addsuffix _test.o, $(addprefix obj/, $(basename $(SRCS))))
 
-libnic.a: $(OBJS)
+libvnet.a: $(OBJS)
 	ar rcv $@ $^
 
 obj/asm.o: src/asm.asm
@@ -38,6 +38,6 @@ test: $(TESTS)
 clean: 
 	rm -rf test
 	rm -rf obj
-	rm -rf libnic.a
+	rm -rf libvnet.a
 
 cleanall: clean
