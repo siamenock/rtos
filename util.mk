@@ -77,11 +77,11 @@ sdk: loader/loader.bin kernel.bin initrd.img system.img
 
 	@echo "* Copy library headers"
 	mkdir -p $(SDK)/include
-	cp -r include/* $(SDK)/include
+	cp -r lib/include/* $(SDK)/include
 
 	@echo "* Copy library: core"
 	mkdir -p $(SDK)/lib
-	cp lib/libpacketngin.a $(SDK)/lib
+	cp lib/libcore.a $(SDK)/lib
 
 	@echo "* Copy library: OpenSSL"
 	cp lib/libcrypto.a lib/libssl.a $(SDK)/lib
@@ -95,11 +95,10 @@ sdk: loader/loader.bin kernel.bin initrd.img system.img
 	@echo "* Copy library: expat"
 	cp lib/libexpat.a $(SDK)/lib
 
-	@echo "* Copy library: JSMN"
-	cp lib/libjsmn.a $(SDK)/lib
-
 	@echo "* Copy utilities"
-	cp -rL bin/* $(SDK)/bin/
+	cp -rL bin/qemu* $(SDK)/bin/
+	cp -rL bin/console $(SDK)/bin/
+	cp -rL scripts/deploy.sh $(SDK)/bin/
 
 	@echo "* Archiving to $(SDK).tgz"
 	tar cfz $(SDK).tgz $(SDK)
