@@ -1,10 +1,13 @@
-# object files
+# Binaries
 *.o
 *.ko
 *.elf
 *.bin
 *.obj
+*.out
 obj
+bin
+main
 
 # Libraries
 *.a
@@ -20,29 +23,29 @@ config.*
 # Disk images
 *.img
 
-# Temporary generated files
-kernel.dis
-kernel.smap
-*.swp
-*.tmp
-
 # SDK
 packetngin_sdk-*
-
-# Hidden file
-.*
 
 # Tag
 tags
 cscope.out
 cscope.files
+GPATH
+GRTAGS
+GTAGS
 
-# Build related
+# Hidden file
+.*
+
+# Temporary generated files
+kernel.dis
+kernel.smap
+*.swp
+*.swo
+*.tmp
+
+# Build-related generated
+Makefile
 *.make
-build
-
-# Generated
-./kernel/test/*
-loader/src/entry_tmp.asm
-lib/expat-2.1.0/*
-lib/zlib-1.2.8/Makefile
+*.gch
+*.pch

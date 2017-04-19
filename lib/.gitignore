@@ -12,12 +12,12 @@ newlib*/x86_64-pc-packetngin
 # OpenSSL temporary files
 openssl*/**/lib
 openssl*/**/*.s
-!openssl*/**/asm/*.s
+openssl*/**/asm/*.s
 openssl*/**/*.bak
 openssl*/crypto/buildinf.h
 openssl*/Makefile.bak
 
-# zlib temporary files
+# Zlib temporary files
 zlib*/**/*.lo
 zlib*/zconf.h
 zlib*/configure.log
@@ -25,4 +25,7 @@ zlib*/example*
 zlib*/minigzip*
 zlib*/zlib.pc
 zlib*/Makefile
+
+# Expat temporari files
+expat*/xmlwf/*
 
