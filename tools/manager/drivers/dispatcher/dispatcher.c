@@ -21,6 +21,13 @@
 
 #include "dispatcher.h"
 
+typedef struct {
+	char		name[MAX_NIC_NAME_LEN];
+	uint64_t	mac;
+
+	Map*		vnics;
+} NICDevice;
+
 static struct task_struct *dispatcher_daemon;
 static spinlock_t work_lock;
 static struct list_head work_list;
@@ -614,7 +621,7 @@ static long dispatcher_ioctl(struct file *f, unsigned int ioctl,
 	pmd_t* pmd;
 	pte_t* pte;
 	struct page* page;
-	void* phys_addr;
+	unsigned long phys_addr;
 	MapIterator iter;
 
 	switch (ioctl) {
@@ -660,7 +667,7 @@ static long dispatcher_ioctl(struct file *f, unsigned int ioctl,
 		case DISPATCHER_CREATE_VNIC:
 			if(!argp)
 				return -EFAULT;
-			vnic = kmalloc(sizeof(VNIC));
+			vnic = kmalloc(sizeof(VNIC), GFP_KERNEL);
 			if(!vnic)
 				return -EFAULT;
 
@@ -675,10 +682,10 @@ static long dispatcher_ioctl(struct file *f, unsigned int ioctl,
 				return -EFAULT;
 			}
 
-			pgd = pgd_offset(mm, vnic->nic);
-			pud = pud_offset(pgd, vnic->nic);
-			pmd = pmd_offset(pud, vnic->nic);
-			pte = pte_offset_map(pmd, vnic->nic);
+			pgd = pgd_offset(mm, (unsigned long)vnic->nic);
+			pud = pud_offset(pgd, (unsigned long)vnic->nic);
+			pmd = pmd_offset(pud, (unsigned long)vnic->nic);
+			pte = pte_offset_map(pmd, (unsigned long)vnic->nic);
 			page = pte_page(*pte);
 			phys_addr = page_to_phys(page);
 			vnic->nic = ioremap_nocache(phys_addr, vnic->nic_size);
@@ -687,7 +694,7 @@ static long dispatcher_ioctl(struct file *f, unsigned int ioctl,
 				return -EFAULT;
 			}
 
-			if(!map_put(nic_device->map, vnic->mac, vnic)) {
+			if(!map_put(nic_device->vnics, (void*)vnic->mac, vnic)) {
 				kfree(vnic);
 				return -EFAULT;
 			}
@@ -704,7 +711,7 @@ static long dispatcher_ioctl(struct file *f, unsigned int ioctl,
 				return -EFAULT;
 			}
 
-			vnic = map_remove(nic_device->map, _vnic.mac);
+			vnic = map_remove(nic_device->vnics, (void*)_vnic.mac);
 			if(!vnic) {
 				return -EFAULT;
 			}
@@ -717,16 +724,16 @@ static long dispatcher_ioctl(struct file *f, unsigned int ioctl,
 				return -EFAULT;
 			}
 
-			nic_device = get_nic_device(_vnic->parent);
+			nic_device = get_nic_device(_vnic.parent);
 			if(!nic_device) {
 				return -EFAULT;
 			}
 
 			//XXX 
-			map_iterator_init(nic_device->map, &iter);
+			map_iterator_init(&iter, nic_device->vnics);
 			while(map_iterator_has_next(&iter)) {
 				MapEntry* entry = map_iterator_next(&iter);
-				if((VNIC*)(entry->data)->id == _vnic.id) {
+				if(((VNIC*)entry->data)->id == _vnic.id) {
 					vnic = entry->data;
 					break;
 				}
@@ -736,20 +743,20 @@ static long dispatcher_ioctl(struct file *f, unsigned int ioctl,
 			}
 
 			if(vnic->mac != _vnic.mac) {
-				if(map_contains(nic_device->map, _vnic.mac)) { //already exist
+				if(map_contains(nic_device->vnics, (void*)_vnic.mac)) { //already exist
 					return -EFAULT;
 				}
 
-				map_remove(nic_device->map, _vnic.mac);
+				map_remove(nic_device->vnics, (void*)_vnic.mac);
 
 				vnic->mac = vnic->nic->mac = _vnic.mac;
-				map_put(nic_device->map, vnic->mac, vnic);
+				map_put(nic_device->vnics, (uint64_t*)vnic->mac, vnic);
 			}
 
 			vnic->rx_bandwidth = vnic->nic->rx_bandwidth = _vnic.rx_bandwidth;
 			vnic->tx_bandwidth = vnic->nic->tx_bandwidth = _vnic.tx_bandwidth;
 			vnic->padding_head = vnic->nic->padding_head = _vnic.padding_head;
-			vnic->paddign_tail = vnic->nic->padding_tail = _vnic.padding_tail;
+			vnic->padding_tail = vnic->nic->padding_tail = _vnic.padding_tail;
 			copy_to_user(argp, vnic, sizeof(VNIC));
 
 			return 0;
@@ -759,12 +766,12 @@ static long dispatcher_ioctl(struct file *f, unsigned int ioctl,
 				return -EFAULT;
 			}
 
-			nic_device = get_nic_device(_vnic->parent);
+			nic_device = get_nic_device(_vnic.parent);
 			if(!nic_device) {
 				return -EFAULT;
 			}
 
-			vnic = map_get(nic_device->map, _vnic->mac);
+			vnic = map_get(nic_device->vnics, _vnic.mac);
 			if(!vnic) {
 				return -EFAULT;
 			}
