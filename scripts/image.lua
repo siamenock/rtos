@@ -195,6 +195,13 @@ local function buildSystemImage(loader, kernel, ramdisk)
 		return os.execute(command)
     end
 
+    local grubImageMaker = 'tools/grub/grub-mkimage'
+    if io.open(grubImageMaker, "r") == nil then
+        print('\tFailed to find grub utility : ' .. grubImageMaker)
+        print('\t\tYou have to compile grub submodule first. See doc/setup.md')
+        return false
+    end
+
     local image = 'system.img'
 	-- FIXME: remove this hard-coded size
 	local size = 64 * 1024 * 1024 -- 64MB
@@ -207,7 +214,7 @@ local function buildSystemImage(loader, kernel, ramdisk)
 		print('\tFailed to make grub image')
 		return false
 	end
-	print('\t\tGrub image created : ' .. 'tools/bin/grub-core/core.img')
+	print('\t\tGrub image created : bin/grub-core/core.img')
 
 	-- Partition information { filesystem, size }
 	local partitions = {
