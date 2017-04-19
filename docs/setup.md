@@ -16,6 +16,7 @@
   * node.js
   * autoconf
   * dcfldd
+  * libcmocka-dev
 
 * Disable automount-open
 gsettings set org.gnome.desktop.media-handling automount-open false
