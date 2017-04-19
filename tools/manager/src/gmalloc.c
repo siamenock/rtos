@@ -10,7 +10,15 @@
 #include "idt.h"
 
 uint32_t bmalloc_count;
-uint64_t* bmalloc_pool;
+
+typedef struct _BmallocPool {
+	bool		used;
+	bool		head;
+	int		count;
+	uint64_t	pool;
+} BmallocPool;
+
+BmallocPool* bmalloc_pool;
 
 void gmalloc_init() {
 	/* Gmalloc pool area : IDT_END_ADDR */
@@ -195,7 +203,7 @@ void gmalloc_init() {
 			return NULL;
 	}
 
-	bmalloc_pool = malloc(sizeof(uint64_t) * bmalloc_count);
+	bmalloc_pool = malloc(sizeof(BmallocPool) * bmalloc_count);
 	uint32_t bmalloc_index = 0;
 	Block* block = pop();
 	while(block) {
@@ -204,7 +212,7 @@ void gmalloc_init() {
 		printf("\t\t0x%016lx - 0x%016lx\n", start, end);
 
 		while(start < end) {
-			bmalloc_pool[bmalloc_index++] = start;
+			bmalloc_pool[bmalloc_index++].pool = start;
 			start += 0x200000;
 		}
 
@@ -244,7 +252,7 @@ inline void* gmalloc(size_t size) {
 		// TODO: print to stderr
 		printf("WARN: Not enough global memory!!!\n");
 
-		void* block = bmalloc();
+		void* block = bmalloc(1);
 		if(!block) {
 			// TODO: print to stderr
 			printf("ERROR: Not enough block memory!!!\n");
@@ -267,12 +275,39 @@ inline void* gcalloc(uint32_t nmemb, size_t size) {
 	return calloc_ex(nmemb, size, gmalloc_pool);
 }
 
-void* bmalloc() {
+static inline bool is_linear(BmallocPool* bmalloc_pool, int count) {
+	for(int i = 0; i < count; i++)
+		if(bmalloc_pool[i].used)
+			return false;
+
+	return true;
+}
+
+static inline void set_used(BmallocPool* bmalloc_pool, int count) {
+	bmalloc_pool[0].head = true;
+	bmalloc_pool[0].count = count;
+
+	for(int i = 0; i < count; i++)
+		bmalloc_pool[i].used = true;
+}
+
+static inline void clear_used(BmallocPool* bmalloc_pool) {
+	for(int i = 0; i < bmalloc_pool[0].count; i++)
+		bmalloc_pool[i].used = false;
+
+	bmalloc_pool[0].head = false;
+	bmalloc_pool[0].count = 0;
+}
+
+void* bmalloc(int count) {
 	for(size_t i = 0; i < bmalloc_count; i++) {
-		if(!(bmalloc_pool[i] & 0x01)) {
-			void* ptr = (void*)bmalloc_pool[i];
-			bmalloc_pool[i] |= 0x01;
-			return ptr;
+		if(!bmalloc_pool[i].used) {
+			if(is_linear(&bmalloc_pool[i], count)) {
+				set_used(&bmalloc_pool[i], count);
+				return (void*)bmalloc_pool[i].pool;
+			}
+
+			i += count;
 		}
 	}
 
@@ -283,12 +318,10 @@ void* bmalloc() {
 }
 
 void bfree(void* ptr) {
-	uint64_t addr = (uint64_t)ptr;
-	addr |= 0x01;
-
 	for(size_t i = 0; i < bmalloc_count; i++) {
-		if(bmalloc_pool[i] == addr) {
-			bmalloc_pool[i] ^= 0x01;
+		if((void*)bmalloc_pool[i].pool == ptr) {
+			if(bmalloc_pool[i].head)
+				clear_used(&bmalloc_pool[i]);
 			break;
 		}
 	}
@@ -301,7 +334,7 @@ size_t bmalloc_total() {
 size_t bmalloc_used() {
 	size_t size = 0;
 	for(size_t i = 0; i < bmalloc_count; i++) {
-		if(bmalloc_pool[i] & 0x01) {
+		if(bmalloc_pool[i].used) {
 			size += 0x200000;
 		}
 	}

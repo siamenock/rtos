@@ -34,74 +34,8 @@
 #include "driver/nic.h"
 
 static bool idle0_event() {
-	extern Device* nic_current;
-	int poll_count = 0;
-	for(int i = 0; i < MAX_NIC_DEVICE_COUNT; i++) {
-		Device* dev = nic_devices[i];
-		if(dev == NULL)
-			break;
-
-		nic_current = dev;
-		NICDriver* nic = nic_current->driver;
-
-		poll_count += nic->poll(nic_current->id);
-	}
+	nic_poll();
 	return true;
-}
-
-static void init_nics(int count) {
-	int index = 0;
-	extern uint64_t manager_mac;
-	for(int i = 0; i < count; i++) {
-		nic_devices[i] = device_get(DEVICE_TYPE_NIC, i);
-		if(!nic_devices[i])
-			continue;
-
-		NICPriv* nic_priv = gmalloc(sizeof(NICPriv));
-		if(!nic_priv)
-			continue;
-
-		nic_priv->nics = map_create(8, NULL, NULL, gmalloc_pool);
-		nic_priv->__nics = (uint64_t)nic_priv->nics;
-		nic_devices[i]->priv = nic_priv;
-
-		NICInfo info;
-		((NICDriver*)nic_devices[i]->driver)->get_info(nic_devices[i]->id, &info);
-
-		nic_priv->port_count = info.port_count;
-		for(int j = 0; j < info.port_count; j++) {
-			nic_priv->mac[j] = info.mac[j];
-			strncpy(nic_priv->name, info.name, sizeof(nic_priv->name));
-
-			/*
-			 *char name_buf[64];
-			 *sprintf(name_buf, "eth%d", index);
-			 */
-			uint16_t port = j << 12;
-
-			Map* vnics = map_create(16, NULL, NULL, gmalloc_pool);
-			map_put(nic_priv->nics, (void*)(uint64_t)port, vnics);
-
-			int rc = dispatcher_register_nic((void*)nic_priv);
-			if(rc < 0)
-				continue;
-
-			printf("\tNICs in physical NIC(%s): %p\n", nic_priv->name, nic_priv->nics);
-			printf("\t%s : [%02lx:%02lx:%02lx:%02lx:%02lx:%02lx] [%c]\n", nic_priv->name,
-					(info.mac[j] >> 40) & 0xff,
-					(info.mac[j] >> 32) & 0xff,
-					(info.mac[j] >> 24) & 0xff,
-					(info.mac[j] >> 16) & 0xff,
-					(info.mac[j] >> 8) & 0xff,
-					(info.mac[j] >> 0) & 0xff,
-					manager_mac == 0 ? '*' : ' ');
-
-			if(!manager_mac)
-				manager_mac = info.mac[j];
-
-			index++;
-		}
-	}
 }
 
 extern int cpu_start;
@@ -523,9 +457,8 @@ int main(int argc, char** argv) {
 	printf("\nInitializing linux netlink devices...\n");
 	netlink_init();
 
-	uint16_t nic_count = device_count(DEVICE_TYPE_NIC);
-	printf("\nInitializing NICs: %d\n", nic_count);
-	init_nics(nic_count);
+	printf("\nInitializing NICs...\n");
+	nic_init();
 
 	printf("\nInitializing RPC manager...\n");
 	manager_init();

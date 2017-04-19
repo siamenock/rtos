@@ -14,6 +14,7 @@
 #include <linux/if_arp.h>
 
 #include "driver/nic.h"
+#include "device.h"
 
 #define IFLIST_REPLY_BUFFER	8192
 #define MAX_NET_DEVICES		8
@@ -40,10 +41,8 @@ static int init(void* device, void* data) {
 }
 
 static void get_info(int id, NICInfo* info) {
-	info->port_count = 1;
-
-	memset(&info->mac[0], 0x0, ETH_ALEN);
-	info->mac[0] = devices[id]->info.mac[0];
+	memset(&info->mac, 0x0, ETH_ALEN);
+	info->mac = devices[id]->info.mac;
 
 	strncpy(info->name, devices[id]->info.name, sizeof(info->name));
 }
@@ -108,9 +107,9 @@ static void rtnl_link(struct nlmsghdr *h, NetDevice* device) {
 				char buf[64];
 				uint8_t* mac = RTA_DATA(attribute);
 
-				memset(&device->info.mac[0], 0x0, ETH_ALEN);
+				memset(&device->info.mac, 0x0, ETH_ALEN);
 				for(int i = 0; i < ETH_ALEN; i++) {
-					device->info.mac[0] |=
+					device->info.mac |=
 						(uint64_t)mac[i] << (ETH_ALEN - i - 1) * 8;
 				}
 

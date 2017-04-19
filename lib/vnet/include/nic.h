@@ -5,6 +5,11 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+
+#define MAX_NIC_NAME_LEN	16
+
+#define ROUNDUP(x, y)	((((x) + (y) - 1) / (y)) * (y))
+
 #define NIC_MAX_COUNT		64
 #define NIC_MAX_LINKS		8
 #define NIC_CHUNK_SIZE		64
@@ -101,6 +106,12 @@ NIC* nic_get_by_id(uint32_t id);
 Packet* nic_alloc(NIC* nic, uint16_t size);
 bool nic_free(Packet* packet);
 
+bool queue_push(NIC* nic, NIC_Queue* queue, Packet* packet);
+void* queue_pop(NIC* nic, NIC_Queue* queue);
+uint32_t queue_size(NIC_Queue* queue);
+bool queue_available(NIC_Queue* queue);
+bool queue_empty(NIC_Queue* queue);
+
 bool nic_has_rx(NIC* nic);
 Packet* nic_rx(NIC* nic);
 uint32_t nic_rx_size(NIC* nic);
@@ -147,10 +158,5 @@ uint64_t nic_config_get(NIC* nic, uint32_t key);
  * @return 1 the base address is not aligned in 2MBs
  * @return 2 the size is not rounded up 2MBs
  */
-int nic_init(uint32_t id, uint64_t mac, void* base, size_t size,
-		uint64_t rx_bandwidth, uint64_t tx_bandwidth,
-		uint16_t padding_head, uint16_t padding_tail,
-		uint32_t rx_queue_size, uint32_t tx_queue_size,
-		uint32_t srx_queue_size, uint32_t stx_queue_size);
 
 #endif /* __NIC_H__ */

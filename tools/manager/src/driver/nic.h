@@ -6,28 +6,18 @@
 #include <util/map.h>
 #include "../device.h"
 
-#define MAX_PORT_COUNT	16
+#define MAX_NIC_NAME_LEN	16
 
 typedef struct {
-	char		name[16];
-	uint8_t		port_count;
-	uint64_t	mac[MAX_PORT_COUNT];
-	/***
-	 * nics
-	 *     key: port(4bits) | vlan_id(12bits)
-	 *     value: Map* -> VNICs
-	 * VNICS
-	 *     key: mac
-	 *     value: VNIC
-	 */
-	Map*		nics;
-	uint64_t	__nics;
-} NICPriv;
+	char		name[MAX_NIC_NAME_LEN];
+	uint64_t	mac;
+
+	Map*		vnics;
+} NICDevice;
 
 typedef struct {
-	char		name[16];
-	uint8_t		port_count;
-	uint64_t	mac[MAX_PORT_COUNT];
+	char		name[MAX_NIC_NAME_LEN];
+	uint64_t	mac;
 } NICInfo;
 
 typedef struct {
@@ -35,12 +25,20 @@ typedef struct {
 } NICStatus;
 
 typedef struct {
-	int	(*init)(void* device, void* data);
-	void	(*destroy)(int id);
-	int	(*poll)(int id);
-	void	(*get_status)(int id, NICStatus* status);
-	bool	(*set_status)(int id, NICStatus* status);
-	void	(*get_info)(int id, NICInfo* info);
+	int		(*init)(void* device, void* data);
+	void		(*destroy)(int id);
+	int		(*poll)(int id);
+	void		(*get_status)(int id, NICStatus* status);
+	bool		(*set_status)(int id, NICStatus* status);
+	void		(*get_info)(int id, NICInfo* info);
 } NICDriver;
+
+void nic_init();
+void nic_poll();
+
+NICDevice* nic_create(Device* dev);
+void nic_destroy(NICDevice* dev);
+NICDevice* nic_device(const char* name);
+bool nic_contains(NICDevice* dev, const uint64_t mac);
 
 #endif /* __DRIVER_NIC__ */

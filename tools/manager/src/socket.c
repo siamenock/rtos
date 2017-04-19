@@ -9,7 +9,7 @@
 #include <linux/if_ether.h>
 #include <arpa/inet.h>
 
-#include <net/packet.h>
+#include "nic.h"
 #include "driver/nic.h"
 #include "vnic.h"
 #include "socket.h"
@@ -156,13 +156,11 @@ static int init(void* device, void* data) {
 }
 
 static void get_info(int id, NICInfo* info) {
-	info->port_count = 1;
-
 	uint8_t mac[ETH_ALEN] = "0GURUM";
 
-	memset(&info->mac[0], 0x0, ETH_ALEN);
+	memset(&info->mac, 0x0, ETH_ALEN);
 	for(int i = 0; i < ETH_ALEN; i++) {
-		info->mac[0] |= (uint64_t)mac[i] << (ETH_ALEN - i - 1) * 8;
+		info->mac |= (uint64_t)mac[i] << (ETH_ALEN - i - 1) * 8;
 	}
 }
 
