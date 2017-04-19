@@ -28,6 +28,8 @@ zlib*/Makefile
 
 # Expat temporary files
 expat*/xmlwf/*
+expat*/expat_config.h
+expat*/libtool
 
 # Headers copied
 include/*
