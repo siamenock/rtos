@@ -8,7 +8,7 @@ project 'kernel'
     linkoptions { '-T elf_x86_64.ld -e main' }
 
     -- Make version header
-    prebuildcommands './mkver.sh > src/version.h'
+    prebuildcommands '../scripts/mkver.sh > src/version.h'
 
     filter 'configurations:debug'
         removefiles { 'src/test/**.c', 'src/test/**.asm' }

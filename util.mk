@@ -55,13 +55,13 @@ endif
 
 ver:
 	@echo "Current PacketNgin RTOS version"
-	@echo $(shell bin/ver.sh)
+	@echo $(shell scripts/ver.sh)
 
 deploy: system.img
 	@echo "Deploy PacketNgin RTOS image to USB"
-	bin/deploy
+	scripts/deploy.sh
 
-SDK := packetngin_sdk-$(shell bin/ver.sh)
+SDK := packetngin_sdk-$(shell scripts/ver.sh)
 
 sdk: loader/loader.bin kernel.bin initrd.img system.img
 	@echo "* Create PacketNgin SDK(Software Development Kit)"
