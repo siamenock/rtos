@@ -1,5 +1,5 @@
 rootPath = os.getcwd()
-build = require 'build'
+build = require 'scripts/build'
 
 workspace 'PacketNgin'
     configurations  { 'debug' , 'release' }
@@ -25,7 +25,7 @@ project 'build'
         'make -C lib',
         'make -C tools',
 
-        'bin/lua image.lua build',
+        'bin/lua scripts/image.lua build',
     }
 
     cleancommands {
@@ -34,5 +34,5 @@ project 'build'
         'make clean -C lib',
         'make clean -C tools',
 
-        'bin/lua image.lua clean'
+        'bin/lua scripts/image.lua clean'
     }

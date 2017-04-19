@@ -1,5 +1,8 @@
-#/usr/bin/lua
--- rootPath variable must be exported for this script.
+#!/usr/bin/lua
+if rootPath == nil then
+    print "This file can not be used directly. Use in rtos/premake5.lua"
+    return
+end
 
 local includePath = {}
 local function exportPath(lib, paths)
