@@ -26,6 +26,8 @@ zlib*/minigzip*
 zlib*/zlib.pc
 zlib*/Makefile
 
-# Expat temporari files
+# Expat temporary files
 expat*/xmlwf/*
 
+# Headers copied
+include/*

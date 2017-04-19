@@ -10,6 +10,9 @@ project 'ext'
         removefiles { 'src/malloc.c' }
     filter {}
 
+    postbuildcommands { '{COPY} -L include/* ../include' }
+
+-- TODO: revive below
 --include 'doc'
 --include 'tests'
 

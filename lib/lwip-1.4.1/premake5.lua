@@ -4,10 +4,9 @@ project "lwip"
     build.compileProperty('x86_64')
     build.linkingProperty()
     build.targetPath('..')
-    build.exportPath('lwip', {
-        'src/include',
-        'src/include/ipv4',
-    })
+    build.exportPath('lwip', { 'include/ipv4' })
 
-    removefiles { 'src/core/ipv6/**.c' }
-    includedirs { '../ext/include' }
+    removefiles         { 'src/core/ipv6/**.c' }
+    includedirs         { '../ext/include' }
+
+    postbuildcommands   { '{COPY} -L include/* ../include' }
