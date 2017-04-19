@@ -1,6 +1,11 @@
 # Utility Makefile for PacketNgin RTOS
-.PHONY: run stop ver deploy sdk gdb dis help
+.PHONY: prepare run stop ver deploy sdk gdb dis help
 
+prepare:
+	@echo "Prepare all requirement packages for PacketNgin build"
+	sudo apt-get install -y git nasm multiboot libcurl4-gnutls-dev qemu-kvm bridge-utils \
+		libc6-dev-i386 doxygen graphviz kpartx bison flex cmake nodejs autoconf dcfldd \
+		libcmocka-dev
 all: run
 
 # Default running option is QEMU
