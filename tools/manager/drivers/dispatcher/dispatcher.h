@@ -13,12 +13,7 @@
 #define DISPATCHER_UPDATE_VNIC		_IOWR(DISPATCHER, 0x22, void *)
 #define DISPATCHER_GET_VNIC		_IOR(DISPATCHER, 0x23, void *)
 
-struct dispatcher_work {
-	struct list_head	node;
-	dispatcher_work_fn_t	fn;
-	void*			data;
-	struct net_device*	dev;
-};
-
+int dispatcher_init(void);
+void dispatcher_exit(void);
 
 #endif /* __DISPATCHER_H__ */

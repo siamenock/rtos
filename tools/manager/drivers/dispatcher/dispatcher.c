@@ -16,17 +16,31 @@
 #include <linux/if_vlan.h>
 #include <linux/etherdevice.h>
 
-#include <util/map.h>
-#include <vnic.h>
+/*
+ *#include <util/map.h>
+ *#include <net/ether.h>
+ *#include <vnic.h>
+ */
 
 #include "dispatcher.h"
 
-typedef struct {
-	char		name[MAX_NIC_NAME_LEN];
-	uint64_t	mac;
+typedef void (*dispatcher_work_fn_t)(void *data);
 
-	Map*		vnics;
-} NICDevice;
+struct dispatcher_work {
+	struct list_head	node;
+	dispatcher_work_fn_t	fn;
+	void*			data;
+	struct net_device*	dev;
+};
+
+/*
+ *typedef struct {
+ *        char		name[MAX_NIC_NAME_LEN];
+ *        uint64_t	mac;
+ *
+ *        Map*		vnics;
+ *} NICDevice;
+ */
 
 static struct task_struct *dispatcher_daemon;
 static spinlock_t work_lock;
@@ -241,27 +255,36 @@ rx_handler_result_t dispatcher_handle_frame(struct sk_buff** pskb)
 
 	BUG_ON(!nic_device);
 
-	//TODO map_get vnic from vnics
-	//lock_lock(nic_device->lock);
-	if(eth->h_dest == ETHER_MULTICAST) { //Multi cast
-		MapIterator iter;
-		map_iterator_init(&iter, nic_device->vnics);
-		while(map_iterator_has_next(&iter)) {
-			VNIC* vnic = (VNIC*)map_iterator_next(&iter);
-			vnic_process_input(vnic, (void*)eth, ETH_HLEN + skb->len, NULL, 0);
-		}
-		//kfree_skb(skb);
-	} else {
-		VNIC* vnic = map_get(nic_device->vnics, eth->h_dest);
-		if(vnic) {
-			vnic_process_input(vnic, (void*)eth, ETH_HLEN + skb->len, NULL, 0);
-			kfree_skb(skb);
-			return RX_HANDLER_CONSUMED;
-		}
-	}
-	//lock_unlock(nic_device->lock);
+	int res = nicdev_rx(nic_device, eth, ETH_HELN + skb->len);
 
-	return RX_HANDLER_PASS;
+	if(res == NICDEV_PROCESS_DONE)
+		return RX_HANDLER_CONSUMED;
+	else if(res == NICDEV_PROCESS_PASS)
+		return RX_HANDLER_PASS;
+
+/*
+ *        //TODO map_get vnic from vnics
+ *        //lock_lock(nic_device->lock);
+ *        if(eth->h_dest == ETHER_MULTICAST) {
+ *                MapIterator iter;
+ *                map_iterator_init(&iter, nic_device->vnics);
+ *                while(map_iterator_has_next(&iter)) {
+ *                        VNIC* vnic = (VNIC*)map_iterator_next(&iter);
+ *                        vnic_process_input(vnic, (void*)eth, ETH_HLEN + skb->len, NULL, 0);
+ *                }
+ *                //kfree_skb(skb);
+ *        } else {
+ *                VNIC* vnic = map_get(nic_device->vnics, eth->h_dest);
+ *                if(vnic) {
+ *                        vnic_process_input(vnic, (void*)eth, ETH_HLEN + skb->len, NULL, 0);
+ *                        kfree_skb(skb);
+ *                        return RX_HANDLER_CONSUMED;
+ *                }
+ *        }
+ *        //lock_unlock(nic_device->lock);
+ *
+ *        return RX_HANDLER_PASS;
+ */
 }
 
 static int dispatcher_open(struct inode *inode, struct file *f)
@@ -287,204 +310,6 @@ static int dispatcher_release(struct inode *inode, struct file *f)
 	printk("PacketNgin manager unassociated with disptacher\n");
 	return 0;
 }
-
-/*static void poll_one_napi(struct napi_struct *napi)*/
-/*{*/
-	/*int work = 0;*/
-
-	/* net_rx_action's ->poll() invocations and our's are
-	 * synchronized by this test which is only made while
-	 * holding the napi->poll_lock.
-	 */
-	/*if (!test_bit(NAPI_STATE_SCHED, &napi->state))*/
-		/*return;*/
-
-	/*
-	 *static int index = 0;
-	 *if(net_ratelimit())
-	 *        printk("Polling Loop index :%d \n", index++);
-	 */
-
-	/* If we set this bit but see that it has already been set,
-	 * that indicates that napi has been disabled and we need
-	 * to abort this operation
-	 */
-	/*
-	 *if (test_and_set_bit(NAPI_STATE_NPSVC, &napi->state))
-	 *        return;
-	 */
-
-	/* We explicilty pass the polling call a budget of 0 to
-	 * indicate that we are clearing the Tx path only.
-	 */
-	/*work = napi->poll(napi, 1);*/
-	/*//WARN_ONCE(work, "%pF exceeded budget in poll\n", napi->poll);*/
-	/*//trace_napi_poll(napi);*/
-
-	/*//clear_bit(NAPI_STATE_NPSVC, &napi->state);*/
-/*}*/
-
-/*static void poll_napi(struct net_device *dev)*/
-/*{*/
-	/*struct napi_struct *napi;*/
-
-	/*list_for_each_entry(napi, &dev->napi_list, dev_list) {*/
-		/*
-		 *if (napi->poll_owner != smp_processor_id() &&
-		 *                spin_trylock(&napi->poll_lock)) {
-		 */
-		/*//poll_one_napi(napi);*/
-		/*if (!test_bit(NAPI_STATE_SCHED, &napi->state))*/
-			/*return;*/
-
-		/*napi->poll(napi, 1);*/
-		/*
-		 *        spin_unlock(&napi->poll_lock);
-		 *}
-		 */
-	/*}*/
-/*}*/
-
-/*static void netpoll_poll_dev(struct net_device *dev)*/
-/*{*/
-	/*const struct net_device_ops *ops;*/
-	/*//struct netpoll_info *ni = rcu_dereference_bh(dev->npinfo);*/
-
-	/* Don't do any rx activity if the dev_lock mutex is held
-	 * the dev_open/close paths use this to block netpoll activity
-	 * while changing device state
-	 */
-	/*
-	 *if (down_trylock(&ni->dev_lock))
-	 *        return;
-	 */
-
-	/*if (!netif_running(dev)) {*/
-		/*//up(&ni->dev_lock);*/
-		/*return;*/
-	/*}*/
-
-	/*ops = dev->netdev_ops;*/
-	/*if (!ops->ndo_poll_controller) {*/
-		/*//up(&ni->dev_lock);*/
-		/*return;*/
-	/*}*/
-
-	/*[> Process pending work on NIC <]*/
-	/*ops->ndo_poll_controller(dev);*/
-
-	/*//poll_napi(dev);*/
-	/*struct napi_struct *napi;*/
-	/*list_for_each_entry(napi, &dev->napi_list, dev_list) {*/
-		/*if (!test_bit(NAPI_STATE_SCHED, &napi->state))*/
-			/*return;*/
-
-		/*napi->poll(napi, 1);*/
-	/*}*/
-
-	/*//up(&ni->dev_lock);*/
-
-	/*//zap_completion_queue();*/
-/*}*/
-
-/*static int netpoll_start_xmit(struct sk_buff *skb, struct net_device *dev)*/
-/*{*/
-	/*int status = NETDEV_TX_OK;*/
-	/*netdev_features_t features;*/
-
-	/*features = netif_skb_features(skb);*/
-
-	/*if (skb_vlan_tag_present(skb) &&*/
-	    /*!vlan_hw_offload_capable(features, skb->vlan_proto)) {*/
-		/*skb = __vlan_hwaccel_push_inside(skb);*/
-		/*if (unlikely(!skb)) {*/
-			/* This is actually a packet drop, but we
-			 * don't want the code that calls this
-			 * function to try and operate on a NULL skb.
-			 */
-			/*goto out;*/
-		/*}*/
-	/*}*/
-
-	/*status = __netdev_start_xmit(dev->netdev_ops, skb, dev, false);*/
-
-/*out:*/
-	/*return status;*/
-/*}*/
-
-/*[> call with IRQ disabled <]*/
-/*void netpoll_send_skb_on_dev(struct sk_buff *skb, struct net_device *dev)*/
-/*{*/
-	/*int status = NETDEV_TX_BUSY;*/
-	/*unsigned long tries;*/
-	/*[> It is up to the caller to keep npinfo alive. <]*/
-	/*//struct netpoll_info *npinfo;*/
-
-	/*WARN_ON_ONCE(!irqs_disabled());*/
-
-	/*//npinfo = rcu_dereference_bh(np->dev->npinfo);*/
-	/*if (!netif_running(dev) || !netif_device_present(dev)) {*/
-		/*dev_kfree_skb_irq(skb);*/
-		/*return;*/
-	/*}*/
-
-	/*[> don't get messages out of order, and no recursion <]*/
-	/*//if (skb_queue_len(&npinfo->txq) == 0 && !netpoll_owner_active(dev)) {*/
-		/*//struct netdev_queue *txq;*/
-
-		/*//txq = netdev_pick_tx(dev, skb, NULL);*/
-
-		/*[> try until next clock tick <]*/
-		/*for (tries = jiffies_to_usecs(1) / 50;*/
-		     /*tries > 0; --tries) {*/
-			/*//if (HARD_TX_TRYLOCK(dev, txq)) {*/
-				/*//if (!netif_xmit_stopped(txq))*/
-			/*//status = netpoll_start_xmit(skb, dev);*/
-			/*int status = NETDEV_TX_OK;*/
-			/*netdev_features_t features;*/
-
-			/*features = netif_skb_features(skb);*/
-
-			/*if (skb_vlan_tag_present(skb) &&*/
-					/*!vlan_hw_offload_capable(features, skb->vlan_proto)) {*/
-				/*skb = __vlan_hwaccel_push_inside(skb);*/
-				/*if (unlikely(!skb)) {*/
-					/* This is actually a packet drop, but we
-					 * don't want the code that calls this
-					 * function to try and operate on a NULL skb.
-					 */
-					/*goto out;*/
-				/*}*/
-			/*}*/
-
-			/*status = __netdev_start_xmit(dev->netdev_ops, skb, dev, false);*/
-
-/*out:*/
-
-			/*//	HARD_TX_UNLOCK(dev, txq);*/
-
-			/*if (status == NETDEV_TX_OK)*/
-					/*break;*/
-
-			/*//}*/
-
-			/*[> tickle device maybe there is some cleanup <]*/
-			/*//netpoll_poll_dev(np->dev);*/
-
-			/*udelay(50);*/
-		/*}*/
-
-		/*WARN_ONCE(!irqs_disabled(),*/
-			/*"netpoll_send_skb_on_dev(): %s enabled interrupts in poll (%pF)\n",*/
-			/*dev->name, dev->netdev_ops->ndo_start_xmit);*/
-
-	/*//}*/
-
-	/*//if (status != NETDEV_TX_OK) {*/
-	/*//	skb_queue_tail(&npinfo->txq, skb);*/
-	/*//	schedule_delayed_work(&npinfo->tx_work,0);*/
-	/*//}*/
-/*}*/
 
 static struct sk_buff* convert_to_skb(struct net_device* dev, Packet* packet)
 {
@@ -523,48 +348,52 @@ static inline void dispatcher_tx(struct net_device *dev)
 
 	//TODO map_iterator
 
-	MapIterator iter;
-	map_iterator_init(&iter, nic_device->vnics);
-	while(map_iterator_has_next(&iter)) {
-		VNIC* vnic = (VNIC*)map_iterator_next(&iter);
+	nicdev_tx(nic_device, packet_process, ...);
 
-		while((packet = vnic_process_output(vnic)) != NULL) {
-			printk("Fast path %p\n", packet);
-			skb = convert_to_skb(dev, packet);
-			if(!skb) {
-				printk("Failed to convert skb\n");
-				vnic_free(packet);
-				continue;
-			}
-
-			//netpoll_send_skb_on_dev(skb, dev);
-			if (!netif_running(dev) || !netif_device_present(dev)) {
-				dev_kfree_skb_irq(skb);
-				printk("not running\n");
-				continue;
-			}
-
-			netdev_features_t features;
-
-			features = netif_skb_features(skb);
-
-			if (skb_vlan_tag_present(skb) &&
-					!vlan_hw_offload_capable(features, skb->vlan_proto)) {
-				skb = __vlan_hwaccel_push_inside(skb);
-				if (unlikely(!skb)) {
-					printk("skb_vlan_tag\n");
-					continue;
-				}
-			}
-
-			printk("__netdev_start_xmit\n");
-			if (current->pid != dispatcher_daemon->pid) {
-				printk("Current PID: %d, Worker PID: %d\n", current->pid, dispatcher_daemon->pid);
-				return ;
-			}
-			__netdev_start_xmit(dev->netdev_ops, skb, dev, false);
-		}
-	}
+/*
+ *        MapIterator iter;
+ *        map_iterator_init(&iter, nic_device->vnics);
+ *        while(map_iterator_has_next(&iter)) {
+ *                VNIC* vnic = (VNIC*)map_iterator_next(&iter);
+ *
+ *                while((packet = vnic_process_output(vnic)) != NULL) {
+ *                        printk("Fast path %p\n", packet);
+ *                        skb = convert_to_skb(dev, packet);
+ *                        if(!skb) {
+ *                                printk("Failed to convert skb\n");
+ *                                vnic_free(packet);
+ *                                continue;
+ *                        }
+ *
+ *                        //netpoll_send_skb_on_dev(skb, dev);
+ *                        if (!netif_running(dev) || !netif_device_present(dev)) {
+ *                                dev_kfree_skb_irq(skb);
+ *                                printk("not running\n");
+ *                                continue;
+ *                        }
+ *
+ *                        netdev_features_t features;
+ *
+ *                        features = netif_skb_features(skb);
+ *
+ *                        if (skb_vlan_tag_present(skb) &&
+ *                                        !vlan_hw_offload_capable(features, skb->vlan_proto)) {
+ *                                skb = __vlan_hwaccel_push_inside(skb);
+ *                                if (unlikely(!skb)) {
+ *                                        printk("skb_vlan_tag\n");
+ *                                        continue;
+ *                                }
+ *                        }
+ *
+ *                        printk("__netdev_start_xmit\n");
+ *                        if (current->pid != dispatcher_daemon->pid) {
+ *                                printk("Current PID: %d, Worker PID: %d\n", current->pid, dispatcher_daemon->pid);
+ *                                return ;
+ *                        }
+ *                        __netdev_start_xmit(dev->netdev_ops, skb, dev, false);
+ *                }
+ *        }
+ */
 	//local_irq_restore(flags);
 }
 
@@ -804,12 +633,12 @@ struct miscdevice dispatcher_misc = {
 	&dispatcher_fops,
 };
 
-static int dispatcher_init()
+int dispatcher_init()
 {
 	return misc_register(&dispatcher_misc);
 }
 
-static void dispatcher_exit(void)
+void dispatcher_exit(void)
 {
 	misc_deregister(&dispatcher_misc);
 }
