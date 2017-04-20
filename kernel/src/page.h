@@ -4,25 +4,25 @@
 #include <stdint.h>
 #include "mmap.h"
 
-#define PAGE_ENTRY_COUNT	512
-#define PAGE_TABLE_SIZE		0x1000		// 4096
-#define PAGE_PAGE_SIZE		0x200000	// 2M
+#define PAGE_ENTRY_COUNT		512
+#define PAGE_TABLE_SIZE			0x1000		// 4096
+#define PAGE_PAGE_SIZE			0x200000	// 2M
 
-#define PAGE_L2_INDEX		0
-#define PAGE_L3U_INDEX		1
-#define PAGE_L3K_INDEX		2
-#define PAGE_L4U_INDEX		3
-#define PAGE_L4U_SIZE		59
-#define PAGE_L4K_INDEX		62
-#define PAGE_L4K_SIZE		2
+#define PAGE_L2_INDEX			0
+#define PAGE_L3U_INDEX			1
+#define PAGE_L3K_INDEX			2
+#define PAGE_L4U_INDEX			3
+#define PAGE_L4U_SIZE			59
+#define PAGE_L4K_INDEX			62
+#define PAGE_L4K_SIZE			2
 
 #define VIRTUAL_TO_PHYSICAL(addr)	(~0xffffffff80000000L & ((uint64_t)addr))
 #define PHYSICAL_TO_VIRTUAL(addr)	(0xffffffff80000000L | ((uint64_t)addr))
 
-#define PAGE_L4U		((PageTable*)(PAGE_TABLE_START + PAGE_TABLE_SIZE * PAGE_L4U_INDEX))
+#define PAGE_L4U			((PageTable*)(PAGE_TABLE_START + PAGE_TABLE_SIZE * PAGE_L4U_INDEX))
 
-#define PAGE_L4U_BASE(coreid)	((PageTable*)(PAGE_TABLE_START + (coreid) * 0x200000 \
-			+ PAGE_TABLE_SIZE * PAGE_L4U_INDEX))
+#define PAGE_L4U_BASE(coreid)		((PageTable*)(PAGE_TABLE_START + (coreid) * 0x200000 \
+					+ PAGE_TABLE_SIZE * PAGE_L4U_INDEX))
 
 #define TRANSLATE_TO_PHYSICAL(vaddr)	\
 	((uint64_t)PAGE_L4U[vaddr >> 21].base << 21 | (vaddr & 0x1fffff))

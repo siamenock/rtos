@@ -14,9 +14,11 @@ void gfree(void* ptr);
 void* grealloc(void* ptr, size_t size);
 void* gcalloc(uint32_t nmemb, size_t size);
 
-void* bmalloc();
+void* bmalloc(int count);
 void bfree(void* ptr);
 size_t bmalloc_total();
 size_t bmalloc_used();
+
+extern void* gmalloc_pool;
 
 #endif /* __GMALLOC_H__ */

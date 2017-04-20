@@ -1,5 +1,6 @@
 #ifndef __SMAP_H__
 #define __SMAP_H__
+#include <stdint.h>
 
 #define SMAP_TYPE_MEMORY        1
 #define SMAP_TYPE_RESERVED      2
@@ -20,5 +21,13 @@ typedef struct {
 	uint32_t	type;
 	//uint32_t	extended;
 } __attribute__((packed)) SMAP;
+
+uint8_t     smap_count;
+SMAP        smap[SMAP_MAX];
+
+int smap_init();
+void smap_dump();
+int smap_update_memmap(char* str);
+int smap_update_mem(char* str);
 
 #endif /* __SMAP_H__ */
