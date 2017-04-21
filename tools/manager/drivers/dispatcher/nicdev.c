@@ -1,10 +1,43 @@
+#include <linux/types.h>
+
 #include "nicdev.h"
+
 #define ETHER_MULTICAST		0Xffffffffffff
 
+#define ID_BUFFER_SIZE (MAX_NIC_DEVICE_COUNT * MAX_VNIC_COUNT / 8)
+static uint8_t id_map[ID_BUFFER_SIZE];
+static int id_alloc() {
+	int i, j;
+	uint8_t idx;
+	for(i = 0; i < ID_BUFFER_SIZE; i++) {
+		if(~id_map[i] & 0xff) {
+			idx = 1;
+			for(j = 0; j < 8; j++) {
+				if(!(id_map[i] & idx)) {
+					id_map[i] |= idx;
+					return i * 8 + j;
+				}
+
+				idx <<= 1;
+			}
+		}
+	}
+
+	return -1;
+}
+
+static void id_free(int id) {
+	int index = id / 8;
+	uint8_t idx = 1 << (id % 8);
+
+	id_map[index] |= idx;
+	id_map[index] ^= idx;
+}
+
 struct _ethhdr {
-	unsigned long long	h_dest: 48;	/* destination eth addr	*/
-	unsigned long long	h_source: 48;	/* source ether addr	*/
-	__be16		h_proto;		/* packet type ID field	*/
+	uint64_t	h_dest: 48;	/* destination eth addr	*/
+	uint64_t	h_source: 48;	/* source ether addr	*/
+	__be16		h_proto;	/* packet type ID field	*/
 } __attribute__((packed));
 
 static NICDevice* devs[MAX_NIC_DEVICE_COUNT]; //key string
@@ -51,7 +84,6 @@ NICDevice* nicdev_unregister(char* name) {
 		}
 
 		if(!netdev_name_compare(devs[i]->name, name)) {
-			//Shift
 			dev = devs[i];
 			devs[i] = NULL;
 			for(j = i; j + 1 < MAX_NIC_DEVICE_COUNT; j++) {
@@ -83,15 +115,12 @@ NICDevice* nicdev_get(char* name) {
 	return NULL;
 }
 
-//TODO fix vnic_id => bitmap max size = MAX_NIC_DEVICE_COUNT x MAX_VNIC_COUNT
-//TODO fix errno
-static uint64_t vnic_id;
 int nicdev_register_vnic(NICDevice* dev, VNIC* vnic) {
 	int i;
 	for(i = 0; i < MAX_VNIC_COUNT; i++) {
 		if(!dev->vnics[i]) {
 			dev->vnics[i] = vnic;
-			vnic->id = vnic_id++;
+			vnic->id = id_alloc();
 			return vnic->id;
 		}
 
@@ -122,6 +151,7 @@ VNIC* nicdev_unregister_vnic(NICDevice* dev, uint32_t id) {
 				}
 			}
 
+			id_free(id);
 			return vnic;
 		}
 	}
