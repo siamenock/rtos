@@ -11,7 +11,6 @@
 #include <util/cmd.h>
 #include <util/map.h>
 #include <util/event.h>
-#include <net/packet.h>
 #include <net/ether.h>
 #include <net/arp.h>
 #include <vnic.h>

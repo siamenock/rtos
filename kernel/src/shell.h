@@ -1,7 +1,7 @@
 #ifndef __SHELL_H__
 #define __SHELL_H__
 
-#include <net/packet.h>
+#include <packet.h>
 
 #define CMD_SIZE        512
 

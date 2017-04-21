@@ -103,7 +103,7 @@ static void ack(Packet* packet, Session* session) {
 	
 	udp_pack(packet, index);
 	
-	nic_output(packet->nic, packet);
+	nic_tx(packet->nic, packet);
 }
 
 static void nack(Packet* packet, uint16_t error_number, char* error_message) {
@@ -123,7 +123,7 @@ static void nack(Packet* packet, uint16_t error_number, char* error_message) {
 	
 	udp_pack(packet, index);
 	
-	nic_output(packet->nic, packet);
+	nic_tx(packet->nic, packet);
 }
 
 bool tftp_process(Packet* packet) {

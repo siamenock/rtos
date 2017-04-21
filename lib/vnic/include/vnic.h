@@ -43,6 +43,8 @@ typedef struct {
 
 	uint64_t	mac;
 
+	uint16_t	budget;
+
 	uint64_t	rx_bandwidth;
 	uint64_t	tx_bandwidth;
 

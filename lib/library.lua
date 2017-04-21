@@ -19,6 +19,7 @@ workspace "Kernel"
         includedirs { "core/include", "TLSF/src", "jsmn/", "../cmocka/include", "vnic/include" }
         files { "core/**.asm", "core/**.S", "core/**.h", "core/**.c" }
         -- Exclude test sources
+        removefiles { "core/src/tftp.c" }
         removefiles { "core/src/arp.c" }
         removefiles { "core/src/tcp.c" }
         removefiles { "core/src/icmp.c" }

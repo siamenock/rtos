@@ -79,7 +79,7 @@ bool arp_process(Packet* packet) {
 			arp->sha = ether->smac;
 			arp->spa = endian32(addr);
 
-			nic_output(packet->nic, packet);
+			nic_tx(packet->nic, packet);
 
 			return true;
 		case 2: // Reply
@@ -148,7 +148,7 @@ bool arp_request(NIC* nic, uint32_t destination, uint32_t source) {
 
 		packet->end = packet->start + sizeof(Ether) + sizeof(ARP);
 
-		return nic_output(nic, packet);
+		return nic_tx(nic, packet);
 	}
 }
 
@@ -192,7 +192,7 @@ bool arp_announce(NIC* nic, uint32_t ip) {
 
 		packet->end = packet->start + sizeof(Ether) + sizeof(ARP);
 
-		return nic_output(nic, packet);
+		return nic_tx(nic, packet);
 	}
 }
 

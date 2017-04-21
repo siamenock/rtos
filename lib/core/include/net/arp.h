@@ -3,7 +3,6 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <net/packet.h>
 #include <nic.h>
 
 /**

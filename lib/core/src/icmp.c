@@ -30,7 +30,7 @@ bool icmp_process(Packet* packet) {
 		
 		swap48(ether->smac, ether->dmac);
 		
-		nic_output(packet->nic, packet);
+		nic_tx(packet->nic, packet);
 		
 		return true;
 	}

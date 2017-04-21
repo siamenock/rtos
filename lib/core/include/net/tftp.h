@@ -2,7 +2,7 @@
 #define __NET_TFTP_H__
 
 #include <stdbool.h>
-#include <net/packet.h>
+#include <packet.h>
 
 #define TFTP_PORT	"net.tftpd.port"
 #define TFTP_CALLBACK	"net.tftpd.callback"

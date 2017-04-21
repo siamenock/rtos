@@ -1,7 +1,7 @@
 #ifndef __NET_UDP_H__
 #define __NET_UDP_H__
 
-#include <net/packet.h>
+#include <packet.h>
 #include <nic.h>
 
 /**

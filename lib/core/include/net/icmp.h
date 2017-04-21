@@ -2,7 +2,7 @@
 #define __NET_ICMP_H__
 
 #include <stdbool.h>
-#include <net/packet.h>
+#include <packet.h>
 
 /**
  * @file
