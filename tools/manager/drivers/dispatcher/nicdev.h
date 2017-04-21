@@ -6,6 +6,7 @@
 #define ETHER_MULTICAST		0Xffffffffffff
 #define MAX_NIC_DEVICE_COUNT	128
 #define MAX_NIC_NAME_LEN	16
+
 #define MAX_VNIC_COUNT		8
 
 typedef struct {
@@ -27,9 +28,10 @@ NICDevice* nicdev_unregister(char* name);
 NICDevice* nicdev_get(char* name);
 
 bool nicdev_register_vnic(NICDevice* dev, VNIC* vnic);
-VNIC* nicdev_unregister_vnic(NICDevice* dev, VNIC* dst_vnic);
-VNIC* nicdev_update_vnic(NICDevice* dev, VNIC* dst_vnic);
-VNIC* nicdev_get_vnic(NICDevice* dev, VNIC* vnic);
+VNIC* nicdev_unregister_vnic(NICDevice* dev, VNIC* vnic);
+VNIC* nicdev_get_vnic(NICDevice* dev, uint64_t id);
+VNIC* nicdev_get_vnic_mac(NICDevice* dev, uint64_t mac);
+VNIC* nicdev_update_vnic(NICDevice* dev, VNIC* src_vnic);
 /**
  * @param dev NIC device
  * @param data data to be sent
