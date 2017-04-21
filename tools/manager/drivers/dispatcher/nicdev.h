@@ -3,7 +3,6 @@
 
 #include <vnic.h>
 
-#define ETHER_MULTICAST		0Xffffffffffff
 #define MAX_NIC_DEVICE_COUNT	128
 #define MAX_NIC_NAME_LEN	16
 
@@ -23,13 +22,13 @@ enum NICDEV_PROCESS_RESULT {
 };
 
 int nicdev_init();
-bool nicdev_register(NICDevice* dev);
+int nicdev_register(NICDevice* dev);
 NICDevice* nicdev_unregister(char* name);
 NICDevice* nicdev_get(char* name);
 
-bool nicdev_register_vnic(NICDevice* dev, VNIC* vnic);
-VNIC* nicdev_unregister_vnic(NICDevice* dev, VNIC* vnic);
-VNIC* nicdev_get_vnic(NICDevice* dev, uint64_t id);
+int nicdev_register_vnic(NICDevice* dev, VNIC* vnic);
+VNIC* nicdev_unregister_vnic(NICDevice* dev, uint32_t id);
+VNIC* nicdev_get_vnic(NICDevice* dev, uint32_t id);
 VNIC* nicdev_get_vnic_mac(NICDevice* dev, uint64_t mac);
 VNIC* nicdev_update_vnic(NICDevice* dev, VNIC* src_vnic);
 /**
