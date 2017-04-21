@@ -24,7 +24,7 @@ typedef struct {
 	ICC*			    icc_queues;
 
 	uint64_t		    magic;
-} __attribute__ ((packed)) Shared;
+} Shared;
 
 
 /*

@@ -50,3 +50,8 @@ build
 loader/src/entry_tmp.asm
 lib/expat-2.1.0/*
 lib/zlib-1.2.8/Makefile
+
+# Module
+*.order
+*.mod.c
+*.symvers
