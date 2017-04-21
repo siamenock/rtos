@@ -19,6 +19,7 @@ typedef struct _BmallocPool {
 } BmallocPool;
 
 BmallocPool* bmalloc_pool;
+void* gmalloc_pool;
 
 void gmalloc_init() {
 	/* Gmalloc pool area : IDT_END_ADDR */

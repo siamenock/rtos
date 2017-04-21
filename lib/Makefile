@@ -1,7 +1,7 @@
 # This makefile is for external libraries which need to be configured.
 .PHONY: all clean cleanall newlib doc
 
-all: libc.a libm.a libexpat.a libz.a libssl.a libxdr.a
+all: libc.a libm.a libexpat.a libz.a libssl.a libxdr.a libvnic.a
 
 newlib/Makefile: 
 	cd newlib; CFLAGS="-fno-stack-protector -D__SSE_4_1__ -msse4.1" ./configure --target=x86_64-pc-packetngin --disable-multilib --enable-newlib-elix-level=4
@@ -55,11 +55,18 @@ xdr/linux/libxdr.a:
 libxdr.a: xdr/linux/libxdr.a
 	cp xdr/linux/libxdr.a .
 
+vnic/libvnic.a:
+	make -C vnic
+
+libvnic.a: vnic/libvnic.a
+	cp vnic/libvnic.a .
+	cp -rL vnic/include/* ../include/
+
 doc:
 	make -C core
 
 clean: 
-	rm -f libc.a libm.a libz.a libssl.a libcrypto.a libexpat.a libxdr.a
+	rm -f libc.a libm.a libz.a libssl.a libcrypto.a libexpat.a libxdr.a libvnic.a
 
 cleanall: clean
 	-make -C newlib distclean
@@ -67,3 +74,4 @@ cleanall: clean
 	-make -C openssl clean
 	-make -C expat clean
 	-make -C xdr -f Makefile.unix realclean
+	-make -C vnic clean

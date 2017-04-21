@@ -56,15 +56,19 @@
 #include <string.h>
 #include <lwip/init.h>
 #include <netif/etharp.h>
-#include <net/nic.h>
+#include <nic.h>
 #include <net/interface.h>
 #include <util/list.h>
+#include <util/map.h>
 #include <lwip/timers.h>
 #include <gmalloc.h>
 
 /* Define those to better describe your network interface. */
 #define IFNAME0 'e'
 #define IFNAME1 'n'
+
+
+typedef Packet* (*NIC_DPI)(Packet*);
 
 struct netif_private {
 	NIC*	nic;
@@ -145,7 +149,7 @@ low_level_output(struct netif *netif, struct pbuf *p)
     packet = postprocessor(packet);
   
   if(packet)
-    nic_output(nic, packet);
+    nic_tx(nic, packet);
 
 #if ETH_PAD_SIZE
   pbuf_header(p, ETH_PAD_SIZE); /* reclaim the padding word */
@@ -323,15 +327,17 @@ struct netif* nic_init(NIC* nic, NIC_DPI preprocessor, NIC_DPI postprocessor) {
  //		}
  //	}
 
-	if(list_size(netifs) >= NIC_SIZE)
+	if(list_size(netifs) >= NIC_MAX_COUNT)
 		return NULL;
 
 	uint32_t ip;
 	IPv4Interface* interface = NULL;
 
-	Map* interfaces = nic_config_get(nic, NIC_ADDR_IPv4);
-	if(!interfaces)
-		return NULL;
+	Map* interfaces = NULL; //nic_config_get(nic, NIC_ADDR_IPv4);
+	/*
+	 *if(!interfaces)
+	 *        return NULL;
+	 */
 
 	MapIterator iter;
 	map_iterator_init(&iter, interfaces);
@@ -407,10 +413,10 @@ process_packet:
 ;
 		struct netif* netif = list_iterator_next(&iter);
 		NIC* nic = ((struct netif_private*)netif->state)->nic;
-		if(!nic_has_input(nic))
+		if(!nic_has_tx(nic))
 			goto done;
 		
-		Packet* packet = nic_input(nic);
+		Packet* packet = nic_rx(nic);
 		NIC_DPI preprocessor = ((struct netif_private*)netif->state)->preprocessor;
 		if(preprocessor)
 			packet = preprocessor(packet);

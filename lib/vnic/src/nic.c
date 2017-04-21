@@ -232,6 +232,10 @@ uint32_t nic_srx_size(NIC* nic) {
 	return queue_size(&nic->srx);
 }
 
+bool nic_has_tx(NIC* nic) {
+	return !queue_empty(&nic->tx);
+}
+
 bool nic_tx(NIC* nic, Packet* packet) {
 	lock_lock(&nic->tx.wlock);
 	if(!queue_push(nic, &nic->tx, packet)) {

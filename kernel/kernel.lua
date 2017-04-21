@@ -35,11 +35,11 @@ workspace "Kernel"
         removefiles { "src/test.c", "src/test/**.c", "src/test/**.h" }
        
         -- Find headers in there 
-        includedirs { "../lib/core/include", "../lib/TLSF/src", "../lib/lwip/src/include", "../lib/lwip/src/include/ipv4" }
+        includedirs { "../lib/core/include", "../lib/TLSF/src", "../lib/lwip/src/include", "../lib/lwip/src/include/ipv4", "../lib/vnic/include" }
         -- Link directory
         libdirs { "../lib" }
         -- Link external libaries named 
-        links { "core", "tlsf", "lwip" }
+        links { "lwip", "core", "vnic", "tlsf" }
 
         -- Penguingin
         defines { "__PENGUIN__" }

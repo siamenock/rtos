@@ -1,7 +1,7 @@
 #include <string.h>
 #include <malloc.h>
 #include <time.h>
-#include <net/nic.h>
+#include <nic.h>
 #include <net/interface.h>
 #include <net/ether.h>
 #include <net/ip.h>

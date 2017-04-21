@@ -11,13 +11,13 @@ void gdt_init() {
 	gdtr->limit = GDT_END_ADDR
 		- GDT_ADDR - 1; 	// null, Kernel code segment, kernel data segment, task segment
 	gdtr->base = (uint64_t)GDT_ADDR;
-	
+
 	// Segments
 	int i = 0;
 	SD8* sd8 = (SD8*)GDT_ADDR;
 	SD8_INIT(sd8[i]);		// null segment
 	i++;
-	
+
 	SD8_INIT(sd8[i]);		// Kernel code segment
 	SD8_BASE(sd8[i], 0);		// Ignored
 	SD8_LIMIT(sd8[i], 0x0fffff);	// Ignored
@@ -28,7 +28,7 @@ void gdt_init() {
 	sd8[i].g = 1;
 	sd8[i].l = 1;
 	i++;
-	
+
 	SD8_INIT(sd8[i]);		// Kernel data segment
 	SD8_BASE(sd8[i], 0);		// Ignored
 	SD8_LIMIT(sd8[i], 0x0fffff);	// Ignored
@@ -39,7 +39,7 @@ void gdt_init() {
 	sd8[i].g = 1;
 	sd8[i].l = 1;
 	i++;
-	
+
 	SD8_INIT(sd8[i]);		// User data segment
 	SD8_BASE(sd8[i], 0);		// Ignored
 	SD8_LIMIT(sd8[i], 0x0fffff);	// Ignored
@@ -50,7 +50,7 @@ void gdt_init() {
 	sd8[i].g = 1;
 	sd8[i].l = 1;
 	i++;
-	
+
 	SD8_INIT(sd8[i]);		// User code segment
 	SD8_BASE(sd8[i], 0);		// Ignored
 	SD8_LIMIT(sd8[i], 0x0fffff);	// Ignored
@@ -61,7 +61,7 @@ void gdt_init() {
 	sd8[i].g = 1;
 	sd8[i].l = 1;
 	i++;
-	
+
 	SD16* sd16 = (SD16*)&sd8[i];
 	for(int j = 0; j < MP_MAX_CORE_COUNT; j++) {	// 16 cores
 		SD16_INIT(sd16[j]);			// TSS segment

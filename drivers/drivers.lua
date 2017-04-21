@@ -17,7 +17,7 @@ workspace "Kernel"
         location "virtio/build"
         targetname "virtio.ko"
         targetdir "."
-        includedirs { "../kernel/src", "../kernel/src/driver", "../lib/core/include" }
+        includedirs { "../kernel/src", "../kernel/src/driver", "../lib/vnic/include", "../lib/core/include" }
         files { "virtio/**.h", "virtio/**.c" }
         linkoptions { "-r ../../linux.ko" }
 
@@ -27,7 +27,7 @@ workspace "Kernel"
         location "fat/build"
         targetname "fat.ko"
         targetdir "."
-        includedirs { "../kernel/src", "../kernel/src/driver", "../lib/core/include" }
+        includedirs { "../kernel/src", "../kernel/src/driver", "../lib/vnic/include", "../lib/core/include" }
         files { "virtio/**.h", "virtio/**.c" }
         files { "fat/**.h", "fat/**.c" }
         linkoptions { "-r ../../linux.ko" }

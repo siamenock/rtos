@@ -16,25 +16,31 @@ workspace "Kernel"
     project "core"
         kind "StaticLib"
         location "core/build"
-        includedirs { "core/include", "TLSF/src", "jsmn/", "../cmocka/include" }
+        includedirs { "core/include", "TLSF/src", "jsmn/", "../cmocka/include", "vnic/include" }
         files { "core/**.asm", "core/**.S", "core/**.h", "core/**.c" }
         -- Exclude test sources
-        removefiles { "core/src/test/*" }
+        removefiles { "core/src/arp.c" }
+        removefiles { "core/src/tcp.c" }
+        removefiles { "core/src/icmp.c" }
+        removefiles { "core/src/ip.c" }
+        removefiles { "core/src/udp.c" }
         -- Enable exntension instruction for SSE. Do not need stack protector 
         buildoptions { "-msse4.1 -fno-stack-protector" }
 
     -- [[ 2. Core library for Linux ]]
-    project "core_linux"
-        kind "StaticLib"
-        location "core/build"
-        includedirs { "core/include", "TLSF/src", "jsmn/", "../cmocka/include" }
-        files { "core/**.asm", "core/**.S", "core/**.h", "core/**.c" }
-        -- Exclude test sources and standard C library functions
-        removefiles { "core/src/test/*" , "core/src/malloc.c", "core/src/errno.c" }
-        -- Memory model needs to be large rather than kernel
-        buildoptions { "-fno-common -msse4.1 -fno-stack-protector -mcmodel=large" }
-        -- Define "LINUX" to make core library for Linux OS
-        defines { "LINUX" }
+    --[[
+       [project "core_linux"
+       [    kind "StaticLib"
+       [    location "core/build"
+       [    includedirs { "core/include", "TLSF/src", "jsmn/", "../cmocka/include" }
+       [    files { "core/**.asm", "core/**.S", "core/**.h", "core/**.c" }
+       [    -- Exclude test sources and standard C library functions
+       [    removefiles { "core/src/test/*" , "core/src/malloc.c", "core/src/errno.c" }
+       [    -- Memory model needs to be large rather than kernel
+       [    buildoptions { "-fno-common -msse4.1 -fno-stack-protector -mcmodel=large" }
+       [    -- Define "LINUX" to make core library for Linux OS
+       [    defines { "LINUX" }
+       ]]
 
     -- [[ 3. TLSF library ]]
     project "tlsf"
@@ -52,7 +58,7 @@ workspace "Kernel"
     project "lwip"
         kind "StaticLib"
         location "lwip/build"
-        includedirs { "core/include", "lwip/src/include", "lwip/src/include/ipv4" }
+        includedirs { "vnic/include", "core/include", "lwip/src/include", "lwip/src/include/ipv4" }
         files { "lwip/src/**.h", "lwip/src/**.c" }
         removefiles { "lwip/src/core/ipv6/**", "lwip/src/include/ipv6/**" }
 

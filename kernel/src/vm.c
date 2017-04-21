@@ -9,6 +9,7 @@
 #include <net/md5.h>
 #include <timer.h>
 #include <file.h>
+#include <vnic.h>
 #include "icc.h"
 #include "vm.h"
 #include "apic.h"
@@ -17,7 +18,7 @@
 #include "stdio.h"
 #include "shared.h"
 #include "mmap.h"
-#include "driver/nic.h"
+#include "driver/nicdev.h"
 
 static uint32_t	last_vmid = 1;
 // FIXME: change to static
@@ -585,7 +586,7 @@ uint32_t vm_create(VMSpec* vm_spec) {
 	memset(vm->nics, 0x0, sizeof(VNIC) * vm->nic_count);
 
 	for(int i = 0; i < vm->nic_count; i++) {
-		NICDevice* dev = nic_device(nics[i].dev);
+		NICDevice* dev = nicdev_get(nics[i].dev);
 		if(!dev) {
 			printf("Manager: Invalid NIC device: %s.\n", nics[i].dev);
 			map_remove(vms, (void*)(uint64_t)vmid);
@@ -598,8 +599,8 @@ uint32_t vm_create(VMSpec* vm_spec) {
 			do {
 				mac = timer_frequency() & 0x0fffffffffffL;
 				mac |= 0x02L << 40;	// Locally administrered
-			} while(nic_contains(dev, mac));
-		} else if(nic_contains(dev, mac)) {
+			} while(nicdev_contains(dev, mac));
+		} else if(nicdev_contains(dev, mac)) {
 			printf("Manager: The mac address already in use: %012lx.\n", mac);
 			map_remove(vms, (void*)(uint64_t)vmid);
 			vm_delete(vm, -1);
@@ -610,16 +611,14 @@ uint32_t vm_create(VMSpec* vm_spec) {
 			VNIC_MAC, mac,
 			VNIC_DEV, (uint64_t)nics[i].dev,
 			VNIC_POOL_SIZE, nics[i].pool_size,
-			VNIC_INPUT_BANDWIDTH, nics[i].input_bandwidth,
-			VNIC_OUTPUT_BANDWIDTH, nics[i].output_bandwidth,
+			VNIC_RX_BANDWIDTH, nics[i].input_bandwidth,
+			VNIC_TX_BANDWIDTH, nics[i].output_bandwidth,
 			VNIC_PADDING_HEAD, nics[i].padding_head ? nics[i].padding_head : 32,
 			VNIC_PADDING_TAIL, nics[i].padding_tail ? nics[i].padding_tail : 32,
-			VNIC_INPUT_BUFFER_SIZE, nics[i].input_buffer_size,
-			VNIC_OUTPUT_BUFFER_SIZE, nics[i].output_buffer_size,
-			VNIC_SLOW_INPUT_BUFFER_SIZE, nics[i].slow_input_buffer_size,
-			VNIC_SLOW_OUTPUT_BUFFER_SIZE, nics[i].slow_output_buffer_size,
-			VNIC_INPUT_ACCEPT_ALL, 1,
-			VNIC_OUTPUT_ACCEPT_ALL, 1,
+			VNIC_RX_QUEUE_SIZE, nics[i].input_buffer_size,
+			VNIC_TX_QUEUE_SIZE, nics[i].output_buffer_size,
+			VNIC_SLOW_RX_QUEUE_SIZE, nics[i].slow_input_buffer_size,
+			VNIC_SLOW_TX_QUEUE_SIZE, nics[i].slow_output_buffer_size,
 			VNIC_NONE
 		};
 

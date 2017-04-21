@@ -4,6 +4,7 @@
 #include <string.h>
 #include <fcntl.h>
 
+#include <nic.h>
 #include <util/cmd.h>
 #include <util/list.h>
 #include <util/types.h>
@@ -16,7 +17,6 @@
 #include "version.h"
 #include "manager.h"
 #include "gmalloc.h"
-#include "driver/nic.h"
 
 bool cmd_sync;
 

@@ -16,10 +16,10 @@ ifeq ($(config),debug)
   TARGET = $(TARGETDIR)/manager
   OBJDIR = obj/Debug
   DEFINES +=
-  INCLUDES += -I../../penguin/lib/nic/include -I../../penguin/include -I../../penguin/include/ipv4
+  INCLUDES += -I../../../include -I../../../include/ipv4
   FORCE_INCLUDE +=
   ALL_CPPFLAGS += $(CPPFLAGS) -MMD -MP $(DEFINES) $(INCLUDES)
-  ALL_CFLAGS += $(CFLAGS) $(ALL_CPPFLAGS) -O2 -g -Wall -Wextra -DLINUX -std=gnu99 -mcmodel=large -Wno-unused -Wno-format -Wno-unused-result
+  ALL_CFLAGS += $(CFLAGS) $(ALL_CPPFLAGS) -O2 -g -Wall -Wextra -idirafter ../../../kernel/src -DLINUX -std=gnu99 -mcmodel=large -Wno-unused -Wno-format -Wno-unused-result
   ALL_CXXFLAGS += $(CXXFLAGS) $(ALL_CFLAGS)
   ALL_RESFLAGS += $(RESFLAGS) $(DEFINES) $(INCLUDES)
   LIBS += -lumpn -lrt -lnic
@@ -45,10 +45,10 @@ ifeq ($(config),release)
   TARGET = $(TARGETDIR)/manager
   OBJDIR = obj/Release
   DEFINES +=
-  INCLUDES += -I../../penguin/lib/nic/include -I../../penguin/include -I../../penguin/include/ipv4
+  INCLUDES += -I../../../include -I../../../include/ipv4
   FORCE_INCLUDE +=
   ALL_CPPFLAGS += $(CPPFLAGS) -MMD -MP $(DEFINES) $(INCLUDES)
-  ALL_CFLAGS += $(CFLAGS) $(ALL_CPPFLAGS) -O2 -g -Wall -Wextra -DLINUX -std=gnu99 -mcmodel=large -Wno-unused -Wno-format -Wno-unused-result
+  ALL_CFLAGS += $(CFLAGS) $(ALL_CPPFLAGS) -O2 -g -Wall -Wextra -idirafter ../../../kernel/src -DLINUX -std=gnu99 -mcmodel=large -Wno-unused -Wno-format -Wno-unused-result
   ALL_CXXFLAGS += $(CXXFLAGS) $(ALL_CFLAGS)
   ALL_RESFLAGS += $(RESFLAGS) $(DEFINES) $(INCLUDES)
   LIBS += -lumpn -lrt -lnic

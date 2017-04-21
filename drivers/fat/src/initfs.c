@@ -124,7 +124,7 @@ TFFS_mount( IN  FileSystemDriver* driver, int first_lba)
 	size_t read_size = 0;
 	size_t fat_size = tffs->fatsz * pbs->byts_per_sec;
 	read_buf = gmalloc(FS_BLOCK_SIZE);
-	fat = bmalloc();
+	fat = bmalloc(1);
 
 	while(read_size < fat_size) {
 	#define MIN(x, y) (((x) < (y)) ? (x) : (y))

@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include <stdint.h>
-
+#include <net/packet.h>
 
 #define MAX_NIC_NAME_LEN	16
 
@@ -24,15 +24,6 @@
  */
 
 // Host API
-typedef struct _Packet {
-	uint64_t	time;
-
-	uint16_t	start;
-	uint16_t	end;
-	uint16_t	size;
-
-	uint8_t		buffer[0];
-} Packet;
 
 typedef struct _NIC_Queue {
 	uint32_t	base;

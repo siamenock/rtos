@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <net/packet.h>
-#include <net/nic.h>
+#include <nic.h>
 
 /**
  * @file

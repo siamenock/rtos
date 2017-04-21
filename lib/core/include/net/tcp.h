@@ -1,7 +1,7 @@
 #ifndef __NET_TCP_H__
 #define __NET_TCP_H__
 
-#include <net/nic.h>
+#include <nic.h>
 
 /**
  * @file

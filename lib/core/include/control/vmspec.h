@@ -21,6 +21,8 @@ typedef struct {
 	char*		dev;
 	uint32_t	input_buffer_size;
 	uint32_t	output_buffer_size;
+	uint32_t	slow_input_buffer_size;
+	uint32_t	slow_output_buffer_size;
 	uint8_t		padding_head;
 	uint8_t		padding_tail;
 	uint64_t	input_bandwidth;

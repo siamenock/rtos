@@ -30,7 +30,7 @@ void module_init() {
 	addr += *(uint32_t*)addr;
 	addr = (void*)PHYSICAL_TO_VIRTUAL((uintptr_t)addr);
 	
-	void* buffer = bmalloc(); // 2MB buffer in memory
+	void* buffer = bmalloc(1); // 2MB buffer in memory
 	if(!buffer) 
 		return;
 	

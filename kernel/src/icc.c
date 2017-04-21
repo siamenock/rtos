@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <util/event.h>
+#include <util/fifo.h>
 #include <lock.h>
 #include <_malloc.h>
 #include <timer.h>

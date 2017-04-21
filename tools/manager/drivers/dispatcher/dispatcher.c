@@ -16,13 +16,11 @@
 #include <linux/if_vlan.h>
 #include <linux/etherdevice.h>
 
-/*
- *#include <util/map.h>
- *#include <net/ether.h>
- *#include <vnic.h>
- */
-
 #include "dispatcher.h"
+
+extern NICDevice;
+extern int nicdev_rx(NICDevice*, void*, size_t);
+extern int nicdev_tx(NICDevice*, void*, size_t);
 
 typedef void (*dispatcher_work_fn_t)(void *data);
 
@@ -32,15 +30,6 @@ struct dispatcher_work {
 	void*			data;
 	struct net_device*	dev;
 };
-
-/*
- *typedef struct {
- *        char		name[MAX_NIC_NAME_LEN];
- *        uint64_t	mac;
- *
- *        Map*		vnics;
- *} NICDevice;
- */
 
 static struct task_struct *dispatcher_daemon;
 static spinlock_t work_lock;

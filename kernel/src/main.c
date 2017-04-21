@@ -41,7 +41,6 @@
 #include "driver/pata.h"
 #include "driver/usb/usb.h"
 #include "driver/ramdisk.h"
-#include "driver/nic.h"
 #include "driver/virtio_blk.h"
 #include "driver/fs.h"
 #include "driver/bfs.h"

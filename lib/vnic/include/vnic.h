@@ -3,6 +3,8 @@
 
 #include "nic.h"
 
+#define MAX_VNIC_COUNT		8
+
 /**
  * VNIC attributes to create or update VNIC.
  */

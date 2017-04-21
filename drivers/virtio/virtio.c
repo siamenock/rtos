@@ -3,9 +3,9 @@
 // PacketNign kernel header
 #include <../gmalloc.h>
 #include <../port.h>
-#include <../vnic.h>
 #include <../pci.h>
-#include <nic.h>
+#include <nicdev.h>
+#include <vnic.h>
 #include <timer.h>
 // Virtio driver header
 #include "virtio.h"
@@ -271,7 +271,7 @@ static int init_vq(VirtIODevice* vdev, uint32_t index, VirtQueue* vqs[]) {
 		return -2;
 	}
 
-	void* queue = bmalloc();
+	void* queue = bmalloc(1);
 	if(!queue) {
 		printf("Queue bmalloc failed\n");
 		return -3;
@@ -581,14 +581,13 @@ bool set_status(int id, NICStatus* status) {
 }
 
 void get_info(int id, NICInfo* info) {
-	info->port_count = 1;
 	uint64_t mac = 0;
 
 	for (int i = 0; i < ETH_ALEN; i++) {
 		mac |= (uint64_t)priv[id]->vdev.config.mac[i] << (ETH_ALEN - i - 1) * 8;
 	}
 
-	info->mac[0] = mac;
+	info->mac = mac;
 }
 
 DeviceType device_type = DEVICE_TYPE_NIC;

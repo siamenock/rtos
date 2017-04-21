@@ -2,7 +2,7 @@
 #define __NET_UDP_H__
 
 #include <net/packet.h>
-#include <net/nic.h>
+#include <nic.h>
 
 /**
  * @file

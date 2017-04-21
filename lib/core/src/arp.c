@@ -28,10 +28,10 @@ bool arp_process(Packet* packet) {
 
 	ARP* arp = (ARP*)ether->payload;
 	uint32_t addr = endian32(arp->tpa);
-	
+
 	if(!nic_ip_get(packet->nic, addr))
 		return false;
-	
+
 	Map* arp_table = nic_config_get(packet->nic, ARP_TABLE);
 	if(!arp_table) {
 		arp_table = map_create(32, map_uint64_hash, map_uint64_equals, packet->nic->pool);
@@ -42,9 +42,9 @@ bool arp_process(Packet* packet) {
 			return false;
 		}
 	}
-	
-	uint64_t current = timer_us(); 
-	
+
+	uint64_t current = timer_us();
+
 	// GC
 	uint64_t gc_time = (uintptr_t)nic_config_get(packet->nic, ARP_TABLE_GC);
 	if(gc_time == 0 && !nic_config_contains(packet->nic, ARP_TABLE_GC)) {
@@ -52,7 +52,7 @@ bool arp_process(Packet* packet) {
 		if(!nic_config_put(packet->nic, ARP_TABLE_GC, (void*)(uintptr_t)gc_time))
 			return false;
 	}
-	
+
 	if(gc_time < current) {
 		MapIterator iter;
 		map_iterator_init(&iter, arp_table);
@@ -63,12 +63,12 @@ bool arp_process(Packet* packet) {
 				map_iterator_remove(&iter);
 			}
 		}
-		
+
 		gc_time = current + GC_INTERVAL;
 		if(!nic_config_put(packet->nic, ARP_TABLE_GC, (void*)(uintptr_t)gc_time))
 			return false;
 	}
-	
+
 	switch(endian16(arp->operation)) {
 		case 1:	// Request
 			ether->dmac = ether->smac;
@@ -91,7 +91,7 @@ bool arp_process(Packet* packet) {
 				entity = __malloc(sizeof(ARPEntity), packet->nic->pool);
 				if(!entity)
 					goto done;
-				
+
 				if(!map_put(arp_table, (void*)(uintptr_t)sip, entity)) {
 					__free(entity, packet->nic->pool);
 					goto done;
@@ -100,12 +100,12 @@ bool arp_process(Packet* packet) {
 			}
 			entity->mac = smac;
 			entity->timeout = current + ARP_TIMEOUT;
-			
+
 done:
 			nic_free(packet);
 			return true;
-	} 
-	
+	}
+
 	return false;
 }
 
@@ -114,9 +114,9 @@ bool arp_request(NIC* nic, uint32_t destination, uint32_t source) {
 		Map* interfaces = nic_config_get(nic, NIC_ADDR_IPv4);
 		if(!interfaces)
 			return false;
-		
+
 		bool result = true;
-		
+
 		MapIterator iter;
 		map_iterator_init(&iter, interfaces);
 		while(map_iterator_has_next(&iter)) {
@@ -129,12 +129,12 @@ bool arp_request(NIC* nic, uint32_t destination, uint32_t source) {
 		Packet* packet = nic_alloc(nic, sizeof(Ether) + sizeof(ARP));
 		if(!packet)
 			return false;
-		
+
 		Ether* ether = (Ether*)(packet->buffer + packet->start);
 		ether->dmac = endian48(0xffffffffffff);
 		ether->smac = endian48(nic->mac);
 		ether->type = endian16(ETHER_TYPE_ARP);
-		
+
 		ARP* arp = (ARP*)ether->payload;
 		arp->htype = endian16(1);
 		arp->ptype = endian16(0x0800);
@@ -145,9 +145,9 @@ bool arp_request(NIC* nic, uint32_t destination, uint32_t source) {
 		arp->spa = endian32(source);
 		arp->tha = endian48(0);
 		arp->tpa = endian32(destination);
-		 
+
 		packet->end = packet->start + sizeof(Ether) + sizeof(ARP);
-		
+
 		return nic_output(nic, packet);
 	}
 }
@@ -157,9 +157,9 @@ bool arp_announce(NIC* nic, uint32_t ip) {
 		Map* interfaces = nic_config_get(nic, NIC_ADDR_IPv4);
 		if(!interfaces)
 			return false;
-		
+
 		bool result = false;
-		
+
 		MapIterator iter;
 		map_iterator_init(&iter, interfaces);
 		while(map_iterator_has_next(&iter)) {
@@ -173,12 +173,12 @@ bool arp_announce(NIC* nic, uint32_t ip) {
 		Packet* packet = nic_alloc(nic, sizeof(Ether) + sizeof(ARP));
 		if(!packet)
 			return false;
-		
+
 		Ether* ether = (Ether*)(packet->buffer + packet->start);
 		ether->dmac = endian48(0xffffffffffff);
 		ether->smac = endian48(nic->mac);
 		ether->type = endian16(ETHER_TYPE_ARP);
-		
+
 		ARP* arp = (ARP*)ether->payload;
 		arp->htype = endian16(1);
 		arp->ptype = endian16(0x0800);
@@ -189,9 +189,9 @@ bool arp_announce(NIC* nic, uint32_t ip) {
 		arp->spa = endian32(ip);
 		arp->tha = endian48(0);
 		arp->tpa = endian32(ip);
-		 
+
 		packet->end = packet->start + sizeof(Ether) + sizeof(ARP);
-		
+
 		return nic_output(nic, packet);
 	}
 }
@@ -202,13 +202,13 @@ uint64_t arp_get_mac(NIC* nic, uint32_t destination, uint32_t source) {
 		arp_request(nic, destination, source);
 		return 0xffffffffffff;
 	}
-	
+
 	ARPEntity* entity = map_get(arp_table, (void*)(uintptr_t)destination);
 	if(!entity) {
 		arp_request(nic, destination, source);
 		return 0xffffffffffff;
 	}
-	
+
 	return entity->mac;
 }
 
@@ -217,7 +217,7 @@ uint32_t arp_get_ip(NIC* nic, uint64_t mac) {
 	if(!arp_table) {
 		return 0;
 	}
-	
+
 	MapIterator iter;
 	map_iterator_init(&iter, arp_table);
 	while(map_iterator_has_next(&iter)) {
@@ -225,13 +225,13 @@ uint32_t arp_get_ip(NIC* nic, uint64_t mac) {
 		if(((ARPEntity*)entry->data)->mac == mac)
 			return (uint32_t)(uintptr_t)entry->key;
 	}
-	
+
 	return 0;
 }
 
 void arp_pack(Packet* packet) {
 	Ether* ether = (Ether*)(packet->buffer + packet->start);
 	ARP* arp = (ARP*)ether->payload;
-	
+
 	packet->end = ((void*)arp + sizeof(ARP)) - (void*)packet->buffer;
 }

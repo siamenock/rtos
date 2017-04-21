@@ -9,7 +9,7 @@ workspace "Penguin"
 
     language "C"
     warnings "Extra"
-    buildoptions { "-DLINUX -std=gnu99", "-mcmodel=large", "-Wno-unused", "-Wno-format", "-Wno-unused-result" }
+    buildoptions { "-idirafter ../../../kernel/src", "-DLINUX -std=gnu99", "-mcmodel=large", "-Wno-unused", "-Wno-format", "-Wno-unused-result" }
     linkoptions { "-nostartfiles", "-Wl,-Ttext-segment=0xff00000000" }
 
     project "Manager"
@@ -19,7 +19,7 @@ workspace "Penguin"
         targetname "manager"
         targetdir "."
         files { "src/**.h", "src/**.c" }
-        includedirs { "../penguin/lib/nic/include", "../penguin/include", "../penguin/include/ipv4" }
+        includedirs { "../../include", "../../include/ipv4" }
         libdirs { "." }
         links { "umpn", "rt", "nic" }
 

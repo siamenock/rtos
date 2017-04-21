@@ -1,4 +1,4 @@
-#include <net/nic.h>
+#include <nic.h>
 #include <net/ether.h>
 #include <net/ip.h>
 #include <net/icmp.h>
