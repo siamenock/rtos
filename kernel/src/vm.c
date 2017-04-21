@@ -599,8 +599,8 @@ uint32_t vm_create(VMSpec* vm_spec) {
 			do {
 				mac = timer_frequency() & 0x0fffffffffffL;
 				mac |= 0x02L << 40;	// Locally administrered
-			} while(nicdev_contains(dev, mac));
-		} else if(nicdev_contains(dev, mac)) {
+			} while(nicdev_get_vnic_mac(dev, mac) != NULL);
+		} else if(nicdev_get_vnic_mac(dev, mac) != NULL) {
 			printf("Manager: The mac address already in use: %012lx.\n", mac);
 			map_remove(vms, (void*)(uint64_t)vmid);
 			vm_delete(vm, -1);

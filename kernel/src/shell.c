@@ -320,46 +320,49 @@ static int cmd_manager(int argc, char** argv, void(*callback)(char* result, int 
 }
 
 static int cmd_nic(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
-	extern Device* nic_devices[];
-	uint16_t nic_device_index = 0;
-
-	if(argc == 1 || (argc == 2 && !strcmp(argv[1], "list"))) {
-		for(int i = 0; i < MAX_NIC_DEVICE_COUNT; i++) {
-			Device* dev = nic_devices[i];
-			if(!dev) {
-				break;
-			}
-
-			NICDevice* nic_device = dev->priv;
-			MapIterator iter;
-			map_iterator_init(&iter, nic_device->vnics);
-			while(map_iterator_has_next(&iter)) {
-				MapEntry* entry = map_iterator_next(&iter);
-				uint16_t port = (uint16_t)(uint64_t)entry->key;
-				uint16_t port_num = (port >> 12) & 0xf;
-				uint16_t vlan_id = port & 0xfff;
-
-				char name_buf[32];
-				if(!vlan_id) {
-					sprintf(name_buf, "eth%d", nic_device_index + port_num);
-				} else {
-					sprintf(name_buf, "eth%d.%d", nic_device_index + port_num, vlan_id);
-				}
-				printf("%12s", name_buf);
-				printf("HWaddr %02x:%02x:%02x:%02x:%02x:%02x\n",
-					(nic_device->mac >> 40) & 0xff,
-					(nic_device->mac >> 32) & 0xff,
-					(nic_device->mac >> 24) & 0xff,
-					(nic_device->mac >> 16) & 0xff,
-					(nic_device->mac >> 8) & 0xff,
-					(nic_device->mac >> 0) & 0xff);
-			}
-			nic_device_index += 1;
-		}
-
-		return 0;
-	} else
-		return -1;
+/*
+ *        extern Device* nic_devices[];
+ *        uint16_t nic_device_index = 0;
+ *
+ *        if(argc == 1 || (argc == 2 && !strcmp(argv[1], "list"))) {
+ *                for(int i = 0; i < MAX_NIC_DEVICE_COUNT; i++) {
+ *                        Device* dev = nic_devices[i];
+ *                        if(!dev) {
+ *                                break;
+ *                        }
+ *
+ *                        NICDevice* nic_device = dev->priv;
+ *                        MapIterator iter;
+ *                        map_iterator_init(&iter, nic_device->vnics);
+ *                        while(map_iterator_has_next(&iter)) {
+ *                                MapEntry* entry = map_iterator_next(&iter);
+ *                                uint16_t port = (uint16_t)(uint64_t)entry->key;
+ *                                uint16_t port_num = (port >> 12) & 0xf;
+ *                                uint16_t vlan_id = port & 0xfff;
+ *
+ *                                char name_buf[32];
+ *                                if(!vlan_id) {
+ *                                        sprintf(name_buf, "eth%d", nic_device_index + port_num);
+ *                                } else {
+ *                                        sprintf(name_buf, "eth%d.%d", nic_device_index + port_num, vlan_id);
+ *                                }
+ *                                printf("%12s", name_buf);
+ *                                printf("HWaddr %02x:%02x:%02x:%02x:%02x:%02x\n",
+ *                                        (nic_device->mac >> 40) & 0xff,
+ *                                        (nic_device->mac >> 32) & 0xff,
+ *                                        (nic_device->mac >> 24) & 0xff,
+ *                                        (nic_device->mac >> 16) & 0xff,
+ *                                        (nic_device->mac >> 8) & 0xff,
+ *                                        (nic_device->mac >> 0) & 0xff);
+ *                        }
+ *                        nic_device_index += 1;
+ *                }
+ *
+ *                return 0;
+ *        } else
+ *                return -1;
+ */
+	return 0;
 }
 
 static int cmd_vnic(int argc, char** argv, void(*callback)(char* result, int exit_status)) {

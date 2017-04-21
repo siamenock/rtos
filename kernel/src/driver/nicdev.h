@@ -10,7 +10,6 @@ typedef struct {
 	char		name[MAX_NIC_NAME_LEN];
 	uint64_t	mac;
 
-	//Map*		vnics; //key mac
 	VNIC*		vnics[MAX_VNIC_COUNT];
 } NICDevice;
 
@@ -32,21 +31,26 @@ typedef struct {
 	void		(*get_info)(int id, NICInfo* info);
 } NICDriver;
 
-enum NICDEV_PROCESS_RESULT {
-	NICDEV_PROCESS_COMPLETE,
-	NICDEV_PROCESS_PASS,
-};
-
 int nicdev_init();
-bool nicdev_register(NICDevice* dev);
+void nicdev_poll();
+int nicdev_init();
+NICDevice* nicdev_create(NICInfo* info);
+void nicdev_destroy(NICDevice* dev);
+
+int nicdev_register(NICDevice* dev);
 NICDevice* nicdev_unregister(const char* name);
 NICDevice* nicdev_get(const char* name);
 
 uint32_t nicdev_register_vnic(NICDevice* dev, VNIC* vnic);
-VNIC* nicdev_unregister_vnic(NICDevice* dev, VNIC* vnic);
+VNIC* nicdev_unregister_vnic(NICDevice* dev, uint32_t id);
 VNIC* nicdev_get_vnic(NICDevice* dev, uint32_t id);
 VNIC* nicdev_get_vnic_mac(NICDevice* dev, uint64_t mac);
 VNIC* nicdev_update_vnic(NICDevice* dev, VNIC* src_vnic);
+
+enum NICDEV_PROCESS_RESULT {
+	NICDEV_PROCESS_COMPLETE,
+	NICDEV_PROCESS_PASS,
+};
 
 /**
  * @param dev NIC device
