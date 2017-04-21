@@ -1,10 +1,13 @@
 #ifndef __NIC_H__
 #define __NIC_H__
 
+#ifndef MODULE
 #include <stddef.h>
 #include <stdbool.h>
 #include <stdint.h>
-
+#else
+#include <linux/types.h>
+#endif
 
 #define MAX_NIC_NAME_LEN	16
 

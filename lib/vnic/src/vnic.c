@@ -1,16 +1,5 @@
-#include <errno.h>
+//#include <errno.h>
 #include <string.h>
-#include <stdlib.h>
-#include <timer.h>
-#include <nic.h>
-#include <util/list.h>
-#include <util/types.h>
-/*
- *#include <net/ether.h>
- *#include <net/vlan.h>
- *#include <net/ip.h>
- */
-
 #include <lock.h>
 #include <vnic.h>
 #include <nic.h>
@@ -26,6 +15,14 @@
  * 3: Pool size is not multiple of 2MB
  * 4: Not enough memory
  */
+
+inline uint64_t timer_frequency() {
+	uint64_t time;
+	uint32_t* p = (uint32_t*)&time;
+	asm volatile("rdtsc" : "=a"(p[0]), "=d"(p[1]));
+	
+	return time;
+}
 
 static uint64_t vnic_id;
 
@@ -130,13 +127,13 @@ bool vnic_init(VNIC* vnic, uint64_t* attrs) {
 		return (uint64_t)-1;
 	}
 
-	errno = 0;
+	//errno = 0;
 
 	//TODO check key
 	if(!has_key(VNIC_DEV) || !has_key(VNIC_MAC) || !has_key(VNIC_POOL_SIZE) ||
 			!has_key(VNIC_RX_BANDWIDTH) || !has_key(VNIC_TX_BANDWIDTH) ||
 			!has_key(VNIC_PADDING_HEAD) || !has_key(VNIC_PADDING_TAIL)) {
-		errno = 1;
+		//errno = 1;
 		return false;
 	}
 

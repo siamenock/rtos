@@ -14,14 +14,10 @@
 #include <linux/rtnetlink.h>
 #include <linux/ip.h>
 #include <linux/if_vlan.h>
+#include <linux/if_ether.h>
 #include <linux/etherdevice.h>
 
-/*
- *#include <util/map.h>
- *#include <net/ether.h>
- *#include <vnic.h>
- */
-
+#include "nicdev.h"
 #include "dispatcher.h"
 
 typedef void (*dispatcher_work_fn_t)(void *data);
@@ -32,15 +28,6 @@ struct dispatcher_work {
 	void*			data;
 	struct net_device*	dev;
 };
-
-/*
- *typedef struct {
- *        char		name[MAX_NIC_NAME_LEN];
- *        uint64_t	mac;
- *
- *        Map*		vnics;
- *} NICDevice;
- */
 
 static struct task_struct *dispatcher_daemon;
 static spinlock_t work_lock;
@@ -154,13 +141,10 @@ static inline void dispatcher_work_queue_flush(void)
 static int dispatcherd(void *data)
 {
 	struct dispatcher_work *work = NULL;
-	struct task_struct *task = (struct task_struct *)data;
 	unsigned uninitialized_var(seq);
 	struct list_head *pos;
 
 	printk("PacketNgin dispatcher daemon created\n");
-	//use_mm(task->mm);
-	//set_user_nice(current, -20);
 
 	for (;;) {
 		if (kthread_should_stop()) {
@@ -180,9 +164,7 @@ static int dispatcherd(void *data)
 		spin_unlock_irq(&work_lock);
 		schedule();
 	}
-
 	printk("PacketNgin dispatcher deamon destroyed\n");
-	//unuse_mm(task->mm);
 	return 0;
 }
 
@@ -255,36 +237,12 @@ rx_handler_result_t dispatcher_handle_frame(struct sk_buff** pskb)
 
 	BUG_ON(!nic_device);
 
-	int res = nicdev_rx(nic_device, eth, ETH_HELN + skb->len);
+	int res = nicdev_rx(nic_device, eth, ETH_HLEN + skb->len);
 
-	if(res == NICDEV_PROCESS_DONE)
+	if(res == NICDEV_PROCESS_COMPLETE)
 		return RX_HANDLER_CONSUMED;
-	else if(res == NICDEV_PROCESS_PASS)
+	else 
 		return RX_HANDLER_PASS;
-
-/*
- *        //TODO map_get vnic from vnics
- *        //lock_lock(nic_device->lock);
- *        if(eth->h_dest == ETHER_MULTICAST) {
- *                MapIterator iter;
- *                map_iterator_init(&iter, nic_device->vnics);
- *                while(map_iterator_has_next(&iter)) {
- *                        VNIC* vnic = (VNIC*)map_iterator_next(&iter);
- *                        vnic_process_input(vnic, (void*)eth, ETH_HLEN + skb->len, NULL, 0);
- *                }
- *                //kfree_skb(skb);
- *        } else {
- *                VNIC* vnic = map_get(nic_device->vnics, eth->h_dest);
- *                if(vnic) {
- *                        vnic_process_input(vnic, (void*)eth, ETH_HLEN + skb->len, NULL, 0);
- *                        kfree_skb(skb);
- *                        return RX_HANDLER_CONSUMED;
- *                }
- *        }
- *        //lock_unlock(nic_device->lock);
- *
- *        return RX_HANDLER_PASS;
- */
 }
 
 static int dispatcher_open(struct inode *inode, struct file *f)
@@ -324,15 +282,51 @@ static struct sk_buff* convert_to_skb(struct net_device* dev, Packet* packet)
 	memcpy(skb->data, buf, len);
 
 	printk("NIC free in convert to skb\n");
-	vnic_free(packet);
+	//TODO fix
+	nic_free(packet);
 	return skb;
+}
+
+bool packet_process(Packet* packet, void* context) {
+	struct net_device *dev = context;
+	struct sk_buff* skb = convert_to_skb(dev, packet);
+	if(!skb) {
+		printk("Failed to convert skb\n");
+		return false;
+	}
+
+	//netpoll_send_skb_on_dev(skb, dev);
+	if(!netif_running(dev) || !netif_device_present(dev)) {
+		dev_kfree_skb_irq(skb);
+		printk("not running\n");
+		return false;
+	}
+
+	netdev_features_t features;
+
+	features = netif_skb_features(skb);
+
+	if(skb_vlan_tag_present(skb) &&
+			!vlan_hw_offload_capable(features, skb->vlan_proto)) {
+		skb = __vlan_hwaccel_push_inside(skb);
+		if(unlikely(!skb)) {
+			printk("skb_vlan_tag\n");
+			return false;
+		}
+	}
+
+	printk("__netdev_start_xmit\n");
+	if(current->pid != dispatcher_daemon->pid) {
+		printk("Current PID: %d, Worker PID: %d\n", current->pid, dispatcher_daemon->pid);
+		return false;
+	}
+	__netdev_start_xmit(dev->netdev_ops, skb, dev, false);
+
+	return true;
 }
 
 static inline void dispatcher_tx(struct net_device *dev)
 {
-	struct sk_buff* skb;
-	Packet* packet;
-
 	/*
 	 *WARN_ONCE(current->pid != dispatcher_daemon->pid,
 	 *        "Current PID: %d, Worker PID: %d\n", current->pid, dispatcher_daemon->pid);
@@ -348,53 +342,7 @@ static inline void dispatcher_tx(struct net_device *dev)
 
 	//TODO map_iterator
 
-	nicdev_tx(nic_device, packet_process, ...);
-
-/*
- *        MapIterator iter;
- *        map_iterator_init(&iter, nic_device->vnics);
- *        while(map_iterator_has_next(&iter)) {
- *                VNIC* vnic = (VNIC*)map_iterator_next(&iter);
- *
- *                while((packet = vnic_process_output(vnic)) != NULL) {
- *                        printk("Fast path %p\n", packet);
- *                        skb = convert_to_skb(dev, packet);
- *                        if(!skb) {
- *                                printk("Failed to convert skb\n");
- *                                vnic_free(packet);
- *                                continue;
- *                        }
- *
- *                        //netpoll_send_skb_on_dev(skb, dev);
- *                        if (!netif_running(dev) || !netif_device_present(dev)) {
- *                                dev_kfree_skb_irq(skb);
- *                                printk("not running\n");
- *                                continue;
- *                        }
- *
- *                        netdev_features_t features;
- *
- *                        features = netif_skb_features(skb);
- *
- *                        if (skb_vlan_tag_present(skb) &&
- *                                        !vlan_hw_offload_capable(features, skb->vlan_proto)) {
- *                                skb = __vlan_hwaccel_push_inside(skb);
- *                                if (unlikely(!skb)) {
- *                                        printk("skb_vlan_tag\n");
- *                                        continue;
- *                                }
- *                        }
- *
- *                        printk("__netdev_start_xmit\n");
- *                        if (current->pid != dispatcher_daemon->pid) {
- *                                printk("Current PID: %d, Worker PID: %d\n", current->pid, dispatcher_daemon->pid);
- *                                return ;
- *                        }
- *                        __netdev_start_xmit(dev->netdev_ops, skb, dev, false);
- *                }
- *        }
- */
-	//local_irq_restore(flags);
+	nicdev_tx(nic_device, packet_process, dev);
 }
 
 static inline void dispatcher_rx(struct net_device *dev) {
@@ -443,7 +391,6 @@ static long dispatcher_ioctl(struct file *f, unsigned int ioctl,
 	NICDevice* nic_device;
 	VNIC _vnic;
 	VNIC* vnic = NULL;
-	int vnic_id;
 	struct mm_struct* mm;
 	pgd_t* pgd;
 	pud_t* pud;
@@ -451,10 +398,9 @@ static long dispatcher_ioctl(struct file *f, unsigned int ioctl,
 	pte_t* pte;
 	struct page* page;
 	unsigned long phys_addr;
-	MapIterator iter;
 
 	switch (ioctl) {
-		case DISPATCHER_REGISTER_NIC:
+		case DISPATCHER_CREATE_NIC:
 			printk("Register NIC on dispatcher device %p\n", argp);
 			nic_device = (NICDevice *)argp;
 			dev = __dev_get_by_name(&init_net, nic_device->name);
@@ -473,7 +419,7 @@ static long dispatcher_ioctl(struct file *f, unsigned int ioctl,
 
 			return 0;
 
-		case DISPATCHER_UNREGISTER_NIC:
+		case DISPATCHER_DESTROY_NIC:
 			//name
 			printk("Unregister NIC on dispatcher device\n");
 			nic_device = (NICDevice *)argp;
@@ -505,7 +451,7 @@ static long dispatcher_ioctl(struct file *f, unsigned int ioctl,
 				return -EFAULT;
 			}
 
-			nic_device = get_nic_device(vnic->parent);
+			nic_device = nicdev_get(vnic->parent);
 			if(!nic_device) {
 				kfree(vnic);
 				return -EFAULT;
@@ -523,7 +469,7 @@ static long dispatcher_ioctl(struct file *f, unsigned int ioctl,
 				return -EFAULT;
 			}
 
-			if(!map_put(nic_device->vnics, (void*)vnic->mac, vnic)) {
+			if(nicdev_register_vnic(nic_device, vnic) < 0) {
 				kfree(vnic);
 				return -EFAULT;
 			}
@@ -531,19 +477,16 @@ static long dispatcher_ioctl(struct file *f, unsigned int ioctl,
 			return 0;
 
 		case DISPATCHER_DESTROY_VNIC:
-			if(copy_from_user(&_vnic, argp, sizeof(VNIC))) {
+			if(copy_from_user(&_vnic, argp, sizeof(VNIC)))
 				return -EFAULT;
-			}
 
-			nic_device = get_nic_device(_vnic.parent);
-			if(!nic_device) {
+			nic_device = nicdev_get(_vnic.parent);
+			if(!nic_device)
 				return -EFAULT;
-			}
 
-			vnic = map_remove(nic_device->vnics, (void*)_vnic.mac);
-			if(!vnic) {
+			vnic = nicdev_unregister_vnic(nic_device, _vnic.id);
+			if(!vnic)
 				return -EFAULT;
-			}
 
 			kfree(vnic);
 			return 0;
@@ -553,61 +496,30 @@ static long dispatcher_ioctl(struct file *f, unsigned int ioctl,
 				return -EFAULT;
 			}
 
-			nic_device = get_nic_device(_vnic.parent);
+			nic_device = nicdev_get(_vnic.parent);
 			if(!nic_device) {
 				return -EFAULT;
 			}
 
-			//XXX 
-			map_iterator_init(&iter, nic_device->vnics);
-			while(map_iterator_has_next(&iter)) {
-				MapEntry* entry = map_iterator_next(&iter);
-				if(((VNIC*)entry->data)->id == _vnic.id) {
-					vnic = entry->data;
-					break;
-				}
-			}
-			if(!vnic) {
-				return -EFAULT;
-			}
-
-			if(vnic->mac != _vnic.mac) {
-				if(map_contains(nic_device->vnics, (void*)_vnic.mac)) { //already exist
-					return -EFAULT;
-				}
-
-				map_remove(nic_device->vnics, (void*)_vnic.mac);
-
-				vnic->mac = vnic->nic->mac = _vnic.mac;
-				map_put(nic_device->vnics, (uint64_t*)vnic->mac, vnic);
-			}
-
-			vnic->rx_bandwidth = vnic->nic->rx_bandwidth = _vnic.rx_bandwidth;
-			vnic->tx_bandwidth = vnic->nic->tx_bandwidth = _vnic.tx_bandwidth;
-			vnic->padding_head = vnic->nic->padding_head = _vnic.padding_head;
-			vnic->padding_tail = vnic->nic->padding_tail = _vnic.padding_tail;
+			nicdev_update_vnic(nic_device, &_vnic);
 			copy_to_user(argp, vnic, sizeof(VNIC));
 
 			return 0;
 
 		case DISPATCHER_GET_VNIC:
-			if(copy_from_user(&_vnic, argp, sizeof(VNIC))) {
+			if(copy_from_user(&_vnic, argp, sizeof(VNIC)))
 				return -EFAULT;
-			}
 
-			nic_device = get_nic_device(_vnic.parent);
-			if(!nic_device) {
+			nic_device = nicdev_get(_vnic.parent);
+			if(!nic_device)
 				return -EFAULT;
-			}
 
-			vnic = map_get(nic_device->vnics, _vnic.mac);
-			if(!vnic) {
+			vnic = nicdev_get_vnic(nic_device, _vnic.id);
+			if(!vnic)
 				return -EFAULT;
-			}
 
-			if(copy_to_user(argp, vnic, sizeof(VNIC))) {
+			if(copy_to_user(argp, vnic, sizeof(VNIC)))
 				return -EFAULT;
-			}
 
 			return 0;
 
