@@ -28,7 +28,7 @@ Packet* nic_alloc(NIC* nic, uint16_t size) {
 	if(packet) {
 		bzero(packet, sizeof(Packet));
 		packet->nic = nic;
-		packet->size = size + ALIGN - 1;
+		packet->size = size + 4 /* VLAN padding */ + ALIGN - 1;
 		packet->start = (((uintptr_t)packet->buffer + 4 /* VLAN padding */ + ALIGN - 1) & ~(ALIGN - 1)) - (uintptr_t)packet->buffer;
 		packet->end = packet->start + size;
 	}
