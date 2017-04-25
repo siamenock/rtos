@@ -1,14 +1,18 @@
-#include <stdio.h>
-#include <string.h>
 #include "nicdev.h"
-#include "../device.h"
-#include "../gmalloc.h"
-#include "../dispatcher.h"
+
+extern int strncmp(const char* s, const char* d, size_t size);
 
 #define ETHER_MULTICAST		0Xffffffffffff
 #define ID_BUFFER_SIZE		(MAX_NIC_DEVICE_COUNT * MAX_VNIC_COUNT / 8)
 
-NICDevice* nic_devices[MAX_NIC_DEVICE_COUNT]; //key string
+typedef struct _Ether {
+	uint64_t dmac: 48;			///< Destination address (endian48)
+	uint64_t smac: 48;			///< Destination address (endian48)
+	uint16_t type;				///< Ether type (endian16)
+	uint8_t payload[0];			///< Ehternet payload
+} __attribute__ ((packed)) Ether;
+
+static NICDevice* nic_devices[MAX_NIC_DEVICE_COUNT]; //key string
 static uint8_t id_map[ID_BUFFER_SIZE];
 
 static int id_alloc() {
@@ -39,112 +43,6 @@ static void id_free(int id) {
 	id_map[index] ^= idx;
 }
 
-struct _ethhdr {
-	uint64_t	h_dest: 48;	/* destination eth addr	*/
-	uint64_t	h_source: 48;	/* source ether addr	*/
-	uint16_t	h_proto;	/* packet type ID field	*/
-} __attribute__((packed));
-
-int nicdev_init() {
-	Device* dev;
-	int index = 0;
-	uint16_t count = device_count(DEVICE_TYPE_NIC);
-	for(int i = 0; i < count; i++) {
-		dev = device_get(DEVICE_TYPE_NIC, i);
-		if(!dev)
-			continue;
-
-		NICInfo info;
-		NICDriver* driver = dev->driver;
-		driver->get_info(dev->id, &info);
-
-		if(info.name[0] == '\0')
-			strncpy(info.name, "eth%d", index++);
-
-		nic_devices[i] = nicdev_create(&info);
-		if(!nic_devices[i])
-			goto failed;
-	}
-
-	return 0;
-
-failed:
-	for(int i = 0; i < count; i++)
-		if(nic_devices[i])
-			nicdev_destroy(nic_devices[i]);
-
-	return -1;
-}
-
-void nicdev_poll() {
-/*
- *        int poll_count = 0;
- *        for(int i = 0; i < MAX_NIC_DEVICE_COUNT; i++) {
- *                NICDevice* dev = nic_devices[i];
- *                if(dev == NULL)
- *                        break;
- *
- *                NICDriver* nic = dev->driver;
- *
- *                poll_count += nic->poll(nic->id);
- *        }
- */
-}
-
-NICDevice* nicdev_create(NICInfo* info) {
-	extern uint64_t manager_mac;
-	NICDevice* nic_device = gmalloc(sizeof(NICDevice));
-	if(!nic_device)
-		return NULL;
-
-	nic_device->mac = info->mac;
-	strncpy(nic_device->name, info->name, sizeof(nic_device->name));
-
-	int rc = dispatcher_create_nic((void*)nic_device);
-	if(rc < 0) {
-		printf("Failed to create NIC in dispatcher module\n");
-		gfree(nic_device);
-		return NULL;
-	}
-
-	printf("\tNIC Device created\n");
-	printf("\t%s : [%02lx:%02lx:%02lx:%02lx:%02lx:%02lx] [%c]\n", nic_device->name,
-			(info->mac >> 40) & 0xff,
-			(info->mac >> 32) & 0xff,
-			(info->mac >> 24) & 0xff,
-			(info->mac >> 16) & 0xff,
-			(info->mac >> 8) & 0xff,
-			(info->mac >> 0) & 0xff,
-			manager_mac == 0 ? '*' : ' ');
-
-	if(!manager_mac)
-		manager_mac = info->mac;
-
-	return nic_device;
-}
-
-void nicdev_destroy(NICDevice* dev) {
-	int rc = dispatcher_destroy_nic((void*)dev);
-	if(rc < 0)
-		printf("WARN: failed to destroy NIC in dispatcher module\n");
-
-	gfree(dev);
-	dev = NULL;
-}
-
-static inline bool netdev_name_compare(const char* name1, const char* name2) {
-	for(int i = 0; i < MAX_NIC_NAME_LEN; i++) {
-		if(name1[i] != name1[i]) {
-			return false;
-		}
-
-		if(name1[i] == '\0')
-			return true;
-	}
-
-	return false;
-}
-
 int nicdev_register(NICDevice* dev) {
 	//Check name
 	int i;
@@ -154,7 +52,7 @@ int nicdev_register(NICDevice* dev) {
 			return 0;
 		}
 
-		if(!netdev_name_compare(nic_devices[i]->name, nic_devices[i]->name))
+		if(!strncmp(nic_devices[i]->name, nic_devices[i]->name, MAX_NIC_NAME_LEN))
 			return -1;
 	}
 
@@ -169,7 +67,7 @@ NICDevice* nicdev_unregister(const char* name) {
 			return NULL;
 		}
 
-		if(!netdev_name_compare(nic_devices[i]->name, name)) {
+		if(!strncmp(nic_devices[i]->name, name, MAX_NIC_NAME_LEN)) {
 			dev = nic_devices[i];
 			nic_devices[i] = NULL;
 			for(j = i; j + 1 < MAX_NIC_DEVICE_COUNT; j++) {
@@ -194,7 +92,7 @@ NICDevice* nicdev_get(const char* name) {
 			return NULL;
 		}
 
-		if(!netdev_name_compare(nic_devices[i]->name, name))
+		if(!strncmp(nic_devices[i]->name, name, MAX_NIC_NAME_LEN))
 			return dev;
 	}
 
@@ -303,12 +201,12 @@ VNIC* nicdev_update_vnic(NICDevice* dev, VNIC* src_vnic) {
  * @return result of process
  */
 int nicdev_rx(NICDevice* dev, void* data, size_t size) {
-	struct _ethhdr* eth = data;
+	Ether* eth = data;
 	int i;
 	VNIC* vnic;
 
 	//TODO lock
-	if(eth->h_dest == ETHER_MULTICAST) {
+	if(eth->dmac == ETHER_MULTICAST) {
 		for(i = 0; i < MAX_VNIC_COUNT; i++) {
 			if(!dev->vnics[i])
 				break;
@@ -318,7 +216,7 @@ int nicdev_rx(NICDevice* dev, void* data, size_t size) {
 		return NICDEV_PROCESS_PASS;
 	} else {
 
-		vnic = nicdev_get_vnic_mac(dev, eth->h_dest);
+		vnic = nicdev_get_vnic_mac(dev, eth->dmac);
 		if(vnic) {
 			vnic_rx(vnic, (uint8_t*)eth, size, NULL, 0);
 			return NICDEV_PROCESS_COMPLETE;

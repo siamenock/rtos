@@ -20,10 +20,6 @@
 #include "nicdev.h"
 #include "dispatcher.h"
 
-extern NICDevice;
-extern int nicdev_rx(NICDevice*, void*, size_t);
-extern int nicdev_tx(NICDevice*, void*, size_t);
-
 typedef void (*dispatcher_work_fn_t)(void *data);
 
 struct dispatcher_work {

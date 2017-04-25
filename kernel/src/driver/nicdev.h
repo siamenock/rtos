@@ -31,12 +31,6 @@ typedef struct {
 	void		(*get_info)(int id, NICInfo* info);
 } NICDriver;
 
-int nicdev_init();
-void nicdev_poll();
-int nicdev_init();
-NICDevice* nicdev_create(NICInfo* info);
-void nicdev_destroy(NICDevice* dev);
-
 int nicdev_register(NICDevice* dev);
 NICDevice* nicdev_unregister(const char* name);
 NICDevice* nicdev_get(const char* name);
