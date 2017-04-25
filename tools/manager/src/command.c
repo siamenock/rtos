@@ -377,8 +377,8 @@ static int cmd_nic(int argc, char** argv, void(*callback)(char* result, int exit
 }
 
 static int cmd_vnic(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
-	extern Device* nic_devices[];
-	uint16_t get_ni_index(Device* device) {
+	//extern Device* nic_devices[];
+//	uint16_t get_ni_index(Device* device) {
 /*
  *                uint16_t ni_index = 0;
  *                for(int i = 0; nic_devices[i] != NULL; i++) {
@@ -390,7 +390,7 @@ static int cmd_vnic(int argc, char** argv, void(*callback)(char* result, int exi
  *
  */
 		return 0;
-	}
+//	}
 
 	void print_byte_size(uint64_t byte_size) {
 		uint64_t size = 1;

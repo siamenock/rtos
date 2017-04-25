@@ -13,7 +13,7 @@
 #include <linux/rtnetlink.h>
 #include <linux/if_arp.h>
 
-#include "driver/nic.h"
+#include "driver/nicdev.h"
 #include "device.h"
 
 #define IFLIST_REPLY_BUFFER	8192

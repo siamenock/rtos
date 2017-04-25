@@ -29,19 +29,23 @@ workspace "Kernel"
         buildoptions { "-msse4.1 -fno-stack-protector" }
 
     -- [[ 2. Core library for Linux ]]
-    --[[
-       [project "core_linux"
-       [    kind "StaticLib"
-       [    location "core/build"
-       [    includedirs { "core/include", "TLSF/src", "jsmn/", "../cmocka/include" }
-       [    files { "core/**.asm", "core/**.S", "core/**.h", "core/**.c" }
-       [    -- Exclude test sources and standard C library functions
-       [    removefiles { "core/src/test/*" , "core/src/malloc.c", "core/src/errno.c" }
-       [    -- Memory model needs to be large rather than kernel
-       [    buildoptions { "-fno-common -msse4.1 -fno-stack-protector -mcmodel=large" }
-       [    -- Define "LINUX" to make core library for Linux OS
-       [    defines { "LINUX" }
-       ]]
+    project "core_linux"
+        kind "StaticLib"
+        location "core/build"
+        includedirs { "core/include", "TLSF/src", "jsmn/", "../cmocka/include" }
+        files { "core/**.asm", "core/**.S", "core/**.h", "core/**.c" }
+        -- Exclude test sources and standard C library functions
+        removefiles { "core/src/test/*" , "core/src/malloc.c", "core/src/errno.c" }
+        removefiles { "core/src/tftp.c" }
+        removefiles { "core/src/arp.c" }
+        removefiles { "core/src/tcp.c" }
+        removefiles { "core/src/icmp.c" }
+        removefiles { "core/src/ip.c" }
+        removefiles { "core/src/udp.c" }
+        -- Memory model needs to be large rather than kernel
+        buildoptions { "-fno-common -msse4.1 -fno-stack-protector -mcmodel=large" }
+        -- Define "LINUX" to make core library for Linux OS
+        defines { "LINUX" }
 
     -- [[ 3. TLSF library ]]
     project "tlsf"

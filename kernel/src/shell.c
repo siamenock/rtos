@@ -320,120 +320,80 @@ static int cmd_manager(int argc, char** argv, void(*callback)(char* result, int 
 }
 
 static int cmd_nic(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
-/*
- *        extern Device* nic_devices[];
- *        uint16_t nic_device_index = 0;
- *
- *        if(argc == 1 || (argc == 2 && !strcmp(argv[1], "list"))) {
- *                for(int i = 0; i < MAX_NIC_DEVICE_COUNT; i++) {
- *                        Device* dev = nic_devices[i];
- *                        if(!dev) {
- *                                break;
- *                        }
- *
- *                        NICDevice* nic_device = dev->priv;
- *                        MapIterator iter;
- *                        map_iterator_init(&iter, nic_device->vnics);
- *                        while(map_iterator_has_next(&iter)) {
- *                                MapEntry* entry = map_iterator_next(&iter);
- *                                uint16_t port = (uint16_t)(uint64_t)entry->key;
- *                                uint16_t port_num = (port >> 12) & 0xf;
- *                                uint16_t vlan_id = port & 0xfff;
- *
- *                                char name_buf[32];
- *                                if(!vlan_id) {
- *                                        sprintf(name_buf, "eth%d", nic_device_index + port_num);
- *                                } else {
- *                                        sprintf(name_buf, "eth%d.%d", nic_device_index + port_num, vlan_id);
- *                                }
- *                                printf("%12s", name_buf);
- *                                printf("HWaddr %02x:%02x:%02x:%02x:%02x:%02x\n",
- *                                        (nic_device->mac >> 40) & 0xff,
- *                                        (nic_device->mac >> 32) & 0xff,
- *                                        (nic_device->mac >> 24) & 0xff,
- *                                        (nic_device->mac >> 16) & 0xff,
- *                                        (nic_device->mac >> 8) & 0xff,
- *                                        (nic_device->mac >> 0) & 0xff);
- *                        }
- *                        nic_device_index += 1;
- *                }
- *
- *                return 0;
- *        } else
- *                return -1;
- */
-	return 0;
+	extern NICDevice* nic_devices[];
+	uint16_t nic_device_index = 0;
+
+	if(argc == 1 || (argc == 2 && !strcmp(argv[1], "list"))) {
+		for(int i = 0; i < MAX_NIC_DEVICE_COUNT; i++) {
+			NICDevice* nic_device = nic_devices[i];
+			if(!nic_device)
+				break;
+
+			printf("%12s", nic_device->name);
+			printf("HWaddr %02x:%02x:%02x:%02x:%02x:%02x\n",
+				(nic_device->mac >> 40) & 0xff,
+				(nic_device->mac >> 32) & 0xff,
+				(nic_device->mac >> 24) & 0xff,
+				(nic_device->mac >> 16) & 0xff,
+				(nic_device->mac >> 8) & 0xff,
+				(nic_device->mac >> 0) & 0xff);
+		}
+
+		return 0;
+	}
+
+	return -1;
 }
 
 static int cmd_vnic(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	void print_byte_size(uint64_t byte_size) {
+		uint64_t size = 1;
+		for(int i = 0; i < 5; i++) {
+			if((byte_size / size) < 1000) {
+				printf("(%.1f ", (float)byte_size / size);
+				switch(i) {
+					case 0:
+						printf("B)");
+					break;
+					case 1:
+						printf("KB)");
+					break;
+					case 2:
+						printf("MB)");
+					break;
+					case 3:
+						printf("GB)");
+					break;
+					case 4:
+						printf("TB)");
+					break;
+				}
+				return;
+			}
+
+			size *= 1000;
+		}
+	}
+
+	if(argc == 1 || (argc == 2 && !strcmp(argv[1], "list"))) {
+		void print_vnic(VNIC* vnic, uint16_t vmid, uint16_t nic_index) {
+			char name_buf[32];
+			if(vmid)
+				sprintf(name_buf, "veth%d.%d%c", vmid, nic_index, vnic == manager_nic ? '*' : ' ');
+			else
+				sprintf(name_buf, "veth%d%c", vmid, vnic == manager_nic ? '*' : ' ');
+
+			printf("%12s", name_buf);
+			printf("HWaddr %02x:%02x:%02x:%02x:%02x:%02x  ",
+				(vnic->mac >> 40) & 0xff,
+				(vnic->mac >> 32) & 0xff,
+				(vnic->mac >> 24) & 0xff,
+				(vnic->mac >> 16) & 0xff,
+				(vnic->mac >> 8) & 0xff,
+				(vnic->mac >> 0) & 0xff);
+
+			printf("Parent %s\n", vnic->parent);
 /*
- *        extern Device* nic_devices[];
- *        uint16_t get_ni_index(Device* device) {
- *                uint16_t ni_index = 0;
- *                for(int i = 0; nic_devices[i] != NULL; i++) {
- *                        if(device == nic_devices[i])
- *                                return ni_index;
- *                        else
- *                                ni_index += ((NICDevice*)(nic_devices[i]->priv))->port_count;
- *                }
- *
- *                return 0;
- *        }
- *
- *        void print_byte_size(uint64_t byte_size) {
- *                uint64_t size = 1;
- *                for(int i = 0; i < 5; i++) {
- *                        if((byte_size / size) < 1000) {
- *                                printf("(%.1f ", (float)byte_size / size);
- *                                switch(i) {
- *                                        case 0:
- *                                                printf("B)");
- *                                        break;
- *                                        case 1:
- *                                                printf("KB)");
- *                                        break;
- *                                        case 2:
- *                                                printf("MB)");
- *                                        break;
- *                                        case 3:
- *                                                printf("GB)");
- *                                        break;
- *                                        case 4:
- *                                                printf("TB)");
- *                                        break;
- *                                }
- *                                return;
- *                        }
- *
- *                        size *= 1000;
- *                }
- *        }
- *
- *        if(argc == 1 || (argc == 2 && !strcmp(argv[1], "list"))) {
- *                void print_vnic(VNIC* vnic, uint16_t vmid, uint16_t nic_index) {
- *                        char name_buf[32];
- *                        if(vmid)
- *                                sprintf(name_buf, "veth%d.%d%c", vmid, nic_index, vnic == manager_nic ? '*' : ' ');
- *                        else
- *                                sprintf(name_buf, "veth%d%c", vmid, vnic == manager_nic ? '*' : ' ');
- *
- *                        printf("%12s", name_buf);
- *                        printf("HWaddr %02x:%02x:%02x:%02x:%02x:%02x  ",
- *                                (vnic->mac >> 40) & 0xff,
- *                                (vnic->mac >> 32) & 0xff,
- *                                (vnic->mac >> 24) & 0xff,
- *                                (vnic->mac >> 16) & 0xff,
- *                                (vnic->mac >> 8) & 0xff,
- *                                (vnic->mac >> 0) & 0xff);
- *
- *                        uint16_t port_num = vnic->port >> 12;
- *                        uint16_t vlan_id = vnic->port & 0xfff;
- *                        if(!vlan_id) {
- *                                sprintf(name_buf, "eth%d", get_ni_index(vnic->device) + port_num);
- *                        } else {
- *                                sprintf(name_buf, "eth%d.%d\t", get_ni_index(vnic->device) + port_num, vlan_id);
- *                        }
- *                        printf("Parent %s\n", name_buf);
  *                        printf("%12sRX packets:%d dropped:%d\n", "", vnic->nic->input_packets, vnic->nic->input_drop_packets);
  *                        printf("%12sTX packets:%d dropped:%d\n", "", vnic->nic->output_packets, vnic->nic->output_drop_packets);
  *                        printf("%12srxqueuelen:%d txqueuelen:%d\n", "", fifo_capacity(vnic->nic->input_buffer), fifo_capacity(vnic->nic->output_buffer));
@@ -445,28 +405,29 @@ static int cmd_vnic(int argc, char** argv, void(*callback)(char* result, int exi
  *                        printf("\n");
  *                        printf("%12sHead Padding:%d Tail Padding:%d", "",vnic->padding_head, vnic->padding_tail);
  *                        printf("\n\n");
- *                }
- *
- *                print_vnic(manager_nic, 0, 0);
- *
- *                extern Map* vms;
- *                MapIterator iter;
- *                map_iterator_init(&iter, vms);
- *                while(map_iterator_has_next(&iter)) {
- *                        MapEntry* entry = map_iterator_next(&iter);
- *                        uint16_t vmid = (uint16_t)(uint64_t)entry->key;
- *                        VM* vm = entry->data;
- *
- *                        for(int i = 0; i < vm->nic_count; i++) {
- *                                VNIC* vnic = vm->nics[i];
- *                                print_vnic(vnic, vmid, i);
- *                        }
- *                }
- *        } else
- *                return -1;
- *
  */
-	return 0;
+		}
+
+		print_vnic(manager_nic, 0, 0);
+
+		extern Map* vms;
+		MapIterator iter;
+		map_iterator_init(&iter, vms);
+		while(map_iterator_has_next(&iter)) {
+			MapEntry* entry = map_iterator_next(&iter);
+			uint16_t vmid = (uint16_t)(uint64_t)entry->key;
+			VM* vm = entry->data;
+
+			for(int i = 0; i < vm->nic_count; i++) {
+				VNIC* vnic = vm->nics[i];
+				print_vnic(vnic, vmid, i);
+			}
+		}
+
+		return 0;
+	}
+
+	return -1;
 }
 
 static int cmd_vlan(int argc, char** argv, void(*callback)(char* result, int exit_status)) {

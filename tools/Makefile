@@ -1,6 +1,6 @@
 .PHONY: all clean
 
-all: pnkc/pnkc smap/smap console/console 
+all: pnkc/pnkc smap/smap #console/console 
 
 pnkc/pnkc:
 	make -C pnkc
@@ -8,8 +8,8 @@ pnkc/pnkc:
 smap/smap:
 	make -C smap
 
-console/console:
-	make -C console
+#console/console:
+	#make -C console
 
 #TODO : UMPN should be moved
 umpn/packetngin:

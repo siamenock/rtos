@@ -24,17 +24,16 @@
 #include "cpu.h"
 #include "gdt.h"
 #include "idt.h"
-#include "socket.h"
 #include "smap.h"
 #include "stdio.h"
 #include "elf.h"
 #include "popcorn.h"
 #include "netlink.h"
 #include "dispatcher.h"
-#include "driver/nic.h"
+#include "driver/nicdev.h"
 
 static bool idle0_event() {
-	nic_poll();
+	//nic_poll();
 	return true;
 }
 
@@ -436,7 +435,7 @@ int main(int argc, char** argv) {
 	mp_sync(1); // Barrier #2
 
 	printf("\nInitailizing local APIC...\n");
-	if(apic_init() < 0)
+	if(mapping_apic() < 0)
 		goto error;
 
 	printf("\nInitializing events...\n");
@@ -451,14 +450,11 @@ int main(int argc, char** argv) {
 	printf("\nInitializing standard IO...\n");
 	stdio_init();
 
-	//printf("\nInitializing linux socket device...\n");
-	//socket_init();
-
 	printf("\nInitializing linux netlink devices...\n");
 	netlink_init();
 
 	printf("\nInitializing NICs...\n");
-	nic_init();
+	nicdev_init();
 
 	printf("\nInitializing RPC manager...\n");
 	manager_init();

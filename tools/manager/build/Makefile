@@ -22,7 +22,7 @@ ifeq ($(config),debug)
   ALL_CFLAGS += $(CFLAGS) $(ALL_CPPFLAGS) -O2 -g -Wall -Wextra -idirafter ../../../kernel/src -DLINUX -std=gnu99 -mcmodel=large -Wno-unused -Wno-format -Wno-unused-result
   ALL_CXXFLAGS += $(CXXFLAGS) $(ALL_CFLAGS)
   ALL_RESFLAGS += $(RESFLAGS) $(DEFINES) $(INCLUDES)
-  LIBS += -lumpn -lrt -lnic
+  LIBS += -lumpn -lrt -lvnic
   LDDEPS +=
   ALL_LDFLAGS += $(LDFLAGS) -L.. -nostartfiles -Wl,-Ttext-segment=0xff00000000
   LINKCMD = $(CC) -o "$@" $(OBJECTS) $(RESOURCES) $(ALL_LDFLAGS) $(LIBS)
@@ -51,7 +51,7 @@ ifeq ($(config),release)
   ALL_CFLAGS += $(CFLAGS) $(ALL_CPPFLAGS) -O2 -g -Wall -Wextra -idirafter ../../../kernel/src -DLINUX -std=gnu99 -mcmodel=large -Wno-unused -Wno-format -Wno-unused-result
   ALL_CXXFLAGS += $(CXXFLAGS) $(ALL_CFLAGS)
   ALL_RESFLAGS += $(RESFLAGS) $(DEFINES) $(INCLUDES)
-  LIBS += -lumpn -lrt -lnic
+  LIBS += -lumpn -lrt -lvnic
   LDDEPS +=
   ALL_LDFLAGS += $(LDFLAGS) -L.. -nostartfiles -Wl,-Ttext-segment=0xff00000000
   LINKCMD = $(CC) -o "$@" $(OBJECTS) $(RESOURCES) $(ALL_LDFLAGS) $(LIBS)
@@ -74,7 +74,7 @@ OBJECTS := \
 	$(OBJDIR)/cpu.o \
 	$(OBJDIR)/device.o \
 	$(OBJDIR)/dispatcher.o \
-	$(OBJDIR)/nic.o \
+	$(OBJDIR)/nicdev.o \
 	$(OBJDIR)/elf.o \
 	$(OBJDIR)/entry.o \
 	$(OBJDIR)/gdt.o \
@@ -91,7 +91,6 @@ OBJECTS := \
 	$(OBJDIR)/shared.o \
 	$(OBJDIR)/shell.o \
 	$(OBJDIR)/smap.o \
-	$(OBJDIR)/socket.o \
 	$(OBJDIR)/stdio.o \
 	$(OBJDIR)/task.o \
 	$(OBJDIR)/vm.o \
@@ -99,6 +98,22 @@ OBJECTS := \
 RESOURCES := \
 
 CUSTOMFILES := \
+
+ifeq ($(config),debug)
+  OBJECTS += \
+	obj/Debug/apic_asm.o \
+	obj/Debug/asm.o \
+	obj/Debug/port_asm.o \
+
+endif
+
+ifeq ($(config),release)
+  OBJECTS += \
+	obj/Release/apic_asm.o \
+	obj/Release/asm.o \
+	obj/Release/port_asm.o \
+
+endif
 
 SHELLTYPE := msdos
 ifeq (,$(ComSpec)$(COMSPEC))
@@ -155,6 +170,26 @@ endif
 $(OBJDIR)/apic.o: ../src/apic.c
 	@echo $(notdir $<)
 	$(SILENT) $(CC) $(ALL_CFLAGS) $(FORCE_INCLUDE) -o "$@" -MF "$(@:%.o=%.d)" -c "$<"
+ifeq ($(config),debug)
+obj/Debug/apic_asm.o: ../src/apic_asm.asm
+	@echo "Compiling ../src/apic_asm.asm"
+	$(SILENT) nasm -f elf64 -o "obj/Debug/apic_asm.o" "../src/apic_asm.asm"
+endif
+ifeq ($(config),release)
+obj/Release/apic_asm.o: ../src/apic_asm.asm
+	@echo "Compiling ../src/apic_asm.asm"
+	$(SILENT) nasm -f elf64 -o "obj/Release/apic_asm.o" "../src/apic_asm.asm"
+endif
+ifeq ($(config),debug)
+obj/Debug/asm.o: ../src/asm.asm
+	@echo "Compiling ../src/asm.asm"
+	$(SILENT) nasm -f elf64 -o "obj/Debug/asm.o" "../src/asm.asm"
+endif
+ifeq ($(config),release)
+obj/Release/asm.o: ../src/asm.asm
+	@echo "Compiling ../src/asm.asm"
+	$(SILENT) nasm -f elf64 -o "obj/Release/asm.o" "../src/asm.asm"
+endif
 $(OBJDIR)/command.o: ../src/command.c
 	@echo $(notdir $<)
 	$(SILENT) $(CC) $(ALL_CFLAGS) $(FORCE_INCLUDE) -o "$@" -MF "$(@:%.o=%.d)" -c "$<"
@@ -167,7 +202,7 @@ $(OBJDIR)/device.o: ../src/device.c
 $(OBJDIR)/dispatcher.o: ../src/dispatcher.c
 	@echo $(notdir $<)
 	$(SILENT) $(CC) $(ALL_CFLAGS) $(FORCE_INCLUDE) -o "$@" -MF "$(@:%.o=%.d)" -c "$<"
-$(OBJDIR)/nic.o: ../src/driver/nic.c
+$(OBJDIR)/nicdev.o: ../src/driver/nicdev.c
 	@echo $(notdir $<)
 	$(SILENT) $(CC) $(ALL_CFLAGS) $(FORCE_INCLUDE) -o "$@" -MF "$(@:%.o=%.d)" -c "$<"
 $(OBJDIR)/elf.o: ../src/elf.c
@@ -209,6 +244,16 @@ $(OBJDIR)/netlink.o: ../src/netlink.c
 $(OBJDIR)/popcorn.o: ../src/popcorn.c
 	@echo $(notdir $<)
 	$(SILENT) $(CC) $(ALL_CFLAGS) $(FORCE_INCLUDE) -o "$@" -MF "$(@:%.o=%.d)" -c "$<"
+ifeq ($(config),debug)
+obj/Debug/port_asm.o: ../src/port_asm.asm
+	@echo "Compiling ../src/port_asm.asm"
+	$(SILENT) nasm -f elf64 -o "obj/Debug/port_asm.o" "../src/port_asm.asm"
+endif
+ifeq ($(config),release)
+obj/Release/port_asm.o: ../src/port_asm.asm
+	@echo "Compiling ../src/port_asm.asm"
+	$(SILENT) nasm -f elf64 -o "obj/Release/port_asm.o" "../src/port_asm.asm"
+endif
 $(OBJDIR)/shared.o: ../src/shared.c
 	@echo $(notdir $<)
 	$(SILENT) $(CC) $(ALL_CFLAGS) $(FORCE_INCLUDE) -o "$@" -MF "$(@:%.o=%.d)" -c "$<"
@@ -216,9 +261,6 @@ $(OBJDIR)/shell.o: ../src/shell.c
 	@echo $(notdir $<)
 	$(SILENT) $(CC) $(ALL_CFLAGS) $(FORCE_INCLUDE) -o "$@" -MF "$(@:%.o=%.d)" -c "$<"
 $(OBJDIR)/smap.o: ../src/smap.c
-	@echo $(notdir $<)
-	$(SILENT) $(CC) $(ALL_CFLAGS) $(FORCE_INCLUDE) -o "$@" -MF "$(@:%.o=%.d)" -c "$<"
-$(OBJDIR)/socket.o: ../src/socket.c
 	@echo $(notdir $<)
 	$(SILENT) $(CC) $(ALL_CFLAGS) $(FORCE_INCLUDE) -o "$@" -MF "$(@:%.o=%.d)" -c "$<"
 $(OBJDIR)/stdio.o: ../src/stdio.c
