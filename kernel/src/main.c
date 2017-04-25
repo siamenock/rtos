@@ -58,120 +58,120 @@ static void ap_timer_init() {
 	__timer_ns = *(uint64_t*)VIRTUAL_TO_PHYSICAL((uint64_t)&__timer_ns);
 }
 
-/*
- *static void init_nics(int count) {
- *        int index = 0;
- *        extern uint64_t manager_mac;
- *        for(int i = 0; i < count; i++) {
- *                nic_devices[i] = device_get(DEVICE_TYPE_NIC, i);
- *                if(!nic_devices[i])
- *                        continue;
- *
- *                NICPriv* nic_priv = gmalloc(sizeof(NICPriv));
- *                if(!nic_priv)
- *                        continue;
- *
- *                nic_priv->nics = map_create(8, NULL, NULL, NULL);
- *
- *                nic_devices[i]->priv = nic_priv;
- *
- *                NICInfo info;
- *                ((NICDriver*)nic_devices[i]->driver)->get_info(nic_devices[i]->id, &info);
- *
- *                nic_priv->port_count = info.port_count;
- *                for(int j = 0; j < info.port_count; j++) {
- *                        nic_priv->mac[j] = info.mac[j];
- *
- *                        char name_buf[64];
- *                        sprintf(name_buf, "eth%d", index);
- *                        uint16_t port = j << 12;
- *
- *                        Map* vnics = map_create(16, NULL, NULL, NULL);
- *                        map_put(nic_priv->nics, (void*)(uint64_t)port, vnics);
- *
- *                        printf("NICs in private data : %p\n", nic_priv->nics);
- *
- *                        printf("\t%s : [%02x:%02x:%02x:%02x:%02x:%02x] [%c]\n", name_buf,
- *                                (info.mac[j] >> 40) & 0xff,
- *                                (info.mac[j] >> 32) & 0xff,
- *                                (info.mac[j] >> 24) & 0xff,
- *                                (info.mac[j] >> 16) & 0xff,
- *                                (info.mac[j] >> 8) & 0xff,
- *                                (info.mac[j] >> 0) & 0xff,
- *                                manager_mac == 0 ? '*' : ' ');
- *
- *                        if(!manager_mac)
- *                                manager_mac = info.mac[j];
- *
- *                        index++;
- *                }
- *        }
- *}
- */
+static Device* devices[16];
+static NICDevice* nicdev_create(NICInfo* info) {
+	extern uint64_t manager_mac;
+	NICDevice* nic_device = gmalloc(sizeof(NICDevice));
+	if(!nic_device)
+		return NULL;
 
-#define VGA_BUFFER_PAGES	12
-//static uint64_t idle_time;
-extern Device* nic_devices[];
+	nic_device->mac = info->mac;
+	strncpy(nic_device->name, info->name, sizeof(nic_device->name));
 
-/*
-static bool idle0_event(void* data) {
-	static uint64_t tick;
-	uint64_t time = cpu_tsc();
-	
-	if(time > tick) {
-		tick = time + cpu_frequency;
-		nic_statistics(time);
-		printf("\033[0;68HLoad: %3d%%", (cpu_frequency - idle_time) * 100 / cpu_frequency);
-		idle_time = 0;
-		return;
+	nicdev_register(nic_device);
+
+	printf("\tNIC Device created\n");
+	printf("\t%s : [%02lx:%02lx:%02lx:%02lx:%02lx:%02lx] [%c]\n", nic_device->name,
+			(info->mac >> 40) & 0xff,
+			(info->mac >> 32) & 0xff,
+			(info->mac >> 24) & 0xff,
+			(info->mac >> 16) & 0xff,
+			(info->mac >> 8) & 0xff,
+			(info->mac >> 0) & 0xff,
+			manager_mac == 0 ? '*' : ' ');
+
+	if(!manager_mac)
+		manager_mac = info->mac;
+
+	return nic_device;
+}
+
+static void nicdev_destroy(NICDevice* dev) {
+	nic_device_unregister(dev->name);
+	gfree(dev);
+}
+
+int nicdev_init() {
+	Device* dev;
+	int index = 0;
+	uint16_t count = device_count(DEVICE_TYPE_NIC);
+	for(int i = 0; i < count; i++) {
+		dev = device_get(DEVICE_TYPE_NIC, i);
+		if(!dev)
+			continue;
+
+		NICInfo info;
+		NICDriver* driver = dev->driver;
+		driver->get_info(dev->id, &info);
+
+		if(info.name[0] == '\0')
+			strncpy(info.name, "eth%d", index++);
+
+		nic_devices[i] = nicdev_create(&info);
+		if(!nic_devices[i])
+			goto failed;
 	}
-	
-	// Poll NICs
-	extern Device* nic_current;
+
+	return 0;
+
+failed:
+	for(int i = 0; i < count; i++)
+		if(nic_devices[i])
+			nicdev_destroy(nic_devices[i]);
+
+	return -1;
+}
+
+static void nicdev_poll() {
 	int poll_count = 0;
-	for(int i = 0; i < NIC_MAX_DEVICE_COUNT; i++) {
-		Device* dev = nic_devices[i];
+	for(int i = 0; i < MAX_NIC_DEVICE_COUNT; i++) {
+		NICDevice* dev = nic_devices[i];
 		if(dev == NULL)
 			break;
-		
-		nic_current = dev;
-		NICDriver* nic = nic_current->driver;
-		
-		poll_count += nic->poll(nic_current->id);
+
+		NICDriver* nic = dev->driver;
+
+		poll_count += nic->poll(nic->id);
 	}
 
-#ifdef VFIO_ENABLED
-	// Poll FIO
-#define MAX_VM_COUNT	128
-	uint32_t vmids[MAX_VM_COUNT];
-	int vm_count = vm_list(vmids, MAX_VM_COUNT);
-	for(int i = 0; i < vm_count; i++) {
-		VM* vm = vm_get(vmids[i]);
-		VFIO* fio = vm->fio;
-		if(!fio)
-			continue;
+}
 
-		if(!fio->input_addr)
-			continue;
+#define VGA_BUFFER_PAGES	12
 
-		// Check if user changed request_id on purpose, and fix it
-		if(fio->user_fio->request_id != fio->request_id + fifo_size(fio->input_addr))
-			fio->user_fio->request_id = fio->request_id + fifo_size(fio->input_addr);
+static bool idle0_event(void* data) {
+	nicdev_poll();
 
-		// Check if there's something in the input fifo
-		if(fifo_size(fio->input_addr) > 0)
-			vfio_poll(vm);
-	}
-#endif
-
-	// idle
-	for(int i = 0; i < 1000; i++)
-		asm volatile("nop");
+// #ifdef VFIO_ENABLED
+// 	// Poll FIO
+// #define MAX_VM_COUNT	128
+// 	uint32_t vmids[MAX_VM_COUNT];
+// 	int vm_count = vm_list(vmids, MAX_VM_COUNT);
+// 	for(int i = 0; i < vm_count; i++) {
+// 		VM* vm = vm_get(vmids[i]);
+// 		VFIO* fio = vm->fio;
+// 		if(!fio)
+// 			continue;
+// 
+// 		if(!fio->input_addr)
+// 			continue;
+// 
+// 		// Check if user changed request_id on purpose, and fix it
+// 		if(fio->user_fio->request_id != fio->request_id + fifo_size(fio->input_addr))
+// 			fio->user_fio->request_id = fio->request_id + fifo_size(fio->input_addr);
+// 
+// 		// Check if there's something in the input fifo
+// 		if(fifo_size(fio->input_addr) > 0)
+// 			vfio_poll(vm);
+// 	}
+// #endif
+// 
+// 	// idle
+// 	for(int i = 0; i < 1000; i++)
+// 		asm volatile("nop");
 	
 	//idle_time += cpu_tsc() - time;
 	return true;
 }
-*/
 
 static bool idle_monitor_event(void* data) {
 	static uint8_t trigger;
