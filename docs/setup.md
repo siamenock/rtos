@@ -55,6 +55,10 @@ Build steps
 
 5. After you build successfully, you can find 'system.img' in $RTOS.
 
+6. Load RTOS system in QEMU
+	`cd $RTOS`
+	`make -f util.mk run`
+
 Miscellaneous
 -------------
 Since we mount loop device to build system image whenever you build annoying nautilus window is appeared. Enter this command to disable this automount-open.
