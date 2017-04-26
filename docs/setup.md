@@ -23,6 +23,7 @@ Ubuntu 14.04/16.04 LTS.
 * cmake
 * node.js
 * autoconf
+* automake
 * dcfldd
 * libcmocka-dev
 
