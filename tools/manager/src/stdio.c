@@ -19,7 +19,7 @@ volatile size_t __stderr_head;
 volatile size_t __stderr_tail;
 size_t __stderr_size = BUFFER_SIZE;
 
-void stdio_init() {
+void stdio_init0() {
 	*__stdout = (char*)VIRTUAL_TO_PHYSICAL(elf_get_symbol("__stdout"));
 	__stdout_head = (volatile size_t*)VIRTUAL_TO_PHYSICAL(elf_get_symbol("__stdout_head"));
 	__stdout_tail = (volatile size_t*)VIRTUAL_TO_PHYSICAL(elf_get_symbol("__stdout_tail"));

@@ -99,6 +99,21 @@ NICDevice* nicdev_get(const char* name) {
 	return NULL;
 }
 
+int nicdev_poll() {
+	int poll_count = 0;
+	for(int i = 0; i < MAX_NIC_DEVICE_COUNT; i++) {
+		NICDevice* dev = nic_devices[i];
+		if(dev == NULL)
+			break;
+
+		NICDriver* driver = dev->driver;
+
+		poll_count += driver->poll(0);
+	}
+
+	return poll_count;
+}
+
 uint32_t nicdev_register_vnic(NICDevice* dev, VNIC* vnic) {
 	int i;
 	for(i = 0; i < MAX_VNIC_COUNT; i++) {

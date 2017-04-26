@@ -38,6 +38,7 @@
 #include "mmap.h"
 
 // Drivers
+#include "driver/nicdev.h"
 #include "driver/pata.h"
 #include "driver/usb/usb.h"
 #include "driver/ramdisk.h"
@@ -58,7 +59,7 @@ static void ap_timer_init() {
 	__timer_ns = *(uint64_t*)VIRTUAL_TO_PHYSICAL((uint64_t)&__timer_ns);
 }
 
-static Device* devices[16];
+static Device* devices[MAX_NIC_DEVICE_COUNT];
 static NICDevice* nicdev_create(NICInfo* info) {
 	extern uint64_t manager_mac;
 	NICDevice* nic_device = gmalloc(sizeof(NICDevice));
@@ -66,7 +67,7 @@ static NICDevice* nicdev_create(NICInfo* info) {
 		return NULL;
 
 	nic_device->mac = info->mac;
-	strncpy(nic_device->name, info->name, sizeof(nic_device->name));
+	strcpy(nic_device->name, info->name);
 
 	nicdev_register(nic_device);
 
@@ -87,7 +88,7 @@ static NICDevice* nicdev_create(NICInfo* info) {
 }
 
 static void nicdev_destroy(NICDevice* dev) {
-	nic_device_unregister(dev->name);
+	nicdev_unregister(dev->name);
 	gfree(dev);
 }
 
@@ -105,35 +106,17 @@ int nicdev_init() {
 		driver->get_info(dev->id, &info);
 
 		if(info.name[0] == '\0')
-			strncpy(info.name, "eth%d", index++);
+			sprintf(info.name, "eth%d", index++);
 
-		nic_devices[i] = nicdev_create(&info);
-		if(!nic_devices[i])
-			goto failed;
+		NICDevice* nic_dev = nicdev_create(&info);
+		if(!nic_dev)
+			return -1;
+
+		nic_dev->driver = driver;
+		dev->priv = nic_dev;
 	}
 
 	return 0;
-
-failed:
-	for(int i = 0; i < count; i++)
-		if(nic_devices[i])
-			nicdev_destroy(nic_devices[i]);
-
-	return -1;
-}
-
-static void nicdev_poll() {
-	int poll_count = 0;
-	for(int i = 0; i < MAX_NIC_DEVICE_COUNT; i++) {
-		NICDevice* dev = nic_devices[i];
-		if(dev == NULL)
-			break;
-
-		NICDriver* nic = dev->driver;
-
-		poll_count += nic->poll(nic->id);
-	}
-
 }
 
 #define VGA_BUFFER_PAGES	12

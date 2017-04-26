@@ -27,6 +27,7 @@
 #include "smap.h"
 #include "stdio.h"
 #include "elf.h"
+#include "device.h"
 #include "popcorn.h"
 #include "netlink.h"
 #include "dispatcher.h"
@@ -336,6 +337,66 @@ static void _timer_init(char* cpu_brand) {
 	*___timer_ns = *___timer_us / 1000;
 }
 
+static Device* devices[MAX_NIC_DEVICE_COUNT];
+static NICDevice* nicdev_create(NICInfo* info) {
+	extern uint64_t manager_mac;
+	NICDevice* nic_device = gmalloc(sizeof(NICDevice));
+	if(!nic_device)
+		return NULL;
+
+	nic_device->mac = info->mac;
+	strcpy(nic_device->name, info->name);
+
+	nicdev_register(nic_device);
+
+	printf("\tNIC Device created\n");
+	printf("\t%s : [%02lx:%02lx:%02lx:%02lx:%02lx:%02lx] [%c]\n", nic_device->name,
+			(info->mac >> 40) & 0xff,
+			(info->mac >> 32) & 0xff,
+			(info->mac >> 24) & 0xff,
+			(info->mac >> 16) & 0xff,
+			(info->mac >> 8) & 0xff,
+			(info->mac >> 0) & 0xff,
+			manager_mac == 0 ? '*' : ' ');
+
+	if(!manager_mac)
+		manager_mac = info->mac;
+
+	return nic_device;
+}
+
+static void nicdev_destroy(NICDevice* dev) {
+	nicdev_unregister(dev->name);
+	gfree(dev);
+}
+
+int nicdev_init() {
+	Device* dev;
+	int index = 0;
+	uint16_t count = device_count(DEVICE_TYPE_NIC);
+	for(int i = 0; i < count; i++) {
+		dev = device_get(DEVICE_TYPE_NIC, i);
+		if(!dev)
+			continue;
+
+		NICInfo info;
+		NICDriver* driver = dev->driver;
+		driver->get_info(dev->id, &info);
+
+		if(info.name[0] == '\0')
+			sprintf(info.name, "eth%d", index++);
+
+		NICDevice* nic_dev = nicdev_create(&info);
+		if(!nic_dev)
+			return -1;
+
+		nic_dev->driver = driver;
+		dev->priv = nic_dev;
+	}
+
+	return 0;
+}
+
 int main(int argc, char** argv) {
 	int ret;
 	if(geteuid() != 0) {
@@ -404,8 +465,7 @@ int main(int argc, char** argv) {
 	mp_init0();
 
 	printf("\nInitializing shared memory area...\n");
-	if(shared_init() < 0)
-		goto error;
+	shared_init();
 
 	printf("\nInitializing malloc area...\n");
 	malloc_init();
@@ -448,7 +508,7 @@ int main(int argc, char** argv) {
 	vm_init();
 
 	printf("\nInitializing standard IO...\n");
-	stdio_init();
+	stdio_init0();
 
 	printf("\nInitializing linux netlink devices...\n");
 	netlink_init();

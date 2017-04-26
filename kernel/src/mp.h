@@ -121,6 +121,7 @@ typedef struct {
 
 uint8_t mp_cores[MP_MAX_CORE_COUNT];
 
+void mp_init0();
 void mp_init();
 uint8_t mp_apic_id();
 uint8_t mp_core_id();

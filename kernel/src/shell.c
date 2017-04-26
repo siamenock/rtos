@@ -323,24 +323,26 @@ static int cmd_nic(int argc, char** argv, void(*callback)(char* result, int exit
 	extern NICDevice* nic_devices[];
 	uint16_t nic_device_index = 0;
 
-	if(argc == 1 || (argc == 2 && !strcmp(argv[1], "list"))) {
-		for(int i = 0; i < MAX_NIC_DEVICE_COUNT; i++) {
-			NICDevice* nic_device = nic_devices[i];
-			if(!nic_device)
-				break;
-
-			printf("%12s", nic_device->name);
-			printf("HWaddr %02x:%02x:%02x:%02x:%02x:%02x\n",
-				(nic_device->mac >> 40) & 0xff,
-				(nic_device->mac >> 32) & 0xff,
-				(nic_device->mac >> 24) & 0xff,
-				(nic_device->mac >> 16) & 0xff,
-				(nic_device->mac >> 8) & 0xff,
-				(nic_device->mac >> 0) & 0xff);
-		}
-
-		return 0;
-	}
+/*
+ *        if(argc == 1 || (argc == 2 && !strcmp(argv[1], "list"))) {
+ *                for(int i = 0; i < MAX_NIC_DEVICE_COUNT; i++) {
+ *                        NICDevice* nic_device = nic_devices[i];
+ *                        if(!nic_device)
+ *                                break;
+ *
+ *                        printf("%12s", nic_device->name);
+ *                        printf("HWaddr %02x:%02x:%02x:%02x:%02x:%02x\n",
+ *                                (nic_device->mac >> 40) & 0xff,
+ *                                (nic_device->mac >> 32) & 0xff,
+ *                                (nic_device->mac >> 24) & 0xff,
+ *                                (nic_device->mac >> 16) & 0xff,
+ *                                (nic_device->mac >> 8) & 0xff,
+ *                                (nic_device->mac >> 0) & 0xff);
+ *                }
+ *
+ *                return 0;
+ *        }
+ */
 
 	return -1;
 }

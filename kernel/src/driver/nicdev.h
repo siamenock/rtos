@@ -9,6 +9,7 @@
 typedef struct {
 	char		name[MAX_NIC_NAME_LEN];
 	uint64_t	mac;
+	void*		driver;
 
 	VNIC*		vnics[MAX_VNIC_COUNT];
 } NICDevice;
@@ -33,7 +34,9 @@ typedef struct {
 
 int nicdev_register(NICDevice* dev);
 NICDevice* nicdev_unregister(const char* name);
+NICDevice* nicdev_unregister(const char* name);
 NICDevice* nicdev_get(const char* name);
+int nicdev_poll();
 
 uint32_t nicdev_register_vnic(NICDevice* dev, VNIC* vnic);
 VNIC* nicdev_unregister_vnic(NICDevice* dev, uint32_t id);
