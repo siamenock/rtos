@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -x
+
 BASE=$(dirname $0)
 
 MODULES="boot.mod crypto.mod extcmd.mod gettext.mod normal.mod terminal.mod"
@@ -58,12 +60,13 @@ sudo parted -s $IMAGE --			\
 	mkpart primary $USER_TYPE  $(($BOOT + 1 + $ROOT))MiB -1s	\
 	set 1 boot on
 
-KPARTX=`sudo kpartx -a -s -v $IMAGE`
-echo $KPARTX
-HDD=`echo $KPARTX | awk 'BEGIN { RS=""; FS=" "} {print $8 }'`
-HDD1=`echo $KPARTX | awk 'BEGIN { RS=""; FS=" "} {print $3 }'`
-HDD2=`echo $KPARTX | awk 'BEGIN { RS=""; FS=" "} {print $12 }'`
-HDD3=`echo $KPARTX | awk 'BEGIN { RS=""; FS=" "} {print $21 }'`
+sudo kpartx -a -s -v $IMAGE
+KPARTX=`sudo kpartx -l $IMAGE | head -n3`
+
+HDD=`echo $KPARTX | awk 'BEGIN { RS=""; FS=" "} {print $5 }'`
+HDD1=`echo $KPARTX | awk 'BEGIN { RS=""; FS=" "} {print $1 }'`
+HDD2=`echo $KPARTX | awk 'BEGIN { RS=""; FS=" "} {print $7 }'`
+HDD3=`echo $KPARTX | awk 'BEGIN { RS=""; FS=" "} {print $13 }'`
 
 sudo mkfs.$ROOT_FS -F32 /dev/mapper/$HDD1
 sudo mkfs.$BOOT_FS -F32 /dev/mapper/$HDD2
