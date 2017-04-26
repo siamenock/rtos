@@ -127,21 +127,19 @@ bool vnic_init(VNIC* vnic, uint64_t* attrs) {
 		return (uint64_t)-1;
 	}
 
-	//errno = 0;
-
 	//TODO check key
 	if(!has_key(VNIC_DEV) || !has_key(VNIC_MAC) || !has_key(VNIC_POOL_SIZE) ||
 			!has_key(VNIC_RX_BANDWIDTH) || !has_key(VNIC_TX_BANDWIDTH) ||
 			!has_key(VNIC_PADDING_HEAD) || !has_key(VNIC_PADDING_TAIL)) {
-		//errno = 1;
 		return false;
 	}
 
-	nic_init(get_value(VNIC_MAC), vnic->nic, vnic->nic_size,
+	nic_init(get_value(VNIC_MAC), vnic->nic, get_value(VNIC_POOL_SIZE),
 			get_value(VNIC_RX_BANDWIDTH), get_value(VNIC_TX_BANDWIDTH),
 			get_value(VNIC_PADDING_HEAD), get_value(VNIC_PADDING_TAIL),
 			get_value(VNIC_RX_QUEUE_SIZE), get_value(VNIC_TX_QUEUE_SIZE),
 			get_value(VNIC_SLOW_RX_QUEUE_SIZE), get_value(VNIC_SLOW_TX_QUEUE_SIZE));
+
 	vnic->magic = vnic->nic->magic;
 	vnic->id = vnic->nic->id;
 	vnic->mac = vnic->nic->mac;

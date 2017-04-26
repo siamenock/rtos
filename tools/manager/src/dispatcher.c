@@ -46,14 +46,14 @@ int dispatcher_exit() {
 	return close(dispatcher_fd);
 }
 
-int dispatcher_create_nic(void* nic) {
+int dispatcher_create_nic(void* dev) {
 	printf("Create NIC to kernel dispatcher\n");
-	return ioctl(dispatcher_fd, DISPATCHER_CREATE_NIC, nic);
+	return ioctl(dispatcher_fd, DISPATCHER_CREATE_NIC, dev);
 }
 
-int dispatcher_destroy_nic(void* nic) {
+int dispatcher_destroy_nic(void* dev) {
 	printf("Create NIC to kernel dispatcher\n");
-	return ioctl(dispatcher_fd, DISPATCHER_DESTROY_NIC, nic);
+	return ioctl(dispatcher_fd, DISPATCHER_DESTROY_NIC, dev);
 }
 
 int dispatcher_create_vnic(void* vnic) {

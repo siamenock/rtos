@@ -15,5 +15,11 @@
 
 int dispatcher_init(void);
 void dispatcher_exit(void);
+int dispatcher_create_nic(void* dev);
+int dispatcher_destroy_nic(void* dev);
+int dispatcher_create_vnic(void* vnic);
+int dispatcher_destroy_vnic(void* vnic);
+int dispatcher_update_vnic(void* vnic);
+int dispatcher_get_vnic(void* vnic);
 
 #endif /* __DISPATCHER_H__ */

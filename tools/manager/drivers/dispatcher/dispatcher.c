@@ -35,7 +35,7 @@ static struct list_head work_list;
 
 static rx_handler_result_t dispatcher_handle_frame(struct sk_buff** pskb);
 
-struct dispatcher_work* alloc_dispatcher_work(dispatcher_work_fn_t fn,
+static struct dispatcher_work* alloc_dispatcher_work(dispatcher_work_fn_t fn,
 		struct net_device *dev, void* data)
 {
 	struct dispatcher_work *work = kmalloc(sizeof(struct dispatcher_work),
@@ -388,6 +388,7 @@ static long dispatcher_ioctl(struct file *f, unsigned int ioctl,
 
 	struct dispatcher_work *work;
 	struct net_device *dev;
+	NICDevice* _nic_device;
 	NICDevice* nic_device;
 	VNIC _vnic;
 	VNIC* vnic = NULL;
@@ -399,18 +400,29 @@ static long dispatcher_ioctl(struct file *f, unsigned int ioctl,
 	struct page* page;
 	unsigned long phys_addr;
 
+	if(!argp)
+		return -EFAULT;
+
+	// TODO: return right errno
 	switch (ioctl) {
 		case DISPATCHER_CREATE_NIC:
 			printk("Register NIC on dispatcher device %p\n", argp);
-			nic_device = (NICDevice *)argp;
-			dev = __dev_get_by_name(&init_net, nic_device->name);
+			_nic_device = (NICDevice *)argp;
+			dev = __dev_get_by_name(&init_net, _nic_device->name);
 			if (!dev) {
-				printk("Failed to find net_device for %s\n", nic_device->name);
+				printk("Failed to find net_device for %s\n", _nic_device->name);
+				return -EINVAL;
+			}
+			nic_device = kzalloc(sizeof(NICDevice), GFP_KERNEL);
+			strncpy(nic_device->name, _nic_device->name, MAX_NIC_NAME_LEN);
+			if(nicdev_register(nic_device) < 0) {
+				printk("Failed to register NIC device\n");
 				return -EINVAL;
 			}
 
 			work = alloc_dispatcher_work(dispatcher_worker, dev, (void *)nic_device);
 			if (!work) {
+				nicdev_unregister(nic_device->name);
 				printk("Failed to alloc work\n");
 				return -ENOMEM;
 			}
@@ -423,7 +435,6 @@ static long dispatcher_ioctl(struct file *f, unsigned int ioctl,
 			//name
 			printk("Unregister NIC on dispatcher device\n");
 			nic_device = (NICDevice *)argp;
-
 			dev = __dev_get_by_name(&init_net, nic_device->name);
 			if(!dev) {
 				printk("Failed to find net_device for %s\n", nic_device->name);
@@ -438,10 +449,14 @@ static long dispatcher_ioctl(struct file *f, unsigned int ioctl,
 
 			dispatcher_work_dequeue(work);
 
+			nicdev_unregister(nic_device->name);
+
+			kfree(work->data);
+			kfree(work);
+
 			return 0;
+
 		case DISPATCHER_CREATE_VNIC:
-			if(!argp)
-				return -EFAULT;
 			vnic = kmalloc(sizeof(VNIC), GFP_KERNEL);
 			if(!vnic)
 				return -EFAULT;
@@ -451,25 +466,32 @@ static long dispatcher_ioctl(struct file *f, unsigned int ioctl,
 				return -EFAULT;
 			}
 
+			printk("parent %s\n", vnic->parent);
 			nic_device = nicdev_get(vnic->parent);
 			if(!nic_device) {
+				printk("Invalid parent device name: %s\n", vnic->parent);
 				kfree(vnic);
 				return -EFAULT;
 			}
 
+			// Bug in here
 			pgd = pgd_offset(mm, (unsigned long)vnic->nic);
 			pud = pud_offset(pgd, (unsigned long)vnic->nic);
 			pmd = pmd_offset(pud, (unsigned long)vnic->nic);
 			pte = pte_offset_map(pmd, (unsigned long)vnic->nic);
 			page = pte_page(*pte);
+			// Bug in here
+
 			phys_addr = page_to_phys(page);
 			vnic->nic = ioremap_nocache(phys_addr, vnic->nic_size);
 			if(!vnic->nic) {
+				printk("Failed to ioremap to %p (%x)\n", phys_addr, vnic->nic_size);
 				kfree(vnic);
 				return -EFAULT;
 			}
 
 			if(nicdev_register_vnic(nic_device, vnic) < 0) {
+				printk("Failed to register VNIC in NIC device\n");
 				kfree(vnic);
 				return -EFAULT;
 			}

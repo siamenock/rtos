@@ -66,6 +66,8 @@ static NICDevice* nicdev_create(NICInfo* info) {
 	if(!nic_device)
 		return NULL;
 
+	memset(nic_device, 0x0, sizeof(NICDevice));
+
 	nic_device->mac = info->mac;
 	strcpy(nic_device->name, info->name);
 
@@ -429,6 +431,8 @@ void main() {
 
 	shared_init();
 	if(apic_id == 0) {
+		printf("Should not happen \n");
+		while(1);
 /*
  *                printf("\x1b""32mOK""\x1b""0m\n");
  *
@@ -555,13 +559,6 @@ void main() {
 		}
 
 	} else {
-		/*
-		 *uint64_t start = VIRTUAL_TO_PHYSICAL(IDT_END_ADDR);
-		 *uint64_t end = VIRTUAL_TO_PHYSICAL((uint64_t)shared);
-		 */
-		/*
-		 *printf("Gmalloc start: %p ~ %p\n", start, end);
-		 */
 		ap_timer_init();
 
 		mp_sync(1);	// Barrier #2

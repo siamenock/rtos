@@ -90,20 +90,27 @@ int elf_copy(char* elf_file, unsigned long kernel_start_address) {
 		return -1;
 	}
 
-	off_t elf_size = lseek(fd, 0, SEEK_END);
-	char* addr = mmap(NULL, elf_size, PROT_READ, MAP_PRIVATE, fd, 0);
-	if(addr == MAP_FAILED) {
-		close(fd);
-		return -2;
-	}
-
-	//Clean Kernel
-	memset((void*)0x200000, 0, 0x600000);
-	copy_kernel((Elf64_Ehdr*)addr);
-	munmap(addr, elf_size);
-	close(fd);
-
-	return 0;
+	char command[256];
+	sprintf(command, "kexec -a 0x%x -l %s -t elf-x86_64 --args-none >/dev/null 2>&1", 
+			kernel_start_address, elf_file);
+	printf("\tExecute command : %s\n", command);
+	return system(command);
+/*
+ *        off_t elf_size = lseek(fd, 0, SEEK_END);
+ *        char* addr = mmap(NULL, elf_size, PROT_READ, MAP_PRIVATE, fd, 0);
+ *        if(addr == MAP_FAILED) {
+ *                close(fd);
+ *                return -2;
+ *        }
+ *
+ *        //Clean Kernel
+ *        memset((void*)0x200000, 0, 0x600000);
+ *        copy_kernel((Elf64_Ehdr*)addr);
+ *        munmap(addr, elf_size);
+ *        close(fd);
+ *
+ *        return 0;
+ */
 }
 
 uint64_t elf_get_symbol(char* sym_name) {

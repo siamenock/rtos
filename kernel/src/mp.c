@@ -92,7 +92,6 @@ uint8_t mp_core_count() {
 }
 
 void mp_sync(int barrier) {
-//	printf("Sync memory : %p\n", &shared->sync[barrier]);
 	while(!shared->sync[barrier])
 		asm volatile("nop");
 /*

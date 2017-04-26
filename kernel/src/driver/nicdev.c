@@ -85,15 +85,13 @@ NICDevice* nicdev_unregister(const char* name) {
 }
 
 NICDevice* nicdev_get(const char* name) {
-	NICDevice* dev;
 	int i;
 	for(i = 0; i < MAX_NIC_DEVICE_COUNT; i++) {
-		if(!nic_devices[i]) {
+		if(!nic_devices[i])
 			return NULL;
-		}
 
 		if(!strncmp(nic_devices[i]->name, name, MAX_NIC_NAME_LEN))
-			return dev;
+			return nic_devices[i];
 	}
 
 	return NULL;
@@ -135,9 +133,8 @@ VNIC* nicdev_unregister_vnic(NICDevice* dev, uint32_t id) {
 	int i, j;
 
 	for(i = 0; i < MAX_VNIC_COUNT; i++) {
-		if(!nic_devices[i]) {
+		if(!nic_devices[i])
 			return NULL;
-		}
 
 		if(dev->vnics[i]->id == id) {
 			//Shift
@@ -162,9 +159,8 @@ VNIC* nicdev_get_vnic(NICDevice* dev, uint32_t id) {
 	int i;
 
 	for(i = 0; i < MAX_VNIC_COUNT; i++) {
-		if(!nic_devices[i]) {
+		if(!nic_devices[i])
 			return NULL;
-		}
 
 		if(dev->vnics[i]->id == id)
 			return dev->vnics[i];
@@ -174,12 +170,9 @@ VNIC* nicdev_get_vnic(NICDevice* dev, uint32_t id) {
 }
 
 VNIC* nicdev_get_vnic_mac(NICDevice* dev, uint64_t mac) {
-	int i;
-
-	for(i = 0; i < MAX_VNIC_COUNT; i++) {
-		if(!nic_devices[i]) {
+	for(int i = 0; i < MAX_VNIC_COUNT; i++) {
+		if(!dev->vnics[i])
 			return NULL;
-		}
 
 		if(dev->vnics[i]->mac == mac)
 			return dev->vnics[i];
@@ -230,7 +223,6 @@ int nicdev_rx(NICDevice* dev, void* data, size_t size) {
 		}
 		return NICDEV_PROCESS_PASS;
 	} else {
-
 		vnic = nicdev_get_vnic_mac(dev, eth->dmac);
 		if(vnic) {
 			vnic_rx(vnic, (uint8_t*)eth, size, NULL, 0);

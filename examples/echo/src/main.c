@@ -15,8 +15,8 @@ void ginit(int argc, char** argv) {
 void init(int argc, char** argv) {
 }
 
-static uint32_t address = 0xc0a8640a;	// 192.168.100.10
-//static uint32_t address = 0xc0a80ac8;	// 192.168.10.200
+//static uint32_t address = 0xc0a8640a;	// 192.168.100.10
+static uint32_t address = 0xc0a80ac8;	// 192.168.10.200
 
 void process(NIC* ni) {
 	Packet* packet = nic_input(ni);
