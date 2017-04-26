@@ -82,11 +82,11 @@ gdt:
 	.quad   0x0000000000000000	/* TS continued */
 gdt_end:
 
-	/* 
-	 * Description table area 
+	/*
+	 * Description table area
 	 * */
 	.section ".desc_table", "w", @nobits
-	.balign 4096 
+	.balign 4096
 	.globl GDTR_ADDR
 GDTR_ADDR:
 	.fill 0x10, 1, 0
@@ -97,33 +97,33 @@ GDT_ADDR:
 	.globl GDT_END_ADDR
 GDT_END_ADDR:
 
-	.globl TSS_ADDR 
+	.globl TSS_ADDR
 TSS_ADDR:
 	.fill 104 * 16 /* MP_MAX_CORE_COUNT */
 
-	.globl IDTR_ADDR 
+	.globl IDTR_ADDR
 IDTR_ADDR:
 	.fill 16, 1, 0
 
-	.globl IDT_ADDR 
+	.globl IDT_ADDR
 IDT_ADDR:
 	.fill 16 * 100
 	.globl IDT_END_ADDR
 IDT_END_ADDR:
-	.org GDTR_ADDR + 0x100000, 0 
+	.org GDTR_ADDR + 0x100000, 0
 
-	/* 
-	 * Shared area 
+	/*
+	 * Shared area
 	 * */
 	/*
 	 *.section ".shared", "a", @nobits
-	 *.balign 4096 
+	 *.balign 4096
 	 *.fill 0x100000, 1, 0
 	 */
 
 	/*
 	 * Kernel data area
-	 * */	
+	 * */
 	// VGA buffer
 	.section ".vga_buffer","a",@nobits
 	.balign 4096
@@ -143,7 +143,7 @@ IDT_END_ADDR:
 	.section ".kernel_stack","a",@nobits
 	.balign 4096
 	.fill 0x10000, 1, 0
-	
+
 	// Page table
 	.section ".pgtable","a",@nobits
 	.balign 4096
