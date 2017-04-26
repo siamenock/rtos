@@ -105,7 +105,7 @@ next:
 	extern	main
 	call	main
 	
-	jmp	0x08:0x200000   ; Jump to kernel64
+	jmp	0x08:0x400000   ; Jump to kernel64
 	
 .loop:
 	hlt
