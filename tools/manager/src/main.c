@@ -476,8 +476,11 @@ int main(int argc, char** argv) {
 	printf("\nInitializing timer...\n");
 	_timer_init(cpu_brand);
 
+	printf("\nWake-Up Multi processor...\n");
+	amp_init(kernel_start_address);
+
 	printf("\nInitializing mulitiprocessing...\n");
-	mp_init(kernel_start_address);
+	mp_init();
 
 	printf("\nInitializing cpu...\n");
 	cpu_init();
