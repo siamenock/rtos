@@ -1,31 +1,21 @@
 #include <stdio.h>
 #include <string.h>
 #include "shared.h"
+#include "page.h"
 #include "mmap.h"
-
-extern uint64_t* gmalloc_pool;
-extern uint32_t bmalloc_count;
-extern uint64_t* bmalloc_pool;
 
 Shared* shared;
 
 void shared_init() {
-	shared = (Shared*)(DESC_TABLE_AREA_END - sizeof(Shared));
+	shared = (Shared*)(VIRTUAL_TO_PHYSICAL((uint64_t)DESC_TABLE_AREA_END) - sizeof(Shared));
+	printf("\tShared space: %p\n", shared);
+	if(!mp_apic_id()) {
+		memset(shared, 0x0, sizeof(Shared));
+		shared->magic = SHARED_MAGIC;
+		memset((void *)shared->mp_cores, MP_CORE_INVALID, MP_MAX_CORE_COUNT * sizeof(uint8_t));
+	} else if(shared->magic != SHARED_MAGIC) {
+		printf("ERROR: Wrong Shared Magic Number\n");
+	}
 
-/*
- *        // Core mapping info
- *        memcpy(shared->mp_cores, mp_core_map(), sizeof(shared->mp_cores));
- *        
- *        // Gmalloc pool info
- *        shared->gmalloc_pool = gmalloc_pool;
- *        printf("Gmalloc Pool : %p\n", gmalloc_pool);
- *
- *        // Bmalloc pool info
- *        shared->bmalloc_count = bmalloc_count;
- *        shared->bmalloc_pool = bmalloc_pool;
- *
- *        printf("Bmalloc Pool : %p\n", bmalloc_pool);
- *        // Magic number info
- *        shared->magic = SHARED_MAGIC;
- */
+	printf("\tShared magic: %p\n", shared->magic);
 }
