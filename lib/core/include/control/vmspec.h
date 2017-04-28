@@ -17,8 +17,8 @@ typedef enum {
 
 typedef struct {
 	uint64_t	mac;
-	//uint32_t	port;
 	char*		dev;
+	uint16_t	budget;
 	uint32_t	input_buffer_size;
 	uint32_t	output_buffer_size;
 	uint32_t	slow_input_buffer_size;

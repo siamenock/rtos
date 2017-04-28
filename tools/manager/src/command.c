@@ -793,6 +793,7 @@ static int cmd_create(int argc, char** argv, void(*callback)(char* result, int e
 
 			NICSpec* nic = &(vm->nics[vm->nic_count++]);
 			nic->mac = 0;
+			nic->budget = 64;
 			nic->dev = malloc(strlen("eth0") + 1);
 			nic->dev = strcpy(nic->dev, "eth0");
 			nic->input_buffer_size = 1024;
@@ -818,6 +819,13 @@ static int cmd_create(int argc, char** argv, void(*callback)(char* result, int e
 					nic->dev = malloc(strlen(argv[i] + 1));
 					strcpy(nic->dev, argv[i]);
 					printf("Device alloc %s \n", argv[i]);
+				} else if(strcmp(argv[i], "budget:") == 0) {
+					i++;
+					if(!is_uint16(argv[i])) {
+						printf("budget must be uint16\n");
+						return -1;
+					}
+					nic->budget = parse_uint16(argv[i]);
 				} else if(strcmp(argv[i], "ibuf:") == 0) {
 					i++;
 					if(!is_uint32(argv[i])) {
@@ -899,6 +907,7 @@ static int cmd_create(int argc, char** argv, void(*callback)(char* result, int e
 		nic->mac = 0;
 		nic->dev = malloc(strlen("eth0") + 1);
 		nic->dev = strcpy(nic->dev, "eth0");
+		nic->budget = 64;
 		nic->input_buffer_size = 1024;
 		nic->output_buffer_size = 1024;
 		nic->slow_input_buffer_size = 1024;

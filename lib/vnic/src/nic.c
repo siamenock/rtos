@@ -3,7 +3,8 @@
 #include "lock.h"
 #include "nic.h"
 
-static NIC* __nics[NIC_MAX_COUNT];
+NIC* __nics[NIC_MAX_COUNT];
+int __nic_count;
 
 static NIC* find_NIC(Packet* packet) {
 	NIC* nic = (void*)((uintptr_t)packet & ~(uintptr_t)(0x200000 - 1)); // 2MB alignment
@@ -18,27 +19,28 @@ static NIC* find_NIC(Packet* packet) {
 }
 
 int nic_count() {
-	int count = 0;
-	for(int i = 0; i < NIC_MAX_COUNT; i++) {
-		if(__nics[i] != NULL)
-			count++;
-	}
-
-	return count;
+	return __nic_count;
 }
 
 NIC* nic_get(int index) {
-	int count = 0;
-	for(int i = 0; i < NIC_MAX_COUNT; i++) {
-		if(__nics[i] != NULL) {
-			if(index == count)
-				return __nics[i];
-			else
-				count++;
-		}
-	}
-
-	return NULL;
+	if(index < __nic_count)
+		return __nics[index];
+	else
+		return NULL;
+/*
+ *
+ *        int count = 0;
+ *        for(int i = 0; i < NIC_MAX_COUNT; i++) {
+ *                if(__nics[i] != NULL) {
+ *                        if(index == count)
+ *                                return __nics[i];
+ *                        else
+ *                                count++;
+ *                }
+ *        }
+ *
+ *        return NULL;
+ */
 }
 
 NIC* nic_get_by_id(uint32_t id) {

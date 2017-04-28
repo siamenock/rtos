@@ -100,6 +100,7 @@ workspace "Kernel"
             "ar x ../libtlsf.a",
             "ar x ../libcore.a",
             "ar x ../libexpat.a",
+            "ar x ../libvnic.a",
             "ar rcs ../libpacketngin.a *.o",
 
             "cp -rL ../core/include/* ../../include",
@@ -113,6 +114,7 @@ workspace "Kernel"
 
             -- Linux Application library
             "ar x ../libtlsf.a ",		-- Blank is added at the end on purpose
+            "ar x ../libvnic.a ",       -- Blank is added at the end on purpose
             "ar x ../libcore_linux.a",
             "ar rcs ../libumpn.a *.o",
             "rm ./*.o -rf ",			-- Blank is added at the end on purpose

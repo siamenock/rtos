@@ -1,9 +1,11 @@
 #include "nicdev.h"
 
-extern int strncmp(const char* s, const char* d, size_t size);
+#define endian48(v)		(__builtin_bswap64((v)) >> 16)	///< Change endianness for 48 bits
 
-#define ETHER_MULTICAST		0Xffffffffffff
+#define ETHER_MULTICAST		((uint64_t)1 << 40)	///< MAC address is multicast
 #define ID_BUFFER_SIZE		(MAX_NIC_DEVICE_COUNT * MAX_VNIC_COUNT / 8)
+
+extern int strncmp(const char* s, const char* d, size_t size);
 
 typedef struct _Ether {
 	uint64_t dmac: 48;			///< Destination address (endian48)
@@ -208,13 +210,16 @@ VNIC* nicdev_update_vnic(NICDevice* dev, VNIC* src_vnic) {
  *
  * @return result of process
  */
+
 int nicdev_rx(NICDevice* dev, void* data, size_t size) {
 	Ether* eth = data;
 	int i;
 	VNIC* vnic;
+	unsigned char* ptr = eth;
+	uint64_t dmac = endian48(eth->dmac);
 
 	//TODO lock
-	if(eth->dmac == ETHER_MULTICAST) {
+	if(dmac & ETHER_MULTICAST) {
 		for(i = 0; i < MAX_VNIC_COUNT; i++) {
 			if(!dev->vnics[i])
 				break;
@@ -223,7 +228,7 @@ int nicdev_rx(NICDevice* dev, void* data, size_t size) {
 		}
 		return NICDEV_PROCESS_PASS;
 	} else {
-		vnic = nicdev_get_vnic_mac(dev, eth->dmac);
+		vnic = nicdev_get_vnic_mac(dev, dmac);
 		if(vnic) {
 			vnic_rx(vnic, (uint8_t*)eth, size, NULL, 0);
 			return NICDEV_PROCESS_COMPLETE;

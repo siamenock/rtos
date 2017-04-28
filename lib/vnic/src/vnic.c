@@ -175,11 +175,14 @@ bool vnic_rx_available(VNIC* vnic) {
 //TODO return error number
 bool vnic_rx(VNIC* vnic, uint8_t* buf1, size_t size1, uint8_t* buf2, size_t size2) {
 	uint64_t time = timer_frequency();
-	if(vnic->rx_closed - vnic->rx_wait_grace > time) {
-		return false;
-	}
+	//TODO
+	/*
+	 *if(vnic->rx_closed - vnic->rx_wait_grace > time) {
+	 *        return -1;
+	 *}
+	 */
 
-	//TODO strict check 
+	//TODO strict check
 	lock_lock(&vnic->nic->rx.wlock);
 	vnic->rx.head = vnic->nic->rx.head;
 	if(queue_available(&vnic->rx)) {

@@ -1,7 +1,7 @@
 #ifndef __DISPATCHER_H__
 #define __DISPATCHER_H__
 
-#include <sys/types.h>
+#include <linux/types.h>
 
 #define DISPATCHER			0xAC
 

@@ -13,6 +13,7 @@ typedef enum {
 	VNIC_ID,			///< NIC ID
 	VNIC_MAC,			///< MAC address
 	VNIC_DEV,			///< Device of Network Interface
+	VNIC_BUDGET,
 	VNIC_POOL_SIZE,			///< NI's total memory size
 	VNIC_RX_BANDWIDTH,		///< Input bandwidth in bps
 	VNIC_TX_BANDWIDTH,		///< Output bandwidth in bps
