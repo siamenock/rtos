@@ -12,7 +12,6 @@
 
 #include "vm.h"
 #include "vnic.h"
-#include "file.h"
 #include "dispatcher.h"
 #include "version.h"
 #include "manager.h"
@@ -1338,83 +1337,3 @@ Command commands[] = {
 		.name = NULL
 	},
 };
-
-static void cmd_callback(char* result, int exit_status) {
-	if(!result)
-		return;
-	cmd_update_var(result, exit_status);
-	cmd_sync = false;
-}
-
-static int execute_cmd(char* line, bool is_dump) {
-	// if is_dump == true then file cmd
-	//    is_dump == false then stdin cmd
-	if(is_dump == true)
-		printf("%s\n", line);
-
-	int exit_status = cmd_exec(line, cmd_callback);
-
-	if(exit_status != 0) {
-		if(exit_status == CMD_STATUS_WRONG_NUMBER) {
-			printf("Wrong number of arguments\n");
-		} else if(exit_status == CMD_STATUS_NOT_FOUND) {
-			printf("Command not found: %s\n", line);
-		} else if(exit_status < 0) {
-			printf("Error code : %d\n", exit_status);
-		} else if(exit_status == CMD_VARIABLE_NOT_FOUND) {
-			printf("Variable not found\n");
-		} else if(exit_status < 0) {
-			printf("Wrong value of argument: %d\n", -exit_status);
-		}
-	}
-	printf("> ");
-	fflush(stdout);
-
-	return exit_status;
-}
-
-#define MAX_LINE_SIZE		2048
-
-void command_process(int fd) {
-	char line[MAX_LINE_SIZE] = {0, };
-	char* head;
-	int seek = 0;
-	int eod = 0; // End of data
-
-	while((eod += read(fd, &line[eod], MAX_LINE_SIZE - eod))) {
-		head = line;
-		for(; seek < eod; seek++) {
-			if(line[seek] == '\n') {
-				line[seek] = '\0';
-				int ret = execute_cmd(head, fd != STDIN_FILENO);
-
-				if(ret == 0) {
-					head = &line[seek] + 1;
-				} else {
-					eod = 0;
-					return;
-				}
-			}
-		}
-		if(head == line && eod == MAX_LINE_SIZE){ // Unfound '\n' and head == 0
-			printf("Command line is too long %d > %d\n", eod, MAX_LINE_SIZE);
-			eod = 0;
-			return;
-		 } else { // Unfound '\n' and seek != 0
-			memmove(line, head, eod - (head - line));
-			eod -= head - line;
-			seek = eod;
-			if(fd == STDIN_FILENO) {
-				return;
-			} else
-				continue;
-		}
-	}
-
-	if(eod != 0) {
-		line[eod] = '\0';
-		execute_cmd(&line[0], fd != STDIN_FILENO);
-	}
-	eod = 0;
-}
-
