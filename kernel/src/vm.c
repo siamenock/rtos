@@ -17,7 +17,6 @@
 #include "gmalloc.h"
 #include "stdio.h"
 #include "shared.h"
-#include "dispatcher.h"
 #include "mmap.h"
 #include "driver/nicdev.h"
 
@@ -612,6 +611,7 @@ uint32_t vm_create(VMSpec* vm_spec) {
 		uint64_t attrs[] = {
 			VNIC_MAC, mac,
 			VNIC_DEV, (uint64_t)nics[i].dev,
+			VNIC_BUDGET, nics[i].budget,
 			VNIC_POOL_SIZE, nics[i].pool_size,
 			VNIC_RX_BANDWIDTH, nics[i].input_bandwidth,
 			VNIC_TX_BANDWIDTH, nics[i].output_bandwidth,
@@ -632,6 +632,7 @@ uint32_t vm_create(VMSpec* vm_spec) {
 			return 0;
 		}
 
+		vnic->nic_size = nics[i].pool_size;
 		vnic->nic = bmalloc(nics[i].pool_size / 0x200000);
 		if(!vnic->nic) {
 			printf("Manager: Failed to allocate NIC in VNIC\n");
@@ -640,6 +641,7 @@ uint32_t vm_create(VMSpec* vm_spec) {
 			return 0;
 		}
 
+		vnic->budget = nics[i].budget;
 		if(!vnic_init(vnic, attrs)) {
 			printf("Manager: Not enough VNIC to allocate: errno=%d.\n", errno);
 			map_remove(vms, (void*)(uint64_t)vmid);
@@ -647,6 +649,7 @@ uint32_t vm_create(VMSpec* vm_spec) {
 			return 0;
 		}
 
+		extern int dispatcher_create_vnic(void* vnic);
 		strcpy(vnic->parent, nics[i].dev);
 		if(dispatcher_create_vnic(vnic) < 0) {
 			printf("Manager: Failed to create VNIC in dispatcher module: errno=%d.\n", errno);
