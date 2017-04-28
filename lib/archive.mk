@@ -7,10 +7,10 @@ endif
 all: libcore.a
 
 ifeq ($(config),debug)
-libcore.a: libtlsf.a libext.a libc.a libm.a libexpat.a
+libcore.a: libhal.a libtlsf.a libext.a libc.a libm.a libexpat.a
 endif
 ifeq ($(config),release)
-libcore.a: libtlsf.a libext.a libc.a libm.a libexpat.a
+libcore.a: libhal.a libtlsf.a libext.a libc.a libm.a libexpat.a
 endif
 ifeq ($(config),linux)
 libcore.a: libtlsf.a libext.a
