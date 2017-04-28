@@ -29,9 +29,11 @@ struct dispatcher_work {
 	struct net_device*	dev;
 };
 
-static struct task_struct *dispatcher_daemon;
 static spinlock_t work_lock;
 static struct list_head work_list;
+
+static struct task_struct *dispatcher_daemon;
+static struct mm_struct *manager_mm;
 
 static rx_handler_result_t dispatcher_handle_frame(struct sk_buff** pskb);
 
@@ -111,7 +113,6 @@ static inline void dispatcher_work_dequeue(struct dispatcher_work *work)
 
 static inline void dispatcher_work_queue_flush(void)
 {
-	//unsigned long flags;
 	struct dispatcher_work *pos;
 	struct dispatcher_work *tmp;
 
@@ -168,15 +169,15 @@ static int dispatcherd(void *data)
 	return 0;
 }
 
-static int dispatcherd_start(struct task_struct *manager_task)
+static int dispatcherd_start()
 {
 	int err;
 
 	spin_lock_init(&work_lock);
 	INIT_LIST_HEAD(&work_list);
 
-	dispatcher_daemon = kthread_create(dispatcherd, manager_task,
-			"dispatcherd-%d", current->pid);
+	dispatcher_daemon = kthread_create(dispatcherd, NULL, "dispatcherd-%d",
+			current->pid);
 	if (IS_ERR(dispatcher_daemon)) {
 		err = PTR_ERR(dispatcher_daemon);
 		goto err;
@@ -221,27 +222,14 @@ rx_handler_result_t dispatcher_handle_frame(struct sk_buff** pskb)
 		return RX_HANDLER_CONSUMED;
 
 	struct ethhdr *eth = (struct ethhdr*)skb_mac_header(skb);
-	printk("Penguin: src mac %pM, dst mac %pM\n", eth->h_source, eth->h_dest);
-
-	//WARN_ONCE(current->pid != dispatcher_daemon->pid,
-	//	"Current PID: %d, Worker PID: %d\n", current->pid, dispatcher_daemon->pid);
-
-	if(current->pid != dispatcher_daemon->pid) {
-		printk("Current PID: %d, Worker PID: %d\n", current->pid, dispatcher_daemon->pid);
-		return RX_HANDLER_PASS;
-	}
-
 	skb_linearize(skb);
-
 	NICDevice* nic_device = rcu_dereference(skb->dev->rx_handler_data);
-
 	BUG_ON(!nic_device);
 
 	int res = nicdev_rx(nic_device, eth, ETH_HLEN + skb->len);
-
 	if(res == NICDEV_PROCESS_COMPLETE)
 		return RX_HANDLER_CONSUMED;
-	else 
+	else
 		return RX_HANDLER_PASS;
 }
 
@@ -253,17 +241,19 @@ static int dispatcher_open(struct inode *inode, struct file *f)
 		return -1;
 	}
 
-	if (dispatcherd_start(task) < 0) {
+	if (dispatcherd_start() < 0) {
 		printk("Failed to start PacketNgin dispatcher daemon\n");
 		return -1;
 	}
 
+	manager_mm = task->mm;
 	printk("PacketNgin manager associated with disptacher\n");
 	return 0;
 }
 
 static int dispatcher_release(struct inode *inode, struct file *f)
 {
+	manager_mm = NULL;
 	dispatcherd_stop();
 	printk("PacketNgin manager unassociated with disptacher\n");
 	return 0;
@@ -282,12 +272,14 @@ static struct sk_buff* convert_to_skb(struct net_device* dev, Packet* packet)
 	memcpy(skb->data, buf, len);
 
 	printk("NIC free in convert to skb\n");
+
 	//TODO fix
 	nic_free(packet);
 	return skb;
 }
 
-bool packet_process(Packet* packet, void* context) {
+static bool packet_process(Packet* packet, void* context)
+{
 	struct net_device *dev = context;
 	struct sk_buff* skb = convert_to_skb(dev, packet);
 	if(!skb) {
@@ -298,7 +290,6 @@ bool packet_process(Packet* packet, void* context) {
 	//netpoll_send_skb_on_dev(skb, dev);
 	if(!netif_running(dev) || !netif_device_present(dev)) {
 		dev_kfree_skb_irq(skb);
-		printk("not running\n");
 		return false;
 	}
 
@@ -310,16 +301,10 @@ bool packet_process(Packet* packet, void* context) {
 			!vlan_hw_offload_capable(features, skb->vlan_proto)) {
 		skb = __vlan_hwaccel_push_inside(skb);
 		if(unlikely(!skb)) {
-			printk("skb_vlan_tag\n");
 			return false;
 		}
 	}
 
-	printk("__netdev_start_xmit\n");
-	if(current->pid != dispatcher_daemon->pid) {
-		printk("Current PID: %d, Worker PID: %d\n", current->pid, dispatcher_daemon->pid);
-		return false;
-	}
 	__netdev_start_xmit(dev->netdev_ops, skb, dev, false);
 
 	return true;
@@ -327,40 +312,17 @@ bool packet_process(Packet* packet, void* context) {
 
 static inline void dispatcher_tx(struct net_device *dev)
 {
-	/*
-	 *WARN_ONCE(current->pid != dispatcher_daemon->pid,
-	 *        "Current PID: %d, Worker PID: %d\n", current->pid, dispatcher_daemon->pid);
-	 */
-
 	NICDevice* nic_device = rcu_dereference(dev->rx_handler_data);
 	BUG_ON(!nic_device);
 
-	/*
-	 *unsigned long flags;
-	 *local_irq_save(flags);
-	 */
-
 	//TODO map_iterator
-
 	nicdev_tx(nic_device, packet_process, dev);
 }
 
-static inline void dispatcher_rx(struct net_device *dev) {
-	/*
-	 *unsigned long flags;
-	 *local_irq_save(flags);
-	 */
-
-	//const struct net_device_ops *ops;
+static inline void dispatcher_rx(struct net_device *dev)
+{
 	if (!netif_running(dev))
 		return;
-
-	//ops = dev->netdev_ops;
-	//if (!ops->ndo_poll_controller)
-	//	return;
-
-	/* Process pending work on NIC */
-	//ops->ndo_poll_controller(dev);
 
 	struct napi_struct *napi;
 	list_for_each_entry(napi, &dev->napi_list, dev_list) {
@@ -369,16 +331,40 @@ static inline void dispatcher_rx(struct net_device *dev) {
 
 		napi->poll(napi, 1);
 	}
-
-//	local_irq_restore(flags);
 }
 
-static void dispatcher_worker(void* data) {
+static void dispatcher_worker(void* data)
+{
 	struct dispatcher_work *work = data;
 	struct net_device *dev = work->dev;
 
 	dispatcher_rx(dev);
 	dispatcher_tx(dev);
+}
+
+static void* mm_virt_remap(struct mm_struct *mm, void* virt_addr, unsigned long size)
+{
+	pgd_t* pgd;
+	pud_t* pud;
+	pmd_t* pmd;
+	pte_t* pte;
+	struct page* page;
+	unsigned long phys_addr;
+
+	pgd = pgd_offset(mm, (unsigned long)virt_addr);
+	pud = pud_offset(pgd, (unsigned long)virt_addr);
+	pmd = pmd_offset(pud, (unsigned long)virt_addr);
+	pte = pte_offset_map(pmd, (unsigned long)virt_addr);
+	page = pte_page(*pte);
+	phys_addr = page_to_phys(page);
+	printk("Found VNIC physical address: %p (%x)\n", phys_addr, size);
+
+	return ioremap_nocache(phys_addr, size);
+}
+
+static void mm_virt_unmap(void* addr)
+{
+	iounmap(addr);
 }
 
 static long dispatcher_ioctl(struct file *f, unsigned int ioctl,
@@ -392,13 +378,6 @@ static long dispatcher_ioctl(struct file *f, unsigned int ioctl,
 	NICDevice* nic_device;
 	VNIC _vnic;
 	VNIC* vnic = NULL;
-	struct mm_struct* mm;
-	pgd_t* pgd;
-	pud_t* pud;
-	pmd_t* pmd;
-	pte_t* pte;
-	struct page* page;
-	unsigned long phys_addr;
 
 	if(!argp)
 		return -EFAULT;
@@ -466,7 +445,6 @@ static long dispatcher_ioctl(struct file *f, unsigned int ioctl,
 				return -EFAULT;
 			}
 
-			printk("parent %s\n", vnic->parent);
 			nic_device = nicdev_get(vnic->parent);
 			if(!nic_device) {
 				printk("Invalid parent device name: %s\n", vnic->parent);
@@ -474,18 +452,11 @@ static long dispatcher_ioctl(struct file *f, unsigned int ioctl,
 				return -EFAULT;
 			}
 
-			// Bug in here
-			pgd = pgd_offset(mm, (unsigned long)vnic->nic);
-			pud = pud_offset(pgd, (unsigned long)vnic->nic);
-			pmd = pmd_offset(pud, (unsigned long)vnic->nic);
-			pte = pte_offset_map(pmd, (unsigned long)vnic->nic);
-			page = pte_page(*pte);
-			// Bug in here
+			BUG_ON(!manager_mm);
 
-			phys_addr = page_to_phys(page);
-			vnic->nic = ioremap_nocache(phys_addr, vnic->nic_size);
+			vnic->nic = mm_virt_remap(manager_mm, vnic->nic, vnic->nic_size);
 			if(!vnic->nic) {
-				printk("Failed to ioremap to %p (%x)\n", phys_addr, vnic->nic_size);
+				printk("Failed to remap VNIC address to physical address\n");
 				kfree(vnic);
 				return -EFAULT;
 			}
@@ -510,6 +481,7 @@ static long dispatcher_ioctl(struct file *f, unsigned int ioctl,
 			if(!vnic)
 				return -EFAULT;
 
+			mm_virt_unmap(vnic->nic);
 			kfree(vnic);
 			return 0;
 
