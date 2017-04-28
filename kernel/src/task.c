@@ -203,72 +203,44 @@ void task_resource(uint32_t id, uint8_t type, void* data) {
 			bool is_first = true;
 			VNIC* vnic = (VNIC*)data;
 
-/*
- *                                printf("VNIC created %p \n", vnic);
- *
- *                                printf("%s : %p \n"," nic", vnic->nic);
- *                                printf("%s : %p \n"," pools", vnic->pools);
- *                                printf("%s : %p \n"," pool", vnic->pool);
- *
- *                                printf("%s : %p \n"," device", vnic->device);
- *                                printf("%s : %x \n"," port;", vnic->port);
- *
- *                                printf("%s : %x \n"," mac", vnic->mac);
- *                                printf("%s : %x \n"," input_bandwidth", vnic->input_bandwidth);
- *                                printf("%s : %x \n"," input_wait", vnic->input_wait);
- *                                printf("%s : %x \n"," input_wait_grace", vnic->input_wait_grace);
- *                                printf("%s : %x \n"," output_bandwidth", vnic->output_bandwidth);
- *                                printf("%s : %x \n"," output_wait", vnic->output_wait);
- *                                printf("%s : %x \n"," output_wait_grace", vnic->output_wait_grace);
- *                                printf("%s : %x \n"," padding_head", vnic->padding_head);
- *                                printf("%s : %x \n"," padding_tail", vnic->padding_tail);
- *                                printf("%s : %x \n"," min_buffer_size", vnic->min_buffer_size);
- *                                printf("%s : %x \n"," max_buffer_size", vnic->max_buffer_size);
- *                                printf("%s : %p \n"," input_accept", vnic->input_accept);
- *                                printf("%s : %p \n"," output_accept", vnic->output_accept);
- *
- *                                printf("VNIC Spec end\n");
- *
- */
-/*
- *                        ListIterator iter;
- *                        list_iterator_init(&iter, vnic->pools);
- *                        while(list_iterator_has_next(&iter)) {
- *                                uint64_t vaddr = (uint64_t)list_iterator_next(&iter);
- *
- *                                uint64_t idx = vaddr >> 21;
- *                                PAGE_L4U[idx].base = idx + (PHYSICAL_OFFSET >> 21);
- *                                PAGE_L4U[idx].us = 1;
- *                                PAGE_L4U[idx].rw = 1;
- *                                PAGE_L4U[idx].exb = 1;
- *
- *                                if(is_first) {
- *                                        printf("Task: virtual memory map : %dMB -> %dMB %c%c%c %s[%02x:%02x:%02x:%02x:%02x:%02x]\n",
- *                                                idx * 2, PAGE_L4U[idx].base * 2,
- *                                                PAGE_L4U[idx].us ? 'r' : '-',
- *                                                PAGE_L4U[idx].rw ? 'w' : '-',
- *                                                PAGE_L4U[idx].exb ? '-' : 'x',
- *                                                "VNIC",
- *                                                (vnic->mac >> 40) & 0xff,
- *                                                (vnic->mac >> 32) & 0xff,
- *                                                (vnic->mac >> 24) & 0xff,
- *                                                (vnic->mac >> 16) & 0xff,
- *                                                (vnic->mac >> 8) & 0xff,
- *                                                (vnic->mac >> 0) & 0xff);
- *
- *                                        is_first = false;
- *                                } else {
- *                                        printf("Task: virtual memory map : %dMB -> %dMB %c%c%c %s\n",
- *                                                idx * 2, PAGE_L4U[idx].base * 2,
- *                                                PAGE_L4U[idx].us ? 'r' : '-',
- *                                                PAGE_L4U[idx].rw ? 'w' : '-',
- *                                                PAGE_L4U[idx].exb ? '-' : 'x',
- *                                                "VNIC");
- *                                }
- *                        }
- *                        task_refresh_mmap();
- *                        break;
- */
+			int count = vnic->nic_size / 0x200000;
+			uint64_t vaddr = (uint64_t)vnic->nic;
+
+			while(count--) {
+				uint64_t idx = vaddr >> 21;
+				PAGE_L4U[idx].base = idx + (PHYSICAL_OFFSET >> 21);
+				PAGE_L4U[idx].us = 1;
+				PAGE_L4U[idx].rw = 1;
+				PAGE_L4U[idx].exb = 1;
+
+				if(is_first) {
+					printf("Task: virtual memory map : %dMB -> %dMB %c%c%c %s[%02x:%02x:%02x:%02x:%02x:%02x]\n",
+						idx * 2, PAGE_L4U[idx].base * 2,
+						PAGE_L4U[idx].us ? 'r' : '-',
+						PAGE_L4U[idx].rw ? 'w' : '-',
+						PAGE_L4U[idx].exb ? '-' : 'x',
+						"VNIC",
+						(vnic->mac >> 40) & 0xff,
+						(vnic->mac >> 32) & 0xff,
+						(vnic->mac >> 24) & 0xff,
+						(vnic->mac >> 16) & 0xff,
+						(vnic->mac >> 8) & 0xff,
+						(vnic->mac >> 0) & 0xff);
+
+					is_first = false;
+				} else {
+					printf("Task: virtual memory map : %dMB -> %dMB %c%c%c %s\n",
+						idx * 2, PAGE_L4U[idx].base * 2,
+						PAGE_L4U[idx].us ? 'r' : '-',
+						PAGE_L4U[idx].rw ? 'w' : '-',
+						PAGE_L4U[idx].exb ? '-' : 'x',
+						"VNIC");
+				}
+
+				vaddr += 0x200000;
+			}
+			task_refresh_mmap();
+			break;
 	}
 }
 
