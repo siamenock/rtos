@@ -15,7 +15,6 @@ typedef struct _ListOps {
 
 typedef struct _List {
 	Collection;
-
 	ListOps;
 } List;
 

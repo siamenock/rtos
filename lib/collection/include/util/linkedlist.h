@@ -17,7 +17,7 @@ typedef struct _LinkedListOps {
 	void		(*rotate)(LinkedList* this);
 } LinkedListOps;
 
-typedef struct {
+typedef struct _LinkedListIterContext {
 	LinkedList*	list;
 	ListNode*	prev;
 	ListNode*	node;
@@ -26,11 +26,10 @@ typedef struct {
 typedef struct _LinkedList {
 	List;
 	DequeOps;
+	LinkedListOps;
 
 	ListNode*	head;
 	ListNode*	tail;
-	LinkedListOps;
-
 	LinkedListIterContext*	context;
 } LinkedList;
 

@@ -17,12 +17,6 @@ Map* map_create(DataType type, PoolType pool, size_t size) {
 	if(!map)
 		return NULL;
 
-	map->set = set_create(DATATYPE_UINT64, pool, sizeof(Set));
-	if(!map->set) {
-		map->free(map);
-		return NULL;
-	}
-
 	map->type	= type;
 	map->pool	= pool;
 
@@ -44,7 +38,6 @@ Map* map_create(DataType type, PoolType pool, size_t size) {
 
 void map_destroy(Map* this) {
 	void (*free)(void*) = this->free;
-	free(this->set);
 	free(this);
 	this = NULL;
 }

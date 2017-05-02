@@ -16,11 +16,10 @@ typedef struct _ArrayListIterContext {
 
 typedef struct _ArrayList {
 	List;
+	ArrayListOps;
 
 	size_t		capacity;
 	void**		array;
-	ArrayListOps;
-
 	ArrayListIterContext*	context;
 } ArrayList;
 
