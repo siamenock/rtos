@@ -19,6 +19,8 @@ static void _destroy(HashMap* this) {
 
 		linkedlist_destroy(list);
 	}
+
+	this->free(this->table);
 }
 
 static void* get(HashMap* this, void* key) {
@@ -31,7 +33,7 @@ static void* get(HashMap* this, void* key) {
 	for(size_t i = 0; i < size; i++) {
 		MapEntry* entry = list->get(list, i);
 		if(this->equals(entry->key, key))
-			return entry->data;
+			return entry->value;
 	}
 
 	return NULL;
@@ -40,36 +42,26 @@ static void* get(HashMap* this, void* key) {
 static bool put(HashMap* this, void* key, void* value) {
 	if(this->size + 1 > this->threshold) {
 		// Create new this
-		HashMap this2;
-		size_t capacity = this->capacity * 2;
-		this2.table = this->malloc(sizeof(LinkedList*) * capacity);
-		if(!this2.table)
+		HashMap* map = hashmap_create(this->type, this->pool,
+				this->capacity * 2);
+		if(!map)
 			return false;
 
-		memset(this2.table, 0x0, sizeof(LinkedList*) * capacity);
-
-		this2.capacity = capacity;
-		this2.threshold = HASHMAP_THRESHOLD(capacity);
-		this2.size = 0;
-
 		// Copy
-		/*
-		 *MapIterator iter;
-		 *this_iterator_init(&iter, this);
-		 *while(this_iterator_has_next(&iter)) {
-		 *        MapEntry* entry = this_iterator_next(&iter);
-		 *        if(!this_put(&this2, entry->key, entry->data)) {
-		 *                destroy(&this2);
-		 *                return false;
-		 *        }
-		 *}
-		 */
+		MapEntry* entry;
+		for_each(entry, this->entry_set) {
+			if(!map->put(map, entry->key, entry->value)) {
+				_destroy(map);
+				return false;
+			}
+		}
 
 		// Destory
 		_destroy(this);
 
 		// Paste
-		memcpy(this, &this2, sizeof(HashMap));
+		memcpy(this, map, sizeof(HashMap));
+		map_destroy((Map*)map);
 	}
 
 	size_t index = this->hash(key) % this->capacity;
@@ -78,6 +70,8 @@ static bool put(HashMap* this, void* key, void* value) {
 		list = linkedlist_create(this->type, this->pool);
 		if(!list)
 			return false;
+
+		this->table[index] = list;
 	} else {
 		size_t size = list->size;
 		for(size_t i = 0; i < size; i++) {
@@ -96,7 +90,7 @@ static bool put(HashMap* this, void* key, void* value) {
 	}
 
 	entry->key = key;
-	entry->data = value;
+	entry->value = value;
 
 	if(!list->add(list, entry)) {
 		this->free(entry);
@@ -121,7 +115,7 @@ static bool update(HashMap* this, void* key, void* value) {
 	for(size_t i = 0; i < size; i++) {
 		MapEntry* entry = list->get(list, i);
 		if(this->equals(entry->key, key)) {
-			entry->data = value;
+			entry->value = value;
 			return true;
 		}
 	}
@@ -139,7 +133,7 @@ static void* remove(HashMap* this, void* key) {
 	for(size_t i = 0; i < size; i++) {
 		MapEntry* entry = list->get(list, i);
 		if(this->equals(entry->key, key)) {
-			void* data = entry->data;
+			void* value = entry->value;
 			list->remove_at(list, i);
 			this->free(entry);
 
@@ -148,7 +142,7 @@ static void* remove(HashMap* this, void* key) {
 
 			this->size--;
 
-			return data;
+			return value;
 		}
 	}
 
@@ -164,59 +158,25 @@ static bool contains_value(HashMap* this, void* value) {
 	return false;
 }
 
-typedef struct _EntrySetIterContext {
-	HashMap*		_map;
-	size_t			index;
-	size_t			list_index;
-	MapEntry		entry;
-} EntrySetIterContext;
-
-typedef struct _EntrySet {
-	Set;
-
-	HashMap*		map;
-	EntrySetIterContext*	context;
-} EntrySet;
-
-typedef struct _KeySet {
-	EntrySet;
-} KeySet;
-
-typedef struct _ValueSet {
-	EntrySet;
-} ValueSet;
-
-static Set* entries(void* this) {
-	return ((HashMap*)this)->entry_set;
-}
-
-static Set* keys(void* this) {
-	return ((HashMap*)this)->key_set;
-}
-
-static Set* values(void* this) {
-	return ((HashMap*)this)->value_set;
-}
-
-static void entry_iterator_init(EntrySetIterContext* context, EntrySet* entry_set) {
-	HashMap* map = entry_set->map;
-	context->_map = map;
+static void iterator_init(MapIterContext* context, EntrySet* set) {
+	HashMap* map = context->_map = set->map;
 	context->index = 0;
-	while(context->index < map->capacity && map->table[context->index])
+	while(context->index < map->capacity && !map->table[context->index])
 		context->index++;
 
 	context->list_index = 0;
 }
 
-static bool entry_iterator_has_next(EntrySetIterContext* context) {
+static bool iterator_has_next(MapIterContext* context) {
 	HashMap* map = context->_map;
 	if(context->index >= map->capacity)
 		return false;
 
 	LinkedList* list = map->table[context->index];
-	if(list && context->list_index < list->size(list))
+	if(list && context->list_index < list->size)
 		return true;
 
+	context->index++;
 	while(context->index < map->capacity && !map->table[context->index])
 		context->index++;
 
@@ -228,64 +188,94 @@ static bool entry_iterator_has_next(EntrySetIterContext* context) {
 	}
 }
 
-static void* entry_iterator_next(EntrySetIterContext* context) {
+static void* entry_iterator_next(MapIterContext* context) {
 	HashMap* map = context->_map;
 	LinkedList* list = map->table[context->index];
 	MapEntry* entry = list->get(list, context->list_index++);
 
 	context->entry.key = entry->key;
-	context->entry.data = entry->data;
+	context->entry.value = entry->value;
 
 	return &context->entry;
 }
 
-static void* entry_iterator_remove(EntrySetIterContext* context) {
+static void* iterator_remove(MapIterContext* context) {
+	HashMap* map = context->_map;
 	context->list_index--;
-	
-	LinkedList* list = iter->map->table[iter->index];
+
+	LinkedList* list = map->table[context->index];
 	MapEntry* entry = list->remove_at(list, context->list_index);
 	context->entry.key = entry->key;
-	context->entry.data = entry->data;
-	free(entry, context->map->pool);
-	
-	if(list_is_empty(context->map->table[context->index])) {
-		list_destroy(context->map->table[context->index]);
-		context->map->table[context->index] = NULL;
+	context->entry.value = entry->value;
+	map->free(entry);
+
+	if(list->is_empty(list)) {
+		linkedlist_destroy(list);
+		list = NULL;
 	}
-	
-	context->map->size--;
-	
+
+	map->size--;
+
 	return &context->entry;
 }
 
-static void* key_iterator_next(EntrySetIterContext* context) {
+static void* key_iterator_next(MapIterContext* context) {
+	MapEntry* entry = entry_iterator_next(context);
+	if(!entry)
+		return NULL;
+
+	return entry->key;
 }
 
-static void* key_iterator_next(EntrySetIterContext* context) {
+static void* value_iterator_next(MapIterContext* context) {
+	MapEntry* entry = entry_iterator_next(context);
+	if(!entry)
+		return NULL;
+
+	return entry->value;
 }
 
 static Iterator entry_iterator = {
-	.init		= (void*)entry_iterator_init,
-	.has_next	= (void*)entry_iterator_has_next,
+	.init		= (void*)iterator_init,
+	.has_next	= (void*)iterator_has_next,
 	.next		= (void*)entry_iterator_next,
-	.remove		= (void*)entry_iterator_remove,
+	.remove		= (void*)iterator_remove,
 };
 
 static Iterator key_iterator = {
-	.init		= (void*)entry_iterator_init,
-	.has_next	= (void*)entry_iterator_has_next,
-	.next		= (void*)value_iterator_next,
-	.remove		= (void*)entry_iterator_remove,
+	.init		= (void*)iterator_init,
+	.has_next	= (void*)iterator_has_next,
+	.next		= (void*)key_iterator_next,
+	.remove		= (void*)iterator_remove,
 };
 
 static Iterator value_iterator = {
-	.init		= (void*)entry_iterator_init,
-	.has_next	= (void*)entry_iterator_has_next,
-	.next		= (void*)key_iterator_next,
-	.remove		= (void*)entry_iterator_remove,
+	.init		= (void*)iterator_init,
+	.has_next	= (void*)iterator_has_next,
+	.next		= (void*)value_iterator_next,
+	.remove		= (void*)iterator_remove,
 };
 
-HashMap* hashmap_create(DataType type, PoolType pool, int initial_capacity) {
+static inline EntrySet* entryset_create(HashMap* this, Iterator* iter) {
+	EntrySet* set = this->malloc(sizeof(EntrySet));
+	if(!set)
+		return NULL;
+
+	set->map = this;
+	set->iter = iter;
+	return set;
+}
+
+static inline void entryset_destroy(HashMap* this) {
+	if(this->entry_set)
+		this->free(this->entry_set);
+	if(this->key_set)
+		this->free(this->key_set);
+	if(this->value_set)
+		this->free(this->value_set);
+}
+
+HashMap* hashmap_create(DataType type, PoolType pool, size_t initial_capacity) {
 	HashMap* map = (HashMap*)map_create(type, pool, sizeof(HashMap));
 	if(!map)
 		return NULL;
@@ -295,10 +285,9 @@ HashMap* hashmap_create(DataType type, PoolType pool, int initial_capacity) {
 		capacity <<= 1;
 
 	map->table = map->malloc(sizeof(LinkedList*) * capacity);
-	if(!map->table) {
-		map->free(map);
-		return NULL;
-	}
+	if(!map->table)
+		goto failed;
+
 	memset(map->table, 0x0, sizeof(LinkedList*) * capacity);
 
 	map->capacity		= capacity;
@@ -311,22 +300,22 @@ HashMap* hashmap_create(DataType type, PoolType pool, int initial_capacity) {
 	map->contains_key	= (void*)contains_key;
 	map->contains_value	= (void*)contains_value;
 
-	map->entry_set = set_create(DATATYPE_UINT64, pool, sizeof(EntrySet));
-	if(!map->set) {
-		map->free(map);
-		return NULL;
-	}
-	map->entry_set->map	= map;
-	map->entry_set->iter	= &iterator;
-
-	map->value_set		= (void*)value_set;
-	map->entry_set		= (void*)entry_set;
-	map->keys		= (void*)keys;
+	map->entry_set		= entryset_create(map, &entry_iterator);
+	map->key_set		= entryset_create(map, &key_iterator);
+	map->value_set		= entryset_create(map, &value_iterator);
+	if(!map->entry_set || !map->key_set || !map->value_set)
+		goto failed;
 
 	return map;
+
+failed:
+	entryset_destroy(map);
+	map->free(map);
+	return NULL;
 }
 
 void hashmap_destroy(HashMap* this) {
 	_destroy(this);
+	entryset_destroy(this);
         map_destroy((Map*)this);
 }

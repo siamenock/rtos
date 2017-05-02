@@ -12,12 +12,12 @@ typedef struct _ArrayQueueOps {
 
 typedef struct _ArrayQueue {
 	Queue;
+	ArrayQueueOps;
 
 	size_t	head;
 	size_t	tail;
 	size_t	capacity;
 	void**	array;
-	ArrayQueueOps;
 } ArrayQueue;
 
 ArrayQueue* arrayqueue_create(DataType type, PoolType pool, size_t initial_capacity);

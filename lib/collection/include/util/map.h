@@ -6,7 +6,7 @@
 
 typedef struct _MapEntry {
 	void*	key;
-	void*	data;
+	void*	value;
 } MapEntry;
 
 typedef struct _Map Map;
@@ -19,19 +19,32 @@ typedef struct _MapOps {
 	void*	(*remove)(void* this, void* key);
 	bool	(*contains_key)(void* this, void* key);
 	bool	(*contains_value)(void* this, void* value);
-
-	Set*	(*values)(void* this);
-	Set*	(*entry_set)(void* this);
-	Set*	(*key_set)(void* this);
 } MapOps;
+
+typedef struct _MapIterContext {
+	void*		_map;
+	size_t		index;
+	size_t		list_index;
+	MapEntry	entry;
+} MapIterContext;
+
+typedef struct _EntrySet {
+	Set;
+	void*		map;
+	MapIterContext*	context;
+} EntrySet;
+
+typedef struct _EntrySet KeySet;
+typedef struct _EntrySet ValueSet;
 
 typedef struct _Map {
 	Base;
-
 	MapOps;
 
-	Set*	set;
-	size_t	size;
+	EntrySet*	entry_set;
+	KeySet*		key_set;
+	ValueSet*	value_set;
+	size_t		size;
 } Map;
 
 Map* map_create(DataType type, PoolType pool, size_t size);

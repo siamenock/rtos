@@ -16,7 +16,6 @@ typedef struct _DequeOps {
 
 typedef struct _Deque {
 	Queue;
-
 	DequeOps;
 } Deque;
 
