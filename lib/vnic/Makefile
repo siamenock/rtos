@@ -6,7 +6,7 @@ CFLAGS = -O2
 all: libvnic.a
 
 CC=gcc
-CFLAGS=-I include -O2 -Wall
+CFLAGS=-I include -O2 -Wall -std=c99
 
 SRCS=lock.c vnic.c asm.asm
 OBJS=$(addsuffix .o, $(addprefix obj/, $(basename $(SRCS))))
@@ -32,7 +32,7 @@ obj/%_test.o: src/%.c
 	$(CC) -g -DTEST $(CFLAGS) $^ -c -o $@
 
 test: $(TESTS)
-	$(CC) $^ -o test
+	$(CC) $^ -Wunused-function -o test
 	./$@
 
 clean: 

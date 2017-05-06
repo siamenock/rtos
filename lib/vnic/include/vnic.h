@@ -82,9 +82,8 @@ typedef struct _VNIC {
 	
 	VNIC_Pool	pool;
 	
-	uint32_t	config;
-	uint8_t		config_head[0];
-	uint8_t		config_tail[0] __attribute__((__aligned__(VNIC_HEADER_SIZE)));
+	uint32_t	config_head[0];
+	uint32_t	config_tail[0] __attribute__((__aligned__(VNIC_HEADER_SIZE)));
 	
 	// rx queue (8 bytes aligned)
 	// tx queue (8 bytes aligned)
@@ -125,10 +124,13 @@ size_t vnic_pool_used(VNIC* vnic);
 size_t vnic_pool_free(VNIC* vnic);
 size_t vnic_pool_total(VNIC* vnic);
 
-uint32_t vnic_config_register(VNIC* vnic, char* name);
-uint32_t vnic_config_key(VNIC* vnic, char* name);
-bool vnic_config_put(VNIC* vnic, uint32_t key, uint64_t value);
-uint64_t vnic_config_get(VNIC* vnic, uint32_t key);
+int32_t vnic_config_alloc(VNIC* vnic, char* name, uint16_t size);
+void vnic_config_free(VNIC* vnic, uint16_t key);
+int32_t vnic_config_key(VNIC* vnic, char* name);
+void* vnic_config_get(VNIC* vnic, uint16_t key);
+uint16_t vnic_config_size(VNIC* vnic, uint16_t key);
+uint32_t vnic_config_available(VNIC* vnic);
+uint32_t vnic_config_total(VNIC* vnic);
 
 // Driver API
 

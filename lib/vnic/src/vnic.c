@@ -364,61 +364,136 @@ size_t vnic_pool_total(VNIC* vnic) {
 	return vnic->pool.count * VNIC_CHUNK_SIZE;
 }
 
-uint32_t vnic_config_register(VNIC* vnic, char* name) {
+/**
+ * Payload
+ * name_length: uint16_t
+ * block_count: uint16_t
+ * name: 4 bytes rounded string length
+ * blocks
+ * @return -1 already allocated
+ * @return -2 no space to allocate
+ * @return 0 ~ 2^16 - 1 key
+ */
+int32_t vnic_config_alloc(VNIC* vnic, char* name, uint16_t size) {
 	int len = strlen(name) + 1;
 	if(len > 255)
 		return 0;
 	
-	uint8_t* n = vnic->config_head;
-	int i;
-	for(i = 0; i < vnic->config; i++) {
-		uint8_t l = *n++;
-
-		if(strncmp(name, (const char*)n, l) == 0)
-			return 0;
+	uint32_t req = 1 + ((len + sizeof(uint32_t) - 1) / sizeof(uint32_t)) + (((uint32_t)size + sizeof(uint32_t) - 1) / sizeof(uint32_t)); // heder + round(name) + round(blocks)
+	
+	// Check name is already allocated
+	for(uint32_t* p = vnic->config_head; p < vnic->config_tail; ) {
+		uint16_t len2 = *p >> 16;
+		uint16_t count2 = *p & 0xffff;
 		
-		n += l;
+		if(*p == 0) {
+			p++;
+		} else {
+			if(len2 == len && strncmp(name, (const char*)(p + 1), len - 1) == 0) {
+				return -1;
+			}
+			
+			p += count2;
+		}
 	}
 	
-	int available = (int)(vnic->config_tail - n) - sizeof(uint64_t) * vnic->config;
-	if(1 + len + sizeof(uint64_t) > available)
-		return 0;
+	// Check available space
+	for(uint32_t* p = vnic->config_head; p < vnic->config_tail; ) {
+		if(*p == 0) {
+			bool found = true;
+			for(int i = 0; i < req; i++) {
+				if(p >= vnic->config_tail) {
+					return -2;
+				}
+				
+				if(p[i] != 0) {
+					p += i - 1;
+					found = false;
+					break;
+				}
+			}
+			
+			if(found) {
+				*p = (uint32_t)len << 16 | req;
+				memcpy(p + 1, name, len);
+				return ((uintptr_t)p - (uintptr_t)vnic->config_head) / sizeof(uint32_t);
+			}
+			
+			p++;
+		} else {
+			p += *p & 0xffff;
+		}
+	}
 	
-	*n++ = (uint8_t)len;
-	memcpy(n, name, len);
-	
-	return ++vnic->config;
+	return -2;
 }
 
-uint32_t vnic_config_key(VNIC* vnic, char* name) {
+void vnic_config_free(VNIC* vnic, uint16_t key) {
+	uint16_t count = (uint16_t)vnic->config_head[key] & 0xffff;
+	
+	for(int i = count - 1; i >= 0; i--) {
+		vnic->config_head[key + i] = 0;
+	}
+}
+
+/**
+ *
+ * @return -1 key of the name not found
+ * @return otherwise key of the name
+ */
+int32_t vnic_config_key(VNIC* vnic, char* name) {
 	int len = strlen(name) + 1;
 	if(len > 255)
 		return 0;
 	
-	uint8_t* n = vnic->config_head;
-	for(int i = 0; i < vnic->config; i++) {
-		uint8_t l = *n++;
-		
-		if(strncmp(name, (const char*)n, l) == 0)
-			return i + 1;
-		
-		n += l;
+	for(uint32_t* p = vnic->config_head; p < vnic->config_tail; ) {
+		if(*p == 0) {
+			p++;
+		} else {
+			uint16_t len2 = *p >> 16;
+			uint16_t count2 = *p & 0xffff;
+			
+			if(len2 == len && strncmp(name, (const char*)(p + 1), len - 1) == 0) {
+				return ((uintptr_t)p - (uintptr_t)vnic->config_head) / sizeof(uint32_t);
+			}
+			
+			p += count2;
+		}
 	}
-	
-	return 0;
+
+	return -1;
 }
 
-bool vnic_config_put(VNIC* vnic, uint32_t key, uint64_t value) {
-	if(key > vnic->config)
-		return false;
+void* vnic_config_get(VNIC* vnic, uint16_t key) {
+	uint16_t len = vnic->config_head[key] >> 16;
 	
-	*(uint64_t*)(vnic->config_tail - key * sizeof(uint64_t)) = value;
-
-	return true;
+	return vnic->config_head + key + 1 + (len + sizeof(uint32_t) - 1) / sizeof(uint32_t);
 }
 
-uint64_t vnic_config_get(VNIC* vnic, uint32_t key) {
-	return *(uint64_t*)(vnic->config_tail - key * sizeof(uint64_t));
+uint16_t vnic_config_size(VNIC* vnic, uint16_t key) {
+	uint16_t len = vnic->config_head[key] >> 16;
+	uint16_t count = vnic->config_head[key] & 0xffff;
+	
+	return (count - (len + sizeof(uint32_t) - 1) / sizeof(uint32_t) - 1) * sizeof(uint32_t);
+}
+
+uint32_t vnic_config_available(VNIC* vnic) {
+	uint32_t count = 0;
+	
+	for(uint32_t* p = vnic->config_head; p < vnic->config_tail; ) {
+		if(*p == 0) {
+			p++;
+			count++;
+		} else {
+			p += *p & 0xffff;
+		}
+	}
+
+	return count * sizeof(uint32_t);
+}
+
+uint32_t vnic_config_total(VNIC* vnic) {
+	return (uint32_t)((uintptr_t)vnic->config_tail - (uintptr_t)vnic->config_head);
 }
 
 // Driver API
@@ -490,7 +565,6 @@ int vnic_driver_init(uint32_t id, uint64_t mac, void* base, size_t size,
 	vnic->pool.used = 0;
 	vnic->pool.lock = 0;
 	
-	vnic->config = 0;
 	bzero(vnic->config_head, (size_t)((uintptr_t)vnic->config_tail - (uintptr_t)vnic->config_head));
 	
 	bzero(base + vnic->pool.bitmap, vnic->pool.count);
@@ -624,28 +698,27 @@ static void print_queue(VNIC_Queue* queue) {
 }
 
 static void print_config(VNIC* vnic) {	
-	printf("Config count: %d\n", vnic->config);
-	uint8_t* name = vnic->config_head;
-	for(int i = 0; i < vnic->config; i++) {
-		uint8_t len = *name++;
-		printf("\t[%d] name: %s, key: %u, value: %016lx\n", i, (char*)name, i + 1, *(uint64_t*)(vnic->config_tail - (i + 1) * sizeof(uint64_t)));
-		name += len;
+	for(uint32_t* p = vnic->config_head; p < vnic->config_tail; ) {
+		if(*p == 0) {
+			p++;
+		} else {
+			uint16_t len2 = *p >> 16;
+			uint16_t count2 = *p & 0xffff;
+			
+			printf("[%3d] %3d %3d \"%s\" ", (int)(((uintptr_t)p - (uintptr_t)vnic->config_head) / sizeof(uint32_t)), len2, count2, (char*)(p + 1));
+			uint32_t* base = p + 1 + (len2 + 3) / 4;
+			uint16_t count3 = count2 - 1 - (len2 + 3) / 4;
+			for(int i = 0; i < count3 && i < 12; i++) {
+				printf("%08x ", base[i]);
+			}
+			if(count3 >= 12)
+				printf("...\n");
+			else
+				printf("\n");
+			
+			p += count2;
+		}
 	}
-}
-
-static void dump_config(VNIC* vnic) {
-	uint8_t* p = (void*)vnic->config_head;
-	int i = 0;
-	while(p < vnic->config_tail) {
-		printf("%02x", *p);
-		if((i + 1) % 8 == 0)
-			printf(" ");
-		if((i + 1) % 40 == 0)
-			printf("\n");
-		p++;
-		i++;
-	}
-	printf("\nconfig=%d\n", vnic->config);
 }
 
 static void dump(VNIC* vnic) {
@@ -729,6 +802,7 @@ void fail(const char* format, ...) {
 	
 	VNIC* vnic = (VNIC*)buffer;
 	
+	/*
 	printf("* rx\n");
 	dump_queue(vnic, &vnic->rx);
 	
@@ -741,11 +815,11 @@ void fail(const char* format, ...) {
 	printf("* stx\n");
 	dump_queue(vnic, &vnic->stx);
 	
-	/*
 	printf("* Bitmap\n");
 	dump_bitmap(vnic);
-	print_config(vnic);
 	*/
+	printf("* Config\n");
+	print_config(vnic);
 	
 	exit(1);
 }
@@ -1609,88 +1683,170 @@ int main(int argc, char** argv) {
 	pass();
 	
 
-	printf("Config: register one: ");
-	uint32_t key = vnic_config_register(vnic, "config");
-	if(key == 0)
-		fail("cannot register config: %u", key);
+	uint16_t total = vnic_config_total(vnic);
+	uint16_t available = vnic_config_available(vnic);
+
+	printf("Config: Check total and available size equals: ");
+	if(total != available)
+		fail("available: %d != total: %d\n", available, total);
+	
+	pass();
+	
+	printf("Config: alloc one: ");
+	int32_t key = vnic_config_alloc(vnic, "net.ipv4", 12);
+	if(key < 0)
+		fail("cannot alloc config: %d", key);
+	else
+		printf("%d", key);
+	
+	pass();
+	
+	printf("Config: available consumption check 1: ");
+	uint32_t available2 = vnic_config_available(vnic);
+	if(available2 != available - 4 - 12 - 12)
+		fail("available memory is differ: %d expected: %d\n", available2, available - 4 - 12 - 12);
+	
+	available += - 4 - 12 - 12;
+	
+	pass();
+	
+	printf("Config: find key: ");
+	int32_t key2 = vnic_config_key(vnic, "net.ipv4");
+	if(key2 != key)
+		fail("cannot find key for net.ipv4: %d", key2);
+	
+	pass();
+	
+	printf("Config: get size: ");
+	size = vnic_config_size(vnic, key);
+	if(size != 12)
+		fail("config size is wrong: %d\n", size);
+	else
+		printf("%d", size);
 	
 	pass();
 	
 	
-	printf("Config: key: ");
-	uint32_t key2 = vnic_config_key(vnic, "config");
-	if(key != key2)
-		fail("cannot get key: %u != %u", key, key2);
+	printf("Config: alloc next: ");
+	key2 = vnic_config_alloc(vnic, "net.ipv6", 48);
+	if(key2 < 0)
+		fail("cannot alloc config: %d", key2);
+	
+	if(key + 1 + (strlen("net.ipv4") + 1 + 3) / 4 + 12 / 4 != key2)
+		fail("wrong second key allocated: %d", key2);
+	
+	pass();
+	
+	printf("Config: available consumption check 2: ");
+	available2 = vnic_config_available(vnic);
+	if(available2 != available - 4 - 12 - 48)
+		fail("available memory is differ: %d expected: %d\n", available2, available - 4 - 12 - 48);
+	
+	available += - 4 - 12 - 48;
+	
+	pass();
+	
+	printf("Config: find second key: ");
+	int32_t key3 = vnic_config_key(vnic, "net.ipv6");
+	if(key3 != key2)
+		fail("cannot find key for net.ipv6: %d", key3);
+	
+	pass();
+	
+	printf("Config: get size: ");
+	size = vnic_config_size(vnic, key2);
+	if(size != 48)
+		fail("config size is wrong: %d\n", size);
+	else
+		printf("%d", size);
+	
+	pass();
+	
+	printf("Config: check overwriting: ");
+	
+	uint32_t* ipv4 = vnic_config_get(vnic, key);
+	ipv4[0] = 0x11223344;
+	ipv4[1] = 0x55667788;
+	ipv4[2] = 0x99001122;
+	
+	uint64_t* ipv6 = vnic_config_get(vnic, key2);
+	ipv6[0] = 0x0102030405060708;
+	ipv6[1] = 0x0900010203040506;
+	ipv6[2] = 0x0708091011121314;
+	ipv6[3] = 0x1516171819202122;
+	ipv6[4] = 0x2324252627282930;
+	ipv6[5] = 0x3132333435363738;
+	
+	printf("Config: find key(2): ");
+	key3 = vnic_config_key(vnic, "net.ipv4");
+	if(key3 != key)
+		fail("cannot find key for net.ipv4: %d", key3);
+	
+	pass();
+	
+	printf("Config: get size(2): ");
+	size = vnic_config_size(vnic, key);
+	if(size != 12)
+		fail("config size is wrong: %d\n", size);
+	else
+		printf("%d", size);
 	
 	pass();
 	
 	
-	printf("Config: put: ");
-	if(!vnic_config_put(vnic, key, 0x1234567890abcdef))
-		fail("cannot put config");
+	printf("Config: find second key(2): ");
+	key3 = vnic_config_key(vnic, "net.ipv6");
+	if(key3 != key2)
+		fail("cannot find key for net.ipv6: %d", key3);
+	
+	pass();
+	
+	printf("Config: get size(2): ");
+	size = vnic_config_size(vnic, key2);
+	if(size != 48)
+		fail("config size is wrong: %d\n", size);
+	else
+		printf("%d", size);
 	
 	pass();
 	
 
-	printf("Config: put with illegal key: ");
-	if(vnic_config_put(vnic, key + 1, 0x1122334455667788))
-		fail("illegal key put: %d", key + 1);
+	printf("Config: free first alloc: ");
+	vnic_config_free(vnic, key);
+	
+	key = vnic_config_key(vnic, "net.ipvs");
+	if(key >= 0)
+		fail("freed key exists: %d", key);
 	
 	pass();
 	
-	printf("Config: get: ");
-	uint64_t config = vnic_config_get(vnic, key);
-	if(config != 0x1234567890abcdef)
-		fail("config returns wrong value: %lx != %lx", config, 0x1234567890abcdef);
+	printf("Config: available consumption check 3: ");
+	available2 = vnic_config_available(vnic);
+	if(available2 != available + 4 + 12 + 12)
+		fail("available memory is differ: %d expected: %d\n", available2, available + 4 + 12 + 12);
 	
-	pass();
+	available += 4 + 12 + 12;
 	
-
-	printf("Config: put full: ");
-	uint32_t available = (uint32_t)((uintptr_t)vnic->config_tail - (uintptr_t)vnic->config_head);
-	available -= 1 + 7 + 8;
-	
-	i = 1;
-	char name[9] = { 0, };
-	while(available > 1 + 9 + 8) {
-		sprintf(name, "%08x", i);
-		key = vnic_config_register(vnic, name);
-		if(key == 0)
-			fail("cannot register config: '%s'", name);
-
-		if(!vnic_config_put(vnic, key, i))
-			fail("cannot put config: %s %d", name, i);
-		
-		available -= 1 + 9 + 8;
-		i++;
-	}
-	printf("available: %d", available);
-	
-	pass();
-	
-
 	printf("Config: overflow: ");
-	key = vnic_config_register(vnic, "hello");
-	if(key != 0)
-		fail("overflow: %u", key);
+	uint32_t chunk = available - 4 - 12 - 12 - 4 - 8;
+	key3 = vnic_config_alloc(vnic, "chunk", chunk);
+	if(key3 < 0)
+		fail("cannot allocate big chunk: %d", key3);
+	
+	key = vnic_config_alloc(vnic, "net.ipv4", 12);
+	if(key < 0)
+		fail("cannot allocate first chunk: %d", key);
 	
 	pass();
 	
-
-	printf("Config: get full: ");
-	for(int j = 1; j < i; j++) {
-		sprintf(name, "%08x", j);
-		key = vnic_config_key(vnic, name);
-		if(key == 0)
-			fail("cannot get key: '%s'", name);
-
-		uint64_t value = vnic_config_get(vnic, key);
-		
-		if(value != j)
-			fail("wrong config value returned: %ld !=  %ld", i, j);
-	}
-
+	printf("Config: available consumption check 4: ");
+	available = vnic_config_available(vnic);
+	if(available != 0)
+		fail("available memory is differ: %d expected: %d\n", available, 0);
+	
 	pass();
+	
+	print_config(vnic);
 	
 	return 0;
 }
