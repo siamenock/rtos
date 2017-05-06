@@ -14,7 +14,6 @@ typedef struct _QueOps {
 
 typedef struct _Queue {
 	Collection;
-
 	QueueOps;
 } Queue;
 

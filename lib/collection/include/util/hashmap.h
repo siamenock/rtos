@@ -7,12 +7,12 @@
 typedef struct _HashMap {
         Map;
 
-	LinkedList**	table;
-	size_t		capacity;
-	size_t		threshold;
+	LinkedList**		table;
+	size_t			capacity;
+	size_t			threshold;
 } HashMap;
 
-HashMap* hashmap_create(DataType type, PoolType pool, int initial_capacity);
+HashMap* hashmap_create(DataType type, PoolType pool, size_t initial_capacity);
 void hashmap_destroy(HashMap* this);
 
 #endif /* __UTIL_HASH_MAP_H__ */
