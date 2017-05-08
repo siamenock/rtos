@@ -145,7 +145,7 @@ end
 local function buildRamdiskImage(files)
     local function calcSize(files)
         -- Get total size of files by bytes
-        local command = 'du -cbL ' .. table.concat(files, ' ') .. ' | grep total | cut -f1'
+        local command = 'du -cbL ' .. table.concat(files, ' ') .. ' | tail -n1 | cut -f1'
         return execute(command)
     end
 
