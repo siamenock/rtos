@@ -12,39 +12,31 @@
 // Ref: http://www.singlix.com/trdos/UNIX_V1/xv6/lapic.c
 
 static uint8_t apic_id;		// APIC ID
-static uint8_t core_id;
-static uint8_t core_count;
-
-static uint32_t sync_map;
-#define SYNC_MAP	*(uint32_t volatile*)VIRTUAL_TO_PHYSICAL((uint64_t)&sync_map)
-static uint8_t sync_lock;
-#define SYNC_LOCK	(uint8_t volatile*)VIRTUAL_TO_PHYSICAL((uint64_t)&sync_lock)
+static uint8_t processor_id;
+static uint8_t processor_count;
 
 extern uint64_t _ioapic_address;
 extern uint64_t _apic_address;
 
-static void cpuid(uint32_t* a, uint32_t* b, uint32_t* c, uint32_t* d) {
-	asm volatile("cpuid"
-		: "=a"(*a), "=b"(*b), "=c"(*c), "=d"(*d)
-		: "a"(*a), "b"(*b), "c"(*c), "d"(*d));
-}
-
-static bool parse_iae(MP_IOAPICEntry* entry, void* context) {
+bool parse_iae(MP_IOAPICEntry* entry, void* context) {
 	_ioapic_address = (uint64_t)entry->io_apic_address;
 	return true;
 }
-
 void mp_init() {
+	/**
+	  * TODO fix here
+	  * Multi kernel user applicatio(manager) can't call rdmsr, wrmsr
+	  * Need permissions.
+	  **/
 	// Get APIC address
-	uint32_t a, b, c = 0x1b, d;
-	asm volatile("rdmsr" : "=a"(a) : "c"(c));
-
-	_apic_address = a & 0xfffff000;
+// 	uint32_t a, b, c = 0x1b, d;
+// 	asm volatile("rdmsr" : "=a"(a) : "c"(c));
+// 
+// 	_apic_address = a & 0xfffff000;
+	_apic_address = 0xfee00000;
 
 	// Get APIC ID
-	a = 0x01;
-	cpuid(&a, &b, &c, &d);
-	apic_id = (b >> 24) & 0xff;
+	apic_id = get_apic_id();
 	// Analyze floating pointer structure
 	//   Get IO APIC address
 	//   Other core APIC IDs
@@ -54,24 +46,24 @@ void mp_init() {
 
 	mp_parse_fps(&parser, NULL);
 
-	memset(mp_cores, 0x0, sizeof(mp_cores));
+	memset(mp_processors, 0x0, sizeof(mp_processors));
 
 	acpi_init();
 
 	// Calculate core ID
-	core_id = 0;
+	processor_id = 0;
 	for(int i = 0; i < apic_id; i++) {
-		if(mp_cores[i])
-			core_id++;
+		if(mp_processors[i])
+			processor_id++;
 	}
 
 	// Calculate core count
-	core_count = 0;
+	processor_count = 0;
 	for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
-		if(mp_cores[i])
-			mp_cores[i] = core_count++;
+		if(mp_processors[i])
+			mp_processors[i] = processor_count++;
 		else
-			mp_cores[i] = MP_CORE_INVALID;
+			mp_processors[i] = MP_CORE_INVALID;
 	}
 }
 
@@ -79,43 +71,25 @@ uint8_t mp_apic_id() {
 	return apic_id;
 }
 
-uint8_t mp_core_id() {
-	return core_id;
+uint8_t mp_processor_id() {
+	return processor_id;
 }
 
-uint8_t mp_apic_id_to_core_id(uint8_t apic_id) {
-	return mp_cores[apic_id];
+uint8_t mp_apic_id_to_processor_id(uint8_t apic_id) {
+	//return shared->mp_processors[apic_id];
+	return mp_processors[apic_id];
 }
 
-uint8_t mp_core_count() {
-	return core_count;
+uint8_t mp_processor_count() {
+	return processor_count;
 }
 
 void mp_sync(int barrier) {
-	while(!shared->sync[barrier])
-		asm volatile("nop");
-/*
- *        uint32_t map = 1 << apic_id;
- *        
- *        uint32_t full = 0;
- *        for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
- *                if(mp_cores[i] != MP_CORE_INVALID)
- *                        full |= 1 << i;
- *        }
- *
- *        lock_lock(SYNC_LOCK);
- *        if(SYNC_MAP == full) {	// The first one
- *                SYNC_MAP = map;
- *        } else {
- *                SYNC_MAP |= map;
- *        }
- *        lock_unlock(SYNC_LOCK);
- */
-/*
- *
- *        while(SYNC_MAP != full && SYNC_MAP & map)
- *                asm volatile("nop");
- */
+	if(apic_id) {
+		while(!shared->sync[barrier])
+			asm volatile("nop");
+	} else
+		shared->sync[barrier] = 1;
 }
 
 void mp_parse_fps(MP_Parser* parser, void* context) {
@@ -229,5 +203,6 @@ void mp_parse_fps(MP_Parser* parser, void* context) {
 }
 
 uint8_t* mp_core_map() {
-	return mp_cores;
+	return mp_processors;
+	//return shared->mp_cores;
 }

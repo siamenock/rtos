@@ -119,13 +119,12 @@ typedef struct {
 	bool(*parse_cbasme)(MP_CompatabilityBusAddressSpaceModifierEntry*, void*);
 } MP_Parser;
 
-uint8_t mp_cores[MP_MAX_CORE_COUNT];
+uint8_t mp_processors[MP_MAX_CORE_COUNT];
 
-void mp_init0();
 void mp_init();
 uint8_t mp_apic_id();
-uint8_t mp_core_id();
-uint8_t mp_apic_id_to_core_id(uint8_t apic_id);
+uint8_t mp_processor_id();
+uint8_t mp_apic_id_to_processor_id(uint8_t apic_id);
 uint8_t mp_core_count();
 void mp_sync(int barrier);
 void mp_parse_fps(MP_Parser* parser, void* context);

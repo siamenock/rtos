@@ -7,5 +7,6 @@
 
 void shell_init();
 bool shell_process(Packet* packet);
+void shell_sync();
 
 #endif /* __SHELL_H__ */

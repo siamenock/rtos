@@ -28,7 +28,7 @@ static void keyboard_handler(uint64_t vector, uint64_t error_code) {
 }
 
 static int init(void* device, void* data) {
-	//apic_register(32 + 1, keyboard_handler);
+	apic_register(32 + 1, keyboard_handler);
 	return 0;
 }
 

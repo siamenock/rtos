@@ -1,9 +1,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include "console.h"
-#include "vga.h"
-#include "keyboard.h"
-#include "serial.h"
+#include "input.h"
 
 static CharOut* console_out_drivers[CONSOLE_OUT_DRIVERS_COUNT];
 static CharIn* console_in_drivers[CONSOLE_IN_DRIVERS_COUNT];
@@ -19,11 +17,8 @@ static CharIn* console_in_drivers[CONSOLE_IN_DRIVERS_COUNT];
 			console_in_drivers[i]->FUNC(__VA_ARGS__);
 
 void console_init() {
-	console_out_drivers[CONSOLE_VGA_DRIVER] = &vga_driver;
-	//console_out_drivers[CONSOLE_SERIAL_OUT_DRIVER] = &serial_out_driver;
-
-	console_in_drivers[CONSOLE_KEYBOARD_DRIVER] = &keyboard_driver;
-	//console_in_drivers[CONSOLE_SERIAL_IN_DRIVER] = &serial_in_driver;
+	console_out_drivers[CONSOLE_OUTPUT_DRIVER] = &output_driver;
+	console_in_drivers[CONSOLE_INPUT_DRIVER] = &input_driver;
 }
 
 static int console_out_init(void* device, void* data) {
@@ -36,7 +31,7 @@ static void console_out_destroy(int id) {
 	EACH_OUT_CONSOLES(destroy, id);
 }
 
-static int write(int id, const char* buf, int len) {
+static int _write(int id, const char* buf, int len) {
 	EACH_OUT_CONSOLES(write, id, buf, len);
 
 	return 0;
@@ -69,7 +64,7 @@ DeviceType console_out_type = DEVICE_TYPE_CHAR_OUT;
 CharOut console_out_driver = {
 	.init = console_out_init,
 	.destroy = console_out_destroy,
-	.write = write,
+	.write = _write,
 	.scroll = scroll,
 	.set_cursor = set_cursor,
 	.get_cursor = get_cursor,

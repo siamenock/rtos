@@ -71,15 +71,15 @@ extern char LOCAL_MALLOC_START[];
 extern char LOCAL_MALLOC_END[];
 
 /*
- * Kernel data area (8M ~ 38M)
+ * Kernel data area (6M ~ 38M)
  *
- * Kernel data area above (4M ~ 6M) is duplicated here for 15 cores.
+ * Kernel data area above (6M ~ 8M) is duplicated here for 15 cores.
  * PacketNgin support maximum 16 cores.
  **/
 
 /*
  * Ramdisk area (38M ~ sizeof(initrd.img))
  **/
-#define RAMDISK_START               (KERNEL_TEXT_AREA_START + KERNEL_TEXT_AREA_SIZE * 16)
+#define RAMDISK_START               (KERNEL_DATA_AREA_START + KERNEL_DATA_AREA_SIZE * 16)
 
 #endif /* __MMAP_H__ */

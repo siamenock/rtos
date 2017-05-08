@@ -94,7 +94,7 @@ static void nicdev_destroy(NICDevice* dev) {
 	gfree(dev);
 }
 
-int nicdev_init() {
+static int nicdev_init() {
 	Device* dev;
 	int index = 0;
 	uint16_t count = device_count(DEVICE_TYPE_NIC);
@@ -120,8 +120,6 @@ int nicdev_init() {
 
 	return 0;
 }
-
-#define VGA_BUFFER_PAGES	12
 
 static bool idle0_event(void* data) {
 	nicdev_poll();
@@ -404,7 +402,6 @@ static void fixup_page_table(uint8_t apic_id, uint64_t offset) {
 
 	uint64_t pml4 = VIRTUAL_TO_PHYSICAL(PAGE_TABLE_START) + apic_id * 0x200000 + offset;
 	asm volatile("movq %0, %%cr3" : : "r"(pml4));
-	//asm volatile("movq %0, %%rdi" : : "r"(pml4));
 }
 
 void main() {
@@ -417,38 +414,31 @@ void main() {
 	console_init();
 
 	uint64_t vga_buffer = (uint64_t)VGA_BUFFER_START;
-		
-	if(apic_id == 1)
-		stdio_init(0, (void*)vga_buffer, 64 * 1024);
-	else
-		stdio_init(apic_id, (void*)vga_buffer, 64 * 1024);
+
+	stdio_init(apic_id, (void*)vga_buffer,  VGA_BUFFER_END - VGA_BUFFER_START);
 
 	malloc_init();
-
-	printf("\nPacketNgin ver 2.0.\n");
 
 	mp_sync(0);	// Barrier #1
 
 	shared_init();
 	if(apic_id == 0) {
-		printf("Should not happen \n");
-		while(1);
-/*
- *                printf("\x1b""32mOK""\x1b""0m\n");
- *
- *                printf("Copy RAM disk image from 0x%x to 0x%x (%d)\n",
- *                                initrd_start,
- *                                PHYSICAL_TO_VIRTUAL(RAMDISK_START),
- *                                initrd_end - initrd_start);
- *
- *                memcpy((void*)PHYSICAL_TO_VIRTUAL(RAMDISK_START),
- *                                (void*)(uintptr_t)PHYSICAL_TO_VIRTUAL(initrd_start),
- *                                initrd_end - initrd_start);
- */
+		printf("\nPacketNgin ver 2.0.\n");
+ 		printf("\x1b""32mOK""\x1b""0m\n");
+ 
+		PNKC* pnkc = (PNKC*)(0x200200 - sizeof(PNKC));
+//  		printf("Copy RAM disk image from 0x%lx to 0x%lx (%d)\n",
+//  				pnkc->initrd_start,
+//  				PHYSICAL_TO_VIRTUAL(RAMDISK_START),
+//  				pnkc->initrd_end - pnkc->initrd_start);
+//  
+//  		memcpy((void*)PHYSICAL_TO_VIRTUAL(RAMDISK_START),
+//  				(void*)(uintptr_t)PHYSICAL_TO_VIRTUAL(pnkc->initrd_start),
+//  				pnkc->initrd_end - pnkc->initrd_start);
+
 		printf("Analyze CPU information...\n");
 		cpu_init();
 		gmalloc_init();
-		//shared_init();
 		timer_init(cpu_brand);
 
 		gdt_init();
@@ -476,7 +466,7 @@ void main() {
 		apic_init();
 		
 		printf("Initializing I/O APIC...\n");
-		//ioapic_init();
+		ioapic_init();
 		apic_enable();
 
 		printf("Initializing Multi-tasking...\n");
@@ -488,76 +478,59 @@ void main() {
 		printf("Initializing inter-core communications...\n");
 		icc_init();
 
-/*
- *                printf("Initializing USB controller driver...\n");
- *                usb_initialize();
- *
- *                printf("Initializing disk drivers...\n");
- *                disk_init();
- *                if(!disk_register(&pata_driver, NULL)) {
- *                        printf("\tPATA driver registration FAILED!\n");
- *                        while(1) asm("hlt");
- *                }
- *
- *                if(!disk_register(&usb_msc_driver, NULL)) {
- *                        printf("\tUSB MSC driver registration FAILED!\n");
- *                        while(1) asm("hlt");
- *                }
- *
- *                if(!disk_register(&virtio_blk_driver, NULL)) {
- *                        printf("\tVIRTIO BLOCK driver registration FAILED!\n");
- *                        while(1) asm("hlt");
- *                }
- *
- *                printf("Initializing RAM disk...\n");
- *                char cmdline[32];
- *                sprintf(cmdline, "-addr 0x%x -size 0x%x", RAMDISK_START, initrd_end - initrd_start);
- *                if(!disk_register(&ramdisk_driver, cmdline)) {
- *                        printf("\tRAM disk driver registration FAILED!\n");
- *                        while(1) asm("hlt");
- *                }
- *
- *                printf("Initializing file system...\n");
- *                fs_init();
- *                fs_register(&bfs_driver);
- *                fs_mount(DISK_TYPE_RAMDISK << 16 | 0x00, 0,  FS_TYPE_BFS, "/boot");
- *
- *                printf("Initializing kernel symbols...\n");
- *                symbols_init();
- *
- *                printf("Initializing modules...\n");
- *                module_init();
- *
- *                printf("Initializing device drivers...\n");
- *                device_module_init();
- *
- *                uint16_t nic_count = device_count(DEVICE_TYPE_NIC);
- *                printf("Initializing NICs: %d\n", nic_count);
- *                init_nics(nic_count);
- *
- *                printf("Initializing VM manager...\n");
- *                vm_init();
- *
- *                printf("Initializing RPC manager...\n");
- *                manager_init();
- *
- *                printf("Initializing shell...\n");
- *                shell_init();
- *
- *                event_busy_add(idle0_event, NULL);
- */
+		printf("Initializing USB controller driver...\n");
+		usb_initialize();
 
-		icc_register(ICC_TYPE_START, icc_start);
-		icc_register(ICC_TYPE_RESUME, icc_resume);
-		icc_register(ICC_TYPE_STOP, icc_stop);
-		apic_register(49, icc_pause);
-
-		if(cpu_has_feature(CPU_FEATURE_MONITOR_MWAIT) && cpu_has_feature(CPU_FEATURE_MWAIT_INTERRUPT))
-			event_idle_add(idle_monitor_event, NULL);
-		else {
-			event_idle_add(idle_hlt_event, NULL);
-		}
-
+ 		printf("Initializing disk drivers...\n");
+ 		disk_init();
+ 		if(!disk_register(&pata_driver, NULL)) {
+ 			printf("\tPATA driver registration FAILED!\n");
+ 			while(1) asm("hlt");
+ 		}
+ 
+ 		if(!disk_register(&usb_msc_driver, NULL)) {
+ 			printf("\tUSB MSC driver registration FAILED!\n");
+ 			while(1) asm("hlt");
+ 		}
+ 
+ 		if(!disk_register(&virtio_blk_driver, NULL)) {
+ 			printf("\tVIRTIO BLOCK driver registration FAILED!\n");
+ 			while(1) asm("hlt");
+ 		}
+ 
+ 		printf("Initializing RAM disk...\n");
+ 		char cmdline[32];
+  		sprintf(cmdline, "-addr 0x%lx -size 0x%lx", RAMDISK_START, pnkc->initrd_end - pnkc->initrd_start);
+		printf("cmdline: %s\n", cmdline);
+ 		if(!disk_register(&ramdisk_driver, cmdline)) {
+ 			printf("\tRAM disk driver registration FAILED!\n");
+ 			while(1) asm("hlt");
+ 		}
+ 
+ 		printf("Initializing file system...\n");
+ 		fs_init();
+ 		fs_register(&bfs_driver);
+ 		fs_mount(DISK_TYPE_RAMDISK << 16 | 0x00, 0,  FS_TYPE_BFS, "/boot");
+ 
+ 		printf("Initializing kernel symbols...\n");
+ 		symbols_init();
+ 
+ 		printf("Initializing modules...\n");
+ 		module_init();
+ 
+ 		printf("Initializing device drivers...\n");
+ 		device_module_init();
+ 
+ 		nicdev_init();
+ 
+ 		printf("Initializing VM manager...\n");
+ 		vm_init();
+ 
+ 		printf("Initializing RPC manager...\n");
+ 		manager_init();
+ 
+ 		printf("Initializing shell...\n");
+ 		shell_init();
 	} else {
 		ap_timer_init();
 
@@ -586,7 +559,8 @@ void main() {
 
 	mp_sync(2); // Barrier #3
 
-	printf("Kernel started...\n");
+	if(apic_id == 0)
+		printf("Kernel started...\n");
 
 	/*
 	 *if(apic_id == 0) {
@@ -595,6 +569,9 @@ void main() {
 	 *}
 	 */
 
+	//int a = 1;
+	//printf("a: %p\n", &a);
+	//while(a);
 	while(1) {
 		event_loop();
 	}

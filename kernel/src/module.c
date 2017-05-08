@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <string.h>
 #include <elf.h>
+#include <fio.h>
 #include "file.h"
 #include "pnkc.h"
 #include "page.h"

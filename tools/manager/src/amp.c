@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <unistd.h>
 #include <syscall.h>
 #include "shared.h"
 
@@ -6,6 +7,8 @@
 
 extern int cpu_start;
 extern int cpu_end;
+int core_count;
+
 static void wakeup_ap(long kernel_start_address) {
 	if(!cpu_end)
 		return;

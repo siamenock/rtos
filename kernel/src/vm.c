@@ -76,14 +76,14 @@ static void icc_started(ICC_Message* msg) {
 
 		core->status = VM_STATUS_START;
 
-		printf("Execution succeed on core[%d].\n", mp_apic_id_to_core_id(msg->apic_id));
+		printf("Execution succeed on core[%d].\n", mp_apic_id_to_processor_id(msg->apic_id));
 
 	} else {
 		core->error_code = msg->result;
 
 		core->status = VM_STATUS_PAUSE;
 
-		printf("Execution FAILED on core[%d]: Error code 0x%x.\n", mp_apic_id_to_core_id(msg->apic_id), msg->result);
+		printf("Execution FAILED on core[%d]: Error code 0x%x.\n", mp_apic_id_to_processor_id(msg->apic_id), msg->result);
 
 	}
 
@@ -121,7 +121,7 @@ static void icc_started(ICC_Message* msg) {
 	if(error_code == 0) {
 		printf("VM started on cores[");
 		for(int i = 0; i < vm->core_size; i++) {
-			printf("%d", mp_apic_id_to_core_id(vm->cores[i]));
+			printf("%d", mp_apic_id_to_processor_id(vm->cores[i]));
 			if(i + 1 < vm->core_size) {
 				printf(", ");
 			}
@@ -130,7 +130,7 @@ static void icc_started(ICC_Message* msg) {
 	} else {
 		printf("VM started with error(s) on cores[");
 		for(int i = 0; i < vm->core_size; i++) {
-			printf("%d", mp_apic_id_to_core_id(vm->cores[i]));
+			printf("%d", mp_apic_id_to_processor_id(vm->cores[i]));
 			error_code = cores[vm->cores[i]].error_code;
 			if(error_code != 0)
 				printf("(0x%x)", error_code);
@@ -148,7 +148,7 @@ static void icc_paused(ICC_Message* msg) {
 
 	cores[msg->apic_id].status = VM_STATUS_PAUSE;
 
-	printf("Execution paused on core[%d].\n", mp_apic_id_to_core_id(msg->apic_id));
+	printf("Execution paused on core[%d].\n", mp_apic_id_to_processor_id(msg->apic_id));
 
 	icc_free(msg);
 	for(int i = 0; i < vm->core_size; i++) {
@@ -162,7 +162,7 @@ static void icc_paused(ICC_Message* msg) {
 
 	printf("VM paused on cores[");
 	for(int i = 0; i < vm->core_size; i++) {
-		printf("%d", mp_apic_id_to_core_id(vm->cores[i]));
+		printf("%d", mp_apic_id_to_processor_id(vm->cores[i]));
 		if(i + 1 < vm->core_size) {
 			printf(", ");
 		}
@@ -182,7 +182,7 @@ static void icc_resumed(ICC_Message* msg) {
 
 	cores[msg->apic_id].status = VM_STATUS_START;
 
-	printf("Execution resumed on core[%d].\n", mp_apic_id_to_core_id(msg->apic_id));
+	printf("Execution resumed on core[%d].\n", mp_apic_id_to_processor_id(msg->apic_id));
 
 	icc_free(msg);
 
@@ -197,7 +197,7 @@ static void icc_resumed(ICC_Message* msg) {
 
 	printf("VM resumed on cores[");
 	for(int i = 0; i < vm->core_size; i++) {
-		printf("%d", mp_apic_id_to_core_id(vm->cores[i]));
+		printf("%d", mp_apic_id_to_processor_id(vm->cores[i]));
 		if(i + 1 < vm->core_size) {
 			printf(", ");
 		}
@@ -223,7 +223,7 @@ static void icc_stopped(ICC_Message* msg) {
 	cores[msg->apic_id].stdout = NULL;
 	cores[msg->apic_id].stderr = NULL;
 
-	printf("Execution completed on core[%d].\n", mp_apic_id_to_core_id(msg->apic_id));
+	printf("Execution completed on core[%d].\n", mp_apic_id_to_processor_id(msg->apic_id));
 
 	icc_free(msg);
 
@@ -239,7 +239,7 @@ static void icc_stopped(ICC_Message* msg) {
 
 	printf("VM stopped on cores[");
 	for(int i = 0; i < vm->core_size; i++) {
-		printf("%d(%d/%d)", mp_apic_id_to_core_id(vm->cores[i]), cores[vm->cores[i]].error_code, cores[vm->cores[i]].return_code);
+		printf("%d(%d/%d)", mp_apic_id_to_processor_id(vm->cores[i]), cores[vm->cores[i]].error_code, cores[vm->cores[i]].return_code);
 		if(i + 1 < vm->core_size) {
 			printf(", ");
 		}
@@ -456,7 +456,7 @@ static bool vm_loop(void* context) {
 		size_t size = *(size_t*)MP_CORE(__stdout_size, i);
 
 		while(*head != *tail) {
-			stdio_dump(mp_apic_id_to_core_id(i), 1, buffer, head, tail, size);
+			stdio_dump(mp_apic_id_to_processor_id(i), 1, buffer, head, tail, size);
 		}
 
 /*
@@ -466,7 +466,7 @@ static bool vm_loop(void* context) {
  *                size = *(size_t*)MP_CORE(&__stderr_size, i);
  *
  *                while(*head != *tail) {
- *                        //stdio_dump(mp_apic_id_to_core_id(i), 2, buffer, head, tail, size);
+ *                        //stdio_dump(mp_apic_id_to_processor_id(i), 2, buffer, head, tail, size);
  *                }
  */
 	}
@@ -664,7 +664,7 @@ uint32_t vm_create(VMSpec* vm_spec) {
 	// Dump info
 	printf("Manager: VM[%d] created(cores [", vmid);
 	for(int i = 0; i < vm->core_size; i++) {
-		printf("%d", mp_apic_id_to_core_id(vm->cores[i]));
+		printf("%d", mp_apic_id_to_processor_id(vm->cores[i]));
 		if(i + 1 < vm->core_size)
 			printf(", ");
 	}
@@ -716,7 +716,7 @@ bool vm_destroy(uint32_t vmid) {
 
 	printf("Manager: Delete vm[%d] on cores [", vmid);
 	for(int i = 0; i < vm->core_size; i++) {
-		printf("%d", mp_apic_id_to_core_id(vm->cores[i]));
+		printf("%d", mp_apic_id_to_processor_id(vm->cores[i]));
 		if(i + 1 < vm->core_size)
 			printf(", ");
 	}
@@ -771,7 +771,7 @@ static bool status_changed(uint64_t event_type, void* event, void* context) {
 
 	printf("Manager: VM[%d] %s %s on cores [", vm->id, op, result ? "succeed" : "failed");
 	for(int i = 0; i < vm->core_size; i++) {
-		printf("%d", mp_apic_id_to_core_id(vm->cores[i]));
+		printf("%d", mp_apic_id_to_processor_id(vm->cores[i]));
 		if(i + 1 < vm->core_size)
 			printf(", ");
 	}

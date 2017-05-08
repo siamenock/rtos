@@ -15,8 +15,8 @@ typedef struct {
 
 typedef struct {
 	volatile uint8_t	mp_cores[MP_MAX_CORE_COUNT];
-		
-    volatile uint8_t    sync[3];
+
+	volatile uint8_t    sync[3];
 
 	struct _FIFO*		icc_pool;
 	volatile uint8_t	icc_lock_alloc;

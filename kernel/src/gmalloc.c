@@ -8,6 +8,8 @@
 #include <malloc.h>
 #include "smap.h"
 #include "idt.h"
+#include "e820.h"
+#include "pnkc.h"
 
 uint32_t bmalloc_count;
 
@@ -30,13 +32,8 @@ void gmalloc_init() {
 
 	gmalloc_pool = (void*)start;
 
-	typedef struct {
-		uintptr_t start;
-		uintptr_t end;
-	} Block;
-
 	// TODO: Check array size
-	Block reserved[3 + MP_MAX_CORE_COUNT];
+	Block reserved[3 + MP_MAX_CORE_COUNT + 1];
 	int reserved_count = 0;
 
 	reserved[reserved_count].start = VIRTUAL_TO_PHYSICAL(BIOS_AREA_START);
@@ -64,6 +61,12 @@ void gmalloc_init() {
 		reserved_count++;
 	}
 
+	//TODO fix here
+	PNKC* pnkc = (PNKC*)(0x200200 - sizeof(PNKC));
+	reserved[reserved_count].start = VIRTUAL_TO_PHYSICAL(RAMDISK_START);
+	reserved[reserved_count].end = VIRTUAL_TO_PHYSICAL(RAMDISK_START + (pnkc->initrd_end - pnkc->initrd_start));
+	reserved_count++;
+
 	// Relocate to physical to determine physical memory map
 	void relocate(Block* blocks, int count) {
 		for(int i = 0; i < count; i++) {
@@ -79,41 +82,7 @@ void gmalloc_init() {
 		printf("\t\tReserved[%02d] : %p ~ %p\n", i, r->start, r->end);
 	}
 
-	int count = smap_count;
-	List* blocks = list_create(NULL);
-	printf("\tSystem memory map\n");
-	for(int i = 0; i < count; i++) {
-		SMAP* entry = &smap[i];
-		char* type;
-		switch(entry->type) {
-			case SMAP_TYPE_MEMORY:
-				;
-				type = "Memory";
-				Block* block = malloc(sizeof(Block));
-				block->start = entry->base;
-				block->end = entry->base + entry->length;
-				list_add(blocks, block);
-				break;
-			case SMAP_TYPE_RESERVED:
-				type = "Reserved";
-				break;
-			case SMAP_TYPE_ACPI:
-				type = "ACPI";
-				break;
-			case SMAP_TYPE_NVS:
-				type = "NVS";
-				break;
-			case SMAP_TYPE_UNUSABLE:
-				type = "Disabled";
-				break;
-			default:
-				break;
-				type = "Unknown";
-		}
-		printf("\t\t0x%016lx - 0x%016lx: %s(%d)\n", entry->base, entry->base + entry->length, type, entry->type);
-	}
-
-
+	List* blocks = e820_get_mem_blocks();
 	// Remove reserved blocks
 	for(size_t i = 0; i < list_size(blocks); i++) {
 		Block* b = list_get(blocks, i);
@@ -250,13 +219,11 @@ inline void* gmalloc(size_t size) {
 		if(ptr)
 			return ptr;
 
-		// TODO: print to stderr
-		printf("WARN: Not enough global memory!!!\n");
-
 		void* block = bmalloc(1);
 		if(!block) {
 			// TODO: print to stderr
 			printf("ERROR: Not enough block memory!!!\n");
+			while(1);
 			return NULL;
 		}
 
@@ -312,8 +279,8 @@ void* bmalloc(int count) {
 		}
 	}
 
-	// TODO: print to stderr
 	printf("Not enough block memory!!!");
+	while(1);
 
 	return NULL;
 }

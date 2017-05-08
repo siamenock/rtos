@@ -76,12 +76,12 @@ static void icc(uint64_t vector, uint64_t err) {
 }
 
 void icc_init() {
-	uint8_t core_count = mp_core_count();
+	uint8_t processor_count = mp_processor_count();
 
 	extern void* gmalloc_pool;
 	uint8_t apic_id = mp_apic_id();
 	if(apic_id == 0) {
-		int icc_max = core_count * core_count;
+		int icc_max = processor_count * processor_count;
 		shared->icc_pool = fifo_create(icc_max, gmalloc_pool);
 
 		for(int i = 0; i < icc_max; i++) {
@@ -96,7 +96,7 @@ void icc_init() {
 		uint8_t* core_map = mp_core_map();
 		for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
 			if(core_map[i] != MP_CORE_INVALID) {
-				shared->icc_queues[i].icc_queue = fifo_create(core_count, gmalloc_pool);
+				shared->icc_queues[i].icc_queue = fifo_create(processor_count, gmalloc_pool);
 				lock_init(&shared->icc_queues[i].icc_queue_lock);
 			}
 		}
@@ -111,7 +111,7 @@ ICC_Message* icc_alloc(uint8_t type) {
 	lock_lock(&shared->icc_lock_alloc);
 	ICC_Message* icc_message = fifo_pop(shared->icc_pool);
 	lock_unlock(&shared->icc_lock_alloc);
-	
+
 	icc_message->id = icc_id++;
 	icc_message->type = type;
 	icc_message->apic_id = mp_apic_id();
@@ -134,16 +134,13 @@ uint32_t icc_send(ICC_Message* msg, uint8_t apic_id) {
 	lock_unlock(&shared->icc_queues[apic_id].icc_queue_lock);
 
 	apic_write64(APIC_REG_ICR, ((uint64_t)(apic_id) << 56) |
-				APIC_DSH_NONE | 
-				APIC_TM_EDGE | 
-				APIC_LV_DEASSERT | 
-				APIC_DM_PHYSICAL | 
-				APIC_DMODE_FIXED |
-				(msg->type == ICC_TYPE_PAUSE ? 49 : 48));
+			APIC_DSH_NONE | 
+			APIC_TM_EDGE | 
+			APIC_LV_DEASSERT | 
+			APIC_DM_PHYSICAL | 
+			APIC_DMODE_FIXED |
+			(msg->type == ICC_TYPE_PAUSE ? 49 : 48));
 
-//	uint64_t time = timer_frequency() + cpu_ms * 100;
-//
-//	while(timer_frequency() < time);
 	// TODO: Remove wait
 	timer_mwait(100);
 

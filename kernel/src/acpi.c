@@ -169,7 +169,7 @@ void acpi_init() {
 					ProcessorLocalAPIC* local_apic = (ProcessorLocalAPIC*)(entry + i);
 					i += local_apic->record_length;
 					if(local_apic->flags) {
-						mp_cores[local_apic->apic_id] = 1;
+						mp_processors[local_apic->apic_id] = 1;
 					}
 					break;
 				case IO_APIC:

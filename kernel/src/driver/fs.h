@@ -6,6 +6,8 @@
 #include <stddef.h>
 #include <sys/types.h>
 #include <util/cache.h>
+#include <fio.h>
+
 #include "../file.h"
 #include "disk.h"
 

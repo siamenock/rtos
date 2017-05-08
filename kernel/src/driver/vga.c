@@ -53,6 +53,76 @@ static void clean(int line, int lines) {
 	}
 }
 
+void stdio_print(const char* str, int row, int col) {
+	char* video = (char*)0xb8000 + (row * 160) + col * 2;
+	while(*str != 0) {
+		*(video++) = *str;
+		*(video++) = DEFAULT_ATTRIBUTE;
+		str++;
+	}
+}
+
+#define HEX(v)  (((v) & 0x0f) > 9 ? ((v) & 0x0f) - 10 + 'a' : ((v) & 0x0f) + '0')
+
+void stdio_print_32(uint32_t v, int row, int col) {
+	char* video = (char*)0xb8000 + (row * 160) + col * 2;
+
+	*video++ = HEX(v >> 28);
+	*video++ = DEFAULT_ATTRIBUTE;
+	*video++ = HEX(v >> 24);
+	*video++ = DEFAULT_ATTRIBUTE;
+	*video++ = HEX(v >> 20);
+	*video++ = DEFAULT_ATTRIBUTE;
+	*video++ = HEX(v >> 16);
+	*video++ = DEFAULT_ATTRIBUTE;
+	*video++ = HEX(v >> 12);
+	*video++ = DEFAULT_ATTRIBUTE;
+	*video++ = HEX(v >> 8);
+	*video++ = DEFAULT_ATTRIBUTE;
+	*video++ = HEX(v >> 4);
+	*video++ = DEFAULT_ATTRIBUTE;
+	*video++ = HEX(v >> 0);
+	*video++ = DEFAULT_ATTRIBUTE;
+}
+
+void stdio_print_64(uint64_t v, int row, int col) {
+	char* video = (char*)0xb8000 + (row * 160) + col * 2;
+
+	*video++ = HEX(v >> 60);
+	*video++ = DEFAULT_ATTRIBUTE;
+	*video++ = HEX(v >> 56);
+	*video++ = DEFAULT_ATTRIBUTE;
+	*video++ = HEX(v >> 52);
+	*video++ = DEFAULT_ATTRIBUTE;
+	*video++ = HEX(v >> 48);
+	*video++ = DEFAULT_ATTRIBUTE;
+	*video++ = HEX(v >> 44);
+	*video++ = DEFAULT_ATTRIBUTE;
+	*video++ = HEX(v >> 40);
+	*video++ = DEFAULT_ATTRIBUTE;
+	*video++ = HEX(v >> 36);
+	*video++ = DEFAULT_ATTRIBUTE;
+	*video++ = HEX(v >> 32);
+	*video++ = DEFAULT_ATTRIBUTE;
+
+	*video++ = HEX(v >> 28);
+	*video++ = DEFAULT_ATTRIBUTE;
+	*video++ = HEX(v >> 24);
+	*video++ = DEFAULT_ATTRIBUTE;
+	*video++ = HEX(v >> 20);
+	*video++ = DEFAULT_ATTRIBUTE;
+	*video++ = HEX(v >> 16);
+	*video++ = DEFAULT_ATTRIBUTE;
+	*video++ = HEX(v >> 12);
+	*video++ = DEFAULT_ATTRIBUTE;
+	*video++ = HEX(v >> 8);
+	*video++ = DEFAULT_ATTRIBUTE;
+	*video++ = HEX(v >> 4);
+	*video++ = DEFAULT_ATTRIBUTE;
+	*video++ = HEX(v >> 0);
+	*video++ = DEFAULT_ATTRIBUTE;
+}
+
 static void extend(int lines) {
 	if(lines > size) {
 		screen = head = 0;

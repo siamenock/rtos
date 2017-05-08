@@ -4,10 +4,9 @@
 #include "page.h"
 #include "mmap.h"
 
-Shared* shared;
 
 void shared_init() {
-	shared = (Shared*)(VIRTUAL_TO_PHYSICAL((uint64_t)DESC_TABLE_AREA_END) - sizeof(Shared));
+	Shared* shared = (Shared*)(VIRTUAL_TO_PHYSICAL((uint64_t)DESC_TABLE_AREA_END) - sizeof(Shared));
 	printf("\tShared space: %p\n", shared);
 	if(!mp_apic_id()) {
 		memset(shared, 0x0, sizeof(Shared));

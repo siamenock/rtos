@@ -63,13 +63,13 @@ void apic_activate() {
 }
 
 // Dummy interrupt handler
-//static void dummy_timer_handler(uint64_t vector, uint64_t error_code) {
-	// Do nothing
-//	apic_eoi();
-//}
+static void dummy_timer_handler(uint64_t vector, uint64_t error_code) {
+      // Do nothing
+	apic_eoi();
+}
 
 void apic_init() {
-//	apic_register(32, dummy_timer_handler);
+	apic_register(32, dummy_timer_handler);
 
 	apic_write32(APIC_REG_SIVR, apic_read32(APIC_REG_SIVR) | 0x100);
 
@@ -190,7 +190,7 @@ uint64_t apic_user_return_code() {
 void apic_dump(uint64_t vector, uint64_t error_code) {
 	Frame* frame = (void*)(PHYSICAL_TO_VIRTUAL(KERNEL_INTR_STACK_END) - sizeof(Frame));//(void*)(0xffffffff805b0000 - sizeof(Frame))
 
-	printf("\n* Exception: ver=%d.%d.%d-%s core=%d, vector=0x%lx, error=0x%lx\n", VERSION_MAJOR, VERSION_MINOR, VERSION_MICRO, VERSION_TAG, mp_core_id(), vector, error_code);
+	printf("\n* Exception: ver=%d.%d.%d-%s core=%d, vector=0x%lx, error=0x%lx\n", VERSION_MAJOR, VERSION_MINOR, VERSION_MICRO, VERSION_TAG, mp_processor_id(), vector, error_code);
 	printf("AX=%016lx BX=%016lx CX=%016lx DX=%016lx\n", frame->rax, frame->rbx, frame->rcx, frame->rdx);
 	printf("SI=%016lx DI=%016lx BP=%016lx SP=%016lx\n", frame->rsi, frame->rdi, frame->rbp, frame->rsp);
 	printf("8 =%016lx 9 =%016lx 10=%016lx 11=%016lx\n", frame->r8, frame->r9, frame->r10, frame->r11);
@@ -217,11 +217,11 @@ void isr_exception_handler(uint64_t vector, uint64_t error_code) {
 		apic_dump(vector, error_code);
 
 		while(1) {
-			uint8_t core_id = mp_core_id();
-			char* v = (char*)0xb8000 + core_id * 160 + 40 * 2;
-			*v++ = HEX(core_id >> 4);
+			uint8_t processor_id = mp_processor_id();
+			char* v = (char*)0xb8000 + processor_id * 160 + 40 * 2;
+			*v++ = HEX(processor_id >> 4);
 			*v++ = 0x40;
-			*v++ = HEX(core_id);
+			*v++ = HEX(processor_id);
 			*v++ = 0x40;
 			*v++ = ' ';
 			*v++ = 0x40;
@@ -302,11 +302,11 @@ void isr_interrupt_handler(uint64_t vector) {
 		apic_dump(vector, 0);
 
 		while(1) {
-			uint8_t core_id = mp_core_id();
-			char* v = (char*)0xb8000 + core_id * 160 + 50 * 2;
-			*v++ = HEX(core_id >> 4);
+			uint8_t processor_id = mp_processor_id();
+			char* v = (char*)0xb8000 + processor_id * 160 + 50 * 2;
+			*v++ = HEX(processor_id >> 4);
 			*v++ = 0x40;
-			*v++ = HEX(core_id);
+			*v++ = HEX(processor_id);
 			*v++ = 0x40;
 			*v++ = ' ';
 			*v++ = 0x40;

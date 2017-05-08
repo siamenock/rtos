@@ -215,7 +215,6 @@ int nicdev_rx(NICDevice* dev, void* data, size_t size) {
 	Ether* eth = data;
 	int i;
 	VNIC* vnic;
-	unsigned char* ptr = eth;
 	uint64_t dmac = endian48(eth->dmac);
 
 	//TODO lock
