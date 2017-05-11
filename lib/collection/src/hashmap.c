@@ -154,7 +154,14 @@ static bool contains_key(HashMap* this, void* key) {
 }
 
 static bool contains_value(HashMap* this, void* value) {
-	// Not implemented yet
+	for(size_t index = 0; index < this->capacity; index++) {
+		LinkedList* list = this->table[index];
+		if(!list)
+			continue;
+
+		if(list->index_of(list, value) >= 0)
+			return true;
+	}
 	return false;
 }
 

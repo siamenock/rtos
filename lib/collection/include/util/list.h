@@ -10,7 +10,7 @@ typedef struct _ListOps {
 	void*	(*set)(void* this, size_t index, void* element);
 	void*	(*remove_at)(void* this, size_t index);
 	bool	(*add_at)(void* this, size_t index, void* element);
-	int	(*index_of)(void* this, size_t index, void* element);
+	int	(*index_of)(void* this, void* element);
 } ListOps;
 
 typedef struct _List {

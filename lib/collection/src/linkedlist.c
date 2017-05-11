@@ -86,8 +86,21 @@ static void* get(LinkedList* this, size_t index) {
 }
 
 static void* set(LinkedList* this, size_t index, void* element) {
-	// Not yet implemented
-	return NULL;
+	ListNode* node = this->head;
+	while(index > 0) {
+		if(!node->next)
+			return NULL;
+
+		node = node->next;
+		index--;
+	}
+
+	if(node) {
+		void* data = node->data;
+		node->data = element;
+		return data;
+	} else
+		return NULL;
 }
 
 static void* remove_at(LinkedList* this, size_t index) {
@@ -155,13 +168,28 @@ static int index_of(LinkedList* this, void* element) {
 }
 
 static bool add_first(LinkedList* this, void* element) {
-	// Not yet implemented
-	return false;
+	ListNode* node = this->malloc(sizeof(ListNode));
+	if(!node)
+		return false;
+
+	node->data = element;
+	node->prev = NULL;
+	node->next = NULL;
+
+	if(this->head) {
+		this->head->prev = node;
+		node->next = this->head;
+		this->head = node;
+	} else {
+		this->head = this->tail = node;
+	}
+	this->size++;
+
+	return true;
 }
 
 static bool add_last(LinkedList* this, void* element) {
-	// Not yet implemented
-	return false;
+	return add(this, element);
 }
 
 static void* remove_first(LinkedList* this) {
