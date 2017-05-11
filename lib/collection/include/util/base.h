@@ -49,7 +49,7 @@ typedef struct _Base {
 
 int register_type(DataType type, uint64_t (*hash)(void*),
 		bool (*equals)(void*, void*), int (*compare)(void*, void*));
-int register_pool(PoolType pool, void* (*malloc)(size_t), void* (*free)(void*),
+int register_pool(PoolType pool, void* (*malloc)(size_t), void (*free)(void*),
 		void* (*calloc)(size_t, size_t), void* (*realloc)(void*, size_t));
 
 DataOps* data_ops(DataType type);

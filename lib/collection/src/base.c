@@ -72,18 +72,37 @@ static PoolOps pool_operations[POOLTYPE_COUNT] = {
 
 int register_type(DataType type, uint64_t (*hash)(void*),
 		bool (*equals)(void*, void*), int (*compare)(void*, void*)) {
-	// Not yet implemented
+	if(type >= DATATYPE_COUNT)
+		return 1;
+
+	DataOps d = {
+		.hash = hash,
+		.equals = equals,
+		.compare = compare,
+	};
+	data_operations[type] = d;
+
 	return 0;
 }
 
-int register_pool(PoolType pool, void* (*malloc)(size_t), void* (*free)(void*),
+int register_pool(PoolType pool, void* (*malloc)(size_t), void (*free)(void*),
 		void* (*calloc)(size_t, size_t), void* (*realloc)(void*, size_t)) {
-	// Not yet implemented
+	if(pool >= POOLTYPE_COUNT)
+		return 1;
+
+	PoolOps po = {
+		.malloc = malloc,
+		.free = free,
+		.calloc = calloc,
+		.realloc = realloc,
+	};
+	pool_operations[pool] = po;
+
 	return 0;
 }
 
 DataOps* data_ops(DataType type) {
-	if(type < 0 || type >= DATATYPE_COUNT)
+	if(type >= DATATYPE_COUNT)
 		return NULL;
 
 	if(!data_operations[type].hash)
@@ -93,7 +112,7 @@ DataOps* data_ops(DataType type) {
 }
 
 PoolOps* pool_ops(PoolType pool) {
-	if(pool < 0 || pool >= POOLTYPE_COUNT)
+	if(pool >= POOLTYPE_COUNT)
 		return NULL;
 
 	if(!pool_operations[pool].malloc)
