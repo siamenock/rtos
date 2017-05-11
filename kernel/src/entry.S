@@ -1,4 +1,5 @@
 #include "entry.h"
+#include "shared.h"
 
 #define STACK_SIZE	    512
 #define CORE_COUNT	    16
@@ -81,6 +82,19 @@ gdt:
 	.quad	0x0080890000000000	/* TS descriptor */
 	.quad   0x0000000000000000	/* TS continued */
 gdt_end:
+
+//TODO: fix Shared area space
+	.section ".rodata"
+	.balign 16
+	.globl SHARED_ADDR
+SHARED_ADDR:
+	.fill 16, 1, 0
+	.byte 0
+	.quad 0
+	.byte 0
+	.byte 0
+	.quad 0
+	.quad SHARED_MAGIC
 
 	/*
 	 * Description table area

@@ -39,6 +39,7 @@ typedef struct {
 	int id;
 	VirtIODevice vdev;
 	VirtQueue *rvq, *svq, *cvq;
+	NICDevice* nicdev;
 } VirtNetPriv;
 
 /* Private structure that virtio network device driver use */
@@ -416,9 +417,9 @@ static bool virtnet_send_command(int id, uint8_t class, uint8_t cmd, void* data)
 }
 
 /* Function for packet receive */
-static int virtnet_receive(int id, void* buf, uint32_t len) {
+static int virtnet_receive(VirtNetPriv* priv, void* buf, uint32_t len) {
 	// Instead of calling add_buf, we just notify that buffer index is updated 
-	VirtQueue* vq = priv[id]->rvq;
+	VirtQueue* vq = priv->rvq;
 	vq->num_added++; 
 
 	// If the number of free descriptors goes beyond half of the maximum buffer, kick it
@@ -428,7 +429,9 @@ static int virtnet_receive(int id, void* buf, uint32_t len) {
 	}
 
 	VirtIONetPacket* vp = (VirtIONetPacket*)buf;
-	nic_process_input(0, vp->data, len - VNET_HDR_LEN, NULL, 0);
+
+	nicdev_rx(priv->nicdev, vp->data, len - VNET_HDR_LEN);
+	//nic_process_input(0, vp->data, len - VNET_HDR_LEN, NULL, 0);
 
 #if DEBUG
 	printf("Received : ");
@@ -445,9 +448,9 @@ static int virtnet_receive(int id, void* buf, uint32_t len) {
 }
 
 /* Function for packet send */
-static int virtnet_send(int id, Packet* packet) {
+static int virtnet_send(VirtNetPriv* priv, Packet* packet) {
 	// Check whether free descriptor exists to prevent buffer overflow 
-	VirtQueue* vq = priv[id]->svq;
+	VirtQueue* vq = priv->svq;
 	if(vq->num_free == 0) {
 #if DEBUG
 		printf("No more free descriptor in send queue\n");
@@ -523,6 +526,26 @@ int init(void* device, void* data) {
 
 	vdev_count++;
 
+	//Register NICDevice
+	NICDevice* nic_device = gmalloc(sizeof(NICDevice));
+	if(!nic_device)
+		goto error;
+
+	memset(nic_device, 0x0, sizeof(NICDevice));
+
+	extern int nicdev_get_count();
+	sprintf(nic_device->name, "eth%d", nicdev_get_count());
+	nic_device->mac = *(uint64_t*)&priv[id]->vdev.config.mac;
+	//memcpy(&nic_device->mac, &priv[id]->vdev.config.mac, ETH_ALEN);
+
+	extern NICDriver device_driver;
+	nic_device->driver = (void*)&device_driver;
+	nic_device->priv = priv[id];
+
+	extern int nicdev_register(NICDevice* dev);
+	//TODO check return value
+	nicdev_register(nic_device);
+
 	return id;
 error: 
 	if(priv[id])
@@ -551,23 +574,29 @@ void destroy(int id) {
 	gfree(priv[id]);
 }
 
-int poll(int id) {
-	// Free used buffer
+static bool process(Packet* packet, void* context) {
+	return !virtnet_send(context, packet);
+}
+
+int poll(void* _priv) {
+	VirtNetPriv* priv = _priv;
 	void* buf;
-	while((buf = get_buf(priv[id]->svq, NULL))) {
+
+	// Free used buffer
+	while((buf = get_buf(priv->svq, NULL))) {
 		nic_free(buf);
 	}
 
 	// TX
-	Packet* packet = nic_process_output(0);
-	if(packet) {
-		virtnet_send(id, packet);
-	}
+	//Packet* packet = nic_process_output(0);
+	int nicdev_tx(NICDevice* dev,
+			bool (*process)(Packet* packet, void* context), void* context);
+	nicdev_tx(priv->nicdev, process, priv);
 
 	// RX
 	uint32_t len;
-	if((buf = get_buf(priv[id]->rvq, &len))) {
-		virtnet_receive(id, buf, len);
+	if((buf = get_buf(priv->rvq, &len))) {
+		virtnet_receive(priv, buf, len);
 	}
 
 	return 0;

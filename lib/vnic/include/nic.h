@@ -71,6 +71,15 @@ typedef struct _NIC {
 	uint64_t	rx_bandwidth;
 	uint64_t	tx_bandwidth;
 
+	uint64_t	input_bytes;		///< Total input bytes (read only)
+	uint64_t	input_packets;		///< Total input packets (read only)
+	uint64_t	input_drop_bytes;	///< Total dropped input bytes (read only)
+	uint64_t	input_drop_packets;	///< Total dropped input packets (read only)
+	uint64_t	output_bytes;		///< Total output bytes (read only)
+	uint64_t	output_packets;		///< Total output packets (read only)
+	uint64_t	output_drop_bytes;	///< Total dropped output bytes (read only)
+	uint64_t	output_drop_packets;	///< Total dropped output packets (read only)
+
 	uint16_t	padding_head;
 	uint16_t	padding_tail;
 

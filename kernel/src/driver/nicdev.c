@@ -3,7 +3,7 @@
 #define endian48(v)		(__builtin_bswap64((v)) >> 16)	///< Change endianness for 48 bits
 
 #define ETHER_MULTICAST		((uint64_t)1 << 40)	///< MAC address is multicast
-#define ID_BUFFER_SIZE		(MAX_NIC_DEVICE_COUNT * MAX_VNIC_COUNT / 8)
+#define ID_BUFFER_SIZE		(MAX_NIC_DEVICE_COUNT * 8)
 
 extern int strncmp(const char* s, const char* d, size_t size);
 
@@ -15,34 +15,15 @@ typedef struct _Ether {
 } __attribute__ ((packed)) Ether;
 
 static NICDevice* nic_devices[MAX_NIC_DEVICE_COUNT]; //key string
-static uint8_t id_map[ID_BUFFER_SIZE];
 
-static int id_alloc() {
-	int i, j;
-	uint8_t idx;
-	for(i = 0; i < ID_BUFFER_SIZE; i++) {
-		if(~id_map[i] & 0xff) {
-			idx = 1;
-			for(j = 0; j < 8; j++) {
-				if(!(id_map[i] & idx)) {
-					id_map[i] |= idx;
-					return i * 8 + j;
-				}
-
-				idx <<= 1;
-			}
-		}
+int nicdev_get_count() {
+	int i; 
+	for(i = 0; i < MAX_NIC_DEVICE_COUNT; i++) {
+		if(!nic_devices[i])
+			return i;
 	}
 
-	return -1;
-}
-
-static void id_free(int id) {
-	int index = id / 8;
-	uint8_t idx = 1 << (id % 8);
-
-	id_map[index] |= idx;
-	id_map[index] ^= idx;
+	return MAX_NIC_DEVICE_COUNT;
 }
 
 int nicdev_register(NICDevice* dev) {
@@ -86,6 +67,13 @@ NICDevice* nicdev_unregister(const char* name) {
 	return NULL;
 }
 
+NICDevice* nicdev_get_by_idx(int idx) {
+	if(idx >= MAX_NIC_DEVICE_COUNT)
+		return NULL;
+
+	return nic_devices[idx];
+}
+
 NICDevice* nicdev_get(const char* name) {
 	int i;
 	for(i = 0; i < MAX_NIC_DEVICE_COUNT; i++) {
@@ -108,18 +96,17 @@ int nicdev_poll() {
 
 		NICDriver* driver = dev->driver;
 
-		poll_count += driver->poll(0);
+		poll_count += driver->poll(dev->priv);
 	}
 
 	return poll_count;
 }
 
-uint32_t nicdev_register_vnic(NICDevice* dev, VNIC* vnic) {
+int nicdev_register_vnic(NICDevice* dev, VNIC* vnic) {
 	int i;
 	for(i = 0; i < MAX_VNIC_COUNT; i++) {
 		if(!dev->vnics[i]) {
 			dev->vnics[i] = vnic;
-			vnic->id = id_alloc();
 			return vnic->id;
 		}
 
@@ -149,7 +136,6 @@ VNIC* nicdev_unregister_vnic(NICDevice* dev, uint32_t id) {
 				}
 			}
 
-			id_free(id);
 			return vnic;
 		}
 	}
@@ -158,12 +144,10 @@ VNIC* nicdev_unregister_vnic(NICDevice* dev, uint32_t id) {
 }
 
 VNIC* nicdev_get_vnic(NICDevice* dev, uint32_t id) {
-	int i;
+	if(!dev)
+		return NULL;
 
-	for(i = 0; i < MAX_VNIC_COUNT; i++) {
-		if(!nic_devices[i])
-			return NULL;
-
+	for(int i = 0; i < MAX_VNIC_COUNT; i++) {
 		if(dev->vnics[i]->id == id)
 			return dev->vnics[i];
 	}
@@ -172,10 +156,10 @@ VNIC* nicdev_get_vnic(NICDevice* dev, uint32_t id) {
 }
 
 VNIC* nicdev_get_vnic_mac(NICDevice* dev, uint64_t mac) {
-	for(int i = 0; i < MAX_VNIC_COUNT; i++) {
-		if(!dev->vnics[i])
-			return NULL;
+	if(!dev)
+		return NULL;
 
+	for(int i = 0; i < MAX_VNIC_COUNT; i++) {
 		if(dev->vnics[i]->mac == mac)
 			return dev->vnics[i];
 	}

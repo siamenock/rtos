@@ -24,7 +24,36 @@ inline uint64_t timer_frequency() {
 	return time;
 }
 
-static uint64_t vnic_id;
+#define ID_BUFFER_SIZE		(128 * MAX_VNIC_COUNT / 8)
+static uint8_t id_map[ID_BUFFER_SIZE];
+
+int vnic_alloc_id() {
+	int i, j;
+	uint8_t idx;
+	for(i = 0; i < ID_BUFFER_SIZE; i++) {
+		if(~id_map[i] & 0xff) {
+			idx = 1;
+			for(j = 0; j < 8; j++) {
+				if(!(id_map[i] & idx)) {
+					id_map[i] |= idx;
+					return i * 8 + j;
+				}
+
+				idx <<= 1;
+			}
+		}
+	}
+
+	return -1;
+}
+
+void vnic_free_id(int id) {
+	int index = id / 8;
+	uint8_t idx = 1 << (id % 8);
+
+	id_map[index] |= idx;
+	id_map[index] ^= idx;
+}
 
 static int nic_init(uint64_t mac, void* base, size_t size,
 		uint64_t rx_bandwidth, uint64_t tx_bandwidth,
@@ -42,7 +71,7 @@ static int nic_init(uint64_t mac, void* base, size_t size,
 
 	NIC* nic = base;
 	nic->magic = NIC_MAGIC_HEADER;
-	nic->id = vnic_id++;
+	nic->id = 0;
 	nic->mac = mac;
 	nic->rx_bandwidth = rx_bandwidth;
 	nic->tx_bandwidth = tx_bandwidth;
@@ -139,9 +168,15 @@ bool vnic_init(VNIC* vnic, uint64_t* attrs) {
 			get_value(VNIC_PADDING_HEAD), get_value(VNIC_PADDING_TAIL),
 			get_value(VNIC_RX_QUEUE_SIZE), get_value(VNIC_TX_QUEUE_SIZE),
 			get_value(VNIC_SLOW_RX_QUEUE_SIZE), get_value(VNIC_SLOW_TX_QUEUE_SIZE));
+	vnic->nic->id = vnic->id;
 
+	strncpy(vnic->parent, (char*)get_value(VNIC_DEV), MAX_NIC_NAME_LEN);
+	//TODO fix default value
+	if(has_key(VNIC_BUDGET))
+		vnic->budget = get_value(VNIC_BUDGET);
+	else
+		vnic->budget = 32;
 	vnic->magic = vnic->nic->magic;
-	vnic->id = vnic->nic->id;
 	vnic->mac = vnic->nic->mac;
 	vnic->rx_bandwidth = vnic->nic->rx_bandwidth;
 	vnic->tx_bandwidth = vnic->nic->tx_bandwidth;

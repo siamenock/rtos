@@ -26,7 +26,7 @@ void* gmalloc_pool;
 void gmalloc_init() {
 	/* Gmalloc pool area : IDT_END_ADDR */
 	uint64_t start = VIRTUAL_TO_PHYSICAL(IDT_END_ADDR);
-	uint64_t end = VIRTUAL_TO_PHYSICAL((uint64_t)shared);
+	uint64_t end = VIRTUAL_TO_PHYSICAL(DESC_TABLE_AREA_END);
 
 	init_memory_pool(end - start, (void*)start, 0);
 

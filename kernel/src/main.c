@@ -59,71 +59,13 @@ static void ap_timer_init() {
 	__timer_ns = *(uint64_t*)VIRTUAL_TO_PHYSICAL((uint64_t)&__timer_ns);
 }
 
-static Device* devices[MAX_NIC_DEVICE_COUNT];
-static NICDevice* nicdev_create(NICInfo* info) {
-	extern uint64_t manager_mac;
-	NICDevice* nic_device = gmalloc(sizeof(NICDevice));
-	if(!nic_device)
-		return NULL;
-
-	memset(nic_device, 0x0, sizeof(NICDevice));
-
-	nic_device->mac = info->mac;
-	strcpy(nic_device->name, info->name);
-
-	nicdev_register(nic_device);
-
-	printf("\tNIC Device created\n");
-	printf("\t%s : [%02lx:%02lx:%02lx:%02lx:%02lx:%02lx] [%c]\n", nic_device->name,
-			(info->mac >> 40) & 0xff,
-			(info->mac >> 32) & 0xff,
-			(info->mac >> 24) & 0xff,
-			(info->mac >> 16) & 0xff,
-			(info->mac >> 8) & 0xff,
-			(info->mac >> 0) & 0xff,
-			manager_mac == 0 ? '*' : ' ');
-
-	if(!manager_mac)
-		manager_mac = info->mac;
-
-	return nic_device;
-}
-
 static void nicdev_destroy(NICDevice* dev) {
 	nicdev_unregister(dev->name);
 	gfree(dev);
 }
 
-static int nicdev_init() {
-	Device* dev;
-	int index = 0;
-	uint16_t count = device_count(DEVICE_TYPE_NIC);
-	for(int i = 0; i < count; i++) {
-		dev = device_get(DEVICE_TYPE_NIC, i);
-		if(!dev)
-			continue;
-
-		NICInfo info;
-		NICDriver* driver = dev->driver;
-		driver->get_info(dev->id, &info);
-
-		if(info.name[0] == '\0')
-			sprintf(info.name, "eth%d", index++);
-
-		NICDevice* nic_dev = nicdev_create(&info);
-		if(!nic_dev)
-			return -1;
-
-		nic_dev->driver = driver;
-		dev->priv = nic_dev;
-	}
-
-	return 0;
-}
-
 static bool idle0_event(void* data) {
-	nicdev_poll();
-
+	nicdev_poll(); 
 // #ifdef VFIO_ENABLED
 // 	// Poll FIO
 // #define MAX_VM_COUNT	128
@@ -419,9 +361,8 @@ void main() {
 
 	malloc_init();
 
-	mp_sync(0);	// Barrier #1
-
 	shared_init();
+	mp_sync();	// Barrier #1
 	if(apic_id == 0) {
 		printf("\nPacketNgin ver 2.0.\n");
  		printf("\x1b""32mOK""\x1b""0m\n");
@@ -445,7 +386,7 @@ void main() {
 		tss_init();
 		idt_init();
 
-		mp_sync(1);	// Barrier #2
+		mp_sync();	// Barrier #2
 
 		printf("Loading GDT...\n");
 		gdt_load();
@@ -521,8 +462,6 @@ void main() {
  		printf("Initializing device drivers...\n");
  		device_module_init();
  
- 		nicdev_init();
- 
  		printf("Initializing VM manager...\n");
  		vm_init();
  
@@ -532,9 +471,8 @@ void main() {
  		printf("Initializing shell...\n");
  		shell_init();
 	} else {
+		mp_sync();	// Barrier #2
 		ap_timer_init();
-
-		mp_sync(1);	// Barrier #2
 
 		gdt_load();
 		tss_load();
@@ -557,7 +495,7 @@ void main() {
 			event_idle_add(idle_hlt_event, NULL);
 	}
 
-	mp_sync(2); // Barrier #3
+	mp_sync(); // Barrier #3
 
 	if(apic_id == 0)
 		printf("Kernel started...\n");

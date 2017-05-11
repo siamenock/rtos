@@ -10,6 +10,7 @@ typedef struct {
 	char		name[MAX_NIC_NAME_LEN];
 	uint64_t	mac;
 	void*		driver;
+	void*		priv;
 
 	VNIC*		vnics[MAX_VNIC_COUNT];
 } NICDevice;
@@ -26,19 +27,21 @@ typedef struct {
 typedef struct {
 	int		(*init)(void* device, void* data);
 	void		(*destroy)(int id);
-	int		(*poll)(int id);
+	int		(*poll)(void* priv);
 	void		(*get_status)(int id, NICStatus* status);
 	bool		(*set_status)(int id, NICStatus* status);
 	void		(*get_info)(int id, NICInfo* info);
 } NICDriver;
 
+int nicdev_get_count();
 int nicdev_register(NICDevice* dev);
 NICDevice* nicdev_unregister(const char* name);
 NICDevice* nicdev_unregister(const char* name);
+NICDevice* nicdev_get_by_idx(int idx);
 NICDevice* nicdev_get(const char* name);
 int nicdev_poll();
 
-uint32_t nicdev_register_vnic(NICDevice* dev, VNIC* vnic);
+int nicdev_register_vnic(NICDevice* dev, VNIC* vnic);
 VNIC* nicdev_unregister_vnic(NICDevice* dev, uint32_t id);
 VNIC* nicdev_get_vnic(NICDevice* dev, uint32_t id);
 VNIC* nicdev_get_vnic_mac(NICDevice* dev, uint64_t mac);

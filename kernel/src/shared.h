@@ -1,11 +1,12 @@
 #ifndef __SHARED_H__
 #define __SHARED_H__
 
-#include <stdint.h>
-#include "mp.h"
-
 #define SHARED_MAGIC		0x481230420134f090
 
+#ifndef __ASSEMBLY__
+
+#include <stdint.h>
+#include "mp.h"
 struct _FIFO;
 
 typedef struct {
@@ -16,38 +17,19 @@ typedef struct {
 typedef struct {
 	volatile uint8_t	mp_cores[MP_MAX_CORE_COUNT];
 
-	volatile uint8_t    sync[3];
+	volatile uint8_t    	sync;
 
 	struct _FIFO*		icc_pool;
 	volatile uint8_t	icc_lock_alloc;
 	volatile uint8_t	icc_lock_free;
-	ICC*			    icc_queues;
+	ICC*			icc_queues;
 
-	uint64_t		    magic;
-} Shared;
+	uint64_t		magic;
+} __attribute__ ((packed)) Shared;
 
-
-/*
- *typedef struct {
- *    uint8_t			    mp_cores[MP_MAX_CORE_COUNT];
- *   
- *    volatile uint8_t    sync[3];
- *    uint64_t*           gmalloc_pool;
- *    uint32_t            bmalloc_count;
- *    uint64_t*           bmalloc_pool;
- *
- *    struct _FIFO*		icc_pool;
- *    volatile uint8_t	icc_lock_alloc;
- *    volatile uint8_t	icc_lock_free;
- *
- *    ICC*			    icc_queues;
- *
- *    uint64_t		    magic;
- *} Shared;
- */
-
-Shared* shared;
+extern char SHARED_ADDR[];
 
 void shared_init();
+#endif /* __ASSEMBLY__ */
 
 #endif /* __SHARED_H__ */

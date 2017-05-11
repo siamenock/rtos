@@ -49,6 +49,15 @@ typedef struct {
 	uint64_t	rx_bandwidth;
 	uint64_t	tx_bandwidth;
 
+	uint64_t	input_bytes;		///< Total input bytes 
+	uint64_t	input_packets;		///< Total input packets
+	uint64_t	input_drop_bytes;	///< Total dropped input bytes
+	uint64_t	input_drop_packets;	///< Total dropped input packets
+	uint64_t	output_bytes;		///< Total output bytes
+	uint64_t	output_packets;		///< Total output packets
+	uint64_t	output_drop_bytes;	///< Total dropped output bytes
+	uint64_t	output_drop_packets;	///< Total dropped output packets
+
 	uint16_t	padding_head;
 	uint16_t	padding_tail;
 
@@ -69,6 +78,8 @@ typedef struct {
 } VNIC;
 
 bool vnic_init(VNIC* vnic, uint64_t* attrs);
+int vnic_alloc_id();
+void vnic_free_id(int id);
 uint32_t vnic_update(VNIC* nic, uint64_t* attrs);
 
 bool vnic_has_rx(VNIC* vnic);

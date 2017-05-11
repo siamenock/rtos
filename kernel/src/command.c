@@ -182,8 +182,8 @@ static bool parse_addr(char* argv, uint32_t* address) {
 }
 
 static int cmd_manager(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
-	if(manager_nic == NULL) {
-		printf("Can'nt found manager\n");
+	if(!manager_nic) {
+		printf("Can't found manager\n");
 		return -1;
 	}
 
@@ -205,11 +205,6 @@ static int cmd_manager(int argc, char** argv, void(*callback)(char* result, int 
 		printf("%10sGateway:%d.%d.%d.%d\n", "", (gw >> 24) & 0xff, (gw >> 16) & 0xff, (gw >> 8) & 0xff, (gw >> 0) & 0xff);
 
 		return 0;
-	}
-
-	if(!manager_nic) {
-		printf("Manager not found\n");
-		return -1;
 	}
 
 	if(!strcmp("ip", argv[1])) {
@@ -316,31 +311,23 @@ static int cmd_manager(int argc, char** argv, void(*callback)(char* result, int 
 }
 
 static int cmd_nic(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
-	extern NICDevice* nic_devices[];
-	uint16_t nic_device_index = 0;
+	int nicdev_count = nicdev_get_count();
+	for(int i = 0 ; i < nicdev_count; i++) {
+		NICDevice* nicdev = nicdev_get_by_idx(i);
+		if(!nicdev)
+			break;
 
-/*
- *        if(argc == 1 || (argc == 2 && !strcmp(argv[1], "list"))) {
- *                for(int i = 0; i < MAX_NIC_DEVICE_COUNT; i++) {
- *                        NICDevice* nic_device = nic_devices[i];
- *                        if(!nic_device)
- *                                break;
- *
- *                        printf("%12s", nic_device->name);
- *                        printf("HWaddr %02x:%02x:%02x:%02x:%02x:%02x\n",
- *                                (nic_device->mac >> 40) & 0xff,
- *                                (nic_device->mac >> 32) & 0xff,
- *                                (nic_device->mac >> 24) & 0xff,
- *                                (nic_device->mac >> 16) & 0xff,
- *                                (nic_device->mac >> 8) & 0xff,
- *                                (nic_device->mac >> 0) & 0xff);
- *                }
- *
- *                return 0;
- *        }
- */
+		printf("%12s", nicdev->name);
+		printf("HWaddr %02x:%02x:%02x:%02x:%02x:%02x\n",
+				(nicdev->mac >> 40) & 0xff,
+				(nicdev->mac >> 32) & 0xff,
+				(nicdev->mac >> 24) & 0xff,
+				(nicdev->mac >> 16) & 0xff,
+				(nicdev->mac >> 8) & 0xff,
+				(nicdev->mac >> 0) & 0xff);
+	}
 
-	return -1;
+	return 0;
 }
 
 static int cmd_vnic(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
@@ -391,22 +378,23 @@ static int cmd_vnic(int argc, char** argv, void(*callback)(char* result, int exi
 				(vnic->mac >> 0) & 0xff);
 
 			printf("Parent %s\n", vnic->parent);
-/*
- *                        printf("%12sRX packets:%d dropped:%d\n", "", vnic->nic->input_packets, vnic->nic->input_drop_packets);
- *                        printf("%12sTX packets:%d dropped:%d\n", "", vnic->nic->output_packets, vnic->nic->output_drop_packets);
- *                        printf("%12srxqueuelen:%d txqueuelen:%d\n", "", fifo_capacity(vnic->nic->input_buffer), fifo_capacity(vnic->nic->output_buffer));
- *
- *                        printf("%12sRX bytes:%lu ", "", vnic->nic->input_bytes);
- *                        print_byte_size(vnic->nic->input_bytes);
- *                        printf("  TX bytes:%lu ", vnic->nic->output_bytes);
- *                        print_byte_size(vnic->nic->output_bytes);
- *                        printf("\n");
- *                        printf("%12sHead Padding:%d Tail Padding:%d", "",vnic->padding_head, vnic->padding_tail);
- *                        printf("\n\n");
- */
+
+			printf("%12sRX packets:%d dropped:%d\n", "", vnic->input_packets, vnic->input_drop_packets);
+			printf("%12sTX packets:%d dropped:%d\n", "", vnic->output_packets, vnic->output_drop_packets);
+			//printf("%12srxqueuelen:%d txqueuelen:%d\n", "", fifo_capacity(vnic->nic->input_buffer), fifo_capacity(vnic->nic->output_buffer));
+
+			printf("%12sRX bytes:%lu ", "", vnic->input_bytes);
+			print_byte_size(vnic->input_bytes);
+			printf("  TX bytes:%lu ", vnic->output_bytes);
+			print_byte_size(vnic->output_bytes);
+			printf("\n");
+			printf("%12sHead Padding:%d Tail Padding:%d", "",vnic->padding_head, vnic->padding_tail);
+			printf("\n\n");
+
 		}
 
-		print_vnic(manager_nic, 0, 0);
+		if(manager_nic)
+			print_vnic(manager_nic, 0, 0);
 
 		extern Map* vms;
 		MapIterator iter;

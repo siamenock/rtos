@@ -126,7 +126,7 @@ uint8_t mp_apic_id();
 uint8_t mp_processor_id();
 uint8_t mp_apic_id_to_processor_id(uint8_t apic_id);
 uint8_t mp_core_count();
-void mp_sync(int barrier);
+void mp_sync();
 void mp_parse_fps(MP_Parser* parser, void* context);
 uint8_t* mp_core_map();
 

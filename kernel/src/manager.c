@@ -25,17 +25,18 @@
 #include "shell.h"
 #include "vm.h"
 #include "stdio.h"
+#include "driver/nicdev.h"
 
 #include "manager.h"
 
 #define DEFAULT_MANAGER_IP	0xc0a864fe	// 192.168.100.254
 #define DEFAULT_MANAGER_GW	0xc0a864c8	// 192.168.100.200
 #define DEFAULT_MANAGER_NETMASK	0xffffff00	// 255.255.255.0
-#define DEFAULT_MANAGER_PORT	111
+#define DEFAULT_MANAGER_PORT	1111
 
-uint64_t manager_mac;
 static struct netif* manager_netif;
 static struct tcp_pcb* manager_server;
+uint64_t manager_mac;
 static uint32_t manager_ip;
 static uint16_t manager_port;
 
@@ -461,57 +462,56 @@ static bool manager_timer(void* context) {
 	return true;
 }
 
-void manager_init() {
-/*
- *        uint64_t attrs[] = { 
- *                VNIC_MAC, manager_mac, // Physical MAC
- *                VNIC_DEV, (uint64_t)"eth0",
- *                VNIC_POOL_SIZE, 0x400000,
- *                VNIC_RX_BANDWIDTH, 1000000000L,
- *                VNIC_TX_BANDWIDTH, 1000000000L,
- *                VNIC_RX_QUEUE_SIZE, 1024,
- *                VNIC_TX_QUEUE_SIZE, 1024,
- *                VNIC_PADDING_HEAD, 32,
- *                VNIC_PADDING_TAIL, 32,
- *                VNIC_RX_ACCEPT_ALL, 1,
- *                VNIC_TX_ACCEPT_ALL, 1,
- *                VNIC_NONE
- *        };
- *        
- *        manager_nic = vnic_create(attrs);
- *        if(!manager_nic) {
- *                printf("\tCannot create manager\n");
- *                return;
- *        }
- *
- *        manager_ip = DEFAULT_MANAGER_IP;
- *        if(!nic_ip_add(manager_nic->nic, DEFAULT_MANAGER_IP)) {
- *                printf("\tCan'nt allocate manager ip\n");
- *                return;
- *        }
- *
- *        IPv4Interface* interface = nic_ip_get(manager_nic->nic, DEFAULT_MANAGER_IP);
- *        interface->gateway = DEFAULT_MANAGER_GW;
- *        interface->netmask = DEFAULT_MANAGER_NETMASK;
- *        interface->_default = true;
- *
- *        if(!udp_port_alloc0(manager_nic->nic, DEFAULT_MANAGER_IP, manager_port)) {
- *                printf("\tCan'nt allocate manager port\n");
- *                return;
- *        }
- *        manager_port = DEFAULT_MANAGER_PORT;
- *#ifdef __PENGUIN__
- *#else
- *        manager_netif = nic_init(manager_nic->nic, manage, NULL);
- *        
- *        manager_server_open();
- *        
- *        event_idle_add(manager_loop, NULL);
- *        event_timer_add(manager_timer, NULL, 100000, 100000);
- *        
- *        vm_stdio_handler(stdio_callback);
- *#endif
- */
+int manager_init() {
+	NICDevice* nicdev = nicdev_get_by_idx(0);
+	if(!nicdev) {
+		printf("\tCannot create manager\n");
+		return -1;
+	}
+
+	uint64_t attrs[] = {
+		VNIC_MAC, nicdev->mac,
+		VNIC_DEV, (uint64_t)nicdev->name,
+		VNIC_BUDGET, 32,
+		VNIC_POOL_SIZE, 0x200000,
+		VNIC_RX_BANDWIDTH, 1000000000L,
+		VNIC_TX_BANDWIDTH, 1000000000L,
+		VNIC_RX_QUEUE_SIZE, 1024,
+		VNIC_TX_QUEUE_SIZE, 1024,
+		VNIC_PADDING_HEAD, 32,
+		VNIC_PADDING_TAIL, 32,
+		VNIC_SLOW_RX_QUEUE_SIZE, 1024,
+		VNIC_SLOW_TX_QUEUE_SIZE, 1024,
+		VNIC_NONE
+	};
+
+	VNIC* vnic = gmalloc(sizeof(VNIC));
+	if(!vnic) {
+		return -2;
+	}
+	memset(vnic, 0, sizeof(VNIC));
+
+	vnic->id = vnic_alloc_id();
+	vnic->nic_size = 0x200000;
+	vnic->nic = bmalloc(1);
+	if(!vnic->nic) {
+		return -3;
+	}
+
+	if(!vnic_init(vnic, attrs)) {
+		return -4;
+	}
+
+	manager_ip = DEFAULT_MANAGER_IP;
+	manager_port = DEFAULT_MANAGER_PORT;
+
+	int vnic_id = nicdev_register_vnic(nicdev, vnic);
+	if(vnic_id < 0)
+		return -5;
+
+	manager_nic = vnic;
+
+	return 0;
 }
 
 uint32_t manager_get_ip() {

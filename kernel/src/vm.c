@@ -290,9 +290,11 @@ static bool vm_delete(VM* vm, int core) {
 
 		if(vm->nics) {
 			for(uint16_t i = 0; i < vm->nic_count; i++) {
-				if(vm->nics[i])
-					//vnic_destroy(vm->nics[i]);
+				if(vm->nics[i]) {
 					bfree(vm->nics[i]->nic);
+					vnic_free_id(vm->nics[i]->id);
+					gfree(vm->nics[i]);
+				}
 			}
 
 			gfree(vm->nics);
@@ -632,6 +634,7 @@ uint32_t vm_create(VMSpec* vm_spec) {
 			return 0;
 		}
 
+		vnic->id = vnic_alloc_id();
 		vnic->nic_size = nics[i].pool_size;
 		vnic->nic = bmalloc(nics[i].pool_size / 0x200000);
 		if(!vnic->nic) {
@@ -641,7 +644,6 @@ uint32_t vm_create(VMSpec* vm_spec) {
 			return 0;
 		}
 
-		vnic->budget = nics[i].budget;
 		if(!vnic_init(vnic, attrs)) {
 			printf("Manager: Not enough VNIC to allocate: errno=%d.\n", errno);
 			map_remove(vms, (void*)(uint64_t)vmid);
@@ -650,7 +652,6 @@ uint32_t vm_create(VMSpec* vm_spec) {
 		}
 
 		extern int dispatcher_create_vnic(void* vnic);
-		strcpy(vnic->parent, nics[i].dev);
 		if(dispatcher_create_vnic(vnic) < 0) {
 			printf("Manager: Failed to create VNIC in dispatcher module: errno=%d.\n", errno);
 			map_remove(vms, (void*)(uint64_t)vmid);

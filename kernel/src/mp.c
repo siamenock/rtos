@@ -76,7 +76,6 @@ uint8_t mp_processor_id() {
 }
 
 uint8_t mp_apic_id_to_processor_id(uint8_t apic_id) {
-	//return shared->mp_processors[apic_id];
 	return mp_processors[apic_id];
 }
 
@@ -84,12 +83,17 @@ uint8_t mp_processor_count() {
 	return processor_count;
 }
 
-void mp_sync(int barrier) {
+void mp_sync() {
+	Shared* shared = (Shared*)SHARED_ADDR;
+	static uint8_t barrier;
 	if(apic_id) {
-		while(!shared->sync[barrier])
+		while(shared->sync <= barrier)
 			asm volatile("nop");
-	} else
-		shared->sync[barrier] = 1;
+
+		barrier++;
+	} else {
+		shared->sync = ++barrier;
+	}
 }
 
 void mp_parse_fps(MP_Parser* parser, void* context) {

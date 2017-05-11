@@ -350,7 +350,13 @@ void copy_kernel(uint8_t apic_id) {
 		log("Copying kernel:\n");
 	}
 
-	uint32_t multiboot_temp_addr = 0x2400000;	// Behind the RAM disk area
+	uint32_t multiboot_temp_addr = 0x2a00000;	// Behind the RAM disk area
+
+	if(apic_id == 0) {
+		copy((void*)0x2600000, (void*)initrd_start, initrd_end - initrd_start, 0);
+		pnkc->initrd_start = 0x2600000;
+		pnkc->initrd_end = 0x2600000 + initrd_end - initrd_start;
+	}
 
 	// Clean
 	if(apic_id == 0) {
@@ -358,7 +364,7 @@ void copy_kernel(uint8_t apic_id) {
 		copy((void*)multiboot_temp_addr, (void*)multiboot2_addr, *(uint32_t*)multiboot2_addr, 1);
 
 		print("    clean 0x00200000 (00400000): ");
-		clean((void*)0x200000, 0x200000, apic_id);
+		//clean((void*)0x200000, 0x200000, apic_id);
 	}
 	clean((void*)(0x600000 + 0x200000 * (apic_id)), 0x200000, apic_id);
 	
