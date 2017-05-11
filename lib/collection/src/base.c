@@ -12,7 +12,7 @@ static bool uint64_equals(void* key1, void* key2) {
 }
 
 static int uint64_compare(void* key1, void* key2) {
-	return key1 == key2;
+	return key1 - key2;
 }
 
 static uintptr_t string_hash(void* key) {
@@ -28,18 +28,7 @@ static uintptr_t string_hash(void* key) {
 }
 
 static bool string_equals(void* key1, void* key2) {
-	char* c1 = key1;
-	char* c2 = key2;
-
-	while(*c1 != '\0' && *c2 != '\0') {
-		if(*c1++ != *c2++)
-			return false;
-	}
-
-	if(*c1 != '\0' || *c2 != '\0')
-		return false;
-
-	return true;
+	return strcmp(key1, key2) == 0;
 }
 
 static int string_compare(void* key1, void* key2) {
@@ -47,7 +36,27 @@ static int string_compare(void* key1, void* key2) {
 }
 
 static DataOps data_operations[DATATYPE_COUNT] = {
+	[DATATYPE_INT32] = {
+		.hash		= uint64_hash,
+		.equals		= uint64_equals,
+		.compare	= uint64_compare,
+	},
+	[DATATYPE_INT64] = {
+		.hash		= uint64_hash,
+		.equals		= uint64_equals,
+		.compare	= uint64_compare,
+	},
+	[DATATYPE_UINT32] = {
+		.hash		= uint64_hash,
+		.equals		= uint64_equals,
+		.compare	= uint64_compare,
+	},
 	[DATATYPE_UINT64] = {
+		.hash		= uint64_hash,
+		.equals		= uint64_equals,
+		.compare	= uint64_compare,
+	},
+	[DATATYPE_POINTER] = {
 		.hash		= uint64_hash,
 		.equals		= uint64_equals,
 		.compare	= uint64_compare,
@@ -57,7 +66,6 @@ static DataOps data_operations[DATATYPE_COUNT] = {
 		.equals		= string_equals,
 		.compare	= string_compare,
 	},
-	// TODO: implement other types
 };
 
 static PoolOps pool_operations[POOLTYPE_COUNT] = {
