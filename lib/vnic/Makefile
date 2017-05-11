@@ -33,7 +33,7 @@ obj/%_test.o: src/%.c
 	$(CC) -g -DTEST $(CFLAGS) $^ -c -o $@
 
 test: $(TESTS)
-	$(CC) $^ -o test
+	$(CC) $^ -Wunused-function -o test
 	./$@
 
 clean: 

@@ -1,62 +1,65 @@
-# Ubuntu 14.04 LTS (Desktop)
-* Required Packages
-  * git
-  * nasm
-  * multiboot
-  * libcurl4-gnutls-dev
-  * qemu-kvm
-  * bridge-utils
-  * libc6-dev-i386 
-  * doxygen 
-  * graphviz
-  * kpartx
-  * bison
-  * flex
-  * cmake
-  * node.js
-  * autoconf
-  * dcfldd
-  * openjdk-8-jdk
+How to Build PacketNgin RTOS 
+============================
+This document describes required packages and steps to build PacketNgin RTOS.
 
-* Disable automount-open
-gsettings set org.gnome.desktop.media-handling automount-open false
+Requirements 
+------------
+You need to install these packages below first. Theses packages are based on 
+Ubuntu 14.04/16.04 LTS.
 
-# Setup bridge
-Ref: http://toast.djw.org.uk/qemu.html
+* git
+* nasm
+* multiboot
+* libcurl4-gnutls-dev
+* qemu-kvm
+* bridge-utils
+* libc6-dev-i386 
+* doxygen 
+* graphviz
+* kpartx
+* bison
+* flex
+* cmake
+* node.js
+* autoconf
+* automake
+* dcfldd
+* libcmocka-dev
 
-Edit file: /etc/network/interfaces
-iface br0 inet manual
-	bridge_ports eth0
-	bridge_fd 9
-	bridge_hello 2
-	bridge_maxage 12
-	bridge_stp off
+Build steps
+-----------
+0. We presume your RTOS root source tree is $RTOS.
 
-# Register SSH key to github account
-	https://help.github.com/articles/generating-an-ssh-key/
+1. Initilize git submodules. We have only one submodule 'GNU grub' to be tracked because it's very susceptible to each system. So you have to fetch it from source and install first.
+	`cd $RTOS`
+	`git submodule init`
+	`git submodule update`
 
-# Install submodules
+	`cd $RTOS/tools/grub`
+	`./autogen.sh`
+	`./configure`
+	`make`
 
-* Initilize submodules 
-	git submodule init	
-	git submodule update 
+2. We use premake tool to generate Makefile. We provide premake binary to execute it.
+	`cd $RTOS`
+	`bin/premake5 gmake`
 
-* Build GNU grub 
-	cd rtos/tools/grub
-	./autogen.sh
-	./configure
-	make
+3. Install all required packages. We have helper Makefile to do it.
+	`cd $RTOS`
+	`make -f util.mk prepare`
 
-* Build cmocka
-	cd rtos/tools/cmocka
-	mkdir ./build
-	cd build 
-	cmake ../ -DMAKE_INSTALL_PREFIX=/usr
-	make 
-	sudo make install
+4. Build PacketNgin RTOS system image.
+	`cd $RTOS`
+	`make`
 
+5. After you build successfully, you can find 'system.img' in $RTOS.
 
- 
- 
+6. Load RTOS system in QEMU
+	`cd $RTOS`
+	`make -f util.mk run`
 
+Miscellaneous
+-------------
+Since we mount loop device to build system image whenever you build annoying nautilus window is appeared. Enter this command to disable this automount-open.
 
+	`gsettings set org.gnome.desktop.media-handling automount-open false`

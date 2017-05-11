@@ -54,7 +54,7 @@ static err_t manager_poll(void* arg, struct tcp_pcb* pcb);
 
 static void rpc_free(RPC* rpc) {
 	RPCData* data = (RPCData*)rpc->data;
-	
+
 	ListIterator iter;
 	list_iterator_init(&iter, data->pbufs);
 	while(list_iterator_has_next(&iter)) {
@@ -65,7 +65,7 @@ static void rpc_free(RPC* rpc) {
 	list_destroy(data->pbufs);
 	list_remove_data(actives, rpc);
 	free(rpc);
-	
+
 	list_remove_data(clients, data->pcb);
 }
 
@@ -76,13 +76,13 @@ static void manager_close(struct tcp_pcb* pcb, RPC* rpc, bool is_force) {
 	tcp_recv(pcb, NULL);
 	tcp_err(pcb, NULL);
 	tcp_poll(pcb, NULL, 0);
-	
+
 	if(rpc) {
 		rpc_free(rpc);
 	} else {
 		list_remove_data(clients, pcb);
 	}
-	
+
 	if(is_force) {
 		tcp_abort(pcb);
 	} else if(tcp_close(pcb) != ERR_OK) {
@@ -93,7 +93,7 @@ static void manager_close(struct tcp_pcb* pcb, RPC* rpc, bool is_force) {
 
 static err_t manager_recv(void* arg, struct tcp_pcb* pcb, struct pbuf* p, err_t err) {
 	RPC* rpc = arg;
-	
+
 	if(p == NULL) {	// Remote host closed the connection
 		manager_close(pcb, rpc, false);
 	} else if(err != ERR_OK) {
@@ -110,7 +110,7 @@ static err_t manager_recv(void* arg, struct tcp_pcb* pcb, struct pbuf* p, err_t 
 			}
 		}
 	}
-	
+
 	return ERR_OK;
 }
 
@@ -125,19 +125,19 @@ static void manager_err(void* arg, err_t err) {
 
 static err_t manager_poll(void* arg, struct tcp_pcb* pcb) {
 	RPC* rpc = arg;
-	
+
 	if(rpc == NULL) {
 		manager_close(pcb, NULL, true);
 	} else {
 		RPCData* data = (RPCData*)rpc->data;
 		data->poll_count++;
-		
+
 		if(rpc->ver == 0 && data->poll_count++ >= 4) {	// 2 seconds
 			printf("Close connection: not receiving hello in 2 secs.\n");
 			manager_close(pcb, rpc, false);
 		}
 	}
-	
+
 	return ERR_OK;
 }
 
@@ -181,7 +181,7 @@ typedef struct {
 
 static void status_setted(bool result, void* context) {
 	Data* data = context;
-	
+
 	if(list_index_of(clients, data->pcb, NULL) >= 0) {
 		data->callback(data->rpc, result);
 	}
@@ -193,7 +193,7 @@ static void status_set_handler(RPC* rpc, uint32_t vmid, VMStatus status, void* c
 	data->rpc = rpc;
 	data->pcb = context;
 	data->callback = callback;
-	
+
 	vm_status_set(vmid, status, status_setted, data);
 }
 
@@ -212,6 +212,7 @@ static void storage_download_handler(RPC* rpc, uint32_t vmid, uint64_t download_
 }
 
 static void storage_upload_handler(RPC* rpc, uint32_t vmid, uint32_t offset, void* buf, int32_t size, void* context, void(*callback)(RPC* rpc, int32_t size)) {
+	static int total_size = 0;
 	if(size < 0) {
 		callback(rpc, size);
 	} else {
@@ -222,20 +223,24 @@ static void storage_upload_handler(RPC* rpc, uint32_t vmid, uint32_t offset, voi
 				return;
 			}
 		}
-		
+
 		if(size < 0) {
 			printf(". Aborted: %d\n", size);
 			callback(rpc, size);
 		} else {
 			size = vm_storage_write(vmid, buf, offset, size);
 			callback(rpc, size);
-			 
-			if(size > 0)
+
+			if(size > 0) {
 				printf(".");
-			else if(size == 0)
-				printf(". Done\n");
-			else if(size < 0)
+				total_size += size;
+			} else if(size == 0) {
+				printf(". Done. Total size: %d\n", total_size);
+				total_size = 0;
+			} else if(size < 0) {
 				printf(". Error: %d\n", size);
+				total_size = 0;
+			}
 		}
 	}
 }
@@ -255,7 +260,7 @@ static void storage_md5_handler(RPC* rpc, uint32_t id, uint64_t size, void* cont
 // PCB utility
 static int pcb_read(RPC* rpc, void* buf, int size) {
 	RPCData* data = (RPCData*)rpc->data;
-	
+
 	int idx = 0;
 	ListIterator iter;
 	list_iterator_init(&iter, data->pbufs);
@@ -277,7 +282,7 @@ static int pcb_read(RPC* rpc, void* buf, int size) {
 
 static int pcb_write(RPC* rpc, void* buf, int size) {
 	RPCData* data = (RPCData*)rpc->data;
-	
+
 	int len = tcp_sndbuf(data->pcb);
 	len = len > size ? size : len;
 
@@ -303,13 +308,13 @@ static err_t manager_accept(void* arg, struct tcp_pcb* pcb, err_t err) {
 	struct tcp_pcb_listen* server = arg;
 	tcp_accepted(server);
 	printf("Accepted: %p\n", pcb);
-	
+
 	RPC* rpc = malloc(sizeof(RPC) + sizeof(RPCData));
 	bzero(rpc, sizeof(RPC) + sizeof(RPCData));
 	rpc->read = pcb_read;
 	rpc->write = pcb_write;
 	rpc->close = pcb_close;
-	
+
 	rpc_vm_create_handler(rpc, vm_create_handler, NULL);
 	rpc_vm_get_handler(rpc, vm_get_handler, NULL);
 	rpc_vm_set_handler(rpc, vm_set_handler, NULL);
@@ -321,18 +326,18 @@ static err_t manager_accept(void* arg, struct tcp_pcb* pcb, err_t err) {
 	rpc_storage_upload_handler(rpc, storage_upload_handler, NULL);
 	rpc_stdio_handler(rpc, stdio_handler, NULL);
 	rpc_storage_md5_handler(rpc, storage_md5_handler, NULL);
-	
+
 	RPCData* data = (RPCData*)rpc->data;
 	data->pcb = pcb;
 	data->pbufs = list_create(NULL);
-	
+
 	tcp_arg(pcb, rpc);
 	tcp_recv(pcb, manager_recv);
 	tcp_err(pcb, manager_err);
 	tcp_poll(pcb, manager_poll, 2);
-	
+
 	list_add(clients, pcb);
-	
+
 	return ERR_OK;
 }
 
@@ -340,11 +345,14 @@ static err_t manager_accept(void* arg, struct tcp_pcb* pcb, err_t err) {
 static Packet* manage(Packet* packet) {
 	if(shell_process(packet))
 		return NULL;
+
+	if(dhcp_process(packet))
+		return NULL;
 //	else if(rpc_process(packet))
 //		return NULL;
 //	else if(tftp_process(packet))
 //		return NULL;
-	
+
 	return packet;
 }
 
@@ -368,18 +376,18 @@ static void stdio_callback(uint32_t vmid, int thread_id, int fd, char* buffer, v
 	while(list_iterator_has_next(&iter)) {
 		struct tcp_pcb* pcb = list_iterator_next(&iter);
 		RPC* rpc = pcb->callback_arg;
-	
+
 		if(wrapped) {
 			rpc_stdio(rpc, vmid, thread_id, fd, buffer + *head, len1, NULL, NULL);
 			rpc_stdio(rpc, vmid, thread_id, fd, buffer, len2, NULL, NULL);
 
 		} else {
 			rpc_stdio(rpc, vmid, thread_id, fd, buffer + *head, len0, NULL, NULL);
-		}	
-		
+		}
+
 		rpc_loop(rpc);
 	}
-	
+
 	if(wrapped) {
 		*head = (*head + len1 + len2) % size;
 	} else {
@@ -390,24 +398,24 @@ static void stdio_callback(uint32_t vmid, int thread_id, int fd, char* buffer, v
 static bool manager_server_open() {
 	struct ip_addr ip;
 	IP4_ADDR(&ip, (manager_ip >> 24) & 0xff, (manager_ip >> 16) & 0xff, (manager_ip >> 8) & 0xff, (manager_ip >> 0) & 0xff);
-	
+
 	manager_server = tcp_new();
-	
+
 	err_t err = tcp_bind(manager_server, &ip, manager_port);
 	if(err != ERR_OK) {
 		printf("ERROR: Manager cannot bind TCP session: %d\n", err);
 
 		return false;
 	}
-	
+
 	manager_server = tcp_listen(manager_server);
 	tcp_arg(manager_server, manager_server);
-	
-	printf("Manager started: %d.%d.%d.%d:%d\n", (manager_ip >> 24) & 0xff, (manager_ip >> 16) & 0xff, 
+
+	printf("Manager started: %d.%d.%d.%d:%d\n", (manager_ip >> 24) & 0xff, (manager_ip >> 16) & 0xff,
 		(manager_ip >> 8) & 0xff, (manager_ip >> 0) & 0xff, manager_port);
-	
+
 	tcp_accept(manager_server, manager_accept);
-	
+
 	if(clients == NULL)
 		clients = list_create(NULL);
 
@@ -439,7 +447,7 @@ static bool manager_server_close() {
 
 static bool manager_loop(void* context) {
 	nic_poll();
-	
+
 	if(!list_is_empty(actives)) {
 		ListIterator iter;
 		list_iterator_init(&iter, actives);
@@ -452,13 +460,13 @@ static bool manager_loop(void* context) {
 			}
 		}
 	}
-	
+
 	return true;
 }
 
 static bool manager_timer(void* context) {
 	nic_timer();
-	
+
 	return true;
 }
 

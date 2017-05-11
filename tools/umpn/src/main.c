@@ -36,6 +36,7 @@ Group* ne;
 fd_set in_put, out_put;
 
 uint8_t buffer[BUFFER_SIZE];
+pid_t pid_map[16];
 
 extern int main(int argc, char** argv);
 extern void destroy();
@@ -167,13 +168,13 @@ static int cmd_vm_create(int argc, char** argv, void(*callback)(char* result, in
 
 	memset(_vm, 0, sizeof(VM));
 
-	_vm->process_size = vmspec->core_size;
+	_vm->core_size = vmspec->core_size;
 	_vm->nic_count = vmspec->nic_count;
-	_vm->nics = malloc(sizeof(NI) * vmspec->nic_count);
+	_vm->nics = malloc(sizeof(NIC) * vmspec->nic_count);
 	if(!_vm->nics)
 		goto error;
 
-	memset(_vm->nics, 0, sizeof(NI) * vmspec->nic_count);
+	memset(_vm->nics, 0, sizeof(NIC) * vmspec->nic_count);
 
 	_vm->argc = vmspec->argc;
 	_vm->argv = malloc(sizeof(char*) * vmspec->argc);
@@ -188,20 +189,20 @@ static int cmd_vm_create(int argc, char** argv, void(*callback)(char* result, in
 
 	for(int i = 0; i < _vm->nic_count; i++) {
 		uint64_t attrs[] = {
-			NI_MAC, ((NEPort*)ne->nodes[i])->ti->mac,
-			NI_DEV, i,
-			NI_INPUT_BUFFER_SIZE, vmspec->nics[i].input_buffer_size,
-			NI_OUTPUT_BUFFER_SIZE, vmspec->nics[i].output_buffer_size,
-			NI_INPUT_BANDWIDTH, 1000000000, //not used
-			NI_OUTPUT_BANDWIDTH, 1000000000, //not used
-			NI_POOL_SIZE, vmspec->nics[i].pool_size,
-			NI_INPUT_ACCEPT_ALL, 1,
-			NI_OUTPUT_ACCEPT_ALL, 1,
-			NI_INPUT_FUNC, 0,
-			NI_NONE
+			NIC_MAC, ((NEPort*)ne->nodes[i])->ti->mac,
+			NIC_DEV, i,
+			NIC_INPUT_BUFFER_SIZE, vmspec->nics[i].input_buffer_size,
+			NIC_OUTPUT_BUFFER_SIZE, vmspec->nics[i].output_buffer_size,
+			NIC_INPUT_BANDWIDTH, 1000000000, //not used
+			NIC_OUTPUT_BANDWIDTH, 1000000000, //not used
+			NIC_POOL_SIZE, vmspec->nics[i].pool_size,
+			NIC_INPUT_ACCEPT_ALL, 1,
+			NIC_OUTPUT_ACCEPT_ALL, 1,
+			NIC_INPUT_FUNC, 0,
+			NIC_NONE
 		};
 
-		_vm->nics[i] = ni_create(attrs);
+		_vm->nics[i] = vnic_create(attrs);
 		if(_vm->nics[i] == NULL) {
 			printf("nic create error\n");
 			goto error;
@@ -275,7 +276,7 @@ static int cmd_vm_destroy(int argc, char** argv, void(*callback)(char* result, i
 	}
 
 	for(int i = 0; i < vm->nic_count; i++) {
-		ni_destroy(vm->nics[i]);
+		vnic_destroy(vm->nics[i]);
 	}
 
 	free(vm->argv);
@@ -322,24 +323,24 @@ static int cmd_vm_start(int argc, char** argv, void(*callback)(char* result, int
 	bzero((void*)barrior_lock, sizeof(uint8_t volatile));
 	bzero((void*)barrior, sizeof(uint32_t volatile));
 
-	for(int i = 0; i < vm->process_size; i++) {
+	for(int i = 0; i < vm->core_size; i++) {
 		int pid = fork();
 
 		if(pid == 0) {
-			extern int __nis_count;
-			extern NetworkInterface* __nis[];
+			extern int __nic_count;
+			extern NIC* __nics[];
 			extern int __thread_id;
 			extern int __thread_count;
 
 			extern uint8_t volatile* __barrior_lock;
 			extern uint32_t volatile* __barrior;
 
-			__nis_count = vm->nic_count;
+			__nic_count = vm->nic_count;
 			for(int j = 0; j < vm->nic_count; j++) {
-				__nis[j] = vm->nics[j]->ni;
+				__nics[j] = vm->nics[j]->nic;
 			}
 			__thread_id = i; 
-			__thread_count = vm->process_size;
+			__thread_count = vm->core_size;
 			__barrior_lock = barrior_lock;
 			__barrior = barrior;
 
@@ -348,7 +349,9 @@ static int cmd_vm_start(int argc, char** argv, void(*callback)(char* result, int
 
 			break;
 		} else {
-			vm->pids[i] = pid;
+			//vm->cores[i] = pid;
+			vm->cores[i] = i;
+			pid_map[i] = pid;
 		}
 	}
 
@@ -361,9 +364,11 @@ static int cmd_vm_stop(int argc, char** argv, void(*callback)(char* result, int 
 	if(vm->status != VM_STATUS_START)
 		return -1;
 
-	for(int i = 0; i < vm->process_size; i++) {
-		kill(vm->pids[i], SIGTERM);
-		while(!(waitpid(vm->pids[i], NULL, WNOHANG) == vm->pids[i]));
+	for(int i = 0; i < vm->core_size; i++) {
+		//kill(vm->cores[i], SIGTERM);
+		//while(!(waitpid(vm->cores[i], NULL, WNOHANG) == vm->cores[i]));
+		kill(pid_map[i], SIGTERM);
+		while(!(waitpid(pid_map[i], NULL, WNOHANG) == pid_map[i]));
 	}
 
 	FD_ZERO(&in_put);
@@ -389,8 +394,9 @@ static int cmd_vm_pause(int argc, char** argv, void(*callback)(char* result, int
 
 	vm->status = VM_STATUS_PAUSE;
 
-	for(int i = 0; i < vm->process_size; i++) {
-		kill(vm->pids[i], SIGSTOP);
+	for(int i = 0; i < vm->core_size; i++) {
+		//kill(vm->cores[i], SIGSTOP);
+		kill(pid_map[i], SIGSTOP);
 	}
 
 	return 0;
@@ -402,8 +408,9 @@ static int cmd_vm_resume(int argc, char** argv, void(*callback)(char* result, in
 
 	vm->status = VM_STATUS_START;
 
-	for(int i = 0; i < vm->process_size; i++) {
-		kill(vm->pids[i], SIGCONT);
+	for(int i = 0; i < vm->core_size; i++) {
+		//kill(vm->cores[i], SIGCONT);
+		kill(pid_map[i], SIGCONT);
 	}
 
 	return 0;
@@ -548,14 +555,15 @@ static void get_cmd_line(int fd) {
 #undef main
 int main(int _argc, char** _argv) { 
 	cmd_init();
-	ni_init0();
+	extern void nic_init0();
+	nic_init0();
 
 	extern void* __gmalloc_pool;
 	__gmalloc_pool = mmap(0, 0x200000, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	if(__gmalloc_pool == MAP_FAILED)
 		return -1;
 
-	init_memory_pool(0x200000, __gmalloc_pool, 0);
+	init_memory_pool(0x200000, __gmalloc_pool, 1);
 
 	barrior_lock = gmalloc(sizeof(uint8_t volatile));
 	barrior = gmalloc(sizeof(uint32_t volatile));
@@ -593,10 +601,8 @@ int main(int _argc, char** _argv) {
 				int fd_temp = (int)(int64_t)list_get(fd_list, i);
 
 				if(FD_ISSET(fd_temp, &temp_in)) {
-					extern int ni_port;
-					ni_port = i;
 					int size = read(fd_temp, buffer, BUFFER_SIZE); 
-					ni_process_input(buffer, size, NULL, 0);
+					nic_process_input(i, buffer, size, NULL, 0);
 				}
 			}
 
@@ -604,9 +610,7 @@ int main(int _argc, char** _argv) {
 				int fd_temp = (int)(int64_t)list_get(fd_list, i);
 
 				if(FD_ISSET(fd_temp, &temp_out)) {
-					extern int ni_port;
-					ni_port = i;
-					Packet* packet = ni_process_output();
+					Packet* packet = nic_process_output(i);
 
 					if(packet != NULL) {
 						int seek = 0;
@@ -615,7 +619,7 @@ int main(int _argc, char** _argv) {
 							if(len == seek)
 								break;
 						}
-						ni_free(packet);
+						nic_free(packet);
 					}
 				}
 			}

@@ -140,6 +140,115 @@ done:
 	;
 }
 
+int pci_get_entrys(PCI_Bus_Entry* bus_entry) {
+	uint32_t bus, slot, function;
+	uint32_t bus_count = 0;
+
+	for(bus = 0; bus < PCI_MAX_BUS; bus++) {
+		bool bus_has_function = false;
+		for(slot = 0; slot < PCI_MAX_SLOT; slot++) {
+			bool slot_has_function = false;
+			uint16_t slot_count = bus_entry[bus_count].slot_count;
+
+			for(function = 0; function < PCI_MAX_FUNCTION; function++) {
+				uint16_t vendor_id = _pci_read16(bus, slot, function, PCI_VENDOR_ID, false);
+				if(vendor_id == INVALID_VENDOR)
+					continue;
+
+				uint16_t function_count = bus_entry[bus_count].slot_entry[slot_count].function_count;
+				slot_has_function = true;
+
+				uint16_t device_id = _pci_read16(bus, slot, function, PCI_DEVICE_ID, false);
+				uint8_t header_type = _pci_read8(bus, slot, function, PCI_HEADER_TYPE, false);
+
+				
+				bus_entry[bus_count].slot_entry[slot_count].function_entry[function_count].function = function;
+				bus_entry[bus_count].slot_entry[slot_count].function_count++;
+
+			}
+
+			if(slot_has_function) {
+				bus_entry[bus_count].slot_entry[slot_count].slot = slot;
+				bus_entry[bus_count].slot_count++;
+				bus_has_function = true;
+			}
+		}
+
+		if(bus_has_function) {
+			bus_entry[bus_count].bus = bus;
+			bus_count++;
+		}
+	}
+
+	return bus_count;
+}
+
+void pci_data_dump(uint8_t bus, uint8_t slot, uint8_t function, uint8_t level) {
+	uint16_t length  = 0;
+	bool is_pcix = false;
+
+	if(_pci_read16(bus, slot, function, PCI_STATUS, false) & PCI_STATUS_CAP_LIST) {
+		int reg = PCI_CAPABILITY_LIST;
+		if(_pci_read8(bus, slot, function, PCI_HEADER_TYPE, false) == PCI_HEADER_TYPE_CARDBUS)
+			reg = PCI_CB_CAPABILITY_LIST;
+		
+		for(int i = 0; i < 48; i++) { // TTL is 48 (from Linux)
+			reg = _pci_read8(bus, slot, function, reg, false);
+			if(reg < 0x40)
+				break;
+			
+			reg &= ~3;
+			
+			uint8_t id = _pci_read8(bus, slot, function, reg + PCI_CAP_LIST_ID, false);
+			if(id == 0xff)
+				break;
+			
+			if(id <= PCI_CAP_ID_MAX) {
+				if(id == PCI_CAP_ID_EXP) {
+					is_pcix = true;
+					break;
+				}
+			}
+			
+			reg += PCI_CAP_LIST_NEXT;
+		}
+	}
+
+	if(is_pcix) {
+		switch(level) {
+			case PCI_DUMP_LEVEL_X:
+			case PCI_DUMP_LEVEL_XX:
+				length = 64;
+				break;
+			case PCI_DUMP_LEVEL_XXX:
+				length = 256;
+				break;
+			case PCI_DUMP_LEVEL_XXXX:
+				length = 4096;
+				break;
+		}
+	} else {
+		switch(level) {
+			case PCI_DUMP_LEVEL_X:
+			case PCI_DUMP_LEVEL_XX:
+				length = 64;
+				break;
+			case PCI_DUMP_LEVEL_XXX:
+			case PCI_DUMP_LEVEL_XXXX:
+				length = 256;
+				break;
+		}
+	}
+
+	for(int i = 0; i < length;) {
+		printf("%02x: ", i);
+		for(int j =0 ; j < 16; j++, i++) {
+			printf("%02x ", _pci_read8(bus, slot, function, i, is_pcix));
+		}
+		printf("\n");
+	}
+}
+
 void pci_init() {
 	pci_devices_count = pci_count();
 

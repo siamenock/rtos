@@ -8,11 +8,7 @@ pnkc/pnkc:
 smap/smap:
 	make -C smap
 
-#console/console:
-	#make -C console
-
-#TODO : UMPN should be moved
-umpn/packetngin:
+umpn:
 	make -C umpn
 
 clean:

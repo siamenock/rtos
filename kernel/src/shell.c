@@ -17,6 +17,7 @@ void shell_callback() {
 	static char cmd[CMD_SIZE];
 	static int cmd_idx = 0;
 	extern Device* device_stdout;
+	char* line;
 
 	if(cmd_sync)
 		return;
@@ -43,6 +44,7 @@ void shell_callback() {
 
 				printf("# ");
 				cmd_idx = 0;
+				cmd_history.reset();
 				break;
 			case '\f':
 				putchar(ch);
@@ -72,6 +74,27 @@ void shell_callback() {
 					case 'O':
 						ch = stdio_getchar();
 						switch(ch) {
+							case 'A': // Up
+								history_erase();
+								line = cmd_history.get_past();
+								if(line) {
+									printf("%s", line);
+									strcpy(cmd, line);
+									cmd_idx = strlen(line);
+								}
+								break;
+							case 'B': // Down
+								history_erase();
+								line = cmd_history.get_later();
+								if(line) {
+									printf("%s", line);
+									strcpy(cmd, line);
+									cmd_idx = strlen(line);
+								} else {
+									cmd_history.reset();
+									cmd_idx = 0;
+								}
+								break;
 							case 'H':
 								((CharOut*)device_stdout->driver)->scroll(device_stdout->id, INT32_MIN);
 								break;

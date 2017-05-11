@@ -137,7 +137,7 @@ bool nic_free(Packet* packet) {
 
 	for(uint32_t i = idx + req - 1; i > idx; i--) {
 		bitmap[i] = 0;
-}
+	}
 	bitmap[idx] = 0;	// if idx is zero, it for loop will never end
 
 	return true;
@@ -368,61 +368,136 @@ size_t nic_pool_total(NIC* nic) {
 	return nic->pool.count * NIC_CHUNK_SIZE;
 }
 
-uint32_t nic_config_register(NIC* nic, char* name) {
+/**
+ * Payload
+ * name_length: uint16_t
+ * block_count: uint16_t
+ * name: 4 bytes rounded string length
+ * blocks
+ * @return -1 already allocated
+ * @return -2 no space to allocate
+ * @return 0 ~ 2^16 - 1 key
+ */
+int32_t nic_config_alloc(NIC* nic, char* name, uint16_t size) {
 	int len = strlen(name) + 1;
 	if(len > 255)
 		return 0;
-
-	uint8_t* n = nic->config_head;
-	int i;
-	for(i = 0; i < nic->config; i++) {
-		uint8_t l = *n++;
-
-		if(strncmp(name, (const char*)n, l) == 0)
-			return 0;
-
-		n += l;
+	
+	uint32_t req = 1 + ((len + sizeof(uint32_t) - 1) / sizeof(uint32_t)) + (((uint32_t)size + sizeof(uint32_t) - 1) / sizeof(uint32_t)); // heder + round(name) + round(blocks)
+	
+	// Check name is already allocated
+	for(uint32_t* p = nic->config_head; p < nic->config_tail; ) {
+		uint16_t len2 = *p >> 16;
+		uint16_t count2 = *p & 0xffff;
+		
+		if(*p == 0) {
+			p++;
+		} else {
+			if(len2 == len && strncmp(name, (const char*)(p + 1), len - 1) == 0) {
+				return -1;
+			}
+			
+			p += count2;
+		}
 	}
-
-	int available = (int)(nic->config_tail - n) - sizeof(uint64_t) * nic->config;
-	if(1 + len + sizeof(uint64_t) > available)
-		return 0;
-
-	*n++ = (uint8_t)len;
-	memcpy(n, name, len);
-
-	return ++nic->config;
+	
+	// Check available space
+	for(uint32_t* p = nic->config_head; p < nic->config_tail; ) {
+		if(*p == 0) {
+			bool found = true;
+			for(int i = 0; i < req; i++) {
+				if(p >= nic->config_tail) {
+					return -2;
+				}
+				
+				if(p[i] != 0) {
+					p += i - 1;
+					found = false;
+					break;
+				}
+			}
+			
+			if(found) {
+				*p = (uint32_t)len << 16 | req;
+				memcpy(p + 1, name, len);
+				return ((uintptr_t)p - (uintptr_t)nic->config_head) / sizeof(uint32_t);
+			}
+			
+			p++;
+		} else {
+			p += *p & 0xffff;
+		}
+	}
+	
+	return -2;
 }
 
-uint32_t nic_config_key(NIC* nic, char* name) {
+void nic_config_free(NIC* nic, uint16_t key) {
+	uint16_t count = (uint16_t)nic->config_head[key] & 0xffff;
+	
+	for(int i = count - 1; i >= 0; i--) {
+		nic->config_head[key + i] = 0;
+	}
+}
+
+/**
+ *
+ * @return -1 key of the name not found
+ * @return otherwise key of the name
+ */
+int32_t nic_config_key(NIC* nic, char* name) {
 	int len = strlen(name) + 1;
 	if(len > 255)
 		return 0;
-
-	uint8_t* n = nic->config_head;
-	for(int i = 0; i < nic->config; i++) {
-		uint8_t l = *n++;
-
-		if(strncmp(name, (const char*)n, l) == 0)
-			return i + 1;
-
-		n += l;
+	
+	for(uint32_t* p = nic->config_head; p < nic->config_tail; ) {
+		if(*p == 0) {
+			p++;
+		} else {
+			uint16_t len2 = *p >> 16;
+			uint16_t count2 = *p & 0xffff;
+			
+			if(len2 == len && strncmp(name, (const char*)(p + 1), len - 1) == 0) {
+				return ((uintptr_t)p - (uintptr_t)nic->config_head) / sizeof(uint32_t);
+			}
+			
+			p += count2;
+		}
 	}
 
-	return 0;
+	return -1;
 }
 
-bool nic_config_put(NIC* nic, uint32_t key, uint64_t value) {
-	if(key > nic->config)
-		return false;
-
-	*(uint64_t*)(nic->config_tail - key * sizeof(uint64_t)) = value;
-
-	return true;
+void* nic_config_get(NIC* nic, uint16_t key) {
+	uint16_t len = nic->config_head[key] >> 16;
+	
+	return nic->config_head + key + 1 + (len + sizeof(uint32_t) - 1) / sizeof(uint32_t);
 }
 
-uint64_t nic_config_get(NIC* nic, uint32_t key) {
-	return *(uint64_t*)(nic->config_tail - key * sizeof(uint64_t));
+uint16_t nic_config_size(NIC* nic, uint16_t key) {
+	uint16_t len = nic->config_head[key] >> 16;
+	uint16_t count = nic->config_head[key] & 0xffff;
+	
+	return (count - (len + sizeof(uint32_t) - 1) / sizeof(uint32_t) - 1) * sizeof(uint32_t);
+}
+
+uint32_t nic_config_available(NIC* nic) {
+	uint32_t count = 0;
+	
+	for(uint32_t* p = nic->config_head; p < nic->config_tail; ) {
+		if(*p == 0) {
+			p++;
+			count++;
+		} else {
+			p += *p & 0xffff;
+		}
+	}
+
+	return count * sizeof(uint32_t);
+}
+
+uint32_t nic_config_total(NIC* nic) {
+	return (uint32_t)((uintptr_t)nic->config_tail - (uintptr_t)nic->config_head);
 }
 
 #if TEST
@@ -438,13 +513,27 @@ static void print_queue(NIC_Queue* queue) {
 	printf("\tsize: %d\n", queue->size);
 }
 
-static void print_config(NIC* nic) {
-	printf("Config count: %d\n", nic->config);
-	uint8_t* name = nic->config_head;
-	for(int i = 0; i < nic->config; i++) {
-		uint8_t len = *name++;
-		printf("\t[%d] name: %s, key: %u, value: %016lx\n", i, (char*)name, i + 1, *(uint64_t*)(nic->config_tail - (i + 1) * sizeof(uint64_t)));
-		name += len;
+static void print_config(VNIC* vnic) {	
+	for(uint32_t* p = vnic->config_head; p < vnic->config_tail; ) {
+		if(*p == 0) {
+			p++;
+		} else {
+			uint16_t len2 = *p >> 16;
+			uint16_t count2 = *p & 0xffff;
+			
+			printf("[%3d] %3d %3d \"%s\" ", (int)(((uintptr_t)p - (uintptr_t)vnic->config_head) / sizeof(uint32_t)), len2, count2, (char*)(p + 1));
+			uint32_t* base = p + 1 + (len2 + 3) / 4;
+			uint16_t count3 = count2 - 1 - (len2 + 3) / 4;
+			for(int i = 0; i < count3 && i < 12; i++) {
+				printf("%08x ", base[i]);
+			}
+			if(count3 >= 12)
+				printf("...\n");
+			else
+				printf("\n");
+			
+			p += count2;
+		}
 	}
 }
 
@@ -533,980 +622,1063 @@ void pass() {
 
 void fail(const char* format, ...) {
 	fflush(stdout);
-	fprintf(stderr, "\tFAILED\n");
-
+	fprintf(stderr, "\tFAILED\n"
+	
 	va_list argptr;
 	va_start(argptr, format);
-	vfprintf(stderr, format, argptr);
+	vfprintf(stderr, format, arg
 	va_end(argptr);
 
 	printf("\n");
-
-	NIC* nic = (NIC*)buffer;
-
-	printf("* rx\n");
-	dump_queue(nic, &nic->rx);
-
-	printf("* tx\n");
-	dump_queue(nic, &nic->tx);
-
-	printf("* srx\n");
-	dump_queue(nic, &nic->srx);
-
-	printf("* stx\n");
-	dump_queue(nic, &nic->stx);
-
+	
+	VNIC* vnic = (VNIC*)buffer;
+	
 	/*
+	printf("* rx\n");
+	dump_queue(vnic, &vnic->rx);
+	
+	printf("* tx\n");
+	dump_queue(vnic, &vnic->tx);
+	
+	printf("* srx\n");
+	dump_queue(vnic, &vnic->srx)
+	
+	printf("* stx\n");
+	dump_queue(vnic, &vnic->stx)
+	
 	printf("* Bitmap\n");
-	dump_bitmap(nic);
-	print_config(nic);
+	dump_bitmap(vnic);
 	*/
-
+	printf("* Config\n");
+	print_config(vnic);
+	
 	exit(1);
 }
 
 int main(int argc, char** argv) {
-	NIC* nic = (NIC*)buffer;
-
-	nic_driver_init(1, 0x001122334455, nic, 2 * 1024 * 1024,
+	VNIC* vnic = (VNIC*)buffer;
+	
+	vnic_driver_init(1, 0x001122334455, vnic, 2 * 1024 * 1024,
 		1000000000L, 1000000000L,
 		16, 32, 128, 128, 64, 64);
+	
+	dump(vnic);
 
-	dump(nic);
 
-
-	int used = bitmap_used(nic);
+	int used = bitmap_used(vnic);
 	printf("Pool: Check initial used: %d", used);
 	if(used == 0)
 		pass();
 	else
 		fail("initial used must be 0");
-
-
-	Packet* p1 = nic_alloc(nic, 64);
-	used = bitmap_used(nic);
+	
+	
+	Packet* p1 = vnic_alloc(vnic, 64);
+	used = bitmap_used(vnic);
 	printf("Pool: Check 64 bytes packet allocation: packet: %p, used: %d", p1, used);
 	if(used == 2 && p1 != NULL)
 		pass();
 	else
 		fail("packet must not be NULL and 2 chunks must be used");
-
-
-	nic_free(p1);
-	used = bitmap_used(nic);
+	
+	
+	vnic_free(p1);
+	used = bitmap_used(vnic);
 	printf("Pool: Check 64 bytes packet deallocation: used: %d", used);
 	if(used == 0)
 		pass();
 	else
 		fail("0 chunks must be used");
-
-
-	p1 = nic_alloc(nic, 512);
-	used = bitmap_used(nic);
+	
+	
+	p1 = vnic_alloc(vnic, 512);
+	used = bitmap_used(vnic);
 	printf("Pool: Check 512 bytes packet allocation: packet: %p, used: %d", p1, used);
 	if(used == 9 && p1 != NULL)
 		pass();
 	else
 		fail("packet must not be NULL and 9 chunks must be used");
-
-
-	nic_free(p1);
-	used = bitmap_used(nic);
+	
+	
+	vnic_free(p1);
+	used = bitmap_used(vnic);
 	printf("Pool: Check 512cbytes packet deallocation: used: %d", used);
 	if(used == 0)
 		pass();
 	else
 		fail("0 chunks must be used");
-
-
-	p1 = nic_alloc(nic, 1500);
-	used = bitmap_used(nic);
+	
+	
+	p1 = vnic_alloc(vnic, 1500);
+	used = bitmap_used(vnic);
 	printf("Pool: Check 1500 bytes packet allocation: packet: %p, used: %d", p1, used);
 	if(used == 25 && p1 != NULL)
 		pass();
 	else
 		fail("packet must not be NULL and 25 chunks must be used");
-
-
-	nic_free(p1);
-	used = bitmap_used(nic);
+	
+	
+	vnic_free(p1);
+	used = bitmap_used(vnic);
 	printf("Pool: Check 1500 bytes packet deallocation: used: %d", used);
 	if(used == 0)
 		pass();
 	else
 		fail("0 chunks must be used");
-
-
-	p1 = nic_alloc(nic, 0);
-	used = bitmap_used(nic);
+	
+	
+	p1 = vnic_alloc(vnic, 0);
+	used = bitmap_used(vnic);
 	printf("Pool: Check 0 bytes packet allocation: packet: %p, used: %d", p1, used);
 	if(used == 1 && p1 != NULL)
 		pass();
 	else
 		fail("packet must not be NULL and 1 chunk must be used");
-
-
-	nic_free(p1);
-	used = bitmap_used(nic);
+	
+	
+	vnic_free(p1);
+	used = bitmap_used(vnic);
 	printf("Pool: Check 0 bytes packet deallocation: used: %d", used);
 	if(used == 0)
 		pass();
 	else
 		fail("0 chunks must be used");
-
-
+	
+	
 	printf("Pool: Check full allocation: ");
-	nic->pool.index = 0;
-
-	int max = nic->pool.count / 25;
+	vnic->pool.index = 0;
+	
+	int max = vnic->pool.count / 25;
 	Packet* ps[2048] = { NULL, };
 	int i;
 	for(i = 0; i < max; i++) {
-		ps[i] = nic_alloc(nic, 1500);
+		ps[i] = vnic_alloc(vnic, 1500);
 		if(ps[i] == NULL)
 			fail("allocation failed: index: %d", i);
 	}
 
-	used = bitmap_used(nic);
+	used = bitmap_used(vnic);
 	if(used != max * 25)
 		fail("%d * 25 chunks must be used: %d", max, used);
 	else
 		pass();
-
+	
 
 	printf("Pool: Check overflow(big packet): ");
-	p1 = nic_alloc(nic, 1500);
+	p1 = vnic_alloc(vnic, 1500);
 	if(p1 != NULL)
 		fail("packet must not be allocated: %p", p1);
 	else
 		pass();
-
+	
 	printf("Pool: Small packets allocation from rest of small chunks: ");
-	used = bitmap_used(nic);
-	while(nic->pool.count - used > 0) {
-		ps[i] = nic_alloc(nic, 0);
+	used = bitmap_used(vnic);
+	while(vnic->pool.count - used > 0) {
+		ps[i] = vnic_alloc(vnic, 0);
 		if(ps[i] == NULL) {
 			fail("Small packet must be allocated: index: %d, packet: %p", i, ps[i]);
 		}
 		i++;
-		used = bitmap_used(nic);
+		used = bitmap_used(vnic);
 	}
 	pass();
-
+	
 	printf("Pool: Check overflow(small packet): ");
-	p1 = nic_alloc(nic, 0);
+	p1 = vnic_alloc(vnic, 0);
 	if(p1 != NULL)
 		fail("packet must not be allocated: %p", p1);
 	else
 		pass();
-
+	
 	printf("Pool: Clear all: ");
 	for(int j = 0; j < i; j++) {
-		if(!nic_free(ps[j]))
+		if(!vnic_free(ps[j]))
 			fail("packet can not be freed: index: %d, packet: %p\n", j, ps[j]);
 	}
 
-	used = bitmap_used(nic);
+	used = bitmap_used(vnic);
 	if(used != 0)
 		fail("0 chunk must be used: %d", used);
 	else
 		pass();
+	
 
-
-	p1 = nic_alloc(nic, 64);
-	used = bitmap_used(nic);
+	p1 = vnic_alloc(vnic, 64);
+	used = bitmap_used(vnic);
 	printf("Pool: Check 64 bytes packet allocation after full allocation: packet: %p, used: %d", p1, used);
 	if(used == 2 && p1 != NULL)
 		pass();
 	else
 		fail("packet must not be NULL and 2 chunks must be used");
-
-
-	nic_free(p1);
-	used = bitmap_used(nic);
+	
+	
+	vnic_free(p1);
+	used = bitmap_used(vnic);
 	printf("Pool: Check 64 bytes packet deallocation after full allocation: used: %d", used);
 	if(used == 0)
 		pass();
 	else
 		fail("0 chunks must be used");
-
-
+	
+	
 	printf("rx queue: Check initial status: ");
-	if(nic_has_rx(nic))
-		fail("nic_has_rxmust be false");
-
-	p1 = nic_rx(nic);
+	if(vnic_has_rx(vnic))
+		fail("vnic_has_rxmust be false");
+	
+	p1 = vnic_rx(vnic);
 	if(p1 != NULL)
-		fail("nic_rx must be NULL: %p", p1);
+		fail("vnic_rx must be NULL: %p", p1);
 
-	uint32_t size = nic_rx_size(nic);
+	uint32_t size = vnic_rx_size(vnic);
 	if(size != 0)
-		fail("nic_rx_size must be 0: %d", size);
-
-	if(!nic_driver_has_rx(nic))
-		fail("nic_driver_has_rx must be true");
-
+		fail("vnic_rx_size must be 0: %d", size);
+	
+	if(!vnic_driver_has_rx(vnic))
+		fail("vnic_driver_has_rx must be true");
+	
 	pass();
 
 
 	printf("rx queue: push one: ");
-	p1 = nic_alloc(nic, 64);
-	if(!nic_driver_rx2(nic, p1))
-		fail("nic_driver_rx must be return true");
-
-	if(!nic_has_rx(nic))
-		fail("nic_has_rx must be true");
-
-	size = nic_rx_size(nic);
+	p1 = vnic_alloc(vnic, 64);
+	if(!vnic_driver_rx2(vnic, p1))
+		fail("vnic_driver_rx must be return true");
+	
+	if(!vnic_has_rx(vnic))
+		fail("vnic_has_rx must be true");
+	
+	size = vnic_rx_size(vnic);
 	if(size != 1)
-		fail("nic_rx_size must be 1: %d", size);
-
+		fail("vnic_rx_size must be 1: %d", size);
+	
 	pass();
-
+	
 
 	printf("rx queue: pop one: ");
-
-	Packet* p2 = nic_rx(nic);
+	
+	Packet* p2 = vnic_rx(vnic);
 	if(p2 != p1)
-		fail("nic_rx returned wrong pointer: %p != %p", p1, p2);
-
-	size = nic_rx_size(nic);
+		fail("vnic_rx returned wrong pointer: %p != %p", p1, p2);
+	
+	size = vnic_rx_size(vnic);
 	if(size != 0)
-		fail("nic_rx_size must be 0: %d", size);
-
-	nic_free(p2);
-
+		fail("vnic_rx_size must be 0: %d", size);
+	
+	vnic_free(p2);
+	
 	pass();
-
+	
 
 	printf("rx queue: push full: ");
-	for(i = 0; i < nic->rx.size - 1; i++) {
-		ps[i] = nic_alloc(nic, 0);
+	for(i = 0; i < vnic->rx.size - 1; i++) {
+		ps[i] = vnic_alloc(vnic, 0);
 		if(ps[i] == NULL)
 			fail("cannot alloc packet: count: %d", i);
-
-		if(!nic_driver_rx2(nic, ps[i]))
-			fail("cannot push rx: count: %d, queue size: %d", i, nic->rx.size);
+		
+		if(!vnic_driver_rx2(vnic, ps[i]))
+			fail("cannot push rx: count: %d, queue size: %d", i, vnic->rx.size);
 	}
-
-	if(nic_driver_has_rx(nic))
-		fail("nic_driver_has_rx must return false");
-
-	size = nic_rx_size(nic);
-	if(size != nic->rx.size - 1)
-		fail("nic_rx_size must return %d but %d", nic->rx.size - 1, size);
-
-	if(!nic_has_rx(nic))
-		fail("nic_has_rx must return true");
-
+	
+	if(vnic_driver_has_rx(vnic))
+		fail("vnic_driver_has_rx must return false");
+	
+	size = vnic_rx_size(vnic);
+	if(size != vnic->rx.size - 1)
+		fail("vnic_rx_size must return %d but %d", vnic->rx.size - 1, size);
+	
+	if(!vnic_has_rx(vnic))
+		fail("vnic_has_rx must return true");
+	
 	pass();
-
+	
 
 	printf("rx queue: overflow: ");
 
-	used = bitmap_used(nic);
-
-	p1 = nic_alloc(nic, 0);
+	used = bitmap_used(vnic);
+	
+	p1 = vnic_alloc(vnic, 0);
 	if(p1 == NULL)
 		fail("packet allocation failed");
-
-	if(nic_driver_rx2(nic, p1))
-		fail("push overflow: count: %d, queue size: %d", i, nic->rx.size);
-
-	int used2 = bitmap_used(nic);
+	
+	if(vnic_driver_rx2(vnic, p1))
+		fail("push overflow: count: %d, queue size: %d", i, vnic->rx.size);
+	
+	int used2 = bitmap_used(vnic);
 	if(used != used2)
 		fail("packet pool usage is changed: used: %d != %d", used, used2);
-
-	if(nic_driver_has_rx(nic))
-		fail("nic_driver_has_rx must return false");
-
-	size = nic_rx_size(nic);
-	if(size != nic->rx.size - 1)
-		fail("nic_rx_size must return %d but %d", nic->rx.size - 1, size);
-
-	if(!nic_has_rx(nic))
-		fail("nic_has_rx must return true");
-
+	
+	if(vnic_driver_has_rx(vnic))
+		fail("vnic_driver_has_rx must return false");
+	
+	size = vnic_rx_size(vnic);
+	if(size != vnic->rx.size - 1)
+		fail("vnic_rx_size must return %d but %d", vnic->rx.size - 1, size);
+	
+	if(!vnic_has_rx(vnic))
+		fail("vnic_has_rx must return true");
+	
 	pass();
-
+	
 
 	printf("rx queue: pop: ");
-	for(i = 0; i < nic->rx.size - 1; i++) {
-		Packet* p1 = nic_rx(nic);
+	for(i = 0; i < vnic->rx.size - 1; i++) {
+		Packet* p1 = vnic_rx(vnic);
 		if(p1 != ps[i])
 			fail("worong pointer returned: %p, expected: %p", p1, (void*)(uintptr_t)i);
 
-		nic_free(p1);
+		vnic_free(p1);
 	}
-
-	if(!nic_driver_has_rx(nic))
-		fail("nic_driver_has_rx must return true");
-
-	size = nic_rx_size(nic);
+	
+	if(!vnic_driver_has_rx(vnic))
+		fail("vnic_driver_has_rx must return true");
+	
+	size = vnic_rx_size(vnic);
 	if(size != 0)
-		fail("nic_rx_size must return 0 but %d", size);
-
-	if(nic_has_rx(nic))
-		fail("nic_has_rx must return false");
-
+		fail("vnic_rx_size must return 0 but %d", size);
+	
+	if(vnic_has_rx(vnic))
+		fail("vnic_has_rx must return false");
+	
 	pass();
 
 
 	printf("rx queue: push one after overflow: ");
-	p1 = nic_alloc(nic, 0);
+	p1 = vnic_alloc(vnic, 0);
 	if(p1 == NULL)
 		fail("cannot alloc packet: %p\n", p1);
-
-	if(!nic_driver_rx2(nic, p1))
-		fail("nic_driver_rx must be return true");
-
-	if(!nic_has_rx(nic))
-		fail("nic_has_rx must be true");
-
-	size = nic_rx_size(nic);
+	
+	if(!vnic_driver_rx2(vnic, p1))
+		fail("vnic_driver_rx must be return true");
+	
+	if(!vnic_has_rx(vnic))
+		fail("vnic_has_rx must be true");
+	
+	size = vnic_rx_size(vnic);
 	if(size != 1)
-		fail("nic_rx_size must be 1: %d", size);
-
+		fail("vnic_rx_size must be 1: %d", size);
+	
 	pass();
-
+	
 
 	printf("rx queue: pop one after overflow: ");
-
-	p2 = nic_rx(nic);
+	
+	p2 = vnic_rx(vnic);
 	if(p1 != p2)
-		fail("nic_rx returned wrong pointer: %p != %p", p1, p2);
-
-	size = nic_rx_size(nic);
+		fail("vnic_rx returned wrong pointer: %p != %p", p1, p2);
+	
+	size = vnic_rx_size(vnic);
 	if(size != 0)
-		fail("nic_rx_size must be 0: %d", size);
-
-	nic_free(p2);
-
-	used = bitmap_used(nic);
+		fail("vnic_rx_size must be 0: %d", size);
+	
+	vnic_free(p2);
+	
+	used = bitmap_used(vnic);
 	if(used != 0)
 		fail("packet is not freed: used: %d", used);
-
+	
 	pass();
 
 
 	printf("srx queue: Check initial status: ");
-	if(nic_has_srx(nic))
-		fail("nic_has_srx must be false");
-
-	p1 = nic_srx(nic);
+	if(vnic_has_srx(vnic))
+		fail("vnic_has_srx must be false");
+	
+	p1 = vnic_srx(vnic);
 	if(p1 != NULL)
-		fail("nic_srx must be NULL: %p", p1);
+		fail("vnic_srx must be NULL: %p", p1);
 
-	size = nic_srx_size(nic);
+	size = vnic_srx_size(vnic);
 	if(size != 0)
-		fail("nic_srx_size must be 0: %d", size);
-
-	if(!nic_driver_has_srx(nic))
-		fail("nic_driver_has_srx must be true");
-
+		fail("vnic_srx_size must be 0: %d", size);
+	
+	if(!vnic_driver_has_srx(vnic))
+		fail("vnic_driver_has_srx must be true");
+	
 	pass();
 
 
 	printf("srx queue: push one: ");
-	p1 = nic_alloc(nic, 64);
-	if(!nic_driver_srx2(nic, p1))
-		fail("nic_driver_srx must be return true");
-
-	if(!nic_has_srx(nic))
-		fail("nic_has_srx must be true");
-
-	size = nic_srx_size(nic);
+	p1 = vnic_alloc(vnic, 64);
+	if(!vnic_driver_srx2(vnic, p1))
+		fail("vnic_driver_srx must be return true");
+	
+	if(!vnic_has_srx(vnic))
+		fail("vnic_has_srx must be true");
+	
+	size = vnic_srx_size(vnic);
 	if(size != 1)
-		fail("nic_srx_size must be 1: %d", size);
-
+		fail("vnic_srx_size must be 1: %d", size);
+	
 	pass();
-
+	
 
 	printf("srx queue: pop one: ");
-
-	p2 = nic_srx(nic);
+	
+	p2 = vnic_srx(vnic);
 	if(p2 != p1)
-		fail("nic_srx returned wrong pointer: %p != %p", p1, p2);
-
-	size = nic_srx_size(nic);
+		fail("vnic_srx returned wrong pointer: %p != %p", p1, p2);
+	
+	size = vnic_srx_size(vnic);
 	if(size != 0)
-		fail("nic_srx_size must be 0: %d", size);
-
-	nic_free(p2);
-
+		fail("vnic_srx_size must be 0: %d", size);
+	
+	vnic_free(p2);
+	
 	pass();
-
+	
 
 	printf("srx queue: push full: ");
-	for(i = 0; i < nic->srx.size - 1; i++) {
-		ps[i] = nic_alloc(nic, 0);
+	for(i = 0; i < vnic->srx.size - 1; i++) {
+		ps[i] = vnic_alloc(vnic, 0);
 		if(ps[i] == NULL)
 			fail("cannot alloc packet: count: %d", i);
-
-		if(!nic_driver_srx2(nic, ps[i]))
-			fail("cannot push srx: count: %d, queue size: %d", i, nic->srx.size);
+		
+		if(!vnic_driver_srx2(vnic, ps[i]))
+			fail("cannot push srx: count: %d, queue size: %d", i, vnic->srx.size);
 	}
-
-	if(nic_driver_has_srx(nic))
-		fail("nic_driver_has_srx must return false");
-
-	size = nic_srx_size(nic);
-	if(size != nic->srx.size - 1)
-		fail("nic_srx_size must return %d but %d", nic->srx.size - 1, size);
-
-	if(!nic_has_srx(nic))
-		fail("nic_has_srx must return true");
-
+	
+	if(vnic_driver_has_srx(vnic))
+		fail("vnic_driver_has_srx must return false");
+	
+	size = vnic_srx_size(vnic);
+	if(size != vnic->srx.size - 1)
+		fail("vnic_srx_size must return %d but %d", vnic->srx.size - 1, size);
+	
+	if(!vnic_has_srx(vnic))
+		fail("vnic_has_srx must return true");
+	
 	pass();
-
+	
 
 	printf("srx queue: overflow: ");
 
-	used = bitmap_used(nic);
-
-	p1 = nic_alloc(nic, 0);
+	used = bitmap_used(vnic);
+	
+	p1 = vnic_alloc(vnic, 0);
 	if(p1 == NULL)
 		fail("packet allocation failed");
-
-	if(nic_driver_srx2(nic, p1))
-		fail("push overflow: count: %d, queue size: %d", i, nic->srx.size);
-
-	used2 = bitmap_used(nic);
+	
+	if(vnic_driver_srx2(vnic, p1))
+		fail("push overflow: count: %d, queue size: %d", i, vnic->srx.size);
+	
+	used2 = bitmap_used(vnic);
 	if(used != used2)
 		fail("packet pool usage is changed: used: %d != %d", used, used2);
-
-	if(nic_driver_has_srx(nic))
-		fail("nic_driver_has_srx must return false");
-
-	size = nic_srx_size(nic);
-	if(size != nic->srx.size - 1)
-		fail("nic_srx_size must return %d but %d", nic->srx.size - 1, size);
-
-	if(!nic_has_srx(nic))
-		fail("nic_has_srx must return true");
-
+	
+	if(vnic_driver_has_srx(vnic))
+		fail("vnic_driver_has_srx must return false");
+	
+	size = vnic_srx_size(vnic);
+	if(size != vnic->srx.size - 1)
+		fail("vnic_srx_size must return %d but %d", vnic->srx.size - 1, size);
+	
+	if(!vnic_has_srx(vnic))
+		fail("vnic_has_srx must return true");
+	
 	pass();
-
+	
 
 	printf("srx queue: pop: ");
-	for(i = 0; i < nic->srx.size - 1; i++) {
-		Packet* p1 = nic_srx(nic);
+	for(i = 0; i < vnic->srx.size - 1; i++) {
+		Packet* p1 = vnic_srx(vnic);
 		if(p1 != ps[i])
 			fail("worong pointer returned: %p, expected: %p", p1, (void*)(uintptr_t)i);
 
-		nic_free(p1);
+		vnic_free(p1);
 	}
-
-	if(!nic_driver_has_srx(nic))
-		fail("nic_driver_has_srx must return true");
-
-	size = nic_srx_size(nic);
+	
+	if(!vnic_driver_has_srx(vnic))
+		fail("vnic_driver_has_srx must return true");
+	
+	size = vnic_srx_size(vnic);
 	if(size != 0)
-		fail("nic_srx_size must return 0 but %d", size);
-
-	if(nic_has_srx(nic))
-		fail("nic_has_srx must return false");
-
+		fail("vnic_srx_size must return 0 but %d", size);
+	
+	if(vnic_has_srx(vnic))
+		fail("vnic_has_srx must return false");
+	
 	pass();
 
 
 	printf("srx queue: push one after overflow: ");
-	p1 = nic_alloc(nic, 0);
+	p1 = vnic_alloc(vnic, 0);
 	if(p1 == NULL)
 		fail("cannot alloc packet: %p\n", p1);
-
-	if(!nic_driver_srx2(nic, p1))
-		fail("nic_driver_srx must be return true");
-
-	if(!nic_has_srx(nic))
-		fail("nic_has_srx must be true");
-
-	size = nic_srx_size(nic);
+	
+	if(!vnic_driver_srx2(vnic, p1))
+		fail("vnic_driver_srx must be return true");
+	
+	if(!vnic_has_srx(vnic))
+		fail("vnic_has_srx must be true");
+	
+	size = vnic_srx_size(vnic);
 	if(size != 1)
-		fail("nic_srx_size must be 1: %d", size);
-
+		fail("vnic_srx_size must be 1: %d", size);
+	
 	pass();
-
+	
 
 	printf("srx queue: pop one after overflow: ");
-
-	p2 = nic_srx(nic);
+	
+	p2 = vnic_srx(vnic);
 	if(p1 != p2)
-		fail("nic_srx returned wrong pointer: %p != %p", p1, p2);
-
-	size = nic_srx_size(nic);
+		fail("vnic_srx returned wrong pointer: %p != %p", p1, p2);
+	
+	size = vnic_srx_size(vnic);
 	if(size != 0)
-		fail("nic_srx_size must be 0: %d", size);
-
-	nic_free(p2);
-
-	used = bitmap_used(nic);
+		fail("vnic_srx_size must be 0: %d", size);
+	
+	vnic_free(p2);
+	
+	used = bitmap_used(vnic);
 	if(used != 0)
 		fail("packet is not freed: used: %d", used);
-
+	
 	pass();
 
 
 
 	printf("tx queue: Check initial state: ");
 
-	size = nic_tx_size(nic);
+	size = vnic_tx_size(vnic);
 	if(size != 0)
-		fail("nic_tx_size must be 0: %d", size);
-
-	if(!nic_has_tx(nic))
-		fail("nic_has_tx must be true");
-
-	if(nic_driver_has_tx(nic))
-		fail("nic_driver_has_tx must false");
+		fail("vnic_tx_size must be 0: %d", size);
+	
+	if(!vnic_has_tx(vnic))
+		fail("vnic_has_tx must be true");
+	
+	if(vnic_driver_has_tx(vnic))
+		fail("vnic_driver_has_tx must false");
 
 	pass();
-
+	
 
 	printf("tx queue: tx one: ");
-	p1 = nic_alloc(nic, 0);
-
-	if(!nic_tx(nic, p1))
-		fail("nic_tx must be true");
-
-	size = nic_tx_size(nic);
+	p1 = vnic_alloc(vnic, 0);
+	
+	if(!vnic_tx(vnic, p1))
+		fail("vnic_tx must be true");
+	
+	size = vnic_tx_size(vnic);
 	if(size != 1)
-		fail("nic_tx_size must be 1: %d", size);
-
-	if(!nic_has_tx(nic))
-		fail("nic_has_tx must be true");
-
-	if(!nic_driver_has_tx(nic))
-		fail("nic_driver_has_tx must true");
+		fail("vnic_tx_size must be 1: %d", size);
+	
+	if(!vnic_has_tx(vnic))
+		fail("vnic_has_tx must be true");
+	
+	if(!vnic_driver_has_tx(vnic))
+		fail("vnic_driver_has_tx must true");
 
 	pass();
-
+	
 
 	printf("tx queue: send one: ");
-	p1 = nic_driver_tx(nic);
-	nic_free(p1);
-
-	used = bitmap_used(nic);
+	p1 = vnic_driver_tx(vnic);
+	vnic_free(p1);
+	
+	used = bitmap_used(vnic);
 	if(used != 0)
 		fail("cannot free packet: %d", used);
-
-	size = nic_tx_size(nic);
+	
+	size = vnic_tx_size(vnic);
 	if(size != 0)
-		fail("nic_tx_size must be 0: %d", size);
-
-	if(!nic_has_tx(nic))
-		fail("nic_has_tx must be true");
-
-	if(nic_driver_has_tx(nic))
-		fail("nic_driver_has_tx must false");
-
+		fail("vnic_tx_size must be 0: %d", size);
+	
+	if(!vnic_has_tx(vnic))
+		fail("vnic_has_tx must be true");
+	
+	if(vnic_driver_has_tx(vnic))
+		fail("vnic_driver_has_tx must false");
+	
 	pass();
 
 
 	printf("tx queue: tx full: ");
-	for(i = 0; i < nic->tx.size - 1; i++) {
-		ps[i] = nic_alloc(nic, 0);
+	for(i = 0; i < vnic->tx.size - 1; i++) {
+		ps[i] = vnic_alloc(vnic, 0);
 		if(ps[i] == NULL)
 			fail("cannot alloc packet: count: %d", i + 1);
-
-		if(!nic_tx(nic, ps[i]))
+		
+		if(!vnic_tx(vnic, ps[i]))
 			fail("cannot tx packet: index: %d", i);
 	}
 
-	size = nic_tx_size(nic);
-	if(size != nic->tx.size - 1)
-		fail("nic_tx_size must be %d: %d", nic->tx.size - 1, size);
-
-	if(nic_has_tx(nic))
-		fail("nic_has_tx must be false");
-
-	if(!nic_driver_has_tx(nic))
-		fail("nic_driver_has_tx must true");
-
+	size = vnic_tx_size(vnic);
+	if(size != vnic->tx.size - 1)
+		fail("vnic_tx_size must be %d: %d", vnic->tx.size - 1, size);
+	
+	if(vnic_has_tx(vnic))
+		fail("vnic_has_tx must be false");
+	
+	if(!vnic_driver_has_tx(vnic))
+		fail("vnic_driver_has_tx must true");
+	
 	pass();
 
 
 	printf("tx queue: overflow: ");
-
-	used = bitmap_used(nic);
-
-	p1 = nic_alloc(nic, 0);
-
-	if(nic_tx(nic, p1))
-		fail("nic_tx overflow");
-
-	used2 = bitmap_used(nic);
-
+	
+	used = bitmap_used(vnic);
+	
+	p1 = vnic_alloc(vnic, 0);
+	
+	if(vnic_tx(vnic, p1))
+		fail("vnic_tx overflow");
+	
+	used2 = bitmap_used(vnic);
+	
 	if(used != used2)
 		fail("packet not freed on overflow %d != %d", used, used2);
-
-	if(nic_try_tx(nic, p1))
-		fail("nic_try_tx overflow");
-
-	used2 = bitmap_used(nic);
-
+		
+	if(vnic_try_tx(vnic, p1))
+		fail("vnic_try_tx overflow");
+	
+	used2 = bitmap_used(vnic);
+	
 	if(used != used2)
 		fail("packet freed on try_tx %d != %d", used, used2);
-
-	if(nic_tx_dup(nic, p1))
-		fail("nic_tx_dup overflow");
-
-	used2 = bitmap_used(nic);
-
+	
+	if(vnic_tx_dup(vnic, p1))
+		fail("vnic_tx_dup overflow");
+	
+	used2 = bitmap_used(vnic);
+	
 	if(used != used2)
 		fail("packet allocated on overflow %d != %d", used, used2);
 
-	size = nic_tx_size(nic);
-	if(size != nic->tx.size - 1)
-		fail("nic_tx_size must be %d: %d", nic->tx.size - 1, size);
-
-	if(nic_has_tx(nic))
-		fail("nic_has_tx must be false");
-
-	if(!nic_driver_has_tx(nic))
-		fail("nic_driver_has_tx must true");
-
+	size = vnic_tx_size(vnic);
+	if(size != vnic->tx.size - 1)
+		fail("vnic_tx_size must be %d: %d", vnic->tx.size - 1, size);
+	
+	if(vnic_has_tx(vnic))
+		fail("vnic_has_tx must be false");
+	
+	if(!vnic_driver_has_tx(vnic))
+		fail("vnic_driver_has_tx must true");
+	
 	pass();
-
-
+	
+	
 	printf("tx queue: send all: ");
-	for(i = 0; i < nic->tx.size - 1; i++) {
-		p1 = nic_driver_tx(nic);
+	for(i = 0; i < vnic->tx.size - 1; i++) {
+		p1 = vnic_driver_tx(vnic);
 		if(p1 != ps[i])
 			fail("wrong pointer returned: %p != %p", ps[i], p1);
-
-		if(!nic_free(p1))
+		
+		if(!vnic_free(p1))
 			fail("cannot free packet: %p", p1);
 	}
 
-	size = nic_tx_size(nic);
+	size = vnic_tx_size(vnic);
 	if(size != 0)
-		fail("nic_tx_size must be 0: %d", 0, size);
-
-	if(!nic_has_tx(nic))
-		fail("nic_has_tx must be true");
-
-	if(nic_driver_has_tx(nic))
-		fail("nic_driver_has_tx must false");
-
-	used = bitmap_used(nic);
+		fail("vnic_tx_size must be 0: %d", 0, size);
+	
+	if(!vnic_has_tx(vnic))
+		fail("vnic_has_tx must be true");
+	
+	if(vnic_driver_has_tx(vnic))
+		fail("vnic_driver_has_tx must false");
+	
+	used = bitmap_used(vnic);
 	if(used != 0)
 		fail("packet is not freed: used: %d", used);
-
+		
 	pass();
 
 
 	printf("tx queue: tx one after overflow: ");
-	p1 = nic_alloc(nic, 0);
-
-	if(!nic_tx(nic, p1))
-		fail("nic_tx must be true");
-
-	size = nic_tx_size(nic);
+	p1 = vnic_alloc(vnic, 0);
+	
+	if(!vnic_tx(vnic, p1))
+		fail("vnic_tx must be true");
+	
+	size = vnic_tx_size(vnic);
 	if(size != 1)
-		fail("nic_tx_size must be 1: %d", size);
-
-	if(!nic_has_tx(nic))
-		fail("nic_has_tx must be true");
-
-	if(!nic_driver_has_tx(nic))
-		fail("nic_driver_has_tx must true");
+		fail("vnic_tx_size must be 1: %d", size);
+	
+	if(!vnic_has_tx(vnic))
+		fail("vnic_has_tx must be true");
+	
+	if(!vnic_driver_has_tx(vnic))
+		fail("vnic_driver_has_tx must true");
 
 	pass();
-
+	
 
 	printf("tx queue: send one after overflow: ");
-	p1 = nic_driver_tx(nic);
-	nic_free(p1);
-
-	used = bitmap_used(nic);
+	p1 = vnic_driver_tx(vnic);
+	vnic_free(p1);
+	
+	used = bitmap_used(vnic);
 	if(used != 0)
 		fail("cannot free packet: %d", used);
-
-	size = nic_tx_size(nic);
+	
+	size = vnic_tx_size(vnic);
 	if(size != 0)
-		fail("nic_tx_size must be 0: %d", size);
-
-	if(!nic_has_tx(nic))
-		fail("nic_has_tx must be true");
-
-	if(nic_driver_has_tx(nic))
-		fail("nic_driver_has_tx must false");
-
+		fail("vnic_tx_size must be 0: %d", size);
+	
+	if(!vnic_has_tx(vnic))
+		fail("vnic_has_tx must be true");
+	
+	if(vnic_driver_has_tx(vnic))
+		fail("vnic_driver_has_tx must false");
+	
 	pass();
 
 
 	printf("Stx queue: Check initial state: ");
 
-	size = nic_stx_size(nic);
+	size = vnic_stx_size(vnic);
 	if(size != 0)
-		fail("nic_stx_size must be 0: %d", size);
-
-	if(!nic_has_stx(nic))
-		fail("nic_has_stx must be true");
-
-	if(nic_driver_has_stx(nic))
-		fail("nic_driver_has_stx must false");
+		fail("vnic_stx_size must be 0: %d", size);
+	
+	if(!vnic_has_stx(vnic))
+		fail("vnic_has_stx must be true");
+	
+	if(vnic_driver_has_stx(vnic))
+		fail("vnic_driver_has_stx must false");
 
 	pass();
-
+	
 
 	printf("Stx queue: stx one: ");
-	p1 = nic_alloc(nic, 0);
-
-	if(!nic_stx(nic, p1))
-		fail("nic_stx must be true");
-
-	size = nic_stx_size(nic);
+	p1 = vnic_alloc(vnic, 0);
+	
+	if(!vnic_stx(vnic, p1))
+		fail("vnic_stx must be true");
+	
+	size = vnic_stx_size(vnic);
 	if(size != 1)
-		fail("nic_stx_size must be 1: %d", size);
-
-	if(!nic_has_stx(nic))
-		fail("nic_has_stx must be true");
-
-	if(!nic_driver_has_stx(nic))
-		fail("nic_driver_has_stx must true");
+		fail("vnic_stx_size must be 1: %d", size);
+	
+	if(!vnic_has_stx(vnic))
+		fail("vnic_has_stx must be true");
+	
+	if(!vnic_driver_has_stx(vnic))
+		fail("vnic_driver_has_stx must true");
 
 	pass();
-
+	
 
 	printf("Stx queue: send one: ");
-	p1 = nic_driver_stx(nic);
-	nic_free(p1);
-
-	used = bitmap_used(nic);
+	p1 = vnic_driver_stx(vnic);
+	vnic_free(p1);
+	
+	used = bitmap_used(vnic);
 	if(used != 0)
 		fail("cannot free packet: %d", used);
-
-	size = nic_stx_size(nic);
+	
+	size = vnic_stx_size(vnic);
 	if(size != 0)
-		fail("nic_stx_size must be 0: %d", size);
-
-	if(!nic_has_stx(nic))
-		fail("nic_has_stx must be true");
-
-	if(nic_driver_has_stx(nic))
-		fail("nic_driver_has_stx must false");
-
+		fail("vnic_stx_size must be 0: %d", size);
+	
+	if(!vnic_has_stx(vnic))
+		fail("vnic_has_stx must be true");
+	
+	if(vnic_driver_has_stx(vnic))
+		fail("vnic_driver_has_stx must false");
+	
 	pass();
 
 
 	printf("Stx queue: stx full: ");
-	for(i = 0; i < nic->stx.size - 1; i++) {
-		ps[i] = nic_alloc(nic, 0);
+	for(i = 0; i < vnic->stx.size - 1; i++) {
+		ps[i] = vnic_alloc(vnic, 0);
 		if(ps[i] == NULL)
 			fail("cannot alloc packet: count: %d", i + 1);
-
-		if(!nic_stx(nic, ps[i]))
+		
+		if(!vnic_stx(vnic, ps[i]))
 			fail("cannot stx packet: index: %d", i);
 	}
 
-	size = nic_stx_size(nic);
-	if(size != nic->stx.size - 1)
-		fail("nic_stx_size must be %d: %d", nic->stx.size - 1, size);
-
-	if(nic_has_stx(nic))
-		fail("nic_has_stx must be false");
-
-	if(!nic_driver_has_stx(nic))
-		fail("nic_driver_has_stx must true");
-
+	size = vnic_stx_size(vnic);
+	if(size != vnic->stx.size - 1)
+		fail("vnic_stx_size must be %d: %d", vnic->stx.size - 1, size);
+	
+	if(vnic_has_stx(vnic))
+		fail("vnic_has_stx must be false");
+	
+	if(!vnic_driver_has_stx(vnic))
+		fail("vnic_driver_has_stx must true");
+	
 	pass();
 
 
 	printf("Stx queue: overflow: ");
-
-	used = bitmap_used(nic);
-
-	p1 = nic_alloc(nic, 0);
-
-	if(nic_stx(nic, p1))
-		fail("nic_stx overflow");
-
-	used2 = bitmap_used(nic);
-
+	
+	used = bitmap_used(vnic);
+	
+	p1 = vnic_alloc(vnic, 0);
+	
+	if(vnic_stx(vnic, p1))
+		fail("vnic_stx overflow");
+	
+	used2 = bitmap_used(vnic);
+	
 	if(used != used2)
 		fail("packet not freed on overflow %d != %d", used, used2);
-
-	if(nic_try_stx(nic, p1))
-		fail("nic_try_stx overflow");
-
-	used2 = bitmap_used(nic);
-
+		
+	if(vnic_try_stx(vnic, p1))
+		fail("vnic_try_stx overflow");
+	
+	used2 = bitmap_used(vnic);
+	
 	if(used != used2)
 		fail("packet freed on try_stx %d != %d", used, used2);
-
-	if(nic_stx_dup(nic, p1))
-		fail("nic_stx_dup overflow");
-
-	used2 = bitmap_used(nic);
-
+	
+	if(vnic_stx_dup(vnic, p1))
+		fail("vnic_stx_dup overflow");
+	
+	used2 = bitmap_used(vnic);
+	
 	if(used != used2)
 		fail("packet allocated on overflow %d != %d", used, used2);
 
-	size = nic_stx_size(nic);
-	if(size != nic->stx.size - 1)
-		fail("nic_stx_size must be %d: %d", nic->stx.size - 1, size);
-
-	if(nic_has_stx(nic))
-		fail("nic_has_stx must be false");
-
-	if(!nic_driver_has_stx(nic))
-		fail("nic_driver_has_stx must true");
-
+	size = vnic_stx_size(vnic);
+	if(size != vnic->stx.size - 1)
+		fail("vnic_stx_size must be %d: %d", vnic->stx.size - 1, size);
+	
+	if(vnic_has_stx(vnic))
+		fail("vnic_has_stx must be false");
+	
+	if(!vnic_driver_has_stx(vnic))
+		fail("vnic_driver_has_stx must true");
+	
 	pass();
-
-
+	
+	
 	printf("Stx queue: send all: ");
-	for(i = 0; i < nic->stx.size - 1; i++) {
-		p1 = nic_driver_stx(nic);
+	for(i = 0; i < vnic->stx.size - 1; i++) {
+		p1 = vnic_driver_stx(vnic);
 		if(p1 != ps[i])
 			fail("wrong pointer returned: %p != %p", ps[i], p1);
-
-		if(!nic_free(p1))
+		
+		if(!vnic_free(p1))
 			fail("cannot free packet: %p", p1);
 	}
 
-	size = nic_stx_size(nic);
+	size = vnic_stx_size(vnic);
 	if(size != 0)
-		fail("nic_stx_size must be 0: %d", 0, size);
-
-	if(!nic_has_stx(nic))
-		fail("nic_has_stx must be true");
-
-	if(nic_driver_has_stx(nic))
-		fail("nic_driver_has_stx must false");
-
-	used = bitmap_used(nic);
+		fail("vnic_stx_size must be 0: %d", 0, size);
+	
+	if(!vnic_has_stx(vnic))
+		fail("vnic_has_stx must be true");
+	
+	if(vnic_driver_has_stx(vnic))
+		fail("vnic_driver_has_stx must false");
+	
+	used = bitmap_used(vnic);
 	if(used != 0)
 		fail("packet is not freed: used: %d", used);
-
+		
 	pass();
 
 
 	printf("Stx queue: stx one after overflow: ");
-	p1 = nic_alloc(nic, 0);
-
-	if(!nic_stx(nic, p1))
-		fail("nic_stx must be true");
-
-	size = nic_stx_size(nic);
+	p1 = vnic_alloc(vnic, 0);
+	
+	if(!vnic_stx(vnic, p1))
+		fail("vnic_stx must be true");
+	
+	size = vnic_stx_size(vnic);
 	if(size != 1)
-		fail("nic_stx_size must be 1: %d", size);
-
-	if(!nic_has_stx(nic))
-		fail("nic_has_stx must be true");
-
-	if(!nic_driver_has_stx(nic))
-		fail("nic_driver_has_stx must true");
+		fail("vnic_stx_size must be 1: %d", size);
+	
+	if(!vnic_has_stx(vnic))
+		fail("vnic_has_stx must be true");
+	
+	if(!vnic_driver_has_stx(vnic))
+		fail("vnic_driver_has_stx must true");
 
 	pass();
-
+	
 
 	printf("Stx queue: send one after overflow: ");
-	p1 = nic_driver_stx(nic);
-	nic_free(p1);
-
-	used = bitmap_used(nic);
+	p1 = vnic_driver_stx(vnic);
+	vnic_free(p1);
+	
+	used = bitmap_used(vnic);
 	if(used != 0)
 		fail("cannot free packet: %d", used);
-
-	size = nic_stx_size(nic);
+	
+	size = vnic_stx_size(vnic);
 	if(size != 0)
-		fail("nic_stx_size must be 0: %d", size);
-
-	if(!nic_has_stx(nic))
-		fail("nic_has_stx must be true");
-
-	if(nic_driver_has_stx(nic))
-		fail("nic_driver_has_stx must false");
-
+		fail("vnic_stx_size must be 0: %d", size);
+	
+	if(!vnic_has_stx(vnic))
+		fail("vnic_has_stx must be true");
+	
+	if(vnic_driver_has_stx(vnic))
+		fail("vnic_driver_has_stx must false");
+	
 	pass();
+	
 
+	uint16_t total = vnic_config_total(vnic);
+	uint16_t available = vnic_config_available(vnic);
 
-	printf("Config: register one: ");
-	uint32_t key = nic_config_register(nic, "config");
-	if(key == 0)
-		fail("cannot register config: %u", key);
-
+	printf("Config: Check total and available size equals: ");
+	if(total != available)
+		fail("available: %d != total: %d\n", available, total);
+	
 	pass();
-
-
-	printf("Config: key: ");
-	uint32_t key2 = nic_config_key(nic, "config");
-	if(key != key2)
-		fail("cannot get key: %u != %u", key, key2);
-
+	
+	printf("Config: alloc one: ");
+	int32_t key = vnic_config_alloc(vnic, "net.ipv4", 12);
+	if(key < 0)
+		fail("cannot alloc config: %d", key);
+	else
+		printf("%d", key);
+	
 	pass();
-
-
-	printf("Config: put: ");
-	if(!nic_config_put(nic, key, 0x1234567890abcdef))
-		fail("cannot put config");
-
+	
+	printf("Config: available consumption check 1: ");
+	uint32_t available2 = vnic_config_available(vnic);
+	if(available2 != available - 4 - 12 - 12)
+		fail("available memory is differ: %d expected: %d\n", available2, available - 4 - 12 - 12);
+	
+	available += - 4 - 12 - 12;
+	
 	pass();
-
-
-	printf("Config: put with illegal key: ");
-	if(nic_config_put(nic, key + 1, 0x1122334455667788))
-		fail("illegal key put: %d", key + 1);
-
+	
+	printf("Config: find key: ");
+	int32_t key2 = vnic_config_key(vnic, "net.ipv4");
+	if(key2 != key)
+		fail("cannot find key for net.ipv4: %d", key2);
+	
 	pass();
-
-	printf("Config: get: ");
-	uint64_t config = nic_config_get(nic, key);
-	if(config != 0x1234567890abcdef)
-		fail("config returns wrong value: %lx != %lx", config, 0x1234567890abcdef);
-
+	
+	printf("Config: get size: ");
+	size = vnic_config_size(vnic, key);
+	if(size != 12)
+		fail("config size is wrong: %d\n", size);
+	else
+		printf("%d", size);
+	
 	pass();
-
-
-	printf("Config: put full: ");
-	uint32_t available = (uint32_t)((uintptr_t)nic->config_tail - (uintptr_t)nic->config_head);
-	available -= 1 + 7 + 8;
-
-	i = 1;
-	char name[9] = { 0, };
-	while(available > 1 + 9 + 8) {
-		sprintf(name, "%08x", i);
-		key = nic_config_register(nic, name);
-		if(key == 0)
-			fail("cannot register config: '%s'", name);
-
-		if(!nic_config_put(nic, key, i))
-			fail("cannot put config: %s %d", name, i);
-
-		available -= 1 + 9 + 8;
-		i++;
-	}
-	printf("available: %d", available);
-
+	
+	
+	printf("Config: alloc next: ");
+	key2 = vnic_config_alloc(vnic, "net.ipv6", 48);
+	if(key2 < 0)
+		fail("cannot alloc config: %d", key2);
+	
+	if(key + 1 + (strlen("net.ipv4") + 1 + 3) / 4 + 12 / 4 != key2)
+		fail("wrong second key allocated: %d", key2);
+	
 	pass();
+	
+	printf("Config: available consumption check 2: ");
+	available2 = vnic_config_available(vnic);
+	if(available2 != available - 4 - 12 - 48)
+		fail("available memory is differ: %d expected: %d\n", available2, available - 4 - 12 - 48);
+	
+	available += - 4 - 12 - 48;
+	
+	pass();
+	
+	printf("Config: find second key: ");
+	int32_t key3 = vnic_config_key(vnic, "net.ipv6");
+	if(key3 != key2)
+		fail("cannot find key for net.ipv6: %d", key3);
+	
+	pass();
+	
+	printf("Config: get size: ");
+	size = vnic_config_size(vnic, key2);
+	if(size != 48)
+		fail("config size is wrong: %d\n", size);
+	else
+		printf("%d", size);
+	
+	pass();
+	
+	printf("Config: check overwriting: ");
+	
+	uint32_t* ipv4 = vnic_config_get(vnic, key);
+	ipv4[0] = 0x11223344;
+	ipv4[1] = 0x55667788;
+	ipv4[2] = 0x99001122;
+	
+	uint64_t* ipv6 = vnic_config_get(vnic, key2);
+	ipv6[0] = 0x0102030405060708;
+	ipv6[1] = 0x0900010203040506;
+	ipv6[2] = 0x0708091011121314;
+	ipv6[3] = 0x1516171819202122;
+	ipv6[4] = 0x2324252627282930;
+	ipv6[5] = 0x3132333435363738;
+	
+	printf("Config: find key(2): ");
+	key3 = vnic_config_key(vnic, "net.ipv4");
+	if(key3 != key)
+		fail("cannot find key for net.ipv4: %d", key3);
+	
+	pass();
+	
+	printf("Config: get size(2): ");
+	size = vnic_config_size(vnic, key);
+	if(size != 12)
+		fail("config size is wrong: %d\n", size);
+	else
+		printf("%d", size);
+	
+	pass();
+	
+	
+	printf("Config: find second key(2): ");
+	key3 = vnic_config_key(vnic, "net.ipv6");
+	if(key3 != key2)
+		fail("cannot find key for net.ipv6: %d", key3);
+	
+	pass();
+	
+	printf("Config: get size(2): ");
+	size = vnic_config_size(vnic, key2);
+	if(size != 48)
+		fail("config size is wrong: %d\n", size);
+	else
+		printf("%d", size);
+	
+	pass();
+	
 
-
+	printf("Config: free first alloc: ");
+	vnic_config_free(vnic, key);
+	
+	key = vnic_config_key(vnic, "net.ipvs");
+	if(key >= 0)
+		fail("freed key exists: %d", key);
+	
+	pass();
+	
+	printf("Config: available consumption check 3: ");
+	available2 = vnic_config_available(vnic);
+	if(available2 != available + 4 + 12 + 12)
+		fail("available memory is differ: %d expected: %d\n", available2, available + 4 + 12 + 12);
+	
+	available += 4 + 12 + 12;
+	
 	printf("Config: overflow: ");
-	key = nic_config_register(nic, "hello");
-	if(key != 0)
-		fail("overflow: %u", key);
-
+	uint32_t chunk = available - 4 - 12 - 12 - 4 - 8;
+	key3 = vnic_config_alloc(vnic, "chunk", chunk);
+	if(key3 < 0)
+		fail("cannot allocate big chunk: %d", key3);
+	
+	key = vnic_config_alloc(vnic, "net.ipv4", 12);
+	if(key < 0)
+		fail("cannot allocate first chunk: %d", key);
+	
 	pass();
-
-
-	printf("Config: get full: ");
-	for(int j = 1; j < i; j++) {
-		sprintf(name, "%08x", j);
-		key = nic_config_key(nic, name);
-		if(key == 0)
-			fail("cannot get key: '%s'", name);
-
-		uint64_t value = nic_config_get(nic, key);
-
-		if(value != j)
-			fail("wrong config value returned: %ld !=  %ld", i, j);
-	}
-
+	
+	printf("Config: available consumption check 4: ");
+	available = vnic_config_available(vnic);
+	if(available != 0)
+		fail("available memory is differ: %d expected: %d\n", available, 0);
+	
 	pass();
-
+	
+	print_config(vnic);
+	
 	return 0;
 }
 

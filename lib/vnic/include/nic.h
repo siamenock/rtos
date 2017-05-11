@@ -140,10 +140,13 @@ size_t nic_pool_used(NIC* nic);
 size_t nic_pool_free(NIC* nic);
 size_t nic_pool_total(NIC* nic);
 
-uint32_t nic_config_register(NIC* nic, char* name);
-uint32_t nic_config_key(NIC* nic, char* name);
-bool nic_config_put(NIC* nic, uint32_t key, uint64_t value);
-uint64_t nic_config_get(NIC* nic, uint32_t key);
+int32_t nic_config_alloc(NIC* nic, char* name, uint16_t size);
+void nic_config_free(NIC* nic, uint16_t key);
+int32_t nic_config_key(NIC* nic, char* name);
+void* nic_config_get(NIC* nic, uint16_t key);
+uint16_t nic_config_size(NIC* nic, uint16_t key);
+uint32_t nic_config_available(NIC* nic);
+uint32_t nic_config_total(NIC* nic);
 
 /**
  * Initialize NIC memory map

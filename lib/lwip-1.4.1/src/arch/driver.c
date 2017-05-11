@@ -314,7 +314,7 @@ struct netif* nic_init(NIC* nic, NIC_DPI preprocessor, NIC_DPI postprocessor) {
 	if(!netifs) {
 		netifs = list_create(NULL);
 		if(!netifs) {
-			printf("Can'nt create netif list\n");
+			printf("Cannot create netif list\n");
 			return NULL;
 		}
 		list_iterator_init(&iter, netifs);
@@ -322,7 +322,7 @@ struct netif* nic_init(NIC* nic, NIC_DPI preprocessor, NIC_DPI postprocessor) {
  //	if(!privates) {
  //		privates = list_create(NULL);
  //		if(!privates) {
- //			printf("Can'nt create netif list\n");
+ //			printf("Cannot create netif list\n");
  //			return NULL;
  //		}
  //	}

@@ -372,4 +372,3 @@ Packet* vnic_stx(VNIC* vnic) {
 
 	return packet;
 }
-
