@@ -8,7 +8,7 @@ static void* get(Cache* this, void* key) {
 
 	LinkedList* list = this->list;
 	list->remove(list, key);
-	list->add(list, key);
+	list->add_first(list, key);
 
 	return data;
 }
@@ -20,13 +20,13 @@ static bool put(Cache* this, void* key, void* value) {
 
 	LinkedList* list = this->list;
 	if(list->size >= this->capacity) {
-		void* lru_key = list->remove_first(list);
+		void* lru_key = list->remove_last(list);
 		void* lru_value = map->remove(map, lru_key);
 		if(this->type == DATATYPE_POINTER)
 			this->free(lru_value);
 	}
 
-	list->add(list, key);
+	list->add_first(list, key);
 	map->put(map, key, value);
 
 	return true;
@@ -46,7 +46,6 @@ static void* remove(Cache* this, void* key) {
 	return data;
 }
 
-// FIXME: iterate reversely
 static void iterator_init(CacheIterContext* context, Cache* cache) {
 	cache->list->iter->init(context, cache->list);
 }
