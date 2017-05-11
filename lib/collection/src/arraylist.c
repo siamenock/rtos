@@ -3,24 +3,33 @@
 #include <stdarg.h>
 #include <util/arraylist.h>
 
-static bool add(ArrayList* this, void* element) {
-	if(this->size >= this->capacity) {
-		size_t new_capacity = (this->capacity * 1.5) + 1;
-		void** array = this->realloc(this->array, sizeof(void*) * new_capacity);
-		if (!array)
-			return false;
+static bool grow(ArrayList* this) {
+	size_t new_capacity = (this->capacity * 1.5) + 1;
+	void** array = this->realloc(this->array, sizeof(void*) * new_capacity);
+	if (!array)
+		return false;
 
-		this->array = array;
-		this->capacity = new_capacity;
-	}
+	this->array = array;
+	this->capacity = new_capacity;
+	return true;
+}
+
+static bool add(ArrayList* this, void* element) {
+	if(this->size >= this->capacity && !grow(this))
+		return false;
 
 	this->array[this->size++] = element;
 	return true;
 }
 
 static bool remove(ArrayList* this, void* element) {
-	// Not yet implemented
-	return false;
+	int index = this->index_of(this, element);
+	if(index < 0)
+		return false;
+
+	memmove(&this->array[index], &this->array[index + 1], (this->size - 1) - index);
+	this->size -= 1;
+	return true;
 }
 
 static void* get(ArrayList* this, size_t index) {
@@ -31,8 +40,12 @@ static void* get(ArrayList* this, size_t index) {
 }
 
 static void* set(ArrayList* this, size_t index, void* element) {
-	// Not yet implemented
-	return NULL;
+	if(index >= this->size)
+		return NULL;
+
+	void* old = this->array[index];
+	this->array[index] = element;
+	return old;
 }
 
 static void* remove_at(ArrayList* this, size_t index) {
@@ -50,11 +63,15 @@ static void* remove_at(ArrayList* this, size_t index) {
 }
 
 static bool add_at(ArrayList* this, size_t index, void* element) {
-	// Not yet implemented
-	return false;
+	if(this->size + 1 >= this->capacity && !grow(this))
+		return false;
+
+	memmove(&this->array[index], &this->array[index + 1], this->size - index);
+	this->array[index] = element;
+	return true;
 }
 
-static int index_of(ArrayList* this, size_t index, void* element) {
+static int index_of(ArrayList* this, void* element) {
 	for(size_t index = 0; index < this->size; index++)
 		if(this->compare(this->array[index], element))
 			return index;
