@@ -114,6 +114,9 @@ static Iterator iterator = {
 };
 
 ArrayList* arraylist_create(DataType type, PoolType pool, size_t initial_capacity) {
+	if(!initial_capacity)
+		return NULL;
+
 	ArrayList* list = (ArrayList*)list_create(type, pool, sizeof(ArrayList));
 	if(!list)
 		return NULL;
