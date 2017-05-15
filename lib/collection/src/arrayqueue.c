@@ -48,8 +48,10 @@ static bool resize(ArrayQueue* this, size_t capacity, void (*popped)(void*)) {
 	while(!this->is_empty(this)) {
 		if(tail < capacity - 1)
 			array[tail++] = this->dequeue(this);
-		else
-			popped(this->dequeue(this));
+		else {
+			if(popped)
+				popped(this->dequeue(this));
+		}
 	}
 
 	this->free(this->array);
