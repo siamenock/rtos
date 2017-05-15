@@ -230,6 +230,7 @@ static void rotate(LinkedList* this) {
 		this->tail->next = node;
 		node->prev = this->tail;
 		this->tail = node;
+		node->next = NULL;
 	}
 }
 
