@@ -4,6 +4,7 @@
 #include "lock.h"
 #include "mp.h"
 #include "shared.h"
+#include "msr.h"
 
 // Ref: http://www.cs.cmu.edu/~410/doc/intel-mp.pdf
 // Ref: http://www.intel.com/design/pentium/datashts/24201606.pdf
@@ -23,17 +24,8 @@ bool parse_iae(MP_IOAPICEntry* entry, void* context) {
 	return true;
 }
 void mp_init() {
-	/**
-	  * TODO fix here
-	  * Multi kernel user applicatio(manager) can't call rdmsr, wrmsr
-	  * Need permissions.
-	  **/
-	// Get APIC address
-// 	uint32_t a, b, c = 0x1b, d;
-// 	asm volatile("rdmsr" : "=a"(a) : "c"(c));
-// 
-// 	_apic_address = a & 0xfffff000;
-	_apic_address = 0xfee00000;
+	// Map IA32_APIC_BASE_MSR(0x1B) to virtual memory
+	_apic_address = msr_read(0x1B) & 0xFFFFF000;
 
 	// Get APIC ID
 	apic_id = get_apic_id();
@@ -94,8 +86,8 @@ void mp_sync() {
 	} else {
 		shared->sync = ++barrier;
 	}
-}
 
+}
 void mp_parse_fps(MP_Parser* parser, void* context) {
 	MP_FloatingPointerStructure* find_FloatingPointerStructure() {
 		bool is_FloatingPointerStructure(uint8_t* p) {
