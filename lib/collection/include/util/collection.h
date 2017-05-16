@@ -39,7 +39,10 @@ Collection* collection_create(DataType type, PoolType pool, size_t size);
 #define ITER_INIT(element, collection, context)				\
 	({								\
 		(collection)->iter->init((context), (collection));	\
-		(element) = (collection)->iter->next((context));	\
+		if((collection)->iter->has_next(context)) 		\
+			(element) = (collection)->iter->next((context));\
+		else							\
+			(element) = NULL;				\
 		(collection)->iter;					\
 	})
 
