@@ -27,8 +27,9 @@ static bool remove(ArrayList* this, void* element) {
 	if(index < 0)
 		return false;
 
-	memmove(&this->array[index], &this->array[index + 1], (this->size - 1) - index);
 	this->size -= 1;
+	memmove(&this->array[index], &this->array[index + 1], (this->size - index) * sizeof(void*));
+
 	return true;
 }
 
@@ -54,10 +55,7 @@ static void* remove_at(ArrayList* this, size_t index) {
 
 	void* data = this->array[index];
 	this->size--;
-	while(index < this->size) {
-		this->array[index] = this->array[index + 1];
-		index++;
-	}
+	memmove(&this->array[index], &this->array[index + 1], (this->size - index) * sizeof(void*));
 
 	return data;
 }
@@ -65,15 +63,19 @@ static void* remove_at(ArrayList* this, size_t index) {
 static bool add_at(ArrayList* this, size_t index, void* element) {
 	if(this->size + 1 >= this->capacity && !grow(this))
 		return false;
+	if(index >= this->size)
+		return false;
 
-	memmove(&this->array[index], &this->array[index + 1], this->size - index);
+	memmove(&this->array[index + 1], &this->array[index], (this->size - index) * sizeof(void*));
 	this->array[index] = element;
+	this->size++;
+
 	return true;
 }
 
 static int index_of(ArrayList* this, void* element) {
 	for(size_t index = 0; index < this->size; index++)
-		if(this->compare(this->array[index], element))
+		if(this->equals(this->array[index], element))
 			return index;
 
 	return -1;

@@ -118,6 +118,9 @@ static void* remove_at(LinkedList* this, size_t index) {
 }
 
 static bool add_at(LinkedList* this, size_t index, void* element) {
+	if(index >= this->size)
+		return false;
+
 	ListNode* node2 = this->malloc(sizeof(ListNode));
 	if(!node2)
 		return false;
@@ -126,7 +129,7 @@ static bool add_at(LinkedList* this, size_t index, void* element) {
 	node2->prev = NULL;
 	node2->next = NULL;
 
-	if(index <= 0) {
+	if(index == 0) {
 		if(this->head) {
 			this->head->prev = node2;
 			node2->next = this->head;
@@ -135,8 +138,6 @@ static bool add_at(LinkedList* this, size_t index, void* element) {
 			this->head = this->tail = node2;
 		}
 		this->size++;
-	} else if(index >= this->size) {
-		_add(this, this->tail, node2);
 	} else {
 		index--;
 
@@ -159,7 +160,7 @@ static int index_of(LinkedList* this, void* element) {
 	int index = 0;
 	void* data;
 	for_each(data, this) {
-		if(this->compare(data, element))
+		if(this->equals(data, element))
 			return index;
 		index++;
 	}
