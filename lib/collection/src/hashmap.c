@@ -132,7 +132,7 @@ static bool update(HashMap* this, void* key, void* value) {
 	return false;
 }
 
-static void* remove(HashMap* this, void* key) {
+static void* _remove(HashMap* this, void* key) {
 	if(!key)
 		return false;
 
@@ -149,9 +149,10 @@ static void* remove(HashMap* this, void* key) {
 			list->remove_at(list, i);
 			this->free(entry);
 
-			if(list->is_empty(list))
+			if(list->is_empty(list)) {
 				linkedlist_destroy(list);
-
+				this->table[index] = NULL;
+			}
 			this->size--;
 
 			return value;
@@ -315,7 +316,7 @@ HashMap* hashmap_create(DataType type, PoolType pool, size_t initial_capacity) {
 	map->get		= (void*)get;
 	map->put		= (void*)put;
 	map->update		= (void*)update;
-	map->remove		= (void*)remove;
+	map->remove		= (void*)_remove;
 	map->contains_key	= (void*)contains_key;
 	map->contains_value	= (void*)contains_value;
 
