@@ -17,7 +17,7 @@ typedef struct _HashSet {
 	Set;
 	HashSetOps;
 
-        HashMap*		map;
+	HashMap*		map;
 	HashSetIterContext*	context;
 } HashSet;
 
