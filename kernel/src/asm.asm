@@ -14,7 +14,6 @@ global refresh_cr3
 global read_rsp, read_rbp
 global read_xmms0
 global mwait, monitor
-global read_msr, write_msr
 
 lgdt:
 	lgdt	[rdi]

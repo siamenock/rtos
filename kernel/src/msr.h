@@ -17,10 +17,17 @@ uint64_t msr_read(uint32_t register_address);
 
 /**
  * Write a value into MSR
+ * @param value value
+ * @param register_address Address of a target MSR
+ */
+void msr_write(uint64_t value, uint32_t register_address);
+
+/**
+ * Write a value into MSR
  * @param dx dx register value
  * @param ax ax register value
  * @param register_address Address of a target MSR
  */
-void msr_write(uint32_t dx, uint32_t ax, uint32_t register_address);
+void msr_write2(uint32_t dx, uint32_t ax, uint32_t register_address);
 
 #endif
