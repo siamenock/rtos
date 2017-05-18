@@ -7,6 +7,6 @@ project "lwip"
     build.exportPath('lwip', { 'include/ipv4' })
 
     removefiles         { 'src/core/ipv6/**.c' }
-    includedirs         { '../ext/include' }
+    includedirs         { '../ext/include', '../vnic/include' }
 
     postbuildcommands   { '{COPY} -L include/* ../include' }

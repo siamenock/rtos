@@ -1,13 +1,12 @@
 #include <stdio.h>
 #include <string.h>
 // PacketNign kernel header
-#include <../gmalloc.h>
-#include <../port.h>
-#include <../pci.h>
-#include <nicdev.h>
+#include <gmalloc.h>
+#include <port.h>
+#include <pci.h>
+#include <driver/nicdev.h>
 #include <vnic.h>
 #include <timer.h>
-#include <driver/nic.h>
 // Virtio driver header
 #include "virtio.h"
 #include "virtio_config.h"
@@ -532,12 +531,12 @@ int init(void* device, void* data) {
 
 	extern int nicdev_get_count();
 	sprintf(nic_device->name, "eth%d", nicdev_get_count());
-	nic_device->mac = *(uint64_t*)&priv[id]->vdev.config.mac;
-	//memcpy(&nic_device->mac, &priv[id]->vdev.config.mac, ETH_ALEN);
+	nic_device->mac = *(uint64_t*)&priv[id]->vdev.config.mac & 0xffffffffffff;
 
 	extern NICDriver device_driver;
 	nic_device->driver = (void*)&device_driver;
 	nic_device->priv = priv[id];
+	priv[id]->nicdev = nic_device;
 
 	extern int nicdev_register(NICDevice* dev);
 	//TODO check return value
@@ -572,7 +571,7 @@ void destroy(int id) {
 }
 
 static bool process(Packet* packet, void* context) {
-	return !virtnet_send(context, packet);
+	return virtnet_send(context, packet) == 0 ? true : false;
 }
 
 int poll(void* _priv) {
@@ -589,12 +588,17 @@ int poll(void* _priv) {
 	int nicdev_tx(NICDevice* dev,
 			bool (*process)(Packet* packet, void* context), void* context);
 	nicdev_tx(priv->nicdev, process, priv);
+	VirtQueue* vq = priv->svq;
+	kick(vq);
 
 	// RX
 	uint32_t len;
 	if((buf = get_buf(priv->rvq, &len))) {
 		virtnet_receive(priv, buf, len);
 	}
+
+	vq = priv->rvq;
+	kick(vq);
 
 	return 0;
 }

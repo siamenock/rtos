@@ -9,7 +9,7 @@ workspace "Penguin"
 
     language "C"
     warnings "Extra"
-    buildoptions { "-idirafter ../../../kernel/src", "-DLINUX -std=gnu99", "-mcmodel=large", "-Wno-unused", "-Wno-format", "-Wno-unused-result" }
+    buildoptions { "-idirafter ../../../kernel/src", "-DLINUX -std=gnu99", "-mcmodel=large", "-Wno-unused", "-Wno-format", "-Wno-unused-result", "-fno-builtin" }
     linkoptions { "-nostartfiles", "-Wl,-Ttext-segment=0xff00000000" }
 
     filter 'files:src/**.asm'
@@ -28,7 +28,7 @@ workspace "Penguin"
         files { "src/**.h", "src/**.c", "src/**.asm" }
         includedirs { "../../include", "../../include/ipv4" }
         libdirs { "." }
-        links { "umpn", "rt", "vnic" }
+        links { "core_linux", "rt", "vnic", "tlsf" }
 
         -- Make version header
         prebuildcommands {

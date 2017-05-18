@@ -41,11 +41,19 @@ local function assemblyProperty(format)
 		buildmessage
 			'Compiling %{file.relpath}'
 		buildcommands
-			{ 'nasm -o "%{cfg.objdir}/%{file.basename}.o" "%{file.relpath}" -f ' .. format }
+			{ 'nasm -D__ASSEMBLY__ -o "%{cfg.objdir}/%{file.basename}.o" "%{file.relpath}" -f ' .. format }
 		buildoutputs
 			'%{cfg.objdir}/%{file.basename}.o'
 
-	filter {}
+    filter 'files:src/**.S'
+		buildmessage
+			'Compiling %{file.relpath}'
+		buildcommands
+			'$(CC) $(ALL_CFLAGS) $(FORCE_INCLUDE) -D__ASSEMBLY__ -o "$@" -MF "$(@:%.o=%.d)" -c "$<"'
+		buildoutputs
+			'%{file.basename}.o'
+
+    filter {}
 end
 
 local function targetPath(path)
@@ -61,17 +69,18 @@ local function compileProperty(arch)
     buildoptions    '-std=gnu99'
     buildoptions    '-Wno-unused-parameter'
 
-    files		    { 'src/**.c', 'src/**.asm', 'src/**.S' }
+
+    files    { 'src/**.c', 'src/**.asm', 'src/**.S' }
 
 	local format
 	if(arch == 'x86') then
 		format = 'elf32'
 	elseif(arch == 'x86_64') then
 		format = 'elf64'
-        buildoptions { '-mcmodel=kernel' }
+                buildoptions '-mcmodel=kernel'
 	end
 
-    assemblyProperty(format)
+    assemblyProperty(format);
     targetPath('.')
 end
 

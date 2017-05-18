@@ -101,7 +101,7 @@ typedef struct _NIC {
 	// slow tx queue (8 bytes aligned)
 	// pool bitmap (8 bytes aligned)
 	// pool (NIC_CHUNK_SIZE(64) bytges aligned)
-} NIC;
+} __attribute__((packed)) NIC;
 
 int nic_count();
 NIC* nic_get(int index);

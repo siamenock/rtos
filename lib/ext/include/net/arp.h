@@ -29,13 +29,14 @@ typedef struct _ARP {
 
 extern uint64_t ARP_TIMEOUT;		///< ARP timeout of ARP table
 
+#define ARP_PROCESS()
 /**
  * Process ARP packet.
  *
  * @param packet the packet to process
  * @return ture if ARP packet is processed (packet must not be reused)
  */
-bool arp_process(Packet* packet);
+bool arp_process(NIC* nic, Packet* packet);
 
 /**
  * Broadcast ARP request (MAC address resolving).

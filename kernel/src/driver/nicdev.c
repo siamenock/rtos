@@ -1,5 +1,6 @@
 #include "nicdev.h"
 
+#define endian16(v)		__builtin_bswap16((v))	///< Change endianness for 48 bits
 #define endian48(v)		(__builtin_bswap64((v)) >> 16)	///< Change endianness for 48 bits
 
 #define ETHER_MULTICAST		((uint64_t)1 << 40)	///< MAC address is multicast
@@ -195,6 +196,28 @@ VNIC* nicdev_update_vnic(NICDevice* dev, VNIC* src_vnic) {
  * @return result of process
  */
 
+static bool packet_dump_switch;
+void nidev_dump_switch(bool enable) {
+	packet_dump_switch = enable;
+}
+
+void packet_dump(void* _data, size_t size) {
+	if(packet_dump_switch) {
+		uint8_t* data = (uint8_t*)_data;
+		Ether* eth = data;
+		printf("Packet Lengh: %d\n", size);
+		printf("Ether Type: %02x\n", endian16(eth->type));
+		//TODO Add packet header information
+		for(int i = 0 ; i < size;) {
+			for(int j = 0; j < 16 && i < size; j++, i++) {
+				printf("%02x ", data[i] & 0xff);
+			}
+			printf("\n");
+		}
+		printf("\n");
+	}
+}
+
 int nicdev_rx(NICDevice* dev, void* data, size_t size) {
 	Ether* eth = data;
 	int i;
@@ -202,6 +225,7 @@ int nicdev_rx(NICDevice* dev, void* data, size_t size) {
 	uint64_t dmac = endian48(eth->dmac);
 
 	//TODO lock
+	packet_dump(data, size);
 	if(dmac & ETHER_MULTICAST) {
 		for(i = 0; i < MAX_VNIC_COUNT; i++) {
 			if(!dev->vnics[i])
@@ -247,6 +271,7 @@ int nicdev_tx(NICDevice* dev,
 			if(!packet)
 				break;
 
+			packet_dump(packet->buffer + packet->start, packet->end - packet->start);
 			if(!process(packet, context)) {
 				nic_free(packet);
 				return 0;

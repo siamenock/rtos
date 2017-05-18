@@ -206,7 +206,7 @@ void load_gdt(uint8_t apic_id) {
 
 /**
  * TLB size: 256KB
- * TLB address: 6MB + apic_id * 2MB - 256KB
+ * TLB address: 8MB + apic_id * 2MB - 256KB
  * TLB Blocks(4K blocks)
  * TLB[0] => l2
  * TLB[1] => l3u
@@ -360,7 +360,6 @@ void copy_kernel(uint8_t apic_id) {
 	}
 
 	// FIXME: caculate size of ramdisk
-	uint32_t multiboot_temp_addr = 0x2800000;	// Behind the RAM disk area (+4MB)
 	// Clean
 	if(apic_id == 0) {
 		// Temporarily copy multiboot info
@@ -568,7 +567,7 @@ void main(uint32_t magic, uint32_t addr) {
 		//*(uint32_t*)(0x5c0000 - 0x400) = initrd_start;
 		//*(uint32_t*)(0x5c0000 - 0x400 + 8) = initrd_end;
 		
-		print("Jump to 64bit kernel: 0x00200000");
+		print("Jump to 64bit kernel: 0x00400000");
 		tab(75);
 	} else {
 		copy_kernel(apic_id);

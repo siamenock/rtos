@@ -107,15 +107,9 @@ next:
 	push	eax
 	extern	main
 	call	main
-<<<<<<< HEAD
 	
 	jmp	0x08:0x400000   ; Jump to kernel64
 	
-=======
-
-	jmp	0x08:0x200000   ; Jump to kernel64
-
->>>>>>> 16a92d14c07674cc82a3983cddeb3cb930c17fe3
 .loop:
 	hlt
 	jmp .loop
@@ -141,10 +135,12 @@ align 8, db 0
 
 	dw	0x0000			; padding for GDTR
 
+align 8
 gdtr:
 	dw	gdtend - gdt - 1	; GDT size
-	dd	gdt ; GDT address
+	dd	gdt; GDT address
 
+align 8
 gdt:
 	; null descriptor
 	dw	0x0000
@@ -173,7 +169,8 @@ gdt:
 	; loader code segment descriptor
 	dw	0xffff	; limit 15:0
 	dw	0x0000	; base 15:0
-	db	0x00	; base 23:16 db	0x9a	; p=1, dpl=0, code segment, read/write
+	db	0x00	; base 23:16
+	db	0x9a	; p=1, dpl=0, code segment, read/write
 	db	0xcf	; g=1, d=1, l=0, limit 19:16
 	db	0x00	; base 31:24
 

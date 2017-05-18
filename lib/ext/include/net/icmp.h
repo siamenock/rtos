@@ -27,9 +27,18 @@ typedef struct _ICMP {
 /**
  * Process ICMPv4 packet
  *
+ * @param nic Network Interface Controller
  * @param packet ICMPv4 packet
  * @return true if the packet is processed, in the case the packet must not be reused
  */
-bool icmp_process(Packet* packet);
+bool icmp_process(NIC* nic, Packet* packet);
+/**
+ * Process ICMPv4 packet
+ *
+ * @param nic Network Interface Controller
+ * @param addr Address for Destination
+ * @return true if the packet is transmitted
+ */
+bool icmp_request(NIC* nic, uint32_t addr);
 
 #endif /* __NET_ICMP_H__ */

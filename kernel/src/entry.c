@@ -275,9 +275,10 @@ void entry() {
 	// To be deleted
 
 	uint8_t apic_id = get_apic_id();
-	if(apic_id) {
+	if(offset) {
 		copy_kernel_data(apic_id, offset);
 	}
+
 	init_page_tables(apic_id, offset);
 
 	activate_pae(apic_id);

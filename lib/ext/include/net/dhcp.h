@@ -1,9 +1,9 @@
 #ifndef __NET_DHCP_H__
 #define __NET_DHCP_H__
 
-#include <net/nic.h>
 #include <util/list.h>
 #include <errno.h>
+#include <nic.h>
 								// code length
 #define DHCP_OPTION_SUBNETMASK				0x01	// 1 	4
 #define DHCP_OPTION_SUBNETMASK_LENGTH			0x04	

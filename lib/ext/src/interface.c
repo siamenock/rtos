@@ -2,22 +2,66 @@
 #include <_malloc.h>
 #include <string.h>
 
-IPv4Interface* interface_alloc(void* pool) {
-	size_t size = sizeof(IPv4Interface);
-	IPv4Interface* interface = __malloc(size, pool);
-	if(!interface)
-		return NULL;
+#define NIC_ADDR_IPv4	"net.addr.ipv4"
 
-	memset(interface, 0x0, size);
+IPv4InterfaceTable* interface_map_get(NIC* nic) {
+	int32_t interface_key = nic_config_key(nic, NIC_ADDR_IPv4);
+	IPv4InterfaceTable* table = NULL;
+
+	if(interface_key <= 0) {
+		interface_key = nic_config_alloc(nic, NIC_ADDR_IPv4, sizeof(IPv4InterfaceTable));
+		if(interface_key <= 0)
+			return false;
+
+		table = nic_config_get(nic, interface_key);
+		memset(table, 0, sizeof(IPv4InterfaceTable));
+	} else
+		table = nic_config_get(nic, interface_key);
+
+	return table;
+}
+
+IPv4Interface* interface_alloc(NIC* nic, uint32_t address, uint32_t netmask) {
+	IPv4InterfaceTable* table = interface_map_get(nic);
+	if(table->count >= IPV4_INTERFACE_MAX_COUNT)
+		return false;
+
+	IPv4Interface* interface = &table->interfaces[table->count++];
+	interface->address = address;
+	interface->netmask = netmask;
 
 	return interface;
 }
 
-void interface_free(IPv4Interface* interface, void* pool) {
-	if(interface->udp_ports)
-		set_destroy(interface->udp_ports);
-	if(interface->tcp_ports)
-		set_destroy(interface->tcp_ports);
+bool interface_free(NIC* nic, uint32_t address) {
+	IPv4InterfaceTable* table = interface_map_get(nic);
+	if(!table)
+		return false;
 
-	__free(interface, pool);
+	for(int i = 0; i < table->count; i++) {
+		if(address == table->interfaces[i].address) {
+			if((table->count - 1) == i) {
+				table->count--;
+				return true;
+			}
+
+			table->interfaces[i] = table->interfaces[--table->count];
+			return true;
+		}
+	}
+
+	return false;
+}
+
+IPv4Interface* interface_get(NIC* nic, uint32_t address) {
+	IPv4InterfaceTable* table = interface_map_get(nic);
+	if(!table)
+		return false;
+
+	for(int i = 0; i < table->count; i++) {
+		if(address == table->interfaces[i].address)
+			return &table->interfaces[i];
+	}
+
+	return NULL;
 }

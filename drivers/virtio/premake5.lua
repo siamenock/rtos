@@ -3,10 +3,8 @@ project 'virtio'
     targetname  'virtio.ko'
 
     build.compileProperty('x86_64')
-    build.linkingProperty()
+    build.linkingProperty{}
     build.targetPath('..')
 
     linkoptions { '-r ../linux.ko' }
-    includedirs { '../../kernel/src', '../../lib/ext/include' }
-
-
+    includedirs { '../../kernel/src', '../../lib/include' }

@@ -137,6 +137,9 @@ low_level_output(struct netif *netif, struct pbuf *p)
 
   u16_t tot_len = p->tot_len;
   Packet* packet = nic_alloc(nic, tot_len);
+  if(!packet)
+	  return ERR_MEM;
+
   packet->end = packet->start + tot_len;
   int idx = 0;
   for(q = p; q != NULL; q = q->next) {
@@ -307,53 +310,29 @@ static bool is_lwip_inited;
  //static struct netif_private* privates[NIC_SIZE];
  //static int netif_count;
 static List* netifs = NULL;
-static ListIterator iter;
 //static List* privates;
 
-struct netif* nic_init(NIC* nic, NIC_DPI preprocessor, NIC_DPI postprocessor) {
+struct netif* lwip_nic_init(NIC* nic, NIC_DPI preprocessor, NIC_DPI postprocessor) {
 	if(!netifs) {
 		netifs = list_create(NULL);
 		if(!netifs) {
 			printf("Cannot create netif list\n");
 			return NULL;
 		}
-		list_iterator_init(&iter, netifs);
 	}
- //	if(!privates) {
- //		privates = list_create(NULL);
- //		if(!privates) {
- //			printf("Cannot create netif list\n");
- //			return NULL;
- //		}
- //	}
 
 	if(list_size(netifs) >= NIC_MAX_COUNT)
 		return NULL;
 
-	uint32_t ip;
-	IPv4Interface* interface = NULL;
+	uint32_t ip = 0xc0a864fe;
+	//IPv4Interface* interface = NULL;
 
-	Map* interfaces = NULL; //nic_config_get(nic, NIC_ADDR_IPv4);
-	/*
-	 *if(!interfaces)
-	 *        return NULL;
-	 */
-
-	MapIterator iter;
-	map_iterator_init(&iter, interfaces);
-	while(map_iterator_has_next(&iter)) {
-		MapEntry* entry = map_iterator_next(&iter);
-		interface = entry->data;
-		ip = (uint32_t)(uint64_t)entry->key;
-		break;
-	}
-
-	if(!interface)
-		return NULL;
-
-	uint32_t netmask = interface->netmask;
-	uint32_t gw = interface->gateway;
-	bool is_default = interface->_default;
+// 	uint32_t netmask = interface->netmask;
+// 	uint32_t gw = interface->gateway;
+// 	bool is_default = interface->_default;
+ 	uint32_t netmask = 0xffffff00;
+ 	uint32_t gw = 0xc0a864ff;
+ 	bool is_default = true;
 	
 	if(!is_lwip_inited) {
 		lwip_init();
@@ -361,12 +340,8 @@ struct netif* nic_init(NIC* nic, NIC_DPI preprocessor, NIC_DPI postprocessor) {
 	}
 	
 	struct netif* netif = gmalloc(sizeof(struct netif));
-	//netifs[netif_count] = netif;
-	struct netif_private* private =  gmalloc(sizeof(struct netif_private));
+	struct netif_private* private = gmalloc(sizeof(struct netif_private));
 	list_add(netifs, netif);
-	//list_add(privates, private);
-	//privates[netif_count] = private;
-	//netif_count++;
 
 	private->nic = nic;
 	private->preprocessor = preprocessor;
@@ -385,7 +360,7 @@ struct netif* nic_init(NIC* nic, NIC_DPI preprocessor, NIC_DPI postprocessor) {
 	return netif;
 }
 
-bool nic_remove(struct netif* netif) {
+bool lwip_nic_remove(struct netif* netif) {
  	netif_set_down(netif);
  	netif_remove(netif);
 	list_remove_data(netifs, netif);
@@ -395,25 +370,18 @@ bool nic_remove(struct netif* netif) {
 	return true;
 }
 
-bool nic_poll() {
+bool lwip_nic_poll() {
 	bool result = false;
 	
 	if(list_size(netifs) == 0)
 		return result;
 	
-	if(!list_iterator_has_next(&iter)) {
-		list_iterator_init(&iter, netifs);
-		goto check_has_next;
-	} else
-		goto process_packet;
-
-check_has_next:
+	ListIterator iter;
+	list_iterator_init(&iter, netifs);
 	if(list_iterator_has_next(&iter)) {
-process_packet:
-;
 		struct netif* netif = list_iterator_next(&iter);
 		NIC* nic = ((struct netif_private*)netif->state)->nic;
-		if(!nic_has_tx(nic))
+		if(!nic_has_rx(nic))
 			goto done;
 		
 		Packet* packet = nic_rx(nic);
@@ -433,6 +401,6 @@ done:
 	return result;
 }
 
-void nic_timer() {
+void lwip_nic_timer() {
 	sys_check_timeouts();
 }

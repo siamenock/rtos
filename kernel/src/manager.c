@@ -343,11 +343,12 @@ static err_t manager_accept(void* arg, struct tcp_pcb* pcb, err_t err) {
 
 // RPC Manager
 static Packet* manage(Packet* packet) {
-	if(shell_process(packet))
-		return NULL;
-
-	if(dhcp_process(packet))
-		return NULL;
+	printf("pre process\n");
+// 	if(shell_process(packet))
+// 		return NULL;
+// 
+// 	if(dhcp_process(packet))
+// 		return NULL;
 //	else if(rpc_process(packet))
 //		return NULL;
 //	else if(tftp_process(packet))
@@ -446,7 +447,7 @@ static bool manager_server_close() {
 }
 
 static bool manager_loop(void* context) {
-	nic_poll();
+	lwip_nic_poll();
 
 	if(!list_is_empty(actives)) {
 		ListIterator iter;
@@ -465,7 +466,7 @@ static bool manager_loop(void* context) {
 }
 
 static bool manager_timer(void* context) {
-	nic_timer();
+	lwip_nic_timer();
 
 	return true;
 }
@@ -494,21 +495,20 @@ int manager_init() {
 	};
 
 	VNIC* vnic = gmalloc(sizeof(VNIC));
-	if(!vnic) {
+	if(!vnic)
 		return -2;
-	}
+
 	memset(vnic, 0, sizeof(VNIC));
 
 	vnic->id = vnic_alloc_id();
 	vnic->nic_size = 0x200000;
 	vnic->nic = bmalloc(1);
-	if(!vnic->nic) {
+	memset(vnic->nic, 0, 0x200000);
+	if(!vnic->nic)
 		return -3;
-	}
 
-	if(!vnic_init(vnic, attrs)) {
+	if(!vnic_init(vnic, attrs))
 		return -4;
-	}
 
 	manager_ip = DEFAULT_MANAGER_IP;
 	manager_port = DEFAULT_MANAGER_PORT;
@@ -518,6 +518,16 @@ int manager_init() {
 		return -5;
 
 	manager_nic = vnic;
+	//dhcp_init(manager_nic->nic);
+
+	manager_netif = lwip_nic_init(manager_nic->nic, manage, NULL);
+
+	manager_server_open();
+
+	event_idle_add(manager_loop, NULL);
+	event_timer_add(manager_timer, NULL, 100000, 100000);
+
+	vm_stdio_handler(stdio_callback);
 
 	return 0;
 }
@@ -553,6 +563,9 @@ void manager_set_ip(uint32_t ip) {
  *        manager_server_close();
  *        manager_server_open();
  */
+}
+
+uint16_t manager_open(uint16_t port) {
 }
 
 uint16_t manager_get_port() {
@@ -632,7 +645,7 @@ void manager_set_interface() {
 		return;
 
 	manager_server_close();
-	nic_remove(manager_netif);
-	manager_netif = nic_init(manager_nic->nic, manage, NULL);
+	lwip_nic_remove(manager_netif);
+	manager_netif = lwip_nic_init(manager_nic->nic, manage, NULL);
 	manager_server_open();
 }

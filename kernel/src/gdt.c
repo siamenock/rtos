@@ -1,5 +1,6 @@
 #include "asm.h"
 #include "mp.h"
+#include "mmap.h"
 
 #include "gdt.h"
 

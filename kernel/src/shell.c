@@ -8,6 +8,22 @@
 
 static bool cmd_sync;
 
+static void history_erase() {
+	if(!cmd_history.using())
+		// Nothing to be erased
+		return;
+
+	/*
+	 *if(cmd_history.index >= cmd_history.count() - 1)
+	 *        // No more entity to be erased
+	 *        return;
+	 *        
+	 */
+	int len = strlen(cmd_history.get_current());
+	for(int i = 0; i < len; i++)
+		putchar('\b');
+}
+
 void shell_callback() {
 	void cmd_callback(char* result, int exit_status) {
 		cmd_update_var(result, exit_status);

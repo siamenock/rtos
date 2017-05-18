@@ -8,7 +8,7 @@ VNIC*	manager_nic;
 
 int manager_init();
 uint32_t manager_get_ip();
-uint32_t manager_set_ip(uint32_t ip);
+void manager_set_ip(uint32_t ip);
 uint16_t manager_get_port();
 void manager_set_port(uint16_t port);
 uint32_t manager_get_gateway();

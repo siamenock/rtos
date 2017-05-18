@@ -380,7 +380,7 @@ void main() {
 		printf("Analyze CPU information...\n");
 		cpu_init();
 		gmalloc_init();
-		timer_init(cpu_brand);
+		timer_init();
 
 		gdt_init();
 		tss_init();
@@ -470,6 +470,8 @@ void main() {
  
  		printf("Initializing shell...\n");
  		shell_init();
+
+		event_busy_add(idle0_event, NULL);
 	} else {
 		mp_sync();	// Barrier #2
 		ap_timer_init();
