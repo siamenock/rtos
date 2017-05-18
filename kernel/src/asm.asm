@@ -114,21 +114,6 @@ read_xmms0:
 	movaps	[rdi], xmm0
 	ret
 
-read_msr:
-	mov	ecx, edi
-	rdmsr
-	shl	rdx, 32
-	or	rax, rdx
-	ret
-
-write_msr:
-	mov	ecx, edi
-	mov	eax, esi
-	shr	rsi, 32
-	mov	edx, esi
-	wrmsr
-	ret
-
 monitor:
 	mov	rax, rdi
 	mov	ecx, 0
