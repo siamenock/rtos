@@ -25,6 +25,7 @@ kernel.dis
 kernel.smap
 *.swp
 *.tmp
+/include
 
 # SDK
 packetngin_sdk-*
@@ -41,7 +42,7 @@ tags
 cscope.out
 cscope.files
 
-# Build related 
+# Build related
 *.make
 build
 
