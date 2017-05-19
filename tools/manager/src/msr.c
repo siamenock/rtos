@@ -23,7 +23,7 @@ uint64_t msr_read(uint32_t register_address) {
 	return data;
 }
 
-void msr_write(uint32_t dx, uint32_t ax, uint32_t register_address) {
+static void write_value(uint32_t dx, uint32_t ax, uint32_t register_address) {
 	int msr = open("/dev/cpu/0/msr", O_WRONLY);
 	if(msr < 0) {
 		perror("Failed to open MSR");
@@ -46,3 +46,10 @@ void msr_write(uint32_t dx, uint32_t ax, uint32_t register_address) {
 	close(msr);
 }
 
+void msr_write(uint64_t value, uint32_t register_address) {
+	write_value(value >> 32, value & 0xFFFFFFFF, register_address);
+}
+
+void msr_write2(uint32_t dx, uint32_t ax, uint32_t register_address) {
+	write_value(dx, ax, register_address);
+}
