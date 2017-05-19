@@ -40,6 +40,9 @@ static bool is_available(ArrayQueue* this) {
 }
 
 static bool resize(ArrayQueue* this, size_t capacity, void (*popped)(void*)) {
+	if(!capacity)
+		return false;
+
 	void** array = this->malloc(capacity * sizeof(void*));
 	if(!array)
 		return false;
@@ -48,8 +51,10 @@ static bool resize(ArrayQueue* this, size_t capacity, void (*popped)(void*)) {
 	while(!this->is_empty(this)) {
 		if(tail < capacity - 1)
 			array[tail++] = this->dequeue(this);
-		else
-			popped(this->dequeue(this));
+		else {
+			if(popped)
+				popped(this->dequeue(this));
+		}
 	}
 
 	this->free(this->array);
@@ -63,6 +68,9 @@ static bool resize(ArrayQueue* this, size_t capacity, void (*popped)(void*)) {
 }
 
 ArrayQueue* arrayqueue_create(DataType type, PoolType pool, size_t initial_capacity) {
+	if(!initial_capacity)
+		return NULL;
+
 	ArrayQueue* queue = (ArrayQueue*)queue_create(type, pool, sizeof(ArrayQueue));
 	if(!queue)
 		return NULL;

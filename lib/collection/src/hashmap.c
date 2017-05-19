@@ -24,6 +24,9 @@ static void _destroy(HashMap* this) {
 }
 
 static void* get(HashMap* this, void* key) {
+	if(!key)
+		return NULL;
+
 	size_t index = this->hash(key) % this->capacity;
 	LinkedList* list = this->table[index];
 	if(!list)
@@ -40,6 +43,9 @@ static void* get(HashMap* this, void* key) {
 }
 
 static bool put(HashMap* this, void* key, void* value) {
+	if(!key)
+		return false;
+
 	if(this->size + 1 > this->threshold) {
 		// Create new this
 		HashMap* map = hashmap_create(this->type, this->pool,
@@ -106,6 +112,9 @@ static bool put(HashMap* this, void* key, void* value) {
 }
 
 static bool update(HashMap* this, void* key, void* value) {
+	if(!key)
+		return false;
+
 	size_t index = this->hash(key) % this->capacity;
 	LinkedList* list = this->table[index];
 	if(!list)
@@ -123,7 +132,10 @@ static bool update(HashMap* this, void* key, void* value) {
 	return false;
 }
 
-static void* remove(HashMap* this, void* key) {
+static void* _remove(HashMap* this, void* key) {
+	if(!key)
+		return false;
+
 	size_t index = this->hash(key) % this->capacity;
 	LinkedList* list = this->table[index];
 	if(!list)
@@ -137,9 +149,10 @@ static void* remove(HashMap* this, void* key) {
 			list->remove_at(list, i);
 			this->free(entry);
 
-			if(list->is_empty(list))
+			if(list->is_empty(list)) {
 				linkedlist_destroy(list);
-
+				this->table[index] = NULL;
+			}
 			this->size--;
 
 			return value;
@@ -154,7 +167,14 @@ static bool contains_key(HashMap* this, void* key) {
 }
 
 static bool contains_value(HashMap* this, void* value) {
-	// Not implemented yet
+	for(size_t index = 0; index < this->capacity; index++) {
+		LinkedList* list = this->table[index];
+		if(!list)
+			continue;
+
+		if(list->index_of(list, value) >= 0)
+			return true;
+	}
 	return false;
 }
 
@@ -296,7 +316,7 @@ HashMap* hashmap_create(DataType type, PoolType pool, size_t initial_capacity) {
 	map->get		= (void*)get;
 	map->put		= (void*)put;
 	map->update		= (void*)update;
-	map->remove		= (void*)remove;
+	map->remove		= (void*)_remove;
 	map->contains_key	= (void*)contains_key;
 	map->contains_value	= (void*)contains_value;
 

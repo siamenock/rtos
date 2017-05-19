@@ -60,6 +60,7 @@ kernel.smap
 *.swo
 *.tmp
 /include
+.ycm_extra_conf.py
 
 # Build-related generated
 Makefile

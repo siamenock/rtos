@@ -86,8 +86,21 @@ static void* get(LinkedList* this, size_t index) {
 }
 
 static void* set(LinkedList* this, size_t index, void* element) {
-	// Not yet implemented
-	return NULL;
+	ListNode* node = this->head;
+	while(index > 0) {
+		if(!node->next)
+			return NULL;
+
+		node = node->next;
+		index--;
+	}
+
+	if(node) {
+		void* data = node->data;
+		node->data = element;
+		return data;
+	} else
+		return NULL;
 }
 
 static void* remove_at(LinkedList* this, size_t index) {
@@ -105,6 +118,9 @@ static void* remove_at(LinkedList* this, size_t index) {
 }
 
 static bool add_at(LinkedList* this, size_t index, void* element) {
+	if(index >= this->size)
+		return false;
+
 	ListNode* node2 = this->malloc(sizeof(ListNode));
 	if(!node2)
 		return false;
@@ -113,7 +129,7 @@ static bool add_at(LinkedList* this, size_t index, void* element) {
 	node2->prev = NULL;
 	node2->next = NULL;
 
-	if(index <= 0) {
+	if(index == 0) {
 		if(this->head) {
 			this->head->prev = node2;
 			node2->next = this->head;
@@ -122,8 +138,6 @@ static bool add_at(LinkedList* this, size_t index, void* element) {
 			this->head = this->tail = node2;
 		}
 		this->size++;
-	} else if(index >= this->size) {
-		_add(this, this->tail, node2);
 	} else {
 		index--;
 
@@ -146,7 +160,7 @@ static int index_of(LinkedList* this, void* element) {
 	int index = 0;
 	void* data;
 	for_each(data, this) {
-		if(this->compare(data, element))
+		if(this->equals(data, element))
 			return index;
 		index++;
 	}
@@ -155,13 +169,28 @@ static int index_of(LinkedList* this, void* element) {
 }
 
 static bool add_first(LinkedList* this, void* element) {
-	// Not yet implemented
-	return false;
+	ListNode* node = this->malloc(sizeof(ListNode));
+	if(!node)
+		return false;
+
+	node->data = element;
+	node->prev = NULL;
+	node->next = NULL;
+
+	if(this->head) {
+		this->head->prev = node;
+		node->next = this->head;
+		this->head = node;
+	} else {
+		this->head = this->tail = node;
+	}
+	this->size++;
+
+	return true;
 }
 
 static bool add_last(LinkedList* this, void* element) {
-	// Not yet implemented
-	return false;
+	return add(this, element);
 }
 
 static void* remove_first(LinkedList* this) {
@@ -202,6 +231,7 @@ static void rotate(LinkedList* this) {
 		this->tail->next = node;
 		node->prev = this->tail;
 		this->tail = node;
+		node->next = NULL;
 	}
 }
 

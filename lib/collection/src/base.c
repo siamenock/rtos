@@ -12,10 +12,13 @@ static bool uint64_equals(void* key1, void* key2) {
 }
 
 static int uint64_compare(void* key1, void* key2) {
-	return key1 == key2;
+	return key1 - key2;
 }
 
 static uintptr_t string_hash(void* key) {
+	if(!key)
+		return 0;
+
 	char* c = key;
 	uint32_t len = 0;
 	uint32_t sum = 0;
@@ -28,26 +31,41 @@ static uintptr_t string_hash(void* key) {
 }
 
 static bool string_equals(void* key1, void* key2) {
-	char* c1 = key1;
-	char* c2 = key2;
-
-	while(*c1 != '\0' && *c2 != '\0') {
-		if(*c1++ != *c2++)
-			return false;
-	}
-
-	if(*c1 != '\0' || *c2 != '\0')
+	if(!key1 || !key2)
 		return false;
 
-	return true;
+	return strcmp(key1, key2) == 0;
 }
 
 static int string_compare(void* key1, void* key2) {
+	if(!key1 || !key2)
+		return false;
+
 	return strcmp(key1, key2);
 }
 
 static DataOps data_operations[DATATYPE_COUNT] = {
+	[DATATYPE_INT32] = {
+		.hash		= uint64_hash,
+		.equals		= uint64_equals,
+		.compare	= uint64_compare,
+	},
+	[DATATYPE_INT64] = {
+		.hash		= uint64_hash,
+		.equals		= uint64_equals,
+		.compare	= uint64_compare,
+	},
+	[DATATYPE_UINT32] = {
+		.hash		= uint64_hash,
+		.equals		= uint64_equals,
+		.compare	= uint64_compare,
+	},
 	[DATATYPE_UINT64] = {
+		.hash		= uint64_hash,
+		.equals		= uint64_equals,
+		.compare	= uint64_compare,
+	},
+	[DATATYPE_POINTER] = {
 		.hash		= uint64_hash,
 		.equals		= uint64_equals,
 		.compare	= uint64_compare,
@@ -57,7 +75,6 @@ static DataOps data_operations[DATATYPE_COUNT] = {
 		.equals		= string_equals,
 		.compare	= string_compare,
 	},
-	// TODO: implement other types
 };
 
 static PoolOps pool_operations[POOLTYPE_COUNT] = {
@@ -72,18 +89,37 @@ static PoolOps pool_operations[POOLTYPE_COUNT] = {
 
 int register_type(DataType type, uint64_t (*hash)(void*),
 		bool (*equals)(void*, void*), int (*compare)(void*, void*)) {
-	// Not yet implemented
+	if(type >= DATATYPE_COUNT)
+		return 1;
+
+	DataOps d = {
+		.hash = hash,
+		.equals = equals,
+		.compare = compare,
+	};
+	data_operations[type] = d;
+
 	return 0;
 }
 
-int register_pool(PoolType pool, void* (*malloc)(size_t), void* (*free)(void*),
+int register_pool(PoolType pool, void* (*malloc)(size_t), void (*free)(void*),
 		void* (*calloc)(size_t, size_t), void* (*realloc)(void*, size_t)) {
-	// Not yet implemented
+	if(pool >= POOLTYPE_COUNT)
+		return 1;
+
+	PoolOps po = {
+		.malloc = malloc,
+		.free = free,
+		.calloc = calloc,
+		.realloc = realloc,
+	};
+	pool_operations[pool] = po;
+
 	return 0;
 }
 
 DataOps* data_ops(DataType type) {
-	if(type < 0 || type >= DATATYPE_COUNT)
+	if(type >= DATATYPE_COUNT)
 		return NULL;
 
 	if(!data_operations[type].hash)
@@ -93,7 +129,7 @@ DataOps* data_ops(DataType type) {
 }
 
 PoolOps* pool_ops(PoolType pool) {
-	if(pool < 0 || pool >= POOLTYPE_COUNT)
+	if(pool >= POOLTYPE_COUNT)
 		return NULL;
 
 	if(!pool_operations[pool].malloc)
