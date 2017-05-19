@@ -52,6 +52,22 @@ enum NICDEV_PROCESS_RESULT {
 	NICDEV_PROCESS_PASS,
 };
 
+#define	NICDEV_DEBUG_OFF			0
+#define	NICDEV_DEBUG_PACKET_INFO		1 << 1
+#define	NICDEV_DEBUG_PACKET_DUMP		1 << 2
+#define NICDEV_DEBUG_PACKET_ETHER_INFO		1 << 3
+#define NICDEV_DEBUG_PACKET_VERBOSE_INFO	1 << 4
+
+/**
+ * @param debug option
+ */
+void nidev_debug_switch_set(uint8_t opt);
+
+/**
+ * @return debug option
+ */
+uint8_t nicdev_debug_switch_get();
+
 /**
  * @param dev NIC device
  * @param data data to be sent

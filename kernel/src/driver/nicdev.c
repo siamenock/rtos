@@ -188,6 +188,47 @@ VNIC* nicdev_update_vnic(NICDevice* dev, VNIC* src_vnic) {
 
 	return dst_vnic;
 }
+
+static uint8_t packet_debug_switch;
+void nidev_debug_switch_set(uint8_t opt) {
+	packet_debug_switch = opt;
+}
+
+uint8_t nicdev_debug_switch_get() {
+	return packet_debug_switch;
+}
+
+#define likely(x)       __builtin_expect((x),1)
+#define unlikely(x)     __builtin_expect((x),0)
+
+inline static void packet_dump(void* _data, size_t size) {
+	if(unlikely(!!packet_debug_switch)) {
+		if(packet_debug_switch | NICDEV_DEBUG_PACKET_INFO) {
+			printf("Packet Lengh: %d\n", size);
+		}
+
+		Ether* eth = _data;
+		if(packet_debug_switch | NICDEV_DEBUG_PACKET_ETHER_INFO) {
+			printf("Ether Type: %02x\n", endian16(eth->type));
+		}
+
+		if(packet_debug_switch | NICDEV_DEBUG_PACKET_VERBOSE_INFO) {
+			//TODO
+		}
+
+		if(packet_debug_switch | NICDEV_DEBUG_PACKET_DUMP) {
+			uint8_t* data = (uint8_t*)_data;
+			for(int i = 0 ; i < size;) {
+				for(int j = 0; j < 16 && i < size; j++, i++) {
+					printf("%02x ", data[i] & 0xff);
+				}
+				printf("\n");
+			}
+			printf("\n");
+		}
+	}
+}
+
 /**
  * @param dev NIC device
  * @param data data to be sent
@@ -195,29 +236,6 @@ VNIC* nicdev_update_vnic(NICDevice* dev, VNIC* src_vnic) {
  *
  * @return result of process
  */
-
-static bool packet_dump_switch;
-void nidev_dump_switch(bool enable) {
-	packet_dump_switch = enable;
-}
-
-void packet_dump(void* _data, size_t size) {
-	if(packet_dump_switch) {
-		uint8_t* data = (uint8_t*)_data;
-		Ether* eth = data;
-		printf("Packet Lengh: %d\n", size);
-		printf("Ether Type: %02x\n", endian16(eth->type));
-		//TODO Add packet header information
-		for(int i = 0 ; i < size;) {
-			for(int j = 0; j < 16 && i < size; j++, i++) {
-				printf("%02x ", data[i] & 0xff);
-			}
-			printf("\n");
-		}
-		printf("\n");
-	}
-}
-
 int nicdev_rx(NICDevice* dev, void* data, size_t size) {
 	Ether* eth = data;
 	int i;
