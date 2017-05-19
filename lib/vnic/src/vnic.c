@@ -218,9 +218,12 @@ bool vnic_rx(VNIC* vnic, uint8_t* buf1, size_t size1, uint8_t* buf2, size_t size
 	 */
 
 	//TODO strict check
-	lock_lock(&vnic->nic->rx.wlock);
+	if(!lock_trylock(&vnic->nic->rx.wlock))
+		return false;
+
 	vnic->rx.head = vnic->nic->rx.head;
 	if(queue_available(&vnic->rx)) {
+		// TODO DO NOT call nic_alloc()
 		Packet* packet = nic_alloc(vnic->nic, size1 + size2);
 		if(packet == NULL) {
 			lock_unlock(&vnic->nic->rx.wlock);
@@ -258,8 +261,9 @@ bool vnic_rx2(VNIC* vnic, Packet* packet) {
 	if(vnic->rx_closed - vnic->rx_wait_grace > time) {
 		return false;
 	}
-	//TODO try_lock
-	lock_lock(&vnic->nic->rx.wlock);
+	if(!lock_trylock(&vnic->nic->rx.wlock))
+		return false;
+
 	vnic->rx.head = vnic->nic->rx.head;
 	if(queue_push(vnic->nic, &vnic->rx, packet)) {
 		vnic->nic->rx.tail = vnic->rx.tail;
@@ -284,9 +288,11 @@ bool vnic_has_srx(VNIC* vnic) {
 }
 
 bool vnic_srx(VNIC* vnic, uint8_t* buf1, size_t size1, uint8_t* buf2, size_t size2) {
-	lock_lock(&vnic->nic->srx.wlock);
+	if(!lock_trylock(&vnic->nic->srx.wlock))
+		return false;
 	vnic->srx.head = vnic->nic->srx.head;
 	if(queue_available(&vnic->srx)) {
+		// TODO DO NOT call nic_alloc()
 		Packet* packet = nic_alloc(vnic->nic, size1 + size2);
 		if(packet == NULL) {
 			lock_unlock(&vnic->nic->srx.wlock);
@@ -315,7 +321,8 @@ bool vnic_srx(VNIC* vnic, uint8_t* buf1, size_t size1, uint8_t* buf2, size_t siz
 
 bool vnic_srx2(VNIC* vnic, Packet* packet) {
 	//TODO try_lock
-	lock_lock(&vnic->nic->srx.wlock);
+	if(!lock_trylock(&vnic->nic->srx.wlock))
+		return false;
 	vnic->srx.head = vnic->nic->srx.head;
 	if(queue_push(vnic->nic, &vnic->srx, packet)) {
 		vnic->nic->srx.tail = vnic->srx.tail;
@@ -335,12 +342,12 @@ bool vnic_has_tx(VNIC* vnic) {
 
 Packet* vnic_tx(VNIC* vnic) {
 	//TODO check
-	//TODO try lock
 	uint64_t time = timer_frequency();
 	if(vnic->tx_closed - vnic->tx_wait_grace > time)
 		return NULL;
 
-	lock_lock(&vnic->nic->tx.rlock);
+	if(!lock_trylock(&vnic->nic->tx.rlock))
+		return NULL;
 	vnic->tx.tail = vnic->nic->tx.tail;
 	Packet* packet = queue_pop(vnic->nic, &vnic->tx);
 
@@ -363,8 +370,8 @@ bool vnic_has_stx(VNIC* vnic) {
 }
 
 Packet* vnic_stx(VNIC* vnic) {
-	//TODO try lock
-	lock_lock(&vnic->nic->stx.rlock);
+	if(!lock_trylock(&vnic->nic->stx.rlock))
+		return NULL;
 	vnic->stx.tail = vnic->nic->stx.tail;
 	Packet* packet = queue_pop(vnic->nic, &vnic->stx);
 	vnic->nic->stx.head = vnic->stx.head;
