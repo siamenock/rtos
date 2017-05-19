@@ -38,6 +38,10 @@ GTAGS
 # Hidden file
 .*
 
+# Build related
+*.make
+build
+
 # Generated
 ./kernel/test/*
 loader/src/entry_tmp.asm
@@ -55,6 +59,7 @@ kernel.smap
 *.swp
 *.swo
 *.tmp
+/include
 
 # Build-related generated
 Makefile
