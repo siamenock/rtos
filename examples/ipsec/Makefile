@@ -1,13 +1,13 @@
 .PHONY: run all depend clean
 #-nostdinc 
-CFLAGS = -I ../../../lib/newlib/newlib/libc/include -I ../../include -O2 -Wall -Werror -m64 -ffreestanding -std=gnu99
+CFLAGS = -I ../../../lib/newlib/newlib/libc/include -I ../../lib/include -O2 -Wall -Werror -m64 -ffreestanding -std=gnu99
 
 DIR = obj 
 
 #OBJS = obj/SA.o obj/SAD.o obj/SPD.o obj/authenticator.o obj/decryptor.o obj/encryptor.o obj/s_window.o obj/IPSec_module.o obj/main.o
 OBJS = obj/SA.o obj/SAD.o obj/SPD.o obj/authenticator.o obj/decryptor.o obj/encryptor.o obj/s_window.o obj/IPSec_module.o obj/main.o
 
-LIBS = --start-group ../../lib/libpacketngin.a ../../lib/libcrypto.a ../../lib/libssl.a --end-group
+LIBS = --start-group ../../lib/libcore.a ../../lib/libcrypto.a ../../lib/libssl.a --end-group
 
 all: $(OBJS)
 	ld -melf_x86_64 -nostdlib -e main -o main $^ $(LIBS)
