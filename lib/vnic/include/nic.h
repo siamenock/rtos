@@ -12,6 +12,7 @@
 
 #define MAX_NIC_NAME_LEN	16
 
+// ROUNDUP(0, 8) -> 0 : ROUNDUP(3, 8) -> 8 : ROUNDUP(8,8) -> 8
 #define ROUNDUP(x, y)	((((x) + (y) - 1) / (y)) * (y))
 
 #define NIC_MAX_COUNT		64
@@ -24,28 +25,28 @@
 
 /**
  * @file
- * Virtual Network Interface Controller (vNIC) host API
+ * Network Interface Controller (NIC) host API
  */
 
 // Host API
 
-typedef struct _NIC_Queue {
-	uint32_t	base;
-	uint32_t	head;
-	uint32_t	tail;
-	uint32_t	size;
-	volatile uint8_t rlock;
-	volatile uint8_t wlock;
-} NIC_Queue;
+typedef struct _NICQueue {
+	uint32_t	base;		///< Base offset
+	uint32_t	head;		///< Queue head
+	uint32_t	tail;		///< Queue tail
+	uint32_t	size;		///< Maximum number of packets this queue can have
+	volatile uint8_t rlock;		///< Read lock
+	volatile uint8_t wlock;		///< Write lock
+} NICQueue;
 
-typedef struct _NIC_Pool {
+typedef struct _NICPool {
 	uint32_t	bitmap;
 	uint32_t	count;
 	uint32_t	pool;
 	uint32_t	index;
 	uint32_t	used;
 	volatile uint8_t lock;
-} NIC_Pool;
+} NICPool;
 
 /**
  * NIC Memory Map
@@ -62,14 +63,12 @@ typedef struct _NIC_Pool {
  */
 typedef struct _NIC {
 	// 2MBs aligned
-	uint64_t	magic;
+	uint64_t	magic;			///< A magic value to verify that the NIC object was found correctly
+	uint32_t	id;			///< NIC unique ID (unique ID in RTOS; copied from VNIC)
+	uint64_t	mac;			///< MAC Address
 
-	uint32_t	id;	// NIC unique ID (unique ID in RTOS)
-
-	uint64_t	mac;
-
-	uint64_t	rx_bandwidth;
-	uint64_t	tx_bandwidth;
+	uint64_t	rx_bandwidth;		///< Rx bandwith limit (bps)
+	uint64_t	tx_bandwidth;		///< Tx bandwith limit (bps)
 
 	uint64_t	input_bytes;		///< Total input bytes (read only)
 	uint64_t	input_packets;		///< Total input packets (read only)
@@ -83,13 +82,13 @@ typedef struct _NIC {
 	uint16_t	padding_head;
 	uint16_t	padding_tail;
 
-	NIC_Queue	rx;
-	NIC_Queue	tx;
+	NICQueue	rx;
+	NICQueue	tx;
 
-	NIC_Queue	srx;
-	NIC_Queue	stx;
+	NICQueue	srx;
+	NICQueue	stx;
 
-	NIC_Pool	pool;
+	NICPool		pool;
 
 	uint32_t	config;
 	uint8_t		config_head[0];
@@ -110,11 +109,11 @@ NIC* nic_get_by_id(uint32_t id);
 Packet* nic_alloc(NIC* nic, uint16_t size);
 bool nic_free(Packet* packet);
 
-bool queue_push(NIC* nic, NIC_Queue* queue, Packet* packet);
-void* queue_pop(NIC* nic, NIC_Queue* queue);
-uint32_t queue_size(NIC_Queue* queue);
-bool queue_available(NIC_Queue* queue);
-bool queue_empty(NIC_Queue* queue);
+bool queue_push(NIC* nic, NICQueue* queue, Packet* packet);
+void* queue_pop(NIC* nic, NICQueue* queue);
+uint32_t queue_size(NICQueue* queue);
+bool queue_available(NICQueue* queue);
+bool queue_empty(NICQueue* queue);
 
 bool nic_has_rx(NIC* nic);
 Packet* nic_rx(NIC* nic);

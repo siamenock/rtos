@@ -1,87 +1,96 @@
-//#include <errno.h>
 #include <string.h>
 #include <lock.h>
 #include <vnic.h>
 #include <nic.h>
 
-#define DEBUG		1
-#define ALIGN		16
-
-/**
- *
- * Error: errno
- * 1: mandatory attributes not specified
- * 2: Conflict attributes speicifed
- * 3: Pool size is not multiple of 2MB
- * 4: Not enough memory
- */
-
-inline uint64_t timer_frequency() {
-	uint64_t time;
-	uint32_t* p = (uint32_t*)&time;
-	asm volatile("rdtsc" : "=a"(p[0]), "=d"(p[1]));
-	
-	return time;
-}
-
-#define ID_BUFFER_SIZE		(128 * MAX_VNIC_COUNT / 8)
+#define ID_BUFFER_SIZE (128 * MAX_VNIC_COUNT / 8)
 static uint8_t id_map[ID_BUFFER_SIZE];
 
-int vnic_alloc_id() {
-	int i, j;
-	uint8_t idx;
-	for(i = 0; i < ID_BUFFER_SIZE; i++) {
-		if(~id_map[i] & 0xff) {
-			idx = 1;
-			for(j = 0; j < 8; j++) {
-				if(!(id_map[i] & idx)) {
-					id_map[i] |= idx;
-					return i * 8 + j;
-				}
+static uint64_t TIMER_FREQUENCY_PER_SEC;
 
-				idx <<= 1;
+void vnic__init_timer(uint64_t freq_per_sec) {
+	TIMER_FREQUENCY_PER_SEC = freq_per_sec;
+}
+
+inline uint64_t timer_frequency() {
+	uint64_t t;
+	uint32_t* p = (uint32_t*)&t;
+	asm volatile("rdtsc" : "=a"(p[0]), "=d"(p[1]));
+	return t;
+}
+
+int vnic_alloc_id() {
+	uint8_t bit;
+	for(size_t bucket = 0; bucket < ID_BUFFER_SIZE; bucket++) {
+		// If all slots in the bucket are not in use
+		if(~id_map[bucket] & 0xff) {
+			bit = 0x1;
+			for(size_t slot = 0; slot < 8; slot++) {
+				if(!(id_map[bucket] & bit)) {
+					id_map[bucket] |= bit;
+					return bucket * 8 + slot;
+				}
+				bit <<= 1;
 			}
 		}
 	}
-
 	return -1;
 }
 
 void vnic_free_id(int id) {
-	int index = id / 8;
-	uint8_t idx = 1 << (id % 8);
+	int bucket = id / 8;
+	uint8_t slot = 1 << (id % 8);
 
-	id_map[index] |= idx;
-	id_map[index] ^= idx;
+	// Mark slot in use and reliably remove it
+	id_map[bucket] |= slot;
+	id_map[bucket] ^= slot;
 }
 
-static int nic_init(uint64_t mac, void* base, size_t size,
-		uint64_t rx_bandwidth, uint64_t tx_bandwidth,
-		uint16_t padding_head, uint16_t padding_tail,
-		uint32_t rx_queue_size, uint32_t tx_queue_size,
-		uint32_t srx_queue_size, uint32_t stx_queue_size) {
+static uint64_t get_value(uint64_t* attrs, uint64_t key) {
+	int i = 0;
+	while(attrs[i * 2] != VNIC_NONE) {
+		if(attrs[i * 2] == key)
+			return attrs[i * 2 + 1];
+		i++;
+	}
+	return (uint64_t)-1;
+}
 
+static bool has_mandatory(uint64_t* attrs) {
+	int match = 0;
+	int mendatory_count = VNIC__MAND_END - VNIC__MAND_STRT -1;
+	for (int i = 0; i != mendatory_count; ++i) {
+		for(int j = 0; attrs[j] != VNIC_NONE; j += 2)
+			if(attrs[j] > VNIC__MAND_STRT && attrs[j] < VNIC__MAND_END)
+				match += 1;
+	}
+	return match == mendatory_count;
+}
+
+static int nic_init(void* base, uint64_t* attrs) {
+	if(!has_mandatory(attrs))
+		return VNIC_ERROR_ATTRIBUTE_MISSING;
 	if((uintptr_t)base == 0 || (uintptr_t)base % 0x200000 != 0)
-		return 1;
+		return VNIC_ERROR_INVALID_BASE;
+	if(get_value(attrs, VNIC_POOL_SIZE) % 0x200000 != 0)
+		return VNIC_ERROR_INVALID_POOLSIZE;
 
-	if(size % 0x200000 != 0)
-		return 2;
-
+	uint64_t size = get_value(attrs, VNIC_POOL_SIZE);
 	int index = sizeof(NIC);
 
 	NIC* nic = base;
 	nic->magic = NIC_MAGIC_HEADER;
 	nic->id = 0;
-	nic->mac = mac;
-	nic->rx_bandwidth = rx_bandwidth;
-	nic->tx_bandwidth = tx_bandwidth;
-	nic->padding_head = padding_head;
-	nic->padding_tail = padding_tail;
+	nic->mac = get_value(attrs, VNIC_MAC);
+	nic->rx_bandwidth = get_value(attrs, VNIC_RX_BANDWIDTH);
+	nic->tx_bandwidth = get_value(attrs, VNIC_TX_BANDWIDTH);
+	nic->padding_head = get_value(attrs, VNIC_PADDING_HEAD);
+	nic->padding_tail = get_value(attrs, VNIC_PADDING_TAIL);
 
 	nic->rx.base = index;
 	nic->rx.head = 0;
 	nic->rx.tail = 0;
-	nic->rx.size = rx_queue_size;
+	nic->rx.size = get_value(attrs, VNIC_RX_QUEUE_SIZE);
 	nic->rx.rlock = 0;
 	nic->rx.wlock = 0;
 
@@ -90,7 +99,7 @@ static int nic_init(uint64_t mac, void* base, size_t size,
 	nic->tx.base = index;
 	nic->tx.head = 0;
 	nic->tx.tail = 0;
-	nic->tx.size = tx_queue_size;
+	nic->tx.size = get_value(attrs, VNIC_TX_QUEUE_SIZE);
 	nic->tx.rlock = 0;
 	nic->tx.wlock = 0;
 
@@ -99,7 +108,7 @@ static int nic_init(uint64_t mac, void* base, size_t size,
 	nic->srx.base = index;
 	nic->srx.head = 0;
 	nic->srx.tail = 0;
-	nic->srx.size = srx_queue_size;
+	nic->srx.size = get_value(attrs, VNIC_SLOW_RX_QUEUE_SIZE);
 	nic->srx.rlock = 0;
 	nic->srx.wlock = 0;
 
@@ -108,7 +117,7 @@ static int nic_init(uint64_t mac, void* base, size_t size,
 	nic->stx.base = index;
 	nic->stx.head = 0;
 	nic->stx.tail = 0;
-	nic->stx.size = stx_queue_size;
+	nic->stx.size = get_value(attrs, VNIC_SLOW_TX_QUEUE_SIZE);
 	nic->stx.rlock = 0;
 	nic->stx.wlock = 0;
 
@@ -132,154 +141,201 @@ static int nic_init(uint64_t mac, void* base, size_t size,
 }
 
 bool vnic_init(VNIC* vnic, uint64_t* attrs) {
-	bool has_key(uint64_t key) {
-		int i = 0;
-		while(attrs[i * 2] != VNIC_NONE) {
-			if(attrs[i * 2] == key)
-				return true;
-
-			i++;
-		}
-
+	if(nic_init(vnic->nic, attrs) != 0)
 		return false;
-	}
 
-	uint64_t get_value(uint64_t key) {
-		int i = 0;
-		while(attrs[i * 2] != VNIC_NONE) {
-			if(attrs[i * 2] == key)
-				return attrs[i * 2 + 1];
-
-			i++;
-		}
-
-		return (uint64_t)-1;
-	}
-
-	//TODO check key
-	if(!has_key(VNIC_DEV) || !has_key(VNIC_MAC) || !has_key(VNIC_POOL_SIZE) ||
-			!has_key(VNIC_RX_BANDWIDTH) || !has_key(VNIC_TX_BANDWIDTH) ||
-			!has_key(VNIC_PADDING_HEAD) || !has_key(VNIC_PADDING_TAIL)) {
-		return false;
-	}
-
-	nic_init(get_value(VNIC_MAC), vnic->nic, get_value(VNIC_POOL_SIZE),
-			get_value(VNIC_RX_BANDWIDTH), get_value(VNIC_TX_BANDWIDTH),
-			get_value(VNIC_PADDING_HEAD), get_value(VNIC_PADDING_TAIL),
-			get_value(VNIC_RX_QUEUE_SIZE), get_value(VNIC_TX_QUEUE_SIZE),
-			get_value(VNIC_SLOW_RX_QUEUE_SIZE), get_value(VNIC_SLOW_TX_QUEUE_SIZE));
+	strncpy(vnic->parent, (char*)get_value(attrs, VNIC_DEV), MAX_NIC_NAME_LEN);
 	vnic->nic->id = vnic->id;
-
-	strncpy(vnic->parent, (char*)get_value(VNIC_DEV), MAX_NIC_NAME_LEN);
-	//TODO fix default value
-	if(has_key(VNIC_BUDGET))
-		vnic->budget = get_value(VNIC_BUDGET);
-	else
-		vnic->budget = 32;
+	vnic->budget = get_value(attrs, VNIC_BUDGET) > 32 ? : 32;
 	vnic->magic = vnic->nic->magic;
 	vnic->mac = vnic->nic->mac;
+
 	vnic->rx_bandwidth = vnic->nic->rx_bandwidth;
 	vnic->tx_bandwidth = vnic->nic->tx_bandwidth;
 	vnic->padding_head = vnic->nic->padding_head;
 	vnic->padding_tail = vnic->nic->padding_tail;
+
 	vnic->rx = vnic->nic->rx;
 	vnic->tx = vnic->nic->tx;
 	vnic->srx = vnic->nic->srx;
 	vnic->stx = vnic->nic->stx;
 
-	//TODO
-// 	vnic->min_buffer_size = 128;
-// 	vnic->max_buffer_size = 2048;
-
 	vnic->rx_closed = vnic->tx_closed = timer_frequency();
+	vnic->rx_wait = TIMER_FREQUENCY_PER_SEC * 8 / vnic->rx_bandwidth;
+	vnic->rx_wait_grace = TIMER_FREQUENCY_PER_SEC / 100;
+	vnic->tx_wait = TIMER_FREQUENCY_PER_SEC * 8 / vnic->tx_bandwidth;
+	vnic->tx_wait_grace = TIMER_FREQUENCY_PER_SEC / 1000;
 
 	return true;
 }
 
-uint32_t vnic_update(VNIC* vnic, uint64_t* attrs) {
-	//TODO
-	return 0;
+VNICError vnic_update(VNIC* vnic, uint64_t* attrs) {
+	// TODO impl
+	return VNIC_ERROR_UNSUPPORTED;
 }
 
-//TODO fix name
-bool vnic_rx_available(VNIC* vnic) {
-	vnic->rx.head = vnic->nic->rx.head;
-	return queue_available(&vnic->rx);
+Packet* vnic_alloc(VNIC* vnic, size_t size) {
+	if(!lock_trylock(&vnic->nic->pool.lock))
+		return NULL;
+
+	uint8_t* bitmap = (void*)vnic->nic + vnic->pool.bitmap;
+	uint32_t count = vnic->pool.count;
+	void* pool = (void*)vnic->nic + vnic->pool.pool;
+
+	uint32_t size2 = sizeof(Packet) + vnic->padding_head + size + vnic->padding_tail;
+	uint8_t req = (ROUNDUP(size2, NIC_CHUNK_SIZE)) / NIC_CHUNK_SIZE;
+
+
+	uint32_t index = vnic->nic->pool.index;
+
+
+	// Find tail
+	 uint32_t idx = 0;
+	for(idx = index; idx <= count - req; idx++) {
+		for(uint32_t j = 0; j < req; j++) {
+			if(bitmap[idx + j] == 0) {
+				continue;
+			} else {
+				idx += j + bitmap[idx + j];
+				goto next;
+			}
+		}
+
+		goto found;
+next:
+		;
+	}
+
+	// Find head
+	for(idx = 0; idx < index - req; idx++) {
+		for(uint32_t j = 0; j < req; j++) {
+			if(bitmap[idx + j] == 0) {
+				continue;
+			} else {
+				idx += j + bitmap[idx + j];
+				goto notfound;
+			}
+		}
+
+		goto found;
+	}
+
+notfound:
+	// Not found
+	lock_unlock(&vnic->nic->pool.lock);
+	return NULL;
+
+found:
+	vnic->nic->pool.index = idx + req;
+	for(uint32_t k = 0; k < req; k++) {
+		bitmap[idx + k] = req - k;
+	}
+
+	vnic->nic->pool.used += req;
+
+	lock_unlock(&vnic->nic->pool.lock);
+
+	Packet* packet = pool + (idx * NIC_CHUNK_SIZE);
+	packet->time = 0;
+	packet->start = 0;
+	packet->end = 0;
+	packet->size = (req * NIC_CHUNK_SIZE) - sizeof(Packet);
+
+	return packet;
 }
 
-//TODO return error number
-bool vnic_rx(VNIC* vnic, uint8_t* buf1, size_t size1, uint8_t* buf2, size_t size2) {
-	uint64_t time = timer_frequency();
-	//TODO
+void vnic_free(VNIC* vnic, Packet* packet) {
 	/*
-	 *if(vnic->rx_closed - vnic->rx_wait_grace > time) {
-	 *        return -1;
-	 *}
+	 * 1. packet에서 nic을 찾아냄
+	 * 2. nic에서 vnic을 찾아냄 (nic의 id값을 활용함. 그러나 해당 값을 믿을 수 없기 때문에 검증은 꼭 필요함)
+	 * 3. vnic의 메모리 풀에서 해당 패킷을 제거함 (vnic_alloc의 역순으로 처리)
 	 */
+	lock_lock(&vnic->nic->pool.lock);
 
-	//TODO strict check
+}
+
+VNICError vnic_rx(VNIC* vnic, uint8_t* buf1, size_t size1, uint8_t* buf2, size_t size2) {
+	const uint64_t t = timer_frequency();
+	const size_t size = size1 + size2;
+	if(vnic->rx_closed - vnic->rx_wait_grace > t) // TODO
+		return -1;
+
 	if(!lock_trylock(&vnic->nic->rx.wlock))
-		return false;
+		return VNIC_ERROR_RESOURCE_NOT_AVAILABLE;
 
 	vnic->rx.head = vnic->nic->rx.head;
 	if(queue_available(&vnic->rx)) {
-		// TODO DO NOT call nic_alloc()
-		Packet* packet = nic_alloc(vnic->nic, size1 + size2);
-		if(packet == NULL) {
+		Packet* packet = vnic_alloc(vnic, size);
+		if(!packet) {
 			lock_unlock(&vnic->nic->rx.wlock);
-			return false;
+			goto drop;
 		}
 
 		memcpy(packet->buffer + packet->start, buf1, size1);
-		memcpy(packet->buffer + packet->start + size1, buf2, size2);
-
-		packet->end = packet->start + size1 + size2;
+		if(size2)
+			memcpy(packet->buffer + packet->start + size1, buf2, size2);
+		packet->end = packet->start + size;
 
 		if(queue_push(vnic->nic, &vnic->rx, packet)) {
 			vnic->nic->rx.tail = vnic->rx.tail;
 			lock_unlock(&vnic->nic->rx.wlock);
 
-			if(vnic->rx_closed > time)
-				vnic->rx_closed += vnic->rx_wait * (size1 + size2);
+			if(vnic->rx_closed > t)
+				vnic->rx_closed += vnic->rx_wait * size;
 			else
-				vnic->rx_closed = time + vnic->rx_wait * (size1 + size2);
+				vnic->rx_closed = t + vnic->rx_wait * size;
 
-			return true;
+			vnic->input_packets += 1;
+			vnic->input_bytes += size;
+			return VNIC_ERROR_NOERROR;
 		} else {
 			lock_unlock(&vnic->nic->rx.wlock);
 			nic_free(packet);
-			return false;
+			goto drop;
 		}
 	} else {
 		lock_unlock(&vnic->nic->rx.wlock);
-		return false;
+		goto drop;
 	}
+
+drop:
+	vnic->input_drop_packets += 1;
+	vnic->input_drop_bytes += size;
+	return VNIC_ERROR_RESOURCE_NOT_AVAILABLE;
 }
 
-bool vnic_rx2(VNIC* vnic, Packet* packet) {
-	uint64_t time = timer_frequency();
-	if(vnic->rx_closed - vnic->rx_wait_grace > time) {
-		return false;
-	}
+VNICError vnic_rx2(VNIC* vnic, Packet* packet) {
+	// For VNICs belonging to the same VM: exchanging is done by putting packets in the queue
+	// For VNICs not in the same VM: packets are replicated for exchange
+	uint64_t t = timer_frequency();
+	if(vnic->rx_closed - vnic->rx_wait_grace > t)
+		goto drop;
 	if(!lock_trylock(&vnic->nic->rx.wlock))
-		return false;
+		goto drop;
 
 	vnic->rx.head = vnic->nic->rx.head;
 	if(queue_push(vnic->nic, &vnic->rx, packet)) {
 		vnic->nic->rx.tail = vnic->rx.tail;
 		lock_unlock(&vnic->nic->rx.wlock);
 
-		if(vnic->rx_closed > time)
+		if(vnic->rx_closed > t)
 			vnic->rx_closed += vnic->rx_wait * (packet->end - packet->start);
 		else
-			vnic->rx_closed = time + vnic->rx_wait * (packet->end - packet->start);
+			vnic->rx_closed = t + vnic->rx_wait * (packet->end - packet->start);
 
-		return true;
+		vnic->input_packets += 1;
+		vnic->input_bytes += packet->end - packet->start;
+		return VNIC_ERROR_NOERROR;
 	} else {
 		lock_unlock(&vnic->nic->rx.wlock);
 		nic_free(packet);
-		return false;
+		goto drop;
 	}
+
+drop:
+	vnic->input_drop_packets += 1;
+	vnic->input_drop_bytes += packet->end - packet->start;
+	return VNIC_ERROR_RESOURCE_NOT_AVAILABLE;
 }
 
 bool vnic_has_srx(VNIC* vnic) {
@@ -290,10 +346,11 @@ bool vnic_has_srx(VNIC* vnic) {
 bool vnic_srx(VNIC* vnic, uint8_t* buf1, size_t size1, uint8_t* buf2, size_t size2) {
 	if(!lock_trylock(&vnic->nic->srx.wlock))
 		return false;
+
+	size_t size = size1 + size2;
 	vnic->srx.head = vnic->nic->srx.head;
 	if(queue_available(&vnic->srx)) {
-		// TODO DO NOT call nic_alloc()
-		Packet* packet = nic_alloc(vnic->nic, size1 + size2);
+		Packet* packet = vnic_alloc(vnic, size);
 		if(packet == NULL) {
 			lock_unlock(&vnic->nic->srx.wlock);
 			return false;
@@ -302,7 +359,7 @@ bool vnic_srx(VNIC* vnic, uint8_t* buf1, size_t size1, uint8_t* buf2, size_t siz
 		memcpy(packet->buffer + packet->start, buf1, size1);
 		memcpy(packet->buffer + packet->start + size1, buf2, size2);
 
-		packet->end = packet->start + size1 + size2;
+		packet->end = packet->start + size;
 
 		if(queue_push(vnic->nic, &vnic->srx, packet)) {
 			vnic->nic->srx.tail = vnic->srx.tail;
@@ -320,7 +377,6 @@ bool vnic_srx(VNIC* vnic, uint8_t* buf1, size_t size1, uint8_t* buf2, size_t siz
 }
 
 bool vnic_srx2(VNIC* vnic, Packet* packet) {
-	//TODO try_lock
 	if(!lock_trylock(&vnic->nic->srx.wlock))
 		return false;
 	vnic->srx.head = vnic->nic->srx.head;
@@ -341,9 +397,11 @@ bool vnic_has_tx(VNIC* vnic) {
 }
 
 Packet* vnic_tx(VNIC* vnic) {
-	//TODO check
-	uint64_t time = timer_frequency();
-	if(vnic->tx_closed - vnic->tx_wait_grace > time)
+	if(!vnic_has_tx(vnic))
+		return NULL;
+
+	uint64_t t = timer_frequency();
+	if(vnic->tx_closed - vnic->tx_wait_grace > t)
 		return NULL;
 
 	if(!lock_trylock(&vnic->nic->tx.rlock))
@@ -352,10 +410,10 @@ Packet* vnic_tx(VNIC* vnic) {
 	Packet* packet = queue_pop(vnic->nic, &vnic->tx);
 
 	if(packet) {
-		if(vnic->tx_closed > time)
+		if(vnic->tx_closed > t)
 			vnic->tx_closed += vnic->tx_wait * (packet->end - packet->start);
 		else
-			vnic->tx_closed = time + vnic->tx_wait * (packet->end - packet->start);
+			vnic->tx_closed = t + vnic->tx_wait * (packet->end - packet->start);
 	}
 
 	vnic->nic->tx.head = vnic->tx.head;
