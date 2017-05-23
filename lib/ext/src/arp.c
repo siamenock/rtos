@@ -1,33 +1,18 @@
 #include <timer.h>
-#include <_malloc.h>
+#include <string.h>
 #include <net/interface.h>
 #include <net/ether.h>
 #include <net/arp.h>
-#include <util/map.h>
+#include <nic.h>
 
 #define ARP_TABLE		"net.arp.arptable"
 #define ARP_TABLE_GC		"net.arp.arptable.gc"
-#define ARP_ENTITY_MAX_COUNT	16
-#define ARP_TIMEOUT		14400 * 1000000;	// 4 hours  (us)
+#define ARP_TIMEOUT		(uint64_t)14400 * 1000000	// 4 hours  (us)
 
-#define GC_INTERVAL	(10 * 1000000)	// 10 secs
-
-typedef struct _ARPEntity {
-	uint64_t	mac;
-	uint32_t	addr;
-	uint64_t	timeout;
-
-	bool		dynamic;
-	int		next;
-} ARPEntity;
-
-typedef struct ARPTable {
-	uint16_t	arp_entity_count;
-	ARPEntity 	arp_entity[ARP_ENTITY_MAX_COUNT];
-} ARPTable;
+#define GC_INTERVAL		(uint64_t)10 * 1000000	// 10 secs
 
 //TODO When load application in kernel, do set arp_table.
-inline ARPTable* get_arp_table(NIC* nic) {
+ARPTable* arp_get_table(NIC* nic) {
 	//TODO Add cache
 	static NIC* _nic = NULL;
 	static ARPTable* arp_table = NULL;
@@ -51,16 +36,12 @@ inline ARPTable* get_arp_table(NIC* nic) {
 	return arp_table;
 }
 
-// static bool arp_table_destroy(NIC* nic) {
-// 	int32_t arp_table_key = nic_config_key(nic, ARP_TABLE);
-// 	if(arp_table_key <= 0)
-// 		return false;
-//
-// 	nic_config_free(nic, arp_table_key);
-// 	return true;
-// }
+// TODO
+bool arp_table_destroy(NIC* nic) {
+	return true;
+}
 
-inline bool arp_table_update(ARPTable* arp_table, uint64_t mac, uint32_t addr, bool dynamic) {
+bool arp_table_update(ARPTable* arp_table, uint64_t mac, uint32_t addr, bool dynamic) {
 	//TODO Check
 	uint64_t current = timer_us();
 	for(int i = 0; i < arp_table->arp_entity_count; i++) {
@@ -79,18 +60,36 @@ inline bool arp_table_update(ARPTable* arp_table, uint64_t mac, uint32_t addr, b
 	return true;
 }
 
+inline ARPEntity* arp_table_get_by_addr(ARPTable* arp_table, uint32_t addr) {
+	for(int i = 0; i < arp_table->arp_entity_count; i++) {
+		if(arp_table->arp_entity[i].addr == addr)
+			return &arp_table->arp_entity[i];
+	}
+
+	return NULL;
+}
+
+inline ARPEntity* arp_table_get_by_mac(ARPTable* arp_table, uint64_t mac) {
+	for(int i = 0; i < arp_table->arp_entity_count; i++) {
+		if(arp_table->arp_entity[i].mac == mac)
+			return &arp_table->arp_entity[i];
+	}
+
+	return NULL;
+}
+
 inline bool arp_table_remove(ARPTable* arp_table, uint32_t addr) {
 	return true;
 }
 
 uint64_t arp_get_mac(NIC* nic, uint32_t destination, uint32_t source) {
-	Map* arp_table = nic_config_get(nic, ARP_TABLE);
+	ARPTable* arp_table = get_arp_table(nic);
 	if(!arp_table) {
 		arp_request(nic, destination, source);
 		return 0xffffffffffff;
 	}
 
-	ARPEntity* entity = map_get(arp_table, (void*)(uintptr_t)destination);
+	ARPEntity* entity = arp_table_get_by_mac(arp_table, destination);
 	if(!entity) {
 		arp_request(nic, destination, source);
 		return 0xffffffffffff;
@@ -101,9 +100,11 @@ uint64_t arp_get_mac(NIC* nic, uint32_t destination, uint32_t source) {
 
 uint32_t arp_get_ip(NIC* nic, uint64_t mac) {
 	ARPTable* arp_table = get_arp_table(nic);
+	ARPEntity* entity = arp_table_get_by_mac(arp_table, mac);
+	if(!entity)
+		return 0;
 
-
-	return 0;
+	return entity->addr;
 }
 
 void arp_set_reply_handler() {
@@ -120,9 +121,6 @@ bool arp_process(NIC* nic, Packet* packet) {
 
 	if(!interface_get(nic, addr))
 		return false;
-
-// 	if(!nic_ip_get(nic, addr)) //Drop?
-// 		return false;
 
 	ARPTable* arp_table = get_arp_table(nic); //Drop?
 	if(!arp_table)

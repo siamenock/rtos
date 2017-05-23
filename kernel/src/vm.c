@@ -487,7 +487,7 @@ void vm_init() {
 	// Core 0 is occupied by RPC manager
 	cores[0].status = VM_STATUS_START;
 
-	uint8_t* core_map = mp_core_map();
+	uint8_t* core_map = mp_processor_map();
 	for(int i = 1; i < MP_MAX_CORE_COUNT; i++) {
 		if(core_map[i] == MP_CORE_INVALID)
 			cores[i].status = VM_STATUS_INVALID;	// Disable the core
@@ -794,7 +794,7 @@ void vm_status_set(uint32_t vmid, int status, VM_STATUS_CALLBACK callback, void*
 	uint64_t event_type = 0;
 	switch(status) {
 		case VM_STATUS_START:
-			printf("VM (%p) Status start\n", vm);
+			printf("VM Status start\n");
 			if(vm->status != VM_STATUS_STOP) {
 				callback(false, context);
 				return;
@@ -819,7 +819,7 @@ void vm_status_set(uint32_t vmid, int status, VM_STATUS_CALLBACK callback, void*
 			icc_type = ICC_TYPE_RESUME;
 			break;
 		case VM_STATUS_STOP:
-			printf("VM (%p) Status stop\n", vm);
+			printf("VM Status stop\n");
 			if(vm->status != VM_STATUS_PAUSE && vm->status != VM_STATUS_START) {
 				callback(false, context);
 				return;
@@ -837,6 +837,8 @@ void vm_status_set(uint32_t vmid, int status, VM_STATUS_CALLBACK callback, void*
 	}
 
 	CallbackInfo* info = malloc(sizeof(CallbackInfo));
+	if(!info)
+		return;
 	info->callback = callback;
 	info->context = context;
 	info->status = status;

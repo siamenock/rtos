@@ -408,8 +408,8 @@ void copy_kernel(uint8_t apic_id) {
 	// Write PNKC
 	if(apic_id == 0) {
 		print("\n    PNKC: 0x");
-		print_32(0x200200 - sizeof(PNKC)); print(" ("); print_32(sizeof(PNKC)); print(") ");
-		copy((void*)(0x200200 /* Kernel entry end */ - sizeof(PNKC)), pnkc, sizeof(PNKC), apic_id);
+		print_32(0x200000 - sizeof(PNKC)); print(" ("); print_32(sizeof(PNKC)); print(") ");
+		copy((void*)(0x200000 /* Kernel entry end */ - sizeof(PNKC)), pnkc, sizeof(PNKC), apic_id);
 	}
 
 	// Write multiboot2 tags

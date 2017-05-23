@@ -33,7 +33,7 @@ void gmalloc_init() {
 	gmalloc_pool = (void*)start;
 
 	// TODO: Check array size
-	Block reserved[3 + MP_MAX_CORE_COUNT + 1];
+	Block reserved[3 + MP_MAX_CORE_COUNT + 1 + 1];
 	int reserved_count = 0;
 
 	reserved[reserved_count].start = VIRTUAL_TO_PHYSICAL(BIOS_AREA_START);
@@ -49,7 +49,7 @@ void gmalloc_init() {
 	reserved_count++;
 
 	printf("\tReserved AP Space\n");
-	uint8_t* core_map = mp_core_map();
+	uint8_t* core_map = mp_processor_map();
 	for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
  		if(core_map[i] == MP_CORE_INVALID)
  			continue;
@@ -62,7 +62,11 @@ void gmalloc_init() {
 	}
 
 	//TODO fix here
-	PNKC* pnkc = (PNKC*)(0x200200 - sizeof(PNKC));
+	PNKC* pnkc = (PNKC*)(0x200000 - sizeof(PNKC));
+	reserved[reserved_count].start = (uint64_t)pnkc;
+	reserved[reserved_count].end = (uint64_t)pnkc + sizeof(PNKC);
+	reserved_count++;
+
 	reserved[reserved_count].start = VIRTUAL_TO_PHYSICAL(RAMDISK_START);
 	reserved[reserved_count].end = VIRTUAL_TO_PHYSICAL(RAMDISK_START + (pnkc->initrd_end - pnkc->initrd_start));
 	reserved_count++;
@@ -216,8 +220,9 @@ inline size_t gmalloc_used() {
 inline void* gmalloc(size_t size) {
 	do {
 		void* ptr = malloc_ex(size, gmalloc_pool);
-		if(ptr)
+		if(ptr) {
 			return ptr;
+		}
 
 		void* block = bmalloc(1);
 		if(!block) {

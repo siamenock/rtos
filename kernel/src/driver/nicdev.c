@@ -1,5 +1,15 @@
 #include "nicdev.h"
 
+#define ETHER_TYPE_IPv4		0x0800		///< Ether type of IPv4
+#define ETHER_TYPE_ARP		0x0806		///< Ether type of ARP
+#define ETHER_TYPE_IPv6		0x86dd		///< Ether type of IPv6
+#define ETHER_TYPE_LLDP		0x88cc		///< Ether type of LLDP
+#define ETHER_TYPE_8021Q	0x8100		///< Ether type of 802.1q
+#define ETHER_TYPE_8021AD	0x88a8		///< Ether type of 802.1ad
+#define ETHER_TYPE_QINQ1	0x9100		///< Ether type of QinQ
+#define ETHER_TYPE_QINQ2	0x9200		///< Ether type of QinQ
+#define ETHER_TYPE_QINQ3	0x9300		///< Ether type of QinQ
+
 #define endian16(v)		__builtin_bswap16((v))	///< Change endianness for 48 bits
 #define endian48(v)		(__builtin_bswap64((v)) >> 16)	///< Change endianness for 48 bits
 
@@ -29,6 +39,7 @@ int nicdev_get_count() {
 
 int nicdev_register(NICDevice* dev) {
 	//Check name
+	//
 	int i;
 	for(i = 0; i < MAX_NIC_DEVICE_COUNT; i++) {
 		if(!nic_devices[i]) {
@@ -36,7 +47,7 @@ int nicdev_register(NICDevice* dev) {
 			return 0;
 		}
 
-		if(!strncmp(nic_devices[i]->name, nic_devices[i]->name, MAX_NIC_NAME_LEN))
+		if(!strncmp(nic_devices[i]->name, dev->name, MAX_NIC_NAME_LEN))
 			return -1;
 	}
 
@@ -92,11 +103,10 @@ int nicdev_poll() {
 	int poll_count = 0;
 	for(int i = 0; i < MAX_NIC_DEVICE_COUNT; i++) {
 		NICDevice* dev = nic_devices[i];
-		if(dev == NULL)
+		if(!dev)
 			break;
 
 		NICDriver* driver = dev->driver;
-
 		poll_count += driver->poll(dev->priv);
 	}
 
@@ -204,21 +214,48 @@ uint8_t nicdev_debug_switch_get() {
 inline static void packet_dump(void* _data, size_t size) {
 	if(unlikely(!!packet_debug_switch)) {
 		if(packet_debug_switch | NICDEV_DEBUG_PACKET_INFO) {
-			printf("Packet Lengh: %d\n", size);
+			printf("Packet Lengh:\t%d\n", size);
 		}
 
 		Ether* eth = _data;
 		if(packet_debug_switch | NICDEV_DEBUG_PACKET_ETHER_INFO) {
-			printf("Ether Type: %02x\n", endian16(eth->type));
+			printf("Ether Type:\t0x%04x\n", endian16(eth->type));
+			uint64_t dmac = eth->dmac;
+			uint64_t smac = eth->smac;
+			printf("%02x:%02x:%02x:%02x:%02x:%02x %02x:%02x:%02x:%02x:%02x:%02x\n",
+					(dmac >> 40) & 0xff, (dmac >> 32) & 0xff, (dmac >> 24) & 0xff,
+					(dmac >> 16) & 0xff, (dmac >> 8) & 0xff, (dmac >> 0) & 0xff,
+					(smac >> 40) & 0xff, (smac >> 32) & 0xff, (smac >> 24) & 0xff,
+					(smac >> 16) & 0xff, (smac >> 8) & 0xff, (smac >> 0) & 0xff);
 		}
 
 		if(packet_debug_switch | NICDEV_DEBUG_PACKET_VERBOSE_INFO) {
-			//TODO
+			switch(eth->type) {
+				case ETHER_TYPE_IPv4:
+					break;
+				case ETHER_TYPE_ARP:
+					break;
+				case ETHER_TYPE_IPv6:
+					break;
+				case ETHER_TYPE_LLDP:
+					break;
+				case ETHER_TYPE_8021Q:
+					break;
+				case ETHER_TYPE_8021AD:
+					break;
+				case ETHER_TYPE_QINQ1:
+					break;
+				case ETHER_TYPE_QINQ2:
+					break;
+				case ETHER_TYPE_QINQ3:
+					break;
+			}
 		}
 
 		if(packet_debug_switch | NICDEV_DEBUG_PACKET_DUMP) {
 			uint8_t* data = (uint8_t*)_data;
 			for(int i = 0 ; i < size;) {
+				printf("\t0x%04x:\t", i);
 				for(int j = 0; j < 16 && i < size; j++, i++) {
 					printf("%02x ", data[i] & 0xff);
 				}
@@ -290,10 +327,8 @@ int nicdev_tx(NICDevice* dev,
 				break;
 
 			packet_dump(packet->buffer + packet->start, packet->end - packet->start);
-			if(!process(packet, context)) {
-				nic_free(packet);
+			if(!process(packet, context))
 				return 0;
-			}
 		}
 	}
 

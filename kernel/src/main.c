@@ -59,41 +59,37 @@ static void ap_timer_init() {
 	__timer_ns = *(uint64_t*)VIRTUAL_TO_PHYSICAL((uint64_t)&__timer_ns);
 }
 
-static void nicdev_destroy(NICDevice* dev) {
-	nicdev_unregister(dev->name);
-	gfree(dev);
-}
-
 static bool idle0_event(void* data) {
 	nicdev_poll(); 
-// #ifdef VFIO_ENABLED
-// 	// Poll FIO
-// #define MAX_VM_COUNT	128
-// 	uint32_t vmids[MAX_VM_COUNT];
-// 	int vm_count = vm_list(vmids, MAX_VM_COUNT);
-// 	for(int i = 0; i < vm_count; i++) {
-// 		VM* vm = vm_get(vmids[i]);
-// 		VFIO* fio = vm->fio;
-// 		if(!fio)
-// 			continue;
-// 
-// 		if(!fio->input_addr)
-// 			continue;
-// 
-// 		// Check if user changed request_id on purpose, and fix it
-// 		if(fio->user_fio->request_id != fio->request_id + fifo_size(fio->input_addr))
-// 			fio->user_fio->request_id = fio->request_id + fifo_size(fio->input_addr);
-// 
-// 		// Check if there's something in the input fifo
-// 		if(fifo_size(fio->input_addr) > 0)
-// 			vfio_poll(vm);
-// 	}
-// #endif
-// 
-// 	// idle
-// 	for(int i = 0; i < 1000; i++)
-// 		asm volatile("nop");
-	
+
+	// #ifdef VFIO_ENABLED
+	// 	// Poll FIO
+	// #define MAX_VM_COUNT	128
+	// 	uint32_t vmids[MAX_VM_COUNT];
+	// 	int vm_count = vm_list(vmids, MAX_VM_COUNT);
+	// 	for(int i = 0; i < vm_count; i++) {
+	// 		VM* vm = vm_get(vmids[i]);
+	// 		VFIO* fio = vm->fio;
+	// 		if(!fio)
+	// 			continue;
+	// 
+	// 		if(!fio->input_addr)
+	// 			continue;
+	// 
+	// 		// Check if user changed request_id on purpose, and fix it
+	// 		if(fio->user_fio->request_id != fio->request_id + fifo_size(fio->input_addr))
+	// 			fio->user_fio->request_id = fio->request_id + fifo_size(fio->input_addr);
+	// 
+	// 		// Check if there's something in the input fifo
+	// 		if(fifo_size(fio->input_addr) > 0)
+	// 			vfio_poll(vm);
+	// 	}
+	// #endif
+	// 
+	// 	// idle
+	// 	for(int i = 0; i < 1000; i++)
+	// 		asm volatile("nop");
+
 	//idle_time += cpu_tsc() - time;
 	return true;
 }
@@ -116,7 +112,7 @@ static bool idle_hlt_event(void* data) {
 static void context_switch() {
 	// Set exception handlers
 	APIC_Handler old_exception_handlers[32];
-	
+
 	void exception_handler(uint64_t vector, uint64_t err) {
 		if(apic_user_rip() == 0 && apic_user_rsp() == task_get_stack(1)) {
 			// Do nothing
@@ -125,36 +121,36 @@ static void context_switch() {
 			apic_dump(vector, err);
 			errno = err;
 		}
-		
+
 		apic_eoi();
-		
+
 		task_destroy(1);
 	}
-	
+
 	for(int i = 0; i < 32; i++) {
 		if(i != 7) {
 			old_exception_handlers[i] = apic_register(i, exception_handler);
 		}
 	}
-	
+
 	// Context switching
 	// TODO: Move exception handlers to task resources
 	task_switch(1);
-	
+
 	// Restore exception handlers
 	for(int i = 0; i < 32; i++) {
 		if(i != 7) {
 			apic_register(i, old_exception_handlers[i]);
 		}
 	}
-	
+
 	// Send callback message
 	bool is_paused = errno == 0 && task_is_active(1);
 	if(is_paused) {
 		// ICC_TYPE_PAUSE is not a ICC message but a interrupt in fact, 
 		// so forcely commit the message
 	}
-	
+
 	ICC_Message* msg3 = icc_alloc(is_paused ? ICC_TYPE_PAUSED : ICC_TYPE_STOPPED);
 	msg3->result = errno;
 	if(!is_paused) {
@@ -162,7 +158,7 @@ static void context_switch() {
 	}
 	errno = 0;
 	icc_send(msg3, 0);
-	
+
 	printf("VM %s...\n", is_paused ? "paused" : "stopped");
 }
 
@@ -189,10 +185,10 @@ static void icc_start(ICC_Message* msg) {
 		task_resource(id, RESOURCE_NI, vm->nics[i]);
 		nics[i] = vm->nics[i]->nic;
 	}
-		
+
 	printf("Starting VM...\n");
 	ICC_Message* msg2 = icc_alloc(ICC_TYPE_STARTED);
-	
+
 	msg2->data.started.stdin = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)*(char**)task_addr(id, SYM_STDIN));
 	msg2->data.started.stdin_head = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)task_addr(id, SYM_STDIN_HEAD));
 	msg2->data.started.stdin_tail = (void*)TRANSLATE_TO_PHYSICAL((uint64_t)task_addr(id, SYM_STDIN_TAIL));
@@ -208,7 +204,7 @@ static void icc_start(ICC_Message* msg) {
 	msg2->data.started.stderr_size = *(int*)task_addr(id, SYM_STDERR_SIZE);
 
 	msg2->data.started.global_heap_idx = TRANSLATE_TO_PHYSICAL((uint64_t)*(uint64_t*)task_addr(id, SYM_GMALLOC_POOL)) >> 21;
-	
+
 	icc_send(msg2, msg->apic_id);
 
 	icc_free(msg);
@@ -253,77 +249,6 @@ static void icc_stop(ICC_Message* msg) {
 	task_destroy(1);
 }
 
-#define EXEC_NOT_FOUND_FILE	-1
-#define EXEC_ERROR		-2
-#define EXEC_NOT_ENOUGH_BUFFER	1
-#define EXEC_END		0
-
-/*
- *static int exec(char* name) {
- *        static char line[CMD_SIZE];
- *        static size_t head = 0;
- *        static size_t eod = 0;
- *        static size_t seek = 0;
- *        int ret;
- *
- *        int fd = open(name, "r");
- *        if(fd < 0)
- *                return EXEC_NOT_FOUND_FILE;
- *
- *        while((ret = read(fd, &line[eod], CMD_SIZE - eod)) > 0) {
- *                eod += ret;
- *                for(; seek < eod; seek++) {
- *                        if(line[seek] == '\n' || line[seek] == '\0') {
- *                                for(; head < seek; head++) {
- *                                        if(line[head] == ' ')
- *                                                head++;
- *                                        else
- *                                                break;
- *                                }
- *
- *                                if(line[head] == '#') {
- *                                        head = seek + 1;
- *                                        continue;
- *                                }
- *
- *                                if(__stdin_tail >= __stdin_head) {
- *                                        if((seek + 1 - head) > (__stdin_size - ( __stdin_tail - __stdin_head))) {
- *                                                printf("Wrong2 %d %d\n", seek - head, __stdin_size - ( __stdin_tail - __stdin_head));
- *                                                return EXEC_NOT_ENOUGH_BUFFER;
- *                                        }
- *                                } else {
- *                                        if((seek + 1 - head) > (__stdin_head - __stdin_tail)) {
- *                                                printf("Wrong2_2 %d %d\n", seek - head, __stdin_head - __stdin_tail);
- *                                                return EXEC_NOT_ENOUGH_BUFFER;
- *                                        }
- *                                }
- *
- *                                apic_disable();
- *                                for(;head <= seek; head++) {
- *                                        stdio_putchar(line[head]);
- *                                }
- *                                apic_enable();
- *                        }
- *                }
- *
- *                if(head == 0 && eod == CMD_SIZE){
- *                        return EXEC_ERROR;
- *                } else {
- *                        if((eod - head) > 0) {
- *                                memmove(line, &line[head], eod - head);
- *                                eod -= head;
- *                                seek = eod;
- *                                head = 0;
- *                        }
- *                }
- *        }
- *
- *        close(fd);
- *
- *        return EXEC_END;
- *}
- */
-
 static void fixup_page_table(uint8_t apic_id, uint64_t offset) {
 	uint64_t base = VIRTUAL_TO_PHYSICAL(PAGE_TABLE_START) + apic_id * 0x200000 + offset;
 	PageTable* l4u = (PageTable*)(base + PAGE_TABLE_SIZE * PAGE_L4U_INDEX);
@@ -365,17 +290,9 @@ void main() {
 	mp_sync();	// Barrier #1
 	if(apic_id == 0) {
 		printf("\nPacketNgin ver 2.0.\n");
- 		printf("\x1b""32mOK""\x1b""0m\n");
- 
-		PNKC* pnkc = (PNKC*)(0x200200 - sizeof(PNKC));
-//  		printf("Copy RAM disk image from 0x%lx to 0x%lx (%d)\n",
-//  				pnkc->initrd_start,
-//  				PHYSICAL_TO_VIRTUAL(RAMDISK_START),
-//  				pnkc->initrd_end - pnkc->initrd_start);
-//  
-//  		memcpy((void*)PHYSICAL_TO_VIRTUAL(RAMDISK_START),
-//  				(void*)(uintptr_t)PHYSICAL_TO_VIRTUAL(pnkc->initrd_start),
-//  				pnkc->initrd_end - pnkc->initrd_start);
+		printf("\x1b""32mOK""\x1b""0m\n");
+
+		PNKC* pnkc = (PNKC*)(0x200000 - sizeof(PNKC));
 
 		printf("Analyze CPU information...\n");
 		cpu_init();
@@ -405,7 +322,7 @@ void main() {
 
 		printf("Initailizing local APIC...\n");
 		apic_init();
-		
+
 		printf("Initializing I/O APIC...\n");
 		ioapic_init();
 		apic_enable();
@@ -414,7 +331,10 @@ void main() {
 		task_init();
 
 		printf("Initializing events...\n");
-		event_init();
+		if(!event_init()) {
+			printf("Event init problem\n");
+			while(1);
+		}
 
 		printf("Initializing inter-core communications...\n");
 		icc_init();
@@ -422,54 +342,53 @@ void main() {
 		printf("Initializing USB controller driver...\n");
 		usb_initialize();
 
- 		printf("Initializing disk drivers...\n");
- 		disk_init();
- 		if(!disk_register(&pata_driver, NULL)) {
- 			printf("\tPATA driver registration FAILED!\n");
- 			while(1) asm("hlt");
- 		}
- 
- 		if(!disk_register(&usb_msc_driver, NULL)) {
- 			printf("\tUSB MSC driver registration FAILED!\n");
- 			while(1) asm("hlt");
- 		}
- 
- 		if(!disk_register(&virtio_blk_driver, NULL)) {
- 			printf("\tVIRTIO BLOCK driver registration FAILED!\n");
- 			while(1) asm("hlt");
- 		}
- 
- 		printf("Initializing RAM disk...\n");
- 		char cmdline[32];
-  		sprintf(cmdline, "-addr 0x%lx -size 0x%lx", RAMDISK_START, pnkc->initrd_end - pnkc->initrd_start);
-		printf("cmdline: %s\n", cmdline);
- 		if(!disk_register(&ramdisk_driver, cmdline)) {
- 			printf("\tRAM disk driver registration FAILED!\n");
- 			while(1) asm("hlt");
- 		}
- 
- 		printf("Initializing file system...\n");
- 		fs_init();
- 		fs_register(&bfs_driver);
- 		fs_mount(DISK_TYPE_RAMDISK << 16 | 0x00, 0,  FS_TYPE_BFS, "/boot");
- 
- 		printf("Initializing kernel symbols...\n");
- 		symbols_init();
- 
- 		printf("Initializing modules...\n");
- 		module_init();
- 
- 		printf("Initializing device drivers...\n");
- 		device_module_init();
- 
- 		printf("Initializing VM manager...\n");
- 		vm_init();
- 
- 		printf("Initializing RPC manager...\n");
- 		manager_init();
- 
- 		printf("Initializing shell...\n");
- 		shell_init();
+		printf("Initializing disk drivers...\n");
+		disk_init();
+		if(!disk_register(&pata_driver, NULL)) {
+			printf("\tPATA driver registration FAILED!\n");
+			while(1) asm("hlt");
+		}
+
+		if(!disk_register(&usb_msc_driver, NULL)) {
+			printf("\tUSB MSC driver registration FAILED!\n");
+			while(1) asm("hlt");
+		}
+
+		if(!disk_register(&virtio_blk_driver, NULL)) {
+			printf("\tVIRTIO BLOCK driver registration FAILED!\n");
+			while(1) asm("hlt");
+		}
+
+		printf("Initializing RAM disk...\n");
+		char cmdline[64];
+		sprintf(cmdline, "-addr 0x%lx -size 0x%lx", RAMDISK_START, pnkc->initrd_end - pnkc->initrd_start);
+		if(!disk_register(&ramdisk_driver, cmdline)) {
+			printf("\tRAM disk driver registration FAILED!\n");
+			while(1) asm("hlt");
+		}
+
+		printf("Initializing file system...\n");
+		fs_init();
+		fs_register(&bfs_driver);
+		fs_mount(DISK_TYPE_RAMDISK << 16 | 0x00, 0,  FS_TYPE_BFS, "/boot");
+
+		printf("Initializing kernel symbols...\n");
+		symbols_init();
+
+		printf("Initializing modules...\n");
+		module_init();
+
+		printf("Initializing device drivers...\n");
+		device_module_init();
+
+		printf("Initializing VM manager...\n");
+		vm_init();
+
+		printf("Initializing RPC manager...\n");
+		manager_init();
+
+		printf("Initializing shell...\n");
+		shell_init();
 
 		event_busy_add(idle0_event, NULL);
 	} else {
@@ -498,20 +417,12 @@ void main() {
 	}
 
 	mp_sync(); // Barrier #3
-
-	if(apic_id == 0)
-		printf("Kernel started...\n");
-
 	/*
 	 *if(apic_id == 0) {
 	 *        while(exec("/boot/init.psh") > 0)
 	 *                event_loop();
 	 *}
 	 */
-
-	//int a = 1;
-	//printf("a: %p\n", &a);
-	//while(a);
 	while(1) {
 		event_loop();
 	}

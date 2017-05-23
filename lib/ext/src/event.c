@@ -35,18 +35,34 @@ static Map* trigger_events;
 static List* triggers;
 static List* idle_events;
 
-void event_init() {
+bool event_init() {
 #ifndef LINUX
 	extern uint64_t __timer_ms;
 	if(!__timer_ms) 
-		return;
+		return false;
 #endif
 
 	busy_events = list_create(NULL);
+	if(!busy_events)
+		return false;
+
 	timer_events = list_create(NULL);
+	if(!timer_events)
+		return false;
+
 	trigger_events = map_create(8, map_uint64_hash, map_uint64_equals, NULL);
+	if(!trigger_events)
+		return false;
+
 	triggers = list_create(NULL);
+	if(!triggers)
+		return false;
+
 	idle_events = list_create(NULL);
+	if(!idle_events)
+		return false;
+
+	return true;
 }
 
 static bool is_trigger_stop;

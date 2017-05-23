@@ -30,7 +30,7 @@ typedef bool(*TriggerEventFunc)(uint64_t event_id, void* event, void* context);
 /**
  * Initialize event engine
  */
-void event_init();
+bool event_init();
 
 /**
  * Process events

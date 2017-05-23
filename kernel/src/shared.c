@@ -15,3 +15,17 @@ void shared_init() {
 		while(1);
 	}
 }
+
+void shared_sync() {
+	Shared* shared = (Shared*)SHARED_ADDR;
+	static uint8_t barrier;
+	uint8_t apic_id = mp_apic_id();
+	if(apic_id) {
+		while(shared->sync <= barrier)
+			asm volatile("nop");
+
+		barrier++;
+	} else {
+		shared->sync = ++barrier;
+	}
+}

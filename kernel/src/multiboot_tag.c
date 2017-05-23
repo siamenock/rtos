@@ -4,7 +4,7 @@
 #include "multiboot_tag.h"
 
 void* multiboot_tag_get(uint32_t multiboot_tag_type) {
-	PNKC* pnkc = (PNKC*)(0x200200 - sizeof(PNKC));
+	PNKC* pnkc = (PNKC*)(0x200000 - sizeof(PNKC));
 	uintptr_t addr = 0x200000 + (((uintptr_t)pnkc->smap_offset + (uintptr_t)pnkc->smap_size + 7) & ~7);
 	uintptr_t end = addr + *(uint32_t*)addr;
 	addr += 8;

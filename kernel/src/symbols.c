@@ -5,7 +5,7 @@
 static Symbol* symbols;
 
 void symbols_init() {
-	PNKC* pnkc = (PNKC*)(0x200200 - sizeof(PNKC));
+	PNKC* pnkc = (PNKC*)(0x200000 - sizeof(PNKC));
 	symbols =  (void*)0x200000 + pnkc->smap_offset;
 	void* end = (void*)0x200000 + pnkc->smap_offset + pnkc->smap_size;
 	

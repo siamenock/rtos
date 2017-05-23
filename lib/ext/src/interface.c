@@ -4,14 +4,16 @@
 
 #define NIC_ADDR_IPv4	"net.addr.ipv4"
 
-IPv4InterfaceTable* interface_map_get(NIC* nic) {
+IPv4InterfaceTable* interface_table_get(NIC* nic) {
 	int32_t interface_key = nic_config_key(nic, NIC_ADDR_IPv4);
 	IPv4InterfaceTable* table = NULL;
 
-	if(interface_key <= 0) {
+	if(interface_key < 0) {
 		interface_key = nic_config_alloc(nic, NIC_ADDR_IPv4, sizeof(IPv4InterfaceTable));
-		if(interface_key <= 0)
-			return false;
+		if(interface_key < 0)
+			return NULL;
+
+		interface_key = nic_config_key(nic, NIC_ADDR_IPv4);
 
 		table = nic_config_get(nic, interface_key);
 		memset(table, 0, sizeof(IPv4InterfaceTable));
@@ -21,25 +23,36 @@ IPv4InterfaceTable* interface_map_get(NIC* nic) {
 	return table;
 }
 
-IPv4Interface* interface_alloc(NIC* nic, uint32_t address, uint32_t netmask) {
-	IPv4InterfaceTable* table = interface_map_get(nic);
+IPv4Interface* interface_alloc(NIC* nic, uint32_t address, uint32_t netmask, uint32_t gateway, bool is_default) {
+	IPv4InterfaceTable* table = interface_table_get(nic);
+	if(!table)
+		return NULL;
+
 	if(table->count >= IPV4_INTERFACE_MAX_COUNT)
-		return false;
+		return NULL;
 
 	IPv4Interface* interface = &table->interfaces[table->count++];
 	interface->address = address;
 	interface->netmask = netmask;
+	interface->gateway = gateway;
+
+	if(is_default) {
+		//TODO
+	}
 
 	return interface;
 }
 
 bool interface_free(NIC* nic, uint32_t address) {
-	IPv4InterfaceTable* table = interface_map_get(nic);
+	IPv4InterfaceTable* table = interface_table_get(nic);
 	if(!table)
 		return false;
 
 	for(int i = 0; i < table->count; i++) {
 		if(address == table->interfaces[i].address) {
+			if(table->default_idx == i)
+				table->default_idx = 0;
+
 			if((table->count - 1) == i) {
 				table->count--;
 				return true;
@@ -53,8 +66,17 @@ bool interface_free(NIC* nic, uint32_t address) {
 	return false;
 }
 
+IPv4Interface* interface_get_default(NIC* nic) {
+	IPv4InterfaceTable* table = interface_table_get(nic);
+
+	if(table->count > table->default_idx)
+		return &table->interfaces[table->default_idx];
+
+	return NULL;
+}
+
 IPv4Interface* interface_get(NIC* nic, uint32_t address) {
-	IPv4InterfaceTable* table = interface_map_get(nic);
+	IPv4InterfaceTable* table = interface_table_get(nic);
 	if(!table)
 		return false;
 

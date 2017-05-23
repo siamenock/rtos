@@ -29,6 +29,28 @@ typedef struct _ARP {
 
 extern uint64_t ARP_TIMEOUT;		///< ARP timeout of ARP table
 
+typedef struct _ARPEntity {
+	uint64_t	mac;
+	uint32_t	addr;
+	uint64_t	timeout;
+
+	bool		dynamic;
+} ARPEntity;
+
+#define ARP_ENTITY_MAX_COUNT	16
+typedef struct ARPTable {
+	uint16_t	arp_entity_count;
+	ARPEntity 	arp_entity[ARP_ENTITY_MAX_COUNT];
+} ARPTable;
+
+/**
+ * Get ARP Table
+ *
+ * @param NIC
+ * @return ARP Table
+ */
+ARPTable* arp_get_table(NIC* nic);
+
 #define ARP_PROCESS()
 /**
  * Process ARP packet.

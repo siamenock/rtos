@@ -32,7 +32,7 @@ static bool icc_event(void* context) {
 	ICC_Message* icc_msg = fifo_pop(icc_queue);
 	lock_unlock(&shared->icc_queues[apic_id].icc_queue_lock);
 
-	if(icc_msg == NULL)
+	if(!icc_msg)
 		return true;
 
 	if(icc_msg->type >= ICC_EVENTS_COUNT) {
@@ -96,7 +96,7 @@ void icc_init() {
 
 		lock_init(&shared->icc_lock_alloc);
 
-		uint8_t* core_map = mp_core_map();
+		uint8_t* core_map = mp_processor_map();
 		for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
 			if(core_map[i] != MP_CORE_INVALID) {
 				shared->icc_queues[i].icc_queue = fifo_create(processor_count, gmalloc_pool);

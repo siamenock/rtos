@@ -374,14 +374,15 @@ size_t nic_pool_total(NIC* nic) {
  * block_count: uint16_t
  * name: 4 bytes rounded string length
  * blocks
- * @return -1 already allocated
- * @return -2 no space to allocate
+ * @return -1 key length is too long
+ * @return -2 already allocated
+ * @return -3 no space to allocate
  * @return 0 ~ 2^16 - 1 key
  */
 int32_t nic_config_alloc(NIC* nic, char* name, uint16_t size) {
 	int len = strlen(name) + 1;
 	if(len > 255)
-		return 0;
+		return -1;
 	
 	uint32_t req = 1 + ((len + sizeof(uint32_t) - 1) / sizeof(uint32_t)) + (((uint32_t)size + sizeof(uint32_t) - 1) / sizeof(uint32_t)); // heder + round(name) + round(blocks)
 	
@@ -442,13 +443,14 @@ void nic_config_free(NIC* nic, uint16_t key) {
 
 /**
  *
- * @return -1 key of the name not found
+ * @return -1 key length is too long
+ * @return -2 key of the name not found
  * @return otherwise key of the name
  */
 int32_t nic_config_key(NIC* nic, char* name) {
 	int len = strlen(name) + 1;
 	if(len > 255)
-		return 0;
+		return -1;
 	
 	for(uint32_t* p = nic->config_head; p < nic->config_tail; ) {
 		if(*p == 0) {
@@ -465,18 +467,20 @@ int32_t nic_config_key(NIC* nic, char* name) {
 		}
 	}
 
-	return -1;
+	return -2;
 }
 
 void* nic_config_get(NIC* nic, uint16_t key) {
-	uint16_t len = nic->config_head[key] >> 16;
+	uint32_t* header = &nic->config_head[key];
+	uint16_t len = *header >> 16;
 	
-	return nic->config_head + key + 1 + (len + sizeof(uint32_t) - 1) / sizeof(uint32_t);
+	return header + 1 + (len + sizeof(uint32_t) - 1) / sizeof(uint32_t);
 }
 
 uint16_t nic_config_size(NIC* nic, uint16_t key) {
-	uint16_t len = nic->config_head[key] >> 16;
-	uint16_t count = nic->config_head[key] & 0xffff;
+	uint32_t* header = &nic->config_head[key];
+	uint16_t len = *header >> 16;
+	uint16_t count = *header & 0xffff;
 	
 	return (count - (len + sizeof(uint32_t) - 1) / sizeof(uint32_t) - 1) * sizeof(uint32_t);
 }

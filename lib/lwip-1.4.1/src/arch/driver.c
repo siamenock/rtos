@@ -58,23 +58,15 @@
 #include <netif/etharp.h>
 #include <nic.h>
 #include <net/interface.h>
-#include <util/list.h>
-#include <util/map.h>
 #include <lwip/timers.h>
 #include <gmalloc.h>
+#include <arch/driver.h>
 
 /* Define those to better describe your network interface. */
 #define IFNAME0 'e'
 #define IFNAME1 'n'
 
 
-typedef Packet* (*NIC_DPI)(Packet*);
-
-struct netif_private {
-	NIC*	nic;
-	NIC_DPI	preprocessor;
-	NIC_DPI	postprocessor;
-};
 
 /**
  * In this function, the hardware should be initialized.
@@ -147,9 +139,9 @@ low_level_output(struct netif *netif, struct pbuf *p)
     idx += q->len;
   }
 
-  NIC_DPI postprocessor = ((struct netif_private*)netif->state)->postprocessor;
-  if(postprocessor)
-    packet = postprocessor(packet);
+  NIC_DPI tx_process = ((struct netif_private*)netif->state)->tx_process;
+  if(tx_process)
+    packet = tx_process(packet);
   
   if(packet)
     nic_tx(nic, packet);
@@ -273,8 +265,8 @@ driver_poll(struct netif *netif, Packet* packet)
  *         ERR_MEM if private data couldn't be allocated
  *         any other err_t on error
  */
-static err_t
-driver_init(struct netif *netif)
+err_t
+lwip_driver_init(struct netif *netif)
 {
   LWIP_ASSERT("netif != NULL", (netif != NULL));
     
@@ -305,100 +297,23 @@ driver_init(struct netif *netif)
   return ERR_OK;
 }
 
-static bool is_lwip_inited;
- //static struct netif* netifs[NIC_SIZE];
- //static struct netif_private* privates[NIC_SIZE];
- //static int netif_count;
-static List* netifs = NULL;
-//static List* privates;
-
-struct netif* lwip_nic_init(NIC* nic, NIC_DPI preprocessor, NIC_DPI postprocessor) {
-	if(!netifs) {
-		netifs = list_create(NULL);
-		if(!netifs) {
-			printf("Cannot create netif list\n");
-			return NULL;
-		}
-	}
-
-	if(list_size(netifs) >= NIC_MAX_COUNT)
-		return NULL;
-
-	uint32_t ip = 0xc0a864fe;
-	//IPv4Interface* interface = NULL;
-
-// 	uint32_t netmask = interface->netmask;
-// 	uint32_t gw = interface->gateway;
-// 	bool is_default = interface->_default;
- 	uint32_t netmask = 0xffffff00;
- 	uint32_t gw = 0xc0a864ff;
- 	bool is_default = true;
-	
-	if(!is_lwip_inited) {
-		lwip_init();
-		is_lwip_inited = true;
-	}
-	
-	struct netif* netif = gmalloc(sizeof(struct netif));
-	struct netif_private* private = gmalloc(sizeof(struct netif_private));
-	list_add(netifs, netif);
-
-	private->nic = nic;
-	private->preprocessor = preprocessor;
-	private->postprocessor = postprocessor;
-	
-	struct ip_addr ip2, netmask2, gw2;
-	IP4_ADDR(&ip2, (ip >> 24) & 0xff, (ip >> 16) & 0xff, (ip >> 8) & 0xff, (ip >> 0) & 0xff);
-	IP4_ADDR(&netmask2, (netmask >> 24) & 0xff, (netmask >> 16) & 0xff, (netmask >> 8) & 0xff, (netmask >> 0) & 0xff);
-	IP4_ADDR(&gw2, (gw >> 24) & 0xff, (gw >> 16) & 0xff, (gw >> 8) & 0xff, (gw >> 0) & 0xff);
-	
-	netif_add(netif, &ip2, &netmask2, &gw2, private, driver_init, ethernet_input);
-	if(is_default)
-		netif_set_default(netif);
-	netif_set_up(netif);
-	
-	return netif;
-}
-
 bool lwip_nic_remove(struct netif* netif) {
- 	netif_set_down(netif);
- 	netif_remove(netif);
-	list_remove_data(netifs, netif);
-	gfree(netif->state);
-	gfree(netif);
+//  	netif_set_down(netif);
+//  	netif_remove(netif);
+// 	list_remove_data(netifs, netif);
+// 	gfree(netif->state);
+// 	gfree(netif);
 
 	return true;
 }
 
-bool lwip_nic_poll() {
-	bool result = false;
-	
-	if(list_size(netifs) == 0)
-		return result;
-	
-	ListIterator iter;
-	list_iterator_init(&iter, netifs);
-	if(list_iterator_has_next(&iter)) {
-		struct netif* netif = list_iterator_next(&iter);
-		NIC* nic = ((struct netif_private*)netif->state)->nic;
-		if(!nic_has_rx(nic))
-			goto done;
-		
-		Packet* packet = nic_rx(nic);
-		NIC_DPI preprocessor = ((struct netif_private*)netif->state)->preprocessor;
-		if(preprocessor)
-			packet = preprocessor(packet);
-		
-		if(packet)
-			driver_poll(netif, packet);
-		
-		result = true;
-	} else {
-		result = false;
-	}
+bool lwip_nic_poll(struct netif* netif, Packet* packet) {
+	NIC_DPI rx_process = ((struct netif_private*)netif->state)->rx_process;
+	if(rx_process)
+		packet = rx_process(packet);
 
-done:
-	return result;
+	if(packet)
+		driver_poll(netif, packet);
 }
 
 void lwip_nic_timer() {

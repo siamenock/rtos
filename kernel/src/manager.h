@@ -2,9 +2,21 @@
 #define __MANAGER_H__
 
 #include <stdint.h>
+#include <util/list.h>
 #include "vnic.h"
 
-VNIC*	manager_nic;
+#define DEFAULT_MANAGER_IP	0xc0a864fe	// 192.168.100.254
+#define DEFAULT_MANAGER_GW	0xc0a86401	// 192.168.100.1
+#define DEFAULT_MANAGER_NETMASK	0xffffff00	// 255.255.255.0
+#define DEFAULT_MANAGER_PORT	1111
+
+typedef struct _Manager {
+	int		nic_count;
+	VNIC*		nics[NIC_MAX_COUNT];	// gmalloc, ni_create
+	List* netifs;
+} Manager;
+
+extern Manager manager;
 
 int manager_init();
 uint32_t manager_get_ip();

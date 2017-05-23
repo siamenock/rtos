@@ -37,15 +37,10 @@ typedef struct {
 } VirtIODevice;
 
 typedef struct {
-	int id;
 	VirtIODevice vdev;
 	VirtQueue *rvq, *svq, *cvq;
 	NICDevice* nicdev;
 } VirtNetPriv;
-
-/* Private structure that virtio network device driver use */
-static VirtNetPriv* priv[MAX_DEVICE_COUNT];
-static int vdev_count = 0;
 
 /* Pseudo header used by add_buf for transmit */
 // TODO: Partial checksum, GSO needs to be implemented. At that time, real virtio header replaces it
@@ -261,6 +256,7 @@ static int init_vq(VirtIODevice* vdev, uint32_t index, VirtQueue* vqs[]) {
 
 	// Alloc and initialize virtqueue 
 	vqs[index] = gmalloc(sizeof(VirtQueue) + sizeof(void*) * num /* For token data */);
+	memset(vqs[index], 0, sizeof(VirtQueue) + sizeof(void*) * num); 
 	vqs[index]->size = num;
 	vqs[index]->last_used_idx = 0;
 	vqs[index]->num_added = 0;
@@ -375,8 +371,9 @@ static int virtnet_probe(VirtNetPriv* priv) {
 }
 
 /* Send control command to VirtI/O network device */
-static bool virtnet_send_command(int id, uint8_t class, uint8_t cmd, void* data) {
+static bool virtnet_send_command(VirtNetPriv* priv, uint8_t class, uint8_t cmd, void* data) {
 	VirtIONetCtrlPacket* ctrl = gmalloc(sizeof(VirtIONetCtrlPacket));
+	memset(ctrl, 0, sizeof(VirtIONetCtrlPacket));
 
 	// Controlling RX mode is only available now 
 	if(class != VIRTIO_NET_CTRL_RX) {
@@ -390,16 +387,16 @@ static bool virtnet_send_command(int id, uint8_t class, uint8_t cmd, void* data)
 	// TODO: Other classes need to be implemented. e.g VLAN, MAC Filtering...
 	ctrl->cmd_specific_data = *(uint8_t*)data;
 
-	if(add_buf(priv[id]->cvq, ctrl, 4))
+	if(add_buf(priv->cvq, ctrl, 4))
 		return false;
 
 	// Notify otherside of new buffer
-	kick(priv[id]->cvq);
+	kick(priv->cvq);
 
 	// Wait for a sec till host send ACK 
 	timer_mwait(100);
 
-	VirtIONetCtrlPacket* ctrl_ack = (VirtIONetCtrlPacket*)get_buf(priv[id]->cvq, NULL);
+	VirtIONetCtrlPacket* ctrl_ack = (VirtIONetCtrlPacket*)get_buf(priv->cvq, NULL);
 
 	if(!ctrl_ack) {
 		printf("Send command failed\n");
@@ -477,35 +474,27 @@ static int virtnet_send(VirtNetPriv* priv, Packet* packet) {
 
 int init(void* device, void* data) {
 	int err;
-	int id = vdev_count;
 
-	priv[id] = NULL;
-
-	if(vdev_count >= MAX_DEVICE_COUNT) {
-		printf("virtio_pci_probe failed: Too many devices\n");
-		goto error;
-	}
-
-	priv[id] = gmalloc(sizeof(VirtNetPriv));
-	priv[id]->vdev.dev = (PCI_Device*)device;
-	priv[id]->id = id;
+	VirtNetPriv* priv = gmalloc(sizeof(VirtNetPriv));
+	memset(priv, 0, sizeof(VirtNetPriv));
+	priv->vdev.dev = (PCI_Device*)device;
 
 	// VirtI/O deivce PCI probing
-	err = virtio_pci_probe(&priv[id]->vdev);
+	err = virtio_pci_probe(&priv->vdev);
 	if(err) {
 		printf("virtio_pci_probe failed: %d\n", err); 
 		goto error;
 	}
 
 	// Feature synchronizing with host OS
-	err = synchronize_features(&priv[id]->vdev);
+	err = synchronize_features(&priv->vdev);
 	if(err) {
 		printf("synchronize_features failed: %d\n", err);
 		goto error;
 	}
 
 	// VirtI/O driver probing 
-	err = virtnet_probe(priv[id]);
+	err = virtnet_probe(priv);
 	if(err) {
 		printf("virtnet_probe failed: %d\n", err);
 		goto error;
@@ -515,59 +504,60 @@ int init(void* device, void* data) {
 
 	// Set promiscuos mode
 	uint8_t promisc = 1; // 1 means ON for the command
-	if(virtnet_send_command(id, VIRTIO_NET_CTRL_RX, VIRTIO_NET_CTRL_RX_PROMISC, &promisc))
+	if(virtnet_send_command(priv, VIRTIO_NET_CTRL_RX, VIRTIO_NET_CTRL_RX_PROMISC, &promisc))
 		printf("Promiscuos mode ON\n");
 	else
 		printf("Promiscous mode OFF\n");
-
-	vdev_count++;
 
 	//Register NICDevice
 	NICDevice* nic_device = gmalloc(sizeof(NICDevice));
 	if(!nic_device)
 		goto error;
-
-	memset(nic_device, 0x0, sizeof(NICDevice));
+	memset(nic_device, 0, sizeof(NICDevice));
 
 	extern int nicdev_get_count();
 	sprintf(nic_device->name, "eth%d", nicdev_get_count());
-	nic_device->mac = *(uint64_t*)&priv[id]->vdev.config.mac & 0xffffffffffff;
+
+	nic_device->mac = 0;
+	for (int i = 0; i < ETH_ALEN; i++) {
+		nic_device->mac |= (uint64_t)priv->vdev.config.mac[i] << (ETH_ALEN - i - 1) * 8;
+	}
 
 	extern NICDriver device_driver;
 	nic_device->driver = (void*)&device_driver;
-	nic_device->priv = priv[id];
-	priv[id]->nicdev = nic_device;
+	nic_device->priv = priv;
+	priv->nicdev = nic_device;
 
 	extern int nicdev_register(NICDevice* dev);
 	//TODO check return value
 	nicdev_register(nic_device);
 
-	return id;
+	return 0;
 error: 
-	if(priv[id])
-		gfree(priv[id]);
+	if(priv)
+		gfree(priv);
 
 	return -1;
 }
 
 void destroy(int id) {
 	// Destory pseudo header 
-	gfree(pseudo_vnet_hdr);
-
-	// Destroy virtqueues
-	bfree(priv[id]->rvq->vring.desc);
-	gfree(priv[id]->rvq);
-
-	bfree(priv[id]->svq->vring.desc);
-	gfree(priv[id]->svq);
-	
-	if(device_has_feature(&priv[id]->vdev, VIRTIO_NET_F_CTRL_VQ)) {
-		bfree(priv[id]->cvq->vring.desc);
-		gfree(priv[id]->rvq);
-	}
-
-	// Destroy private structure
-	gfree(priv[id]);
+// 	gfree(pseudo_vnet_hdr);
+// 
+// 	// Destroy virtqueues
+// 	bfree(priv[id]->rvq->vring.desc);
+// 	gfree(priv[id]->rvq);
+// 
+// 	bfree(priv[id]->svq->vring.desc);
+// 	gfree(priv[id]->svq);
+// 	
+// 	if(device_has_feature(&priv[id]->vdev, VIRTIO_NET_F_CTRL_VQ)) {
+// 		bfree(priv[id]->cvq->vring.desc);
+// 		gfree(priv[id]->rvq);
+// 	}
+// 
+// 	// Destroy private structure
+// 	gfree(priv[id]);
 }
 
 static bool process(Packet* packet, void* context) {
@@ -575,31 +565,30 @@ static bool process(Packet* packet, void* context) {
 }
 
 int poll(void* _priv) {
-	VirtNetPriv* priv = _priv;
-	void* buf;
-
-	// Free used buffer
-	while((buf = get_buf(priv->svq, NULL))) {
-		nic_free(buf);
-	}
-
-	// TX
-	//Packet* packet = nic_process_output(0);
-	int nicdev_tx(NICDevice* dev,
-			bool (*process)(Packet* packet, void* context), void* context);
-	nicdev_tx(priv->nicdev, process, priv);
-	VirtQueue* vq = priv->svq;
-	kick(vq);
-
-	// RX
-	uint32_t len;
-	if((buf = get_buf(priv->rvq, &len))) {
-		virtnet_receive(priv, buf, len);
-	}
-
-	vq = priv->rvq;
-	kick(vq);
-
+ 	VirtNetPriv* priv = _priv;
+ 
+ 	// Free used buffer
+ 	void* buf;
+ 	while((buf = get_buf(priv->svq, NULL))) {
+ 		nic_free(buf);
+ 	}
+ 
+ 	// TX
+ 	int nicdev_tx(NICDevice* dev,
+ 			bool (*process)(Packet* packet, void* context), void* context);
+ 	nicdev_tx(priv->nicdev, process, priv);
+ 	VirtQueue* vq = priv->svq;
+ 	kick(vq);
+ 
+ 	// RX
+ 	uint32_t len;
+ 	if((buf = get_buf(priv->rvq, &len))) {
+ 		virtnet_receive(priv, buf, len);
+ 	}
+ 
+ 	vq = priv->rvq;
+ 	kick(vq);
+ 
 	return 0;
 }
 
@@ -613,9 +602,9 @@ bool set_status(int id, NICStatus* status) {
 void get_info(int id, NICInfo* info) {
 	uint64_t mac = 0;
 
-	for (int i = 0; i < ETH_ALEN; i++) {
-		mac |= (uint64_t)priv[id]->vdev.config.mac[i] << (ETH_ALEN - i - 1) * 8;
-	}
+// 	for (int i = 0; i < ETH_ALEN; i++) {
+// 		mac |= (uint64_t)priv[id]->vdev.config.mac[i] << (ETH_ALEN - i - 1) * 8;
+// 	}
 
 	info->mac = mac;
 }

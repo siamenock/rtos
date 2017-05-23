@@ -12,7 +12,7 @@
 	+315K?	: kernel.bin (grub module)
 	+1M	: initrd.img (grub module)
 
-2MB		: Kernel text area
+4MB		: Kernel text area
 	+256KB?	: Kernel (PNKC, .text)
 	+25KB?	: Kernel (.rodata)
 	+32KB?	: Kernel.smap (8 bytes aligned)
@@ -56,12 +56,12 @@ e.g.	-1MB -> 0xffffffff80100000
 
 -6MB + -2MB * apicid: Kernel data area, mappped to 6MB + 2MB * apicid + +2MB
 	+200KB?	: Kernel (.data, .bss)
-	...	: Local malloc
 	64KB	: VGA buffer
 	32KB	: User interrupt stack
 	32KB	: Kernel interrupt stack
 	64KB	: Kernel stack
 	256KB	: TLB
+	...	: Local malloc
 
 -6MB + -2MB * 16: Initial RAM disk area, mapped to 38MB ~ +sizeof initrd.img
 

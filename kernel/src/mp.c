@@ -12,6 +12,9 @@
 // Ref: http://www.bioscentral.com/misc/cmosmap.htm
 // Ref: http://www.singlix.com/trdos/UNIX_V1/xv6/lapic.c
 
+
+uint8_t mp_processors[MP_MAX_CORE_COUNT];
+
 static uint8_t apic_id;		// APIC ID
 static uint8_t processor_id;
 static uint8_t processor_count;
@@ -23,6 +26,7 @@ bool parse_iae(MP_IOAPICEntry* entry, void* context) {
 	_ioapic_address = (uint64_t)entry->io_apic_address;
 	return true;
 }
+
 void mp_init() {
 	// Map IA32_APIC_BASE_MSR(0x1B) to virtual memory
 	_apic_address = msr_read(0x1B) & 0xFFFFF000;
@@ -59,6 +63,10 @@ void mp_init() {
 	}
 }
 
+void mp_sync() {
+	shared_sync();
+}
+
 uint8_t mp_apic_id() {
 	return apic_id;
 }
@@ -75,19 +83,6 @@ uint8_t mp_processor_count() {
 	return processor_count;
 }
 
-void mp_sync() {
-	Shared* shared = (Shared*)SHARED_ADDR;
-	static uint8_t barrier;
-	if(apic_id) {
-		while(shared->sync <= barrier)
-			asm volatile("nop");
-
-		barrier++;
-	} else {
-		shared->sync = ++barrier;
-	}
-
-}
 void mp_parse_fps(MP_Parser* parser, void* context) {
 	MP_FloatingPointerStructure* find_FloatingPointerStructure() {
 		bool is_FloatingPointerStructure(uint8_t* p) {
@@ -198,7 +193,6 @@ void mp_parse_fps(MP_Parser* parser, void* context) {
 	}
 }
 
-uint8_t* mp_core_map() {
+uint8_t* mp_processor_map() {
 	return mp_processors;
-	//return shared->mp_cores;
 }

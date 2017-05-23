@@ -30,6 +30,8 @@ typedef struct {
 extern char SHARED_ADDR[];
 
 void shared_init();
+void shared_sync();
+
 #endif /* __ASSEMBLY__ */
 
 #endif /* __SHARED_H__ */
