@@ -54,6 +54,7 @@ typedef enum _VNICError {
 	VNIC_ERROR_NO_MEMEORY,		    ///<Not enough memory
 	VNIC_ERROR_RESOURCE_NOT_AVAILABLE,  ///<Resource is not temporary available
 	VNIC_ERROR_NO_ID_AVAILABLE,	    ///<There is no more id for vnic
+	VNIC_ERROR_OPERATION_FAILED,	    ///<Failed to execute command successfully
 	VNIC_ERROR_UNSUPPORTED,		    ///<Unsupported operation were requested
 } VNICError;
 
@@ -207,13 +208,16 @@ VNICError vnic_rx2(VNIC* vnic, Packet* packet);
 bool vnic_has_tx(VNIC* vnic);
 
 /**
- * Sends the queued data to the VNIC
+ * Sends queued packets
  *
  * @param vnic Virtual NIC
+ * @param transmitter Driver function that transmit packets
+ * @param transmitter_context Driver function context
  *
- * @return transmitted packet
+ * @return VNIC_ERROR_NOERROR for success,
+ * VNIC_ERROR_RESOURCE_NOT_AVAILABLE and VNIC_ERROR_OPERATION_FAILED for failure
  */
-Packet* vnic_tx(VNIC* vnic);
+VNICError vnic_tx(VNIC* vnic, bool (*transmitter)(Packet*, void*), void* transmitter_context);
 
 // Slowpath Rx/Tx
 /**

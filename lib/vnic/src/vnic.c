@@ -427,30 +427,42 @@ bool vnic_has_tx(VNIC* vnic) {
 	return !queue_empty(&vnic->tx);
 }
 
-Packet* vnic_tx(VNIC* vnic) {
+VNICError vnic_tx(VNIC* vnic, bool (*transmitter)(Packet*, void*), void* transmitter_context) {
 	if(!vnic_has_tx(vnic))
-		return NULL;
+		return VNIC_ERROR_RESOURCE_NOT_AVAILABLE;
 
 	uint64_t t = timer_frequency();
 	if(vnic->tx_closed - vnic->tx_wait_grace > t)
-		return NULL;
+		return VNIC_ERROR_RESOURCE_NOT_AVAILABLE;
 
 	if(!lock_trylock(&vnic->nic->tx.rlock))
-		return NULL;
-	vnic->tx.tail = vnic->nic->tx.tail;
-	Packet* packet = queue_pop(vnic->nic, &vnic->tx);
+		return VNIC_ERROR_RESOURCE_NOT_AVAILABLE;
+
+	bool transmitted	= false;
+
+	vnic->tx.tail		= vnic->nic->tx.tail;
+	Packet* packet		= queue_pop(vnic->nic, &vnic->tx);
+	vnic->nic->tx.head	= vnic->tx.head;
 
 	if(packet) {
+		uint64_t packet_size = packet->end - packet->start;
 		if(vnic->tx_closed > t)
-			vnic->tx_closed += vnic->tx_wait * (packet->end - packet->start);
+			vnic->tx_closed += vnic->tx_wait * packet_size;
 		else
-			vnic->tx_closed = t + vnic->tx_wait * (packet->end - packet->start);
+			vnic->tx_closed = t + vnic->tx_wait * packet_size;
+
+		transmitted = transmitter(packet, transmitter_context);
+		if(transmitted) {
+			vnic->output_packets += 1;
+			vnic->output_bytes += packet_size;
+		} else {
+			vnic->output_drop_packets += 1;
+			vnic->output_drop_bytes += packet_size;
+		}
 	}
 
-	vnic->nic->tx.head = vnic->tx.head;
 	lock_unlock(&vnic->nic->tx.rlock);
-
-	return packet;
+	return transmitted ? VNIC_ERROR_NOERROR : VNIC_ERROR_OPERATION_FAILED;
 }
 
 bool vnic_has_stx(VNIC* vnic) {
