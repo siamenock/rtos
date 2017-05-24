@@ -44,10 +44,9 @@ Packet* nic_alloc(NIC* nic, uint16_t size) {
 
 	uint32_t size2 = sizeof(Packet) + nic->padding_head + size + nic->padding_tail;
 	uint8_t req = (ROUNDUP(size2, NIC_CHUNK_SIZE)) / NIC_CHUNK_SIZE;
+	uint32_t index = nic->pool.index;
 
 	lock_lock(&nic->pool.lock);
-
-	uint32_t index = nic->pool.index;
 
 	// Find tail
 	uint32_t idx = 0;
@@ -125,6 +124,10 @@ bool nic_free(Packet* packet) {
 		bitmap[i] = 0;
 	}
 	bitmap[idx] = 0;	// if idx is zero, it for loop will never end
+
+	lock_lock(&nic->pool.lock);
+	nic->pool.used -= req;
+	lock_unlock(&nic->pool.lock);
 
 	return true;
 }
