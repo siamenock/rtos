@@ -424,7 +424,6 @@ static int virtnet_receive(VirtNetPriv* priv, void* buf, uint32_t len) {
 	VirtIONetPacket* vp = (VirtIONetPacket*)buf;
 
 	nicdev_rx(priv->nicdev, vp->data, len - VNET_HDR_LEN);
-	//nic_process_input(0, vp->data, len - VNET_HDR_LEN, NULL, 0);
 
 #if DEBUG
 	printf("Received : ");
@@ -566,6 +565,7 @@ static bool process(Packet* packet, void* context) {
 
 int poll(void* _priv) {
  	VirtNetPriv* priv = _priv;
+	VirtQueue* vq;
  
  	// Free used buffer
  	void* buf;
@@ -576,18 +576,24 @@ int poll(void* _priv) {
  	// TX
  	int nicdev_tx(NICDevice* dev,
  			bool (*process)(Packet* packet, void* context), void* context);
- 	nicdev_tx(priv->nicdev, process, priv);
- 	VirtQueue* vq = priv->svq;
- 	kick(vq);
+ 	int count = nicdev_tx(priv->nicdev, process, priv);
+	if(count) {
+		vq = priv->svq;
+		kick(vq);
+	}
  
- 	// RX
- 	uint32_t len;
- 	if((buf = get_buf(priv->rvq, &len))) {
- 		virtnet_receive(priv, buf, len);
- 	}
+	uint32_t len;
+	int received = 0;
+	vq = priv->rvq;
+	while((BUDGET_SIZE > received) && (buf = get_buf(vq, &len))) {
+		virtnet_receive(priv, buf, len);
+		received++;
+	}
  
- 	vq = priv->rvq;
- 	kick(vq);
+	if(vq->num_free > vq->size / 2) {
+		kick(vq);
+		vq->num_free = 0;
+	}
  
 	return 0;
 }

@@ -220,8 +220,8 @@ inline static void packet_dump(void* _data, size_t size) {
 		Ether* eth = _data;
 		if(packet_debug_switch | NICDEV_DEBUG_PACKET_ETHER_INFO) {
 			printf("Ether Type:\t0x%04x\n", endian16(eth->type));
-			uint64_t dmac = eth->dmac;
-			uint64_t smac = eth->smac;
+			uint64_t dmac = endian48(eth->dmac);
+			uint64_t smac = endian48(eth->smac);
 			printf("%02x:%02x:%02x:%02x:%02x:%02x %02x:%02x:%02x:%02x:%02x:%02x\n",
 					(dmac >> 40) & 0xff, (dmac >> 32) & 0xff, (dmac >> 24) & 0xff,
 					(dmac >> 16) & 0xff, (dmac >> 8) & 0xff, (dmac >> 0) & 0xff,
@@ -312,10 +312,10 @@ int nicdev_tx(NICDevice* dev,
 	Packet* packet;
 	VNIC* vnic;
 	int budget;
-	int i;
+	int count = 0;
 
 	//TODO lock
-	for(i = 0; i < MAX_VNIC_COUNT; i++) {
+	for(int i = 0; i < MAX_VNIC_COUNT; i++) {
 		vnic = dev->vnics[i];
 		if(!vnic)
 			break;
@@ -328,9 +328,11 @@ int nicdev_tx(NICDevice* dev,
 
 			packet_dump(packet->buffer + packet->start, packet->end - packet->start);
 			if(!process(packet, context))
-				return 0;
+				return count;
+
+			count++;
 		}
 	}
 
-	return 0;
+	return count;
 }
