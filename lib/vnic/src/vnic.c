@@ -56,20 +56,32 @@ static uint64_t get_value(uint64_t* attrs, uint64_t key) {
 	return (uint64_t)-1;
 }
 
-static bool has_mandatory(uint64_t* attrs) {
-	int match = 0;
-	int mendatory_count = VNIC__MAND_END - VNIC__MAND_STRT -1;
-	for (int i = 0; i != mendatory_count; ++i) {
-		for(int j = 0; attrs[j] != VNIC_NONE; j += 2)
-			if(attrs[j] > VNIC__MAND_STRT && attrs[j] < VNIC__MAND_END)
-				match += 1;
+static VNICError has_mandatory(uint64_t* attrs) {
+	uint8_t used[VNIC__MAND_END] = {0,};
+
+	for(int i = 0; attrs[i] != VNIC_NONE; i += 2) {
+		VNICAttributes key = attrs[i];
+		if(key > VNIC__MAND_STRT && key < VNIC__MAND_END) {
+			if(used[key])
+				return VNIC_ERROR_ATTRIBUTE_CONFLICT;
+			else
+				used[key] = 1;
+		} else {
+			return VNIC_ERROR_ATTRIBUTE_INVALID;
+		}
 	}
-	return match == mendatory_count;
+
+	int nkey = 0;
+	for(int key = VNIC__MAND_STRT + 1; key < VNIC__MAND_END; ++key)
+		nkey += used[key];
+
+	return nkey == (VNIC__MAND_END - VNIC__MAND_STRT - 1) ?
+		VNIC_ERROR_NOERROR : VNIC_ERROR_ATTRIBUTE_MISSING;
 }
 
-static int nic_init(void* base, uint64_t* attrs) {
-	if(!has_mandatory(attrs))
-		return VNIC_ERROR_ATTRIBUTE_MISSING;
+static VNICError nic_init(void* base, uint64_t* attrs) {
+	if(has_mandatory(attrs) != VNIC_ERROR_NOERROR)
+		return has_mandatory(attrs);
 	if((uintptr_t)base == 0 || (uintptr_t)base % 0x200000 != 0)
 		return VNIC_ERROR_INVALID_BASE;
 	if(get_value(attrs, VNIC_POOL_SIZE) % 0x200000 != 0)
@@ -139,11 +151,11 @@ static int nic_init(void* base, uint64_t* attrs) {
 	memset(nic->config_head, 0, (size_t)((uintptr_t)nic->config_tail - (uintptr_t)nic->config_head));
 	memset(base + nic->pool.bitmap, 0, nic->pool.count);
 
-	return 0;
+	return VNIC_ERROR_NOERROR;
 }
 
 bool vnic_init(VNIC* vnic, uint64_t* attrs) {
-	if(nic_init(vnic->nic, attrs) != 0)
+	if(nic_init(vnic->nic, attrs) != VNIC_ERROR_NOERROR)
 		return false;
 
 	strncpy(vnic->parent, (char*)get_value(attrs, VNIC_DEV), MAX_NIC_NAME_LEN);
@@ -195,17 +207,19 @@ Packet* vnic_alloc(VNIC* vnic, size_t size) {
 	uint32_t idx = 0;
 	for(idx = index; idx <= count - req; idx++) {
 		for(uint32_t j = 0; j < req; j++) {
-			if(bitmap[idx + j] == 0) {
+			uint32_t pos = idx + j; // base + i
+			if(bitmap[pos] == 0) {
 				continue;
 			} else {
-				idx += j + bitmap[idx + j];
+				// another packet uses it. jump to the end of packet chunk
+				idx += j + bitmap[pos];
 				goto next;
 			}
 		}
 
 		goto found;
 next:
-		;
+		idx -= 1; // for loop increases idx for next loop
 	}
 
 	// Find head
@@ -247,11 +261,9 @@ found:
 }
 
 bool vnic_free(VNIC* vnic, Packet* packet) {
-	lock_lock(&vnic->nic->pool.lock);
-
 	NIC* nic = nic_find_by_packet(packet);
-	if(!nic || vnic->nic->id != nic->id) // Do not trust user
-		goto fail;
+	if(!nic || vnic->nic->id != nic->id)
+		return false;
 
 	uint8_t* bitmap = (void*)vnic->nic + vnic->pool.bitmap;
 	uint32_t count = vnic->pool.count;
@@ -259,24 +271,20 @@ bool vnic_free(VNIC* vnic, Packet* packet) {
 
 	uint32_t idx = ((uintptr_t)packet - (uintptr_t)pool) / NIC_CHUNK_SIZE;
 	if(idx >= count)
-		goto fail;
+		return false;
 
 	uint8_t req = bitmap[idx];
 	if(idx + req > count)
-		goto fail;
+		return false;
 
-	for(uint32_t i = idx + req - 1; i > idx; i--) {
+	for(uint32_t i = idx + req - 1; i >= idx; i--)
 		bitmap[i] = 0;
-	}
-	bitmap[idx] = 0;
 
+	lock_lock(&vnic->nic->pool.lock);
 	vnic->nic->pool.used -= req;
+	lock_unlock(&vnic->nic->pool.lock);
 
 	return true;
-
-fail:
-	lock_unlock(&vnic->nic->pool.lock);
-	return false;
 }
 
 VNICError vnic_rx(VNIC* vnic, uint8_t* buf1, size_t size1, uint8_t* buf2, size_t size2) {

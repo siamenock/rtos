@@ -48,6 +48,7 @@ typedef enum _VNICError {
 	VNIC_ERROR_NOERROR = 0,
 	VNIC_ERROR_ATTRIBUTE_MISSING,	    ///<Mandatory attributes not specified
 	VNIC_ERROR_ATTRIBUTE_CONFLICT,	    ///<Conflict attributes speicifed
+	VNIC_ERROR_ATTRIBUTE_INVALID,	    ///<Invalid attributes speicifed
 	VNIC_ERROR_INVALID_BASE,	    ///<Base pointer is not pointing correct memory location
 	VNIC_ERROR_INVALID_POOLSIZE,	    ///<Pool size is not multiple of 2MB
 	VNIC_ERROR_NO_MEMEORY,		    ///<Not enough memory
