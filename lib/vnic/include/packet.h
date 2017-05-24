@@ -6,17 +6,27 @@
 #include <stdbool.h>
 #include <stdint.h>
 #else
+// Linux kernel modules such as dispatcher cannot include glibc header files
 #include <linux/types.h>
 #endif
 
+/**
+ * @file
+ * Packet data structure
+ */
+
+/**
+ * Packet data structure
+ */
 typedef struct _Packet {
-	uint64_t	time;
+	uint64_t	time;	    ///< epoch timestamp
 
-	uint16_t	start;
-	uint16_t	end;
-	uint16_t	size;
+	// Actual packet data size: end-start
+	uint16_t	start;	    ///< start offset
+	uint16_t	end;	    ///< end offset
 
-	uint8_t		buffer[0];
+	uint16_t	size;	    ///< size of allocated buffer
+	uint8_t		buffer[0];  ///< data buffer
 } Packet;
 
 #endif /*__PACKET_H__*/
