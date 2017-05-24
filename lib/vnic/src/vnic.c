@@ -75,7 +75,6 @@ static int nic_init(void* base, uint64_t* attrs) {
 	if(get_value(attrs, VNIC_POOL_SIZE) % 0x200000 != 0)
 		return VNIC_ERROR_INVALID_POOLSIZE;
 
-	uint64_t size = get_value(attrs, VNIC_POOL_SIZE);
 	int index = sizeof(NIC);
 
 	NIC* nic = base;
@@ -120,22 +119,25 @@ static int nic_init(void* base, uint64_t* attrs) {
 	nic->stx.size = get_value(attrs, VNIC_SLOW_TX_QUEUE_SIZE);
 	nic->stx.rlock = 0;
 	nic->stx.wlock = 0;
-
 	index += nic->stx.size * sizeof(uint64_t);
 	index = ROUNDUP(index, 8);
+
+	uint64_t poolsize = get_value(attrs, VNIC_POOL_SIZE);
+	#define BITMAP_SIZE (poolsize - index) / NIC_CHUNK_SIZE;
+
 	nic->pool.bitmap = index;
-	index += (size - index) / NIC_CHUNK_SIZE;
+	index += BITMAP_SIZE;
 	index = ROUNDUP(index, NIC_CHUNK_SIZE);
+
 	nic->pool.pool = index;
-	nic->pool.count = (size - index) / NIC_CHUNK_SIZE;
+	nic->pool.count = BITMAP_SIZE;
 	nic->pool.index = 0;
 	nic->pool.used = 0;
 	nic->pool.lock = 0;
 
 	nic->config = 0;
-	bzero(nic->config_head, (size_t)((uintptr_t)nic->config_tail - (uintptr_t)nic->config_head));
-
-	bzero(base + nic->pool.bitmap, nic->pool.count);
+	memset(nic->config_head, 0, (size_t)((uintptr_t)nic->config_tail - (uintptr_t)nic->config_head));
+	memset(base + nic->pool.bitmap, 0, nic->pool.count);
 
 	return 0;
 }
@@ -149,6 +151,9 @@ bool vnic_init(VNIC* vnic, uint64_t* attrs) {
 	vnic->budget = get_value(attrs, VNIC_BUDGET) > 32 ? : 32;
 	vnic->magic = vnic->nic->magic;
 	vnic->mac = vnic->nic->mac;
+	vnic->pool.bitmap = vnic->nic->pool.bitmap;
+	vnic->pool.count = vnic->nic->pool.count;
+	vnic->pool.pool = vnic->nic->pool.pool;
 
 	vnic->rx_bandwidth = vnic->nic->rx_bandwidth;
 	vnic->tx_bandwidth = vnic->nic->tx_bandwidth;
@@ -182,15 +187,12 @@ Packet* vnic_alloc(VNIC* vnic, size_t size) {
 	uint32_t count = vnic->pool.count;
 	void* pool = (void*)vnic->nic + vnic->pool.pool;
 
-	uint32_t size2 = sizeof(Packet) + vnic->padding_head + size + vnic->padding_tail;
-	uint8_t req = (ROUNDUP(size2, NIC_CHUNK_SIZE)) / NIC_CHUNK_SIZE;
-
-
+	uint32_t packet_size = sizeof(Packet) + vnic->padding_head + size + vnic->padding_tail;
+	uint8_t req = (ROUNDUP(packet_size, NIC_CHUNK_SIZE)) / NIC_CHUNK_SIZE;
 	uint32_t index = vnic->nic->pool.index;
 
-
 	// Find tail
-	 uint32_t idx = 0;
+	uint32_t idx = 0;
 	for(idx = index; idx <= count - req; idx++) {
 		for(uint32_t j = 0; j < req; j++) {
 			if(bitmap[idx + j] == 0) {
@@ -244,14 +246,37 @@ found:
 	return packet;
 }
 
-void vnic_free(VNIC* vnic, Packet* packet) {
-	/*
-	 * 1. packet에서 nic을 찾아냄
-	 * 2. nic에서 vnic을 찾아냄 (nic의 id값을 활용함. 그러나 해당 값을 믿을 수 없기 때문에 검증은 꼭 필요함)
-	 * 3. vnic의 메모리 풀에서 해당 패킷을 제거함 (vnic_alloc의 역순으로 처리)
-	 */
+bool vnic_free(VNIC* vnic, Packet* packet) {
 	lock_lock(&vnic->nic->pool.lock);
 
+	NIC* nic = nic_find_by_packet(packet);
+	if(!nic || vnic->nic->id != nic->id) // Do not trust user
+		goto fail;
+
+	uint8_t* bitmap = (void*)vnic->nic + vnic->pool.bitmap;
+	uint32_t count = vnic->pool.count;
+	void* pool = (void*)vnic + vnic->pool.pool;
+
+	uint32_t idx = ((uintptr_t)packet - (uintptr_t)pool) / NIC_CHUNK_SIZE;
+	if(idx >= count)
+		goto fail;
+
+	uint8_t req = bitmap[idx];
+	if(idx + req > count)
+		goto fail;
+
+	for(uint32_t i = idx + req - 1; i > idx; i--) {
+		bitmap[i] = 0;
+	}
+	bitmap[idx] = 0;
+
+	vnic->nic->pool.used -= req;
+
+	return true;
+
+fail:
+	lock_unlock(&vnic->nic->pool.lock);
+	return false;
 }
 
 VNICError vnic_rx(VNIC* vnic, uint8_t* buf1, size_t size1, uint8_t* buf2, size_t size2) {

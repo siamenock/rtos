@@ -6,7 +6,7 @@
 NIC* __nics[NIC_MAX_COUNT];
 int __nic_count;
 
-static NIC* find_NIC(Packet* packet) {
+NIC* nic_find_by_packet(Packet* packet) {
 	NIC* nic = (void*)((uintptr_t)packet & ~(uintptr_t)(0x200000 - 1)); // 2MB alignment
 	for(int i = 0; i < NIC_MAX_SIZE / 0x200000  - 1 && (uintptr_t)nic > 0; i++) {
 		if(nic->magic == NIC_MAGIC_HEADER)
@@ -105,7 +105,7 @@ found:
 }
 
 bool nic_free(Packet* packet) {
-	NIC* nic = find_NIC(packet);
+	NIC* nic = nic_find_by_packet(packet);
 	if(nic == NULL)
 		return false;
 
@@ -130,7 +130,7 @@ bool nic_free(Packet* packet) {
 }
 
 bool queue_push(NIC* nic, NICQueue* queue, Packet* packet) {
-	NIC* nic2 = find_NIC(packet);
+	NIC* nic2 = nic_find_by_packet(packet);
 	if(nic2 == NULL)
 		return false;
 

@@ -149,7 +149,7 @@ Packet* vnic_alloc(VNIC* vnic, size_t size);
  * @param vnic VNIC that owns the packet
  * @param packet Packet created using the vnic_alloc API function
  */
-void vnic_free(VNIC* vnic, Packet* packet);
+bool vnic_free(VNIC* vnic, Packet* packet);
 
 /**
  * Update the attributes of the VNIC

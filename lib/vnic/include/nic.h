@@ -31,21 +31,24 @@
 // Host API
 
 typedef struct _NICQueue {
-	uint32_t	base;		///< Base offset
-	uint32_t	head;		///< Queue head
-	uint32_t	tail;		///< Queue tail
-	uint32_t	size;		///< Maximum number of packets this queue can have
+	uint32_t	base;			///< Base offset
+	uint32_t	head;			///< Queue head
+	uint32_t	tail;			///< Queue tail
+	uint32_t	size;			///< Maximum number of packets this queue can have
 	volatile uint8_t rlock;		///< Read lock
 	volatile uint8_t wlock;		///< Write lock
 } NICQueue;
 
+/**
+ * Bitmap Pool
+ */
 typedef struct _NICPool {
-	uint32_t	bitmap;
-	uint32_t	count;
-	uint32_t	pool;
+	uint32_t	bitmap;		///< Bitmap
+	uint32_t	count;		///< Chunk count
+	uint32_t	pool;		///< Bitmap pool
 	uint32_t	index;
-	uint32_t	used;
-	volatile uint8_t lock;
+	uint32_t	used;		///< Number of active chunks
+	volatile uint8_t lock;	///< Write lock
 } NICPool;
 
 /**
@@ -102,6 +105,7 @@ typedef struct _NIC {
 	// pool (NIC_CHUNK_SIZE(64) bytges aligned)
 } __attribute__((packed)) NIC;
 
+NIC* nic_find_by_packet(Packet* packet);
 int nic_count();
 NIC* nic_get(int index);
 NIC* nic_get_by_id(uint32_t id);
