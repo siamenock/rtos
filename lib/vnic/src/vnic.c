@@ -66,8 +66,6 @@ static VNICError has_mandatory(uint64_t* attrs) {
 				return VNIC_ERROR_ATTRIBUTE_CONFLICT;
 			else
 				used[key] = 1;
-		} else {
-			return VNIC_ERROR_ATTRIBUTE_INVALID;
 		}
 	}
 
