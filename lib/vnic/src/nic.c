@@ -6,7 +6,7 @@
 NIC* __nics[NIC_MAX_COUNT];
 int __nic_count;
 
-static NIC* find_NIC(Packet* packet) {
+NIC* nic_find_by_packet(Packet* packet) {
 	NIC* nic = (void*)((uintptr_t)packet & ~(uintptr_t)(0x200000 - 1)); // 2MB alignment
 	for(int i = 0; i < NIC_MAX_SIZE / 0x200000  - 1 && (uintptr_t)nic > 0; i++) {
 		if(nic->magic == NIC_MAGIC_HEADER)
@@ -23,32 +23,18 @@ int nic_count() {
 }
 
 NIC* nic_get(int index) {
-	if(index < __nic_count)
-		return __nics[index];
-	else
-		return NULL;
-/*
- *
- *        int count = 0;
- *        for(int i = 0; i < NIC_MAX_COUNT; i++) {
- *                if(__nics[i] != NULL) {
- *                        if(index == count)
- *                                return __nics[i];
- *                        else
- *                                count++;
- *                }
- *        }
- *
- *        return NULL;
- */
+	return index < __nic_count ? __nics[index] : NULL;
 }
 
 NIC* nic_get_by_id(uint32_t id) {
-	for(int i = 0; i < NIC_MAX_COUNT; i++)
-		if(__nics[i] != NULL && __nics[i]->id == id)
-			return __nics[i];
-
-	return NULL;
+	NIC* nic = NULL;
+	for(int i = 0; i < __nic_count; i++) {
+		if(__nics[i] && __nics[i]->id == id) {
+			nic =  __nics[i];
+			break;
+		}
+	}
+	return nic;
 }
 
 Packet* nic_alloc(NIC* nic, uint16_t size) {
@@ -119,7 +105,7 @@ found:
 }
 
 bool nic_free(Packet* packet) {
-	NIC* nic = find_NIC(packet);
+	NIC* nic = nic_find_by_packet(packet);
 	if(nic == NULL)
 		return false;
 
@@ -143,8 +129,8 @@ bool nic_free(Packet* packet) {
 	return true;
 }
 
-bool queue_push(NIC* nic, NIC_Queue* queue, Packet* packet) {
-	NIC* nic2 = find_NIC(packet);
+bool queue_push(NIC* nic, NICQueue* queue, Packet* packet) {
+	NIC* nic2 = nic_find_by_packet(packet);
 	if(nic2 == NULL)
 		return false;
 
@@ -160,7 +146,7 @@ bool queue_push(NIC* nic, NIC_Queue* queue, Packet* packet) {
 	}
 }
 
-void* queue_pop(NIC* nic, NIC_Queue* queue) {
+void* queue_pop(NIC* nic, NICQueue* queue) {
 	uint64_t* array = (void*)nic + queue->base;
 
 	if(queue->head != queue->tail) {
@@ -187,18 +173,18 @@ void* queue_pop(NIC* nic, NIC_Queue* queue) {
 	}
 }
 
-uint32_t queue_size(NIC_Queue* queue) {
+uint32_t queue_size(NICQueue* queue) {
 	if(queue->tail >= queue->head)
 		return queue->tail - queue->head;
 	else
 		return queue->size + queue->tail - queue->head;
 }
 
-bool queue_available(NIC_Queue* queue) {
+bool queue_available(NICQueue* queue) {
 	return queue->head != (queue->tail + 1) % queue->size;
 }
 
-bool queue_empty(NIC_Queue* queue) {
+bool queue_empty(NICQueue* queue) {
 	return queue->head == queue->tail;
 }
 
@@ -510,7 +496,7 @@ uint32_t nic_config_total(NIC* nic) {
 #include <stdarg.h>
 #include <stdlib.h>
 
-static void print_queue(NIC_Queue* queue) {
+static void print_queue(NICQueue* queue) {
 	printf("\tbase: %d\n", queue->base);
 	printf("\thead: %d\n", queue->head);
 	printf("\ttail: %d\n", queue->tail);
@@ -580,7 +566,7 @@ static void dump(NIC* nic) {
 	print_config(nic);
 }
 
-static void dump_queue(NIC* nic, NIC_Queue* queue) {
+static void dump_queue(NIC* nic, NICQueue* queue) {
 	print_queue(queue);
 	uint64_t* array = (void*)nic + queue->base;
 	for(int i = 0; i < queue->size; i++) {
