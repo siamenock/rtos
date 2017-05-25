@@ -300,6 +300,24 @@ int nicdev_rx(NICDevice* dev, void* data, size_t size) {
 	return NICDEV_PROCESS_PASS;
 }
 
+typedef struct _TransmitContext{
+	bool (*process)(Packet* packet, void* context);
+	void* context;
+} TransmitContext;
+
+static bool transmitter(Packet* packet, void* context) {
+	if(!packet)
+		return false;
+
+	packet_dump(packet->buffer + packet->start, packet->end - packet->start);
+	TransmitContext* transmitter_context = context;
+
+	if(!transmitter_context->process(packet, transmitter_context->context))
+		return false;
+
+	return true;
+}
+
 /**
  * @param dev NIC device
  * @param process function to process packets in NIC device
@@ -314,6 +332,10 @@ int nicdev_tx(NICDevice* dev,
 	int budget;
 	int count = 0;
 
+	TransmitContext transmitter_context = {
+		.process = process,
+		.context = context};
+
 	//TODO lock
 	for(int i = 0; i < MAX_VNIC_COUNT; i++) {
 		vnic = dev->vnics[i];
@@ -322,13 +344,12 @@ int nicdev_tx(NICDevice* dev,
 
 		budget = vnic->budget;
 		while(budget--) {
-			packet = vnic_tx(vnic);
-			if(!packet)
-				break;
+			VNICError ret = vnic_tx(vnic, transmitter, &transmitter_context);
 
-			packet_dump(packet->buffer + packet->start, packet->end - packet->start);
-			if(!process(packet, context))
+			if(ret == VNIC_ERROR_OPERATION_FAILED) // Transmiitter Error
 				return count;
+			else if(ret == VNIC_ERROR_RESOURCE_NOT_AVAILABLE) // There no Packet, Check next vnic
+				break;
 
 			count++;
 		}

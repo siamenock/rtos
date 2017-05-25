@@ -298,6 +298,7 @@ void main() {
 		cpu_init();
 		gmalloc_init();
 		timer_init();
+		vnic__init_timer(TIMER_FREQUENCY_PER_SEC);
 
 		gdt_init();
 		tss_init();
