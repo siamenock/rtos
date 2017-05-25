@@ -1,12 +1,12 @@
 .PHONY: run all clean
 
-CFLAGS = -I ../../include -I ../../../zlib -O2 -Wall -Werror -m64 -ffreestanding
+CFLAGS = -I ../../lib/include -I ../../../zlib -O2 -Wall -Werror -m64 -ffreestanding
 
 DIR = obj
 
 OBJS = obj/main.o
 
-LIBS = ../../lib/libpacketngin.a ../../lib/zlib/libz.a
+LIBS = ../../lib/libcore.a ../../lib/zlib/libz.a
 
 app: $(OBJS)
 	ld -melf_x86_64 -nostdlib -e main -o app $^ $(LIBS)

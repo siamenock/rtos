@@ -1,12 +1,12 @@
 .PHONY: run all clean
 
-CFLAGS = -I ../../include -O2 -Wall -Werror -m64 -ffreestanding -std=gnu99
+CFLAGS = -I ../../lib/include -O2 -Wall -Werror -m64 -ffreestanding -std=gnu99
 
 DIR = obj
 
 OBJS = obj/main.o
 
-LIBS = -L ../../lib --start-group -lpacketngin -llwip --end-group
+LIBS = -L ../../lib --start-group -lcore -llwip --end-group
 #../../lib/libpacketngin.a ../../lib/liblwip.a
 
 all: $(OBJS)
