@@ -150,6 +150,7 @@ static int upload(int argc, char** argv) {
 }
 
 int main(int argc, char *argv[]) {
+	rpc_init();
 	RPCSession* session = rpc_session();
 	if(!session) {
 		printf("RPC server not connected\n");

@@ -16,5 +16,6 @@ RPC* rpc_connect(char* host, int port, int timeout, bool keep_session);
 void rpc_disconnect(RPC* rpc);
 bool rpc_connected(RPC* rpc);
 RPCSession* rpc_session();
+void rpc_init();
 
 #endif /* __RPC_H__ */

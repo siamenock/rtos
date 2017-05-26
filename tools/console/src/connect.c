@@ -33,6 +33,7 @@ static int connect(int argc, char** argv) {
 
 int main(int argc, char *argv[]) {
 	int rc;
+	rpc_init();
 	if((rc = connect(argc, argv))) {
 		printf("Failed to connect RPC server. Error code : %d\n", rc);
 		return ERROR_RPC_DISCONNECTED;
