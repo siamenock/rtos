@@ -21,7 +21,7 @@ void cpu_init() {
 	bool has_turbo_boost = cpu_has_feature(CPU_FEATURE_TURBO_BOOST);
 	printf("\tTurbo boost: %s\n", has_turbo_boost ? "\x1b""32msupported""\x1b""0m" : "not supported");
 	if(has_turbo_boost) {
-		msr_write(0x00000199, 0xff00);
+		msr_write(0xff00, MSR_IA32_PERF_CTL);
 		printf("\tTurbo boost: ""\x1b""32menabled""\x1b""0m\n");
 	}
 

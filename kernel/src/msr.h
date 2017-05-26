@@ -3,6 +3,10 @@
 
 #include <stdint.h>
 
+#define MSR_IA32_APIC_BASE	0x1B
+#define MSR_IA32_PERF_STATUS	0x198
+#define MSR_IA32_PERF_CTL	0x199
+
 /**
  * @file MSR(Model Specific Register Intrinsics)
  * @see Intel64 Architectures Devlopers's Manual Chapter35
