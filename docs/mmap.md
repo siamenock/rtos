@@ -32,7 +32,7 @@ e.g.	-1MB -> 0xffffffff80100000
 
 -0MB ~ -1MB	: BIOS area, mapped to 0MB ~ 1MB
 
--2MB ~ -3MB	: Description table area, mapped to 1MB ~ 2MB
+-2MB ~ -3MB	: Description table area, mapped to 2MB ~ 3MB
 		: GDT (1976B)
 	16B	: GDTR
 	40B	: Segment Descriptor
