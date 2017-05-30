@@ -1,3 +1,4 @@
+#include "gmalloc.h"
 #include "nicdev.h"
 
 #define ETHER_TYPE_IPv4		0x0800		///< Ether type of IPv4
@@ -28,13 +29,20 @@ typedef struct _Ether {
 static NICDevice* nic_devices[MAX_NIC_DEVICE_COUNT]; //key string
 
 int nicdev_get_count() {
-	int i; 
-	for(i = 0; i < MAX_NIC_DEVICE_COUNT; i++) {
+	for(int i = 0; i < MAX_NIC_DEVICE_COUNT; i++) {
 		if(!nic_devices[i])
 			return i;
 	}
 
 	return MAX_NIC_DEVICE_COUNT;
+}
+
+NICDevice* nicdev_create() {
+	return gmalloc(sizeof(NICDevice));
+}
+
+void nicdev_destroy(NICDevice* dev) {
+	gfree(dev);
 }
 
 int nicdev_register(NICDevice* dev) {
@@ -266,14 +274,12 @@ inline static void packet_dump(void* _data, size_t size) {
 	}
 }
 
-/**
- * @param dev NIC device
- * @param data data to be sent
- * @param size data size
- *
- * @return result of process
- */
 int nicdev_rx(NICDevice* dev, void* data, size_t size) {
+	return nicdev_rx0(dev, data, size, NULL, 0);
+}
+
+int nicdev_rx0(NICDevice* dev, void* data, size_t size,
+		void* data_optional, size_t size_optional) {
 	Ether* eth = data;
 	int i;
 	VNIC* vnic;
@@ -286,13 +292,13 @@ int nicdev_rx(NICDevice* dev, void* data, size_t size) {
 			if(!dev->vnics[i])
 				break;
 
-			vnic_rx(dev->vnics[i], (uint8_t*)eth, size, NULL, 0);
+			vnic_rx(dev->vnics[i], (uint8_t*)eth, size, data_optional, size_optional);
 		}
 		return NICDEV_PROCESS_PASS;
 	} else {
 		vnic = nicdev_get_vnic_mac(dev, dmac);
 		if(vnic) {
-			vnic_rx(vnic, (uint8_t*)eth, size, NULL, 0);
+			vnic_rx(vnic, (uint8_t*)eth, size, data_optional, size_optional);
 			return NICDEV_PROCESS_COMPLETE;
 		}
 	}
@@ -356,4 +362,10 @@ int nicdev_tx(NICDevice* dev,
 	}
 
 	return count;
+}
+
+void nicdev_free(Packet* packet) {
+	// TODO
+	for(int i = 0; i < MAX_VNIC_COUNT; ++i) {
+	}
 }

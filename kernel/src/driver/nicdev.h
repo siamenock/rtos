@@ -26,20 +26,23 @@ typedef struct {
 
 typedef struct {
 	int		(*init)(void* device, void* data);
-	void		(*destroy)(int id);
+	void		(*destroy)(void* priv);
 	int		(*poll)(void* priv);
-	void		(*get_status)(int id, NICStatus* status);
-	bool		(*set_status)(int id, NICStatus* status);
-	void		(*get_info)(int id, NICInfo* info);
+	void		(*get_status)(void* priv, NICStatus* status);
+	bool		(*set_status)(void* priv, NICStatus* status);
+	void		(*get_info)(void* priv, NICInfo* info);
 } NICDriver;
 
 int nicdev_get_count();
+NICDevice* nicdev_create();
+void nicdev_destroy(NICDevice* dev);
 int nicdev_register(NICDevice* dev);
 NICDevice* nicdev_unregister(const char* name);
 NICDevice* nicdev_unregister(const char* name);
 NICDevice* nicdev_get_by_idx(int idx);
 NICDevice* nicdev_get(const char* name);
 int nicdev_poll();
+void nicdev_free(Packet* packet);
 
 int nicdev_register_vnic(NICDevice* dev, VNIC* vnic);
 VNIC* nicdev_unregister_vnic(NICDevice* dev, uint32_t id);
@@ -78,13 +81,23 @@ uint8_t nicdev_debug_switch_get();
 int nicdev_rx(NICDevice* dev, void* data, size_t size);
 
 /**
+ * @param dev NIC Device
+ * @param data data to be sent
+ * @param size data size
+ * @param data_optional optional data to be sent
+ * @param size_optional opttional data size
+ *
+ * @return  result of process
+ */
+int nicdev_rx0(NICDevice* dev, void* data, size_t size, void* data_optional, size_t size_optional);
+
+/**
  * @param dev NIC device
  * @param process function to process packets in NIC device
  * @param context context to be passed to process function
  *
  * @return number of packets proccessed
  */
-int nicdev_tx(NICDevice* dev,
-		bool (*process)(Packet* packet, void* context), void* context);
+int nicdev_tx(NICDevice* dev, bool (*process)(Packet* packet, void* context), void* context);
 
 #endif /* __NICDEV_H__ */
