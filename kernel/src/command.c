@@ -736,7 +736,7 @@ static int cmd_turbo(int argc, char** argv, void(*callback)(char* result, int ex
 		return CMD_STATUS_WRONG_NUMBER;
 	}
 
-	uint64_t perf_status = msr_read(0x00000198);
+	uint64_t perf_status = msr_read(MSR_IA32_PERF_STATUS);
 	perf_status = ((perf_status & 0xff00) >> 8);
 	if(!cpu_has_feature(CPU_FEATURE_TURBO_BOOST)) {
 		printf("Not Support Turbo Boost\n");
@@ -745,7 +745,7 @@ static int cmd_turbo(int argc, char** argv, void(*callback)(char* result, int ex
 		return 0;
 	}
 
-	uint64_t perf_ctrl = msr_read(0x00000199);
+	uint64_t perf_ctrl = msr_read(MSR_IA32_PERF_CTL);
 
 	if(argc == 1) {
 		if(perf_ctrl & 0x100000000) {
@@ -764,17 +764,17 @@ static int cmd_turbo(int argc, char** argv, void(*callback)(char* result, int ex
 			printf("Turbo Boost Already Disabled\n");
 			printf("\tPerfomance status : %d.%d Ghz\n",  perf_status / 10, perf_status % 10);
 		} else {
-			msr_write(0x00000199, 0x10000ff00);
+			msr_write(0x10000ff00, MSR_IA32_PERF_CTL);
 			printf("Turbo Boost Disabled\n");
-			perf_status = msr_read(0x00000198);
+			perf_status = msr_read(MSR_IA32_PERF_STATUS);
 			perf_status = ((perf_status & 0xff00) >> 8);
 			printf("\tPerfomance status : %d.%d Ghz\n", perf_status / 10, perf_status % 10);
 		}
 	} else if(!strcmp(argv[1], "on")) {
 		if(perf_ctrl & 0x100000000) {
-			msr_write(0x00000199, 0xff00);
+			msr_write(0xff00, MSR_IA32_PERF_CTL);
 			printf("Turbo Boost Enabled\n");
-			perf_status = msr_read(0x00000198);
+			perf_status = msr_read(MSR_IA32_PERF_STATUS);
 			perf_status = ((perf_status & 0xff00) >> 8);
 			printf("\tPerfomance status : %d.%d Ghz\n", perf_status / 10, perf_status % 10);
 		} else {

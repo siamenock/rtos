@@ -29,7 +29,7 @@ bool parse_iae(MP_IOAPICEntry* entry, void* context) {
 
 void mp_init() {
 	// Map IA32_APIC_BASE_MSR(0x1B) to virtual memory
-	_apic_address = msr_read(0x1B) & 0xFFFFF000;
+	_apic_address = msr_read(MSR_IA32_APIC_BASE) & 0xFFFFF000;
 
 	// Get APIC ID
 	apic_id = get_apic_id();
