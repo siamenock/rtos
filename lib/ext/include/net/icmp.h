@@ -40,5 +40,4 @@ bool icmp_process(NIC* nic, Packet* packet);
  * @return true if the packet is transmitted
  */
 bool icmp_request(NIC* nic, uint32_t addr);
-
 #endif /* __NET_ICMP_H__ */

@@ -13,10 +13,11 @@ typedef struct _IPv4Interface {
 } IPv4Interface;
 
 #define IPV4_INTERFACE_MAX_COUNT	16
+
 typedef struct _IPv4InterfaceTable {
-	uint8_t		count;
-	uint8_t		default_idx;
-	IPv4Interface	interfaces[IPV4_INTERFACE_MAX_COUNT];
+	uint16_t		bitmap;
+	uint8_t			default_idx;
+	IPv4Interface		interfaces[IPV4_INTERFACE_MAX_COUNT];
 } IPv4InterfaceTable;
 
 typedef struct _IPv6Interface {

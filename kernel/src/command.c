@@ -11,6 +11,7 @@
 #include <util/cmd.h>
 #include <util/map.h>
 #include <util/event.h>
+#include <net/interface.h>
 #include <net/ether.h>
 #include <net/arp.h>
 #include <vnic.h>
@@ -36,32 +37,134 @@
 
 #define MAX_VM_COUNT	128
 
-#ifdef TEST
-#include "test.h"
-static int cmd_test(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
-	// Run all tests
-	if(argc == 1) {
-		printf("Running PacketNgin RTOS all runtime tests...\n");
-		if(run_test(NULL) < 0)
-			return -1;
+static void print_byte_size(uint64_t byte_size) {
+	uint64_t size = 1;
+	for(int i = 0; i < 5; i++) {
+		if((byte_size / size) < 1000) {
+			printf("(%.1f ", (float)byte_size / size);
+			switch(i) {
+				case 0:
+					printf("B)");
+					break;
+				case 1:
+					printf("KB)");
+					break;
+				case 2:
+					printf("MB)");
+					break;
+				case 3:
+					printf("GB)");
+					break;
+				case 4:
+					printf("TB)");
+					break;
+			}
+			return;
+		}
 
-		return 0;
+		size *= 1000;
 	}
-
-	// List up test cases
-	if(!strcmp("list", argv[1])) {
-		list_tests();
-
-		return 0;
-	}
-
-	// Run specific test case
-	if(run_test(argv[1]) < 0)
-		return -1;
-
-	return 0;
 }
-#endif
+
+static void print_vnic_metadata(VNIC* vnic) {
+	printf("%12sRX packets:%d dropped:%d\n", "", vnic->input_packets, vnic->input_drop_packets);
+	printf("%12sTX packets:%d dropped:%d\n", "", vnic->output_packets, vnic->output_drop_packets);
+
+	printf("%12sRX bytes:%lu ", "", vnic->input_bytes);
+	print_byte_size(vnic->input_bytes);
+	printf("  TX bytes:%lu ", vnic->output_bytes);
+	print_byte_size(vnic->output_bytes);
+	printf("\n");
+	printf("%12sHead Padding:%d Tail Padding:%d\n", "",vnic->padding_head, vnic->padding_tail);
+}
+
+static void print_vnic(VNIC* vnic, uint16_t vmid, uint16_t nic_index) {
+	char name_buf[32];
+	sprintf(name_buf, "veth%d.%d", vmid, nic_index);
+	printf("%12s", name_buf);
+	printf("HWaddr %02x:%02x:%02x:%02x:%02x:%02x  ",
+			(vnic->mac >> 40) & 0xff,
+			(vnic->mac >> 32) & 0xff,
+			(vnic->mac >> 24) & 0xff,
+			(vnic->mac >> 16) & 0xff,
+			(vnic->mac >> 8) & 0xff,
+			(vnic->mac >> 0) & 0xff);
+
+	printf("Parent %s\n", vnic->parent);
+	print_vnic_metadata(vnic);
+}
+
+static void print_interface(VNIC* vnic, uint16_t vmid, uint16_t nic_index) {
+	IPv4InterfaceTable* table = interface_table_get(vnic->nic);
+	if(!table)
+		return;
+
+	int offset = 1;
+	for(int interface_index = 0; interface_index < IPV4_INTERFACE_MAX_COUNT; interface_index++, offset <<= 1) {
+		IPv4Interface* interface = NULL;
+		if(table->bitmap & offset)
+			 interface = &table->interfaces[interface_index];
+		else if(interface_index)
+			continue;
+
+		char name_buf[32];
+		if(interface_index)
+			sprintf(name_buf, "veth%d.%d:%d", vmid, nic_index, interface_index - 1);
+		else
+			sprintf(name_buf, "veth%d.%d", vmid, nic_index);
+
+		printf("%12s", name_buf);
+		printf("HWaddr %02x:%02x:%02x:%02x:%02x:%02x  ",
+				(vnic->mac >> 40) & 0xff,
+				(vnic->mac >> 32) & 0xff,
+				(vnic->mac >> 24) & 0xff,
+				(vnic->mac >> 16) & 0xff,
+				(vnic->mac >> 8) & 0xff,
+				(vnic->mac >> 0) & 0xff);
+		printf("Parent %s\n", vnic->parent);
+
+		if(interface) {
+			uint32_t ip = interface->address;
+			uint32_t mask = interface->netmask;
+			uint32_t gw = interface->gateway;
+			printf("%12sinet addr:%d.%d.%d.%d  ", "", (ip >> 24) & 0xff, (ip >> 16) & 0xff, (ip >> 8) & 0xff, (ip >> 0) & 0xff);
+			printf("\tMask:%d.%d.%d.%d\n", (mask >> 24) & 0xff, (mask >> 16) & 0xff, (mask >> 8) & 0xff, (mask >> 0) & 0xff);
+			//printf("%12sGateway:%d.%d.%d.%d\n", "", (gw >> 24) & 0xff, (gw >> 16) & 0xff, (gw >> 8) & 0xff, (gw >> 0) & 0xff);
+		}
+
+		if(interface_index == 0)
+			print_vnic_metadata(vnic);
+		printf("\n");
+	}
+}
+
+// 
+// #ifdef TEST
+// #include "test.h"
+// static int cmd_test(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+// 	// Run all tests
+// 	if(argc == 1) {
+// 		printf("Running PacketNgin RTOS all runtime tests...\n");
+// 		if(run_test(NULL) < 0)
+// 			return -1;
+// 
+// 		return 0;
+// 	}
+// 
+// 	// List up test cases
+// 	if(!strcmp("list", argv[1])) {
+// 		list_tests();
+// 
+// 		return 0;
+// 	}
+// 
+// 	// Run specific test case
+// 	if(run_test(argv[1]) < 0)
+// 		return -1;
+// 
+// 	return 0;
+// }
+// #endif
 
 static int cmd_clear(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	printf("\f");
@@ -125,7 +228,7 @@ static int cmd_date(int argc, char** argv, void(*callback)(char* result, int exi
 	uint32_t time = rtc_time();
 
 	printf("%s %s %d %02d:%02d:%02d UTC %d\n", weeks[RTC_WEEK(date)], months[RTC_MONTH(date)], RTC_DATE(date),
-		RTC_HOUR(time), RTC_MINUTE(time), RTC_SECOND(time), 2000 + RTC_YEAR(date));
+			RTC_HOUR(time), RTC_MINUTE(time), RTC_SECOND(time), 2000 + RTC_YEAR(date));
 
 	return 0;
 }
@@ -182,142 +285,193 @@ static bool parse_addr(char* argv, uint32_t* address) {
 	return true;
 }
 
-extern NIC* __nics[NIC_MAX_COUNT];
-extern int __nic_count;
 //TODO
+//manager create vnic -d eth0
+//manager destroy vnic veth0
+//manager show vnic
+//manager set veth0.1 
 static int cmd_manager(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
-	for(int i = 0 ; i < __nic_count; i++) {
-		NIC* nic = __nics[i];
-		printf("%p\n", nic);
+	//TODO error handle
+	if(!strcmp("create", argv[1])) {
+		VNIC* vnic = manager_create_vnic(argv[2]);
+		if(!vnic)
+			printf("fail\n");
+	} else if(!strcmp("destroy", argv[1])) {
+		if(!manager_destroy_vnic(argv[2]))
+			printf("fail\n");
+
+	} else if(!strcmp("show", argv[1])) {
+		for(int i = 0; i < NIC_MAX_COUNT; i++) {
+			VNIC* vnic = manager.vnics[i];	// gmalloc, ni_create
+			if(!vnic)
+				continue;
+
+			print_interface(vnic, 0, i);
+		}
+	} else if(!strcmp("open", argv[1])) {
+		if(strncmp(argv[2], "veth", 4))
+			return -1;
+
+		char* next;
+		char* vmid = strtok_r(argv[2] + 4, ".", &next);
+		if(!vmid)
+			return -1;
+
+		if(!is_uint8(vmid))
+			return -1;
+
+		char* _interface_index;
+		char* index = strtok_r(next, ":", &_interface_index);
+		if(!index)
+			return -2;
+
+		if(!is_uint8(index))
+			return -2;
+
+		VNIC* vnic;
+		if(parse_uint8(vmid)) {
+			return -2;
+		} else {
+			vnic = manager.vnics[parse_uint8(index)];
+		}
+
+		if(!vnic)
+			return -2;
+
+		IPv4InterfaceTable* table = interface_table_get(vnic->nic);
+		if(!table) {
+			return -3;
+		}
+
+		IPv4Interface* interface = NULL;
+		int interface_index = 0;
+		if(_interface_index) {
+			if(!is_uint8(_interface_index))
+				return -4;
+
+			interface_index = parse_uint8(_interface_index) + 1;
+		}
+		uint16_t offset = 1;
+		for(int i = 0; i < interface_index; i++) {
+			offset <<= 1;
+		}
+
+		if(!(table->bitmap & offset))
+			return -4;
+
+		interface = &table->interfaces[interface_index];
+		struct netif* netif = manager_create_netif(vnic->nic, interface->address, interface->netmask, interface->gateway, false);
+		printf("%p\n", netif);
+		printf("%x %x %x\n", interface->address, interface->netmask, interface->gateway);
+		manager_netif_server_open(netif, 111);
+		return 0;
+	} else if(!strcmp("close", argv[1])) {
+		return 0;
 	}
 	return 0;
-// 	if(!manager_nic) {
-// 		printf("Can't found manager\n");
-// 		return -1;
-// 	}
-// 
-// 	if(argc == 1) {
-// 		printf("HWaddr %02x:%02x:%02x:%02x:%02x:%02x\n",
-// 			(manager_nic->mac >> 40) & 0xff,
-// 			(manager_nic->mac >> 32) & 0xff,
-// 			(manager_nic->mac >> 24) & 0xff,
-// 			(manager_nic->mac >> 16) & 0xff,
-// 			(manager_nic->mac >> 8) & 0xff,
-// 			(manager_nic->mac >> 0) & 0xff);
-// 		uint32_t ip = manager_get_ip();
-// 		printf("%10sinet addr:%d.%d.%d.%d  ", "", (ip >> 24) & 0xff, (ip >> 16) & 0xff, (ip >> 8) & 0xff, (ip >> 0) & 0xff);
-// 		uint16_t port = manager_get_port();
-// 		printf("port:%d\n", port);
-// 		uint32_t mask = manager_get_netmask();
-// 		printf("%10sMask:%d.%d.%d.%d\n", "", (mask >> 24) & 0xff, (mask >> 16) & 0xff, (mask >> 8) & 0xff, (mask >> 0) & 0xff);
-// 		uint32_t gw = manager_get_gateway();
-// 		printf("%10sGateway:%d.%d.%d.%d\n", "", (gw >> 24) & 0xff, (gw >> 16) & 0xff, (gw >> 8) & 0xff, (gw >> 0) & 0xff);
-// 
-// 		return 0;
-// 	}
-// 
-// 	if(!strcmp("ip", argv[1])) {
-// 		uint32_t old = manager_get_ip();
-// 		if(argc == 2) {
-// 			printf("%d.%d.%d.%d\n", (old >> 24) & 0xff, (old >> 16) & 0xff, (old >> 8) & 0xff, (old >> 0) & 0xff);
-// 			return 0;
-// 		}
-// 
-// 		uint32_t address;
-// 		if(!parse_addr(argv[2], &address)) {
-// 			printf("Address wrong\n");
-// 			return 0;
-// 		}
-// 
-// 		manager_set_ip(address);
-// 	} else if(!strcmp("port", argv[1])) {
-// 		uint16_t old = manager_get_port();
-// 		if(argc == 2) {
-// 			printf("%d\n", old);
-// 			return 0;
-// 		}
-// 
-// 		if(!is_uint16(argv[2])) {
-// 			printf("Port number wrong\n");
-// 			return -1;
-// 		}
-// 
-// 		uint16_t port = parse_uint16(argv[2]);
-// 
-// 		manager_set_port(port);
-// 	} else if(!strcmp("netmask", argv[1])) {
-// 		uint32_t old = manager_get_netmask();
-// 		if(argc == 2) {
-// 			printf("%d.%d.%d.%d\n", (old >> 24) & 0xff, (old >> 16) & 0xff, (old >> 8) & 0xff, (old >> 0) & 0xff);
-// 			return 0;
-// 		}
-// 
-// 		uint32_t address;
-// 		if(!parse_addr(argv[2], &address)) {
-// 			printf("Address wrong\n");
-// 			return 0;
-// 		}
-// 
-// 		manager_set_netmask(address);
-// 
-// 		printf("Manager's Gateway changed from %d.%d.%d.%d to %d.%d.%d.%d\n",
-// 			(old >> 24) & 0xff, (old >> 16) & 0xff, (old >> 8) & 0xff, (old >> 0) & 0xff,
-// 			(address >> 24) & 0xff, (address >> 16) & 0xff, (address >> 8) & 0xff, (address >> 0) & 0xff);
-// 
-// 	} else if(!strcmp("gateway", argv[1])) {
-// 		uint32_t old = manager_get_gateway();
-// 		if(argc == 2) {
-// 			printf("%d.%d.%d.%d\n", (old >> 24) & 0xff, (old >> 16) & 0xff, (old >> 8) & 0xff, (old >> 0) & 0xff);
-// 			return 0;
-// 		}
-// 
-// 		uint32_t address;
-// 		if(!parse_addr(argv[2], &address)) {
-// 			printf("Address wrong\n");
-// 			return 0;
-// 		}
-// 
-// 		manager_set_gateway(address);
-// 
-// 		printf("Manager's Gateway changed from %d.%d.%d.%d to %d.%d.%d.%d\n",
-// 			(old >> 24) & 0xff, (old >> 16) & 0xff, (old >> 8) & 0xff, (old >> 0) & 0xff,
-// 			(address >> 24) & 0xff, (address >> 16) & 0xff, (address >> 8) & 0xff, (address >> 0) & 0xff);
-// 	} else if(!strcmp("nic", argv[1])) {
-// 		if(argc == 2) {
-// 			printf("Network Interface name required\n");
-// 			return false;
-// 		}
-// 
-// 		if(argc != 3) {
-// 			printf("Wrong Parameter\n");
-// 			return false;
-// 		}
-// 
-// 		uint16_t port = 0;
-// 		Device* dev = nicdev_get(argv[2]);
-// 		if(!dev)
-// 			return -2;
-// 
-// 		uint64_t attrs[] = {
-// 			VNIC_MAC, ((NICDevice*)dev->priv)->mac,
-// 			VNIC_DEV, (uint64_t)argv[2],
-// 			VNIC_NONE
-// 		};
-// 
-// 		/*
-// 		 *if(vnic_update(manager_nic, attrs)) {
-// 		 *        printf("Device not found\n");
-// 		 *        return -3;
-// 		 *}
-// 		 */
-// 		manager_set_interface();
-// 
-// 		return 0;
-// 	} else
-// 		return -1;
-// 
-// 	return 0;
 }
+	// 
+	// 	if(!strcmp("ip", argv[1])) {
+	// 		uint32_t old = manager_get_ip();
+	// 		if(argc == 2) {
+	// 			printf("%d.%d.%d.%d\n", (old >> 24) & 0xff, (old >> 16) & 0xff, (old >> 8) & 0xff, (old >> 0) & 0xff);
+	// 			return 0;
+	// 		}
+	// 
+	// 		uint32_t address;
+	// 		if(!parse_addr(argv[2], &address)) {
+	// 			printf("Address wrong\n");
+	// 			return 0;
+	// 		}
+	// 
+	// 		manager_set_ip(address);
+	// 	} else if(!strcmp("port", argv[1])) {
+	// 		uint16_t old = manager_get_port();
+	// 		if(argc == 2) {
+	// 			printf("%d\n", old);
+	// 			return 0;
+	// 		}
+	// 
+	// 		if(!is_uint16(argv[2])) {
+	// 			printf("Port number wrong\n");
+	// 			return -1;
+	// 		}
+	// 
+	// 		uint16_t port = parse_uint16(argv[2]);
+	// 
+	// 		manager_set_port(port);
+	// 	} else if(!strcmp("netmask", argv[1])) {
+	// 		uint32_t old = manager_get_netmask();
+	// 		if(argc == 2) {
+	// 			printf("%d.%d.%d.%d\n", (old >> 24) & 0xff, (old >> 16) & 0xff, (old >> 8) & 0xff, (old >> 0) & 0xff);
+	// 			return 0;
+	// 		}
+	// 
+	// 		uint32_t address;
+	// 		if(!parse_addr(argv[2], &address)) {
+	// 			printf("Address wrong\n");
+	// 			return 0;
+	// 		}
+	// 
+	// 		manager_set_netmask(address);
+	// 
+	// 		printf("Manager's Gateway changed from %d.%d.%d.%d to %d.%d.%d.%d\n",
+	// 			(old >> 24) & 0xff, (old >> 16) & 0xff, (old >> 8) & 0xff, (old >> 0) & 0xff,
+	// 			(address >> 24) & 0xff, (address >> 16) & 0xff, (address >> 8) & 0xff, (address >> 0) & 0xff);
+	// 
+	// 	} else if(!strcmp("gateway", argv[1])) {
+	// 		uint32_t old = manager_get_gateway();
+	// 		if(argc == 2) {
+	// 			printf("%d.%d.%d.%d\n", (old >> 24) & 0xff, (old >> 16) & 0xff, (old >> 8) & 0xff, (old >> 0) & 0xff);
+	// 			return 0;
+	// 		}
+	// 
+	// 		uint32_t address;
+	// 		if(!parse_addr(argv[2], &address)) {
+	// 			printf("Address wrong\n");
+	// 			return 0;
+	// 		}
+	// 
+	// 		manager_set_gateway(address);
+	// 
+	// 		printf("Manager's Gateway changed from %d.%d.%d.%d to %d.%d.%d.%d\n",
+	// 			(old >> 24) & 0xff, (old >> 16) & 0xff, (old >> 8) & 0xff, (old >> 0) & 0xff,
+	// 			(address >> 24) & 0xff, (address >> 16) & 0xff, (address >> 8) & 0xff, (address >> 0) & 0xff);
+	// 	} else if(!strcmp("nic", argv[1])) {
+	// 		if(argc == 2) {
+	// 			printf("Network Interface name required\n");
+	// 			return false;
+	// 		}
+	// 
+	// 		if(argc != 3) {
+	// 			printf("Wrong Parameter\n");
+	// 			return false;
+	// 		}
+	// 
+	// 		uint16_t port = 0;
+	// 		Device* dev = nicdev_get(argv[2]);
+	// 		if(!dev)
+	// 			return -2;
+	// 
+	// 		uint64_t attrs[] = {
+	// 			VNIC_MAC, ((NICDevice*)dev->priv)->mac,
+	// 			VNIC_DEV, (uint64_t)argv[2],
+	// 			VNIC_NONE
+	// 		};
+	// 
+	// 		/*
+	// 		 *if(vnic_update(manager_nic, attrs)) {
+	// 		 *        printf("Device not found\n");
+	// 		 *        return -3;
+	// 		 *}
+	// 		 */
+	// 		manager_set_interface();
+	// 
+	// 		return 0;
+	// 	} else
+	// 		return -1;
+	// 
+	// 	return 0;
 
 static int cmd_nic(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	int nicdev_count = nicdev_get_count();
@@ -340,66 +494,13 @@ static int cmd_nic(int argc, char** argv, void(*callback)(char* result, int exit
 }
 
 static int cmd_vnic(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
-	void print_byte_size(uint64_t byte_size) {
-		uint64_t size = 1;
-		for(int i = 0; i < 5; i++) {
-			if((byte_size / size) < 1000) {
-				printf("(%.1f ", (float)byte_size / size);
-				switch(i) {
-					case 0:
-						printf("B)");
-					break;
-					case 1:
-						printf("KB)");
-					break;
-					case 2:
-						printf("MB)");
-					break;
-					case 3:
-						printf("GB)");
-					break;
-					case 4:
-						printf("TB)");
-					break;
-				}
-				return;
-			}
+	if(argc == 1) {
+		for(int i = 0; i < NIC_MAX_COUNT; i++) {
+			VNIC* vnic = manager.vnics[i];	// gmalloc, ni_create
+			if(!vnic)
+				continue;
 
-			size *= 1000;
-		}
-	}
-
-	if(argc == 1 || (argc == 2 && !strcmp(argv[1], "list"))) {
-		void print_vnic(VNIC* vnic, uint16_t vmid, uint16_t nic_index) {
-			char name_buf[32];
-			sprintf(name_buf, "veth%d.%d", vmid, nic_index);
-			printf("%12s", name_buf);
-			printf("HWaddr %02x:%02x:%02x:%02x:%02x:%02x  ",
-				(vnic->mac >> 40) & 0xff,
-				(vnic->mac >> 32) & 0xff,
-				(vnic->mac >> 24) & 0xff,
-				(vnic->mac >> 16) & 0xff,
-				(vnic->mac >> 8) & 0xff,
-				(vnic->mac >> 0) & 0xff);
-
-			printf("Parent %s\n", vnic->parent);
-
-			printf("%12sRX packets:%d dropped:%d\n", "", vnic->input_packets, vnic->input_drop_packets);
-			printf("%12sTX packets:%d dropped:%d\n", "", vnic->output_packets, vnic->output_drop_packets);
-			//printf("%12srxqueuelen:%d txqueuelen:%d\n", "", fifo_capacity(vnic->nic->input_buffer), fifo_capacity(vnic->nic->output_buffer));
-
-			printf("%12sRX bytes:%lu ", "", vnic->input_bytes);
-			print_byte_size(vnic->input_bytes);
-			printf("  TX bytes:%lu ", vnic->output_bytes);
-			print_byte_size(vnic->output_bytes);
-			printf("\n");
-			printf("%12sHead Padding:%d Tail Padding:%d", "",vnic->padding_head, vnic->padding_tail);
-			printf("\n\n");
-
-		}
-
-		for(int i = 0 ; i < manager.nic_count; i++) {
-			print_vnic(manager.nics[i], 0, i);
+			print_vnic(vnic, 0, i);
 		}
 
 		extern Map* vms;
@@ -414,90 +515,214 @@ static int cmd_vnic(int argc, char** argv, void(*callback)(char* result, int exi
 				VNIC* vnic = vm->nics[i];
 				print_vnic(vnic, vmid, i);
 			}
+			printf("\n");
 		}
 
 		return 0;
 	}
 
-	return -1;
+	return 0;
+}
+
+static int cmd_interface(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	if(argc == 1) {
+		for(int i = 0; i < NIC_MAX_COUNT; i++) {
+			VNIC* vnic = manager.vnics[i];	// gmalloc, ni_create
+			if(!vnic)
+				continue;
+
+			print_interface(vnic, 0, i);
+		}
+
+		extern Map* vms;
+		MapIterator iter;
+		map_iterator_init(&iter, vms);
+		while(map_iterator_has_next(&iter)) {
+			MapEntry* entry = map_iterator_next(&iter);
+			uint16_t vmid = (uint16_t)(uint64_t)entry->key;
+			VM* vm = entry->data;
+
+			for(int i = 0; i < vm->nic_count; i++) {
+				VNIC* vnic = vm->nics[i];
+				print_interface(vnic, vmid, i);
+			}
+		}
+
+		return 0;
+	} else {
+		if(strncmp(argv[1], "veth", 4))
+			return -1;
+
+		char* next;
+		char* vmid = strtok_r(argv[1] + 4, ".", &next);
+		if(!vmid)
+			return -1;
+
+		if(!is_uint8(vmid))
+			return -1;
+
+		char* _interface_index;
+		char* index = strtok_r(next, ":", &_interface_index);
+		if(!index)
+			return -2;
+
+		if(!is_uint8(index))
+			return -2;
+
+		VNIC* vnic;
+		if(parse_uint8(vmid)) {
+			extern Map* vms;
+			VM* vm = map_get(vms, (uint64_t)parse_uint8(vmid));
+			if(!vm)
+				return -1;
+
+			if(parse_uint8(index) > vm->nic_count)
+				return -2;
+
+			vnic = vm->nics[parse_uint8(index)];
+		} else {
+			vnic = manager.vnics[parse_uint8(index)];
+		}
+
+		if(!vnic)
+			return -2;
+
+		IPv4InterfaceTable* table = interface_table_get(vnic->nic);
+		if(!table) {
+			return -3;
+		}
+
+		IPv4Interface* interface = NULL;
+		int interface_index = 0;
+		if(_interface_index) {
+			if(!is_uint8(_interface_index))
+				return -4;
+
+			interface_index = parse_uint8(_interface_index) + 1;
+		}
+		uint16_t offset = 1;
+		for(int i = 0; i < interface_index; i++) {
+			offset <<= 1;
+		}
+		table->bitmap |= offset;
+		interface = &table->interfaces[interface_index];
+
+		if(argc > 2) {
+			uint32_t address;
+			if(is_uint32(argv[2])) {
+				address = parse_uint32(argv[2]);
+			} else if(!parse_addr(argv[2], &address)) {
+				printf("Address wrong\n");
+				return 0;
+			}
+			if(address == 0) { //disable
+				table->bitmap ^= offset;
+				return 0;
+			}
+
+			interface->address = address;
+		}
+		if(argc > 3) {
+			uint32_t netmask;
+			if(is_uint32(argv[3])) {
+				netmask = parse_uint32(argv[3]);
+			} else if(!parse_addr(argv[3], &netmask)) {
+				printf("Address wrong\n");
+				return 0;
+			}
+			interface->netmask = netmask;
+		}
+		if(argc > 4) {
+			uint32_t gateway;
+			if(is_uint32(argv[4])) {
+				gateway = parse_uint32(argv[4]);
+			} else if(!parse_addr(argv[4], &gateway)) {
+				printf("Address wrong\n");
+				return 0;
+			}
+			interface->gateway = gateway;
+		}
+	}
+
+	return 0;
 }
 
 static int cmd_vlan(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
-/*
- *        extern Device* nic_devices[];
- *        if(argc < 3) {
- *                printf("Wrong number of arguments\n");
- *                return -1;
- *        }
- *
- *        if(!strcmp(argv[1], "add")) {
- *                if(argc != 4) {
- *                        printf("Wrong number of arguments\n");
- *                        return -1;
- *                }
- *
- *                uint16_t port = 0;
- *                Device* dev = nic_parse_index(argv[2], &port);
- *                if(!dev) {
- *                        printf("Cannot found Device\n");
- *                        return -2;
- *                }
- *
- *                if(!is_uint16(argv[3])) {
- *                        printf("VLAN ID wrong\n");
- *                        return -3;
- *                }
- *                uint16_t vid = parse_uint16(argv[3]);
- *
- *                if(vid == 0 || vid > 4096) {
- *                        printf("VLAN ID wrong\n");
- *                        return -3;
- *                }
- *
- *                Map* nics = ((NICDevice*)dev->priv)->nics;
- *                port = (port & 0xf000) | vid;
- *                if(map_contains(nics, (void*)(uint64_t)port)) {
- *                        printf("Already exist\n");
- *                        return -3;
- *                }
- *
- *                Map* vnics = map_create(8, NULL, NULL, NULL);
- *                if(!vnics) {
- *                        printf("Cannot allocate vnic map\n");
- *                        return -4;
- *                }
- *                if(!map_put(nics, (void*)(uint64_t)port, vnics)) {
- *                        printf("Cannot add VLAN");
- *                        map_destroy(vnics);
- *                        return -4;
- *                }
- *
- *                return 0;
- *        } else if(!strcmp(argv[1], "remove")) {
- *                if(argc != 3) {
- *                        printf("Wrong number of arguments\n");
- *                        return -1;
- *                }
- *
- *                uint16_t port = 0;
- *                Device* dev = nic_parse_index(argv[2], &port);
- *                if(!dev)
- *                        return -2;
- *
- *                if(!(port & 0xfff)) { //vid == 0
- *                        printf("VLan ID is 0\n");
- *                        return -2;
- *                }
- *
- *                if(!map_remove(((NICDevice*)dev->priv)->nics, (void*)(uint64_t)port)) {
- *                        printf("Cannot remove VLAN\n");
- *                        return -2;
- *                }
- *        } else
- *                return -1;
- *
- */
-	return 0;
+	/*
+	 *        extern Device* nic_devices[];
+	 *        if(argc < 3) {
+	 *                printf("Wrong number of arguments\n");
+	 *                return -1;
+	 *        }
+	 *
+	 *        if(!strcmp(argv[1], "add")) {
+	 *                if(argc != 4) {
+	 *                        printf("Wrong number of arguments\n");
+	 *                        return -1;
+	 *                }
+	 *
+	 *                uint16_t port = 0;
+	 *                Device* dev = nic_parse_index(argv[2], &port);
+	 *                if(!dev) {
+	 *                        printf("Cannot found Device\n");
+	 *                        return -2;
+	 *                }
+	 *
+	 *                if(!is_uint16(argv[3])) {
+	 *                        printf("VLAN ID wrong\n");
+	 *                        return -3;
+	 *                }
+	 *                uint16_t vid = parse_uint16(argv[3]);
+	 *
+	 *                if(vid == 0 || vid > 4096) {
+	 *                        printf("VLAN ID wrong\n");
+	 *                        return -3;
+	 *                }
+	 *
+	 *                Map* nics = ((NICDevice*)dev->priv)->nics;
+	 *                port = (port & 0xf000) | vid;
+	 *                if(map_contains(nics, (void*)(uint64_t)port)) {
+	 *                        printf("Already exist\n");
+	 *                        return -3;
+	 *                }
+	 *
+	 *                Map* vnics = map_create(8, NULL, NULL, NULL);
+	 *                if(!vnics) {
+	 *                        printf("Cannot allocate vnic map\n");
+	 *                        return -4;
+	 *                }
+	 *                if(!map_put(nics, (void*)(uint64_t)port, vnics)) {
+	 *                        printf("Cannot add VLAN");
+	 *                        map_destroy(vnics);
+	 *                        return -4;
+	 *                }
+	 *
+	 *                return 0;
+	 *        } else if(!strcmp(argv[1], "remove")) {
+	 *                if(argc != 3) {
+	 *                        printf("Wrong number of arguments\n");
+	 *                        return -1;
+	 *                }
+	 *
+	 *                uint16_t port = 0;
+	 *                Device* dev = nic_parse_index(argv[2], &port);
+	 *                if(!dev)
+	 *                        return -2;
+	 *
+	 *                if(!(port & 0xfff)) { //vid == 0
+	 *                        printf("VLan ID is 0\n");
+	 *                        return -2;
+	 *                }
+	 *
+	 *                if(!map_remove(((NICDevice*)dev->priv)->nics, (void*)(uint64_t)port)) {
+	 *                        printf("Cannot remove VLAN\n");
+	 *                        return -2;
+	 *                }
+	 *        } else
+	*                return -1;
+	*
+		*/
+		return 0;
 }
 
 static int cmd_version(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
@@ -737,156 +962,192 @@ static int cmd_md5(int argc, char** argv, void(*callback)(char* result, int exit
 	return 0;
 }
 
+char* strtok(char* argv, const char* delim) {
+	char* ptr = strstr(argv, delim);
+	if(!ptr)
+		return NULL;
+	*ptr = 0;
+
+	return argv;
+}
+
+char* strtok_r(char* argv, const char* delim, char** next) {
+	char* res = strtok(argv, delim);
+	if(!res) {
+		*next = NULL;
+		return argv;
+	}
+	*next = res + strlen(res) + 1;
+	return res;
+}
+
 static int cmd_create(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	// Default value
-	VMSpec* vm = malloc(sizeof(VMSpec));
-	memset(vm, 0, sizeof(VMSpec));
-	vm->core_size = 1;
-	vm->memory_size = 0x1000000;		/* 16MB */
-	vm->storage_size = 0x1000000;		/* 16MB */
-	vm->nic_count = 1;
-	vm->nics = malloc(sizeof(NICSpec) * MAX_VNIC_COUNT);
-	memset(vm->nics, 0, sizeof(NICSpec) * MAX_VNIC_COUNT);
-	vm->argc = 0;
-	vm->argv = malloc(sizeof(char*) * CMD_MAX_ARGC);
-	memset(vm->argv, 0, sizeof(char*) * CMD_MAX_ARGC);
+	VMSpec vm;
+	memset(&vm, 0, sizeof(VMSpec));
+	vm.core_size = 1;
+	vm.memory_size = 0x1000000;		/* 16MB */
+	vm.storage_size = 0x1000000;		/* 16MB */
 
-	NICSpec* nic = &vm->nics[0];
-	nic->mac = 0;
-	nic->dev = strdup("eth0");
-	nic->input_buffer_size = 1024;
-	nic->output_buffer_size = 1024;
-	nic->input_bandwidth = 1000000000;	/* 1 GB */
-	nic->output_bandwidth = 1000000000;	/* 1 GB */
-	nic->pool_size = 0x400000;		/* 4 MB */
+	NICSpec nics[VM_MAX_NIC_COUNT];
+	memset(nics, 0, sizeof(NICSpec) * VM_MAX_NIC_COUNT);
+	vm.nics = nics;
+
+	vm.argc = 0;
+	vm.argv = malloc(sizeof(char*) * CMD_MAX_ARGC);
+	memset(vm.argv, 0, sizeof(char*) * CMD_MAX_ARGC);
 
 	for(int i = 1; i < argc; i++) {
-		if(strcmp(argv[i], "core:") == 0) {
+		if(strcmp(argv[i], "-c") == 0) {
 			i++;
 			if(!is_uint8(argv[i])) {
 				printf("Core must be uint8\n");
 				return -1;
 			}
 
-			vm->core_size = parse_uint8(argv[i]);
-		} else if(strcmp(argv[i], "memory:") == 0) {
+			vm.core_size = parse_uint8(argv[i]);
+		} else if(strcmp(argv[i], "-m") == 0) {
 			i++;
 			if(!is_uint32(argv[i])) {
 				printf("Memory must be uint32\n");
 				return -1;
 			}
 
-			vm->memory_size = parse_uint32(argv[i]);
-		} else if(strcmp(argv[i], "storage:") == 0) {
+			vm.memory_size = parse_uint32(argv[i]);
+		} else if(strcmp(argv[i], "-s") == 0) {
 			i++;
 			if(!is_uint32(argv[i])) {
 				printf("Storage must be uint32\n");
 				return -1;
 			}
 
-			vm->storage_size = parse_uint32(argv[i]);
-		} else if(strcmp(argv[i], "nic:") == 0) {
+			vm.storage_size = parse_uint32(argv[i]);
+		} else if(strcmp(argv[i], "-n") == 0) {
+			NICSpec* nic = &(vm.nics[vm.nic_count++]);
+
 			i++;
-
-			NICSpec* nic = &(vm->nics[vm->nic_count++]);
-
-			// Default value
-			nic->mac = 0;
-			nic->dev = strdup("eth0");
-			nic->input_buffer_size = 1024;
-			nic->output_buffer_size = 1024;
-			nic->input_bandwidth = 1000000000; /* 1 GB */
-			nic->output_bandwidth = 1000000000; /* 1 GB */
-			nic->pool_size = 0x400000; /* 4 MB */
-
-			for( ; i < argc; i++) {
-				if(strcmp(argv[i], "mac:") == 0) {
-					i++;
-					if(!is_uint64(argv[i])) {
+			char* next;
+			char* token = strtok_r(argv[i], ",", &next);
+			while(token) {
+				char* value;
+				token = strtok_r(token, "=", &value);
+				if(strcmp(token, "mac") == 0) {
+					if(!is_uint64(value)) {
 						printf("Mac must be uint64\n");
 						return -1;
 					}
-					nic->mac = parse_uint64(argv[i]);
-				} else if(strcmp(argv[i], "dev:") == 0) {
-					i++;
-					nic->dev = malloc(strlen(argv[i] + 1));
-					strcpy(nic->dev, argv[i]);
-				} else if(strcmp(argv[i], "ibuf:") == 0) {
-					i++;
-					if(!is_uint32(argv[i])) {
+					nic->mac = parse_uint64(token);
+				} else if(strcmp(token, "dev") == 0) {
+					nic->dev = malloc(strlen(token + 1));
+					strcpy(nic->dev, value);
+				} else if(strcmp(token, "ibuf") == 0) {
+					if(!is_uint32(value)) {
 						printf("Ibuf must be uint32\n");
 						return -1;
 					}
-					nic->input_buffer_size = parse_uint32(argv[i]);
-				} else if(strcmp(argv[i], "obuf:") == 0) {
-					i++;
-					if(!is_uint32(argv[i])) {
+					nic->input_buffer_size = parse_uint32(value);
+				} else if(strcmp(token, "obuf") == 0) {
+					if(!is_uint32(value)) {
 						printf("Obuf must be uint32\n");
 						return -1;
 					}
-					nic->output_buffer_size = parse_uint32(argv[i]);
-				} else if(strcmp(argv[i], "iband:") == 0) {
-					i++;
-					if(!is_uint64(argv[i])) {
+					nic->output_buffer_size = parse_uint32(value);
+				} else if(strcmp(token, "iband") == 0) {
+					if(!is_uint64(value)) {
 						printf("Iband must be uint64\n");
 						return -1;
 					}
-					nic->input_bandwidth = parse_uint64(argv[i]);
-				} else if(strcmp(argv[i], "oband:") == 0) {
-					i++;
-					if(!is_uint64(argv[i])) {
+					nic->input_bandwidth = parse_uint64(value);
+				} else if(strcmp(token, "oband") == 0) {
+					if(!is_uint64(value)) {
 						printf("Oband must be uint64\n");
 						return -1;
 					}
-					nic->output_bandwidth = parse_uint64(argv[i]);
-				} else if(strcmp(argv[i], "hpad:") == 0) {
-					i++;
-					if(!is_uint16(argv[i])) {
+					nic->output_bandwidth = parse_uint64(value);
+				} else if(strcmp(token, "hpad") == 0) {
+					if(!is_uint16(value)) {
 						printf("Iband must be uint16\n");
 						return -1;
 					}
-					nic->padding_head = parse_uint16(argv[i]);
-				} else if(strcmp(argv[i], "tpad:") == 0) {
-					i++;
-					if(!is_uint16(argv[i])) {
+					nic->padding_head = parse_uint16(value);
+				} else if(strcmp(token, "tpad") == 0) {
+					if(!is_uint16(value)) {
 						printf("Oband must be uint16\n");
 						return -1;
 					}
-					nic->padding_tail = parse_uint16(argv[i]);
-				} else if(strcmp(argv[i], "pool:") == 0) {
-					i++;
-					if(!is_uint32(argv[i])) {
+					nic->padding_tail = parse_uint16(value);
+				} else if(strcmp(token, "pool") == 0) {
+					if(!is_uint32(value)) {
 						printf("Pool must be uint32\n");
 						return -1;
 					}
-					nic->pool_size = parse_uint32(argv[i]);
+					nic->pool_size = parse_uint32(value);
 				} else {
 					i--;
 					break;
 				}
+
+				token = strtok_r(next, ",", &next);
 			}
-		} else if(strcmp(argv[i], "args:") == 0) {
+		} else if(strcmp(argv[i], "-a") == 0) {
 			i++;
 			for( ; i < argc; i++) {
-				vm->argv[vm->argc++] = argv[i];
+				vm.argv[vm.argc++] = argv[i];
 			}
 		}
 	}
 
-	uint32_t vmid = vm_create(vm);
+	uint32_t vmid = vm_create(&vm);
 	if(vmid == 0) {
 		callback(NULL, -1);
 	} else {
+		VM* vm = vm_get(vmid);
+
+		printf("Manager: VM[%d] created(cores [\n", vm->id);
+		for(int i = 0; i < vm->core_size; i++) {
+			printf("%d, ", mp_apic_id_to_processor_id(vm->cores[i]));
+			if(i + 1 < vm->core_size)
+				printf(", ");
+		}
+		printf("], %dMBs memory, %dMBs storage, VNICs: %d\n",
+				vm->memory.count * VM_MEMORY_SIZE_ALIGN / 0x100000,
+				vm->storage.count * VM_STORAGE_SIZE_ALIGN / 0x100000, vm->nic_count);
+
+		//Ok
+		for(int i = 0; i < vm->nic_count; i++) {
+			VNIC* vnic = vm->nics[i];
+			printf("\t");
+			for(int j = 5; j >= 0; j--) {
+				printf("%02lx", (vnic->mac >> (j * 8)) & 0xff);
+				if(j - 1 >= 0)
+					printf(":");
+				else
+					printf(" ");
+			}
+			printf("%ldMbps/%ld, %ldMbps/%ld, %ldMBs\n", vnic->rx_bandwidth / 1000000, vnic->rx.size, vnic->tx_bandwidth / 1000000, vnic->tx.size, vnic->nic_size / (1024 * 1024));
+		}
+
+		printf("\targs(%d): ", vm->argc);
+		for(int i = 0; i < vm->argc; i++) {
+			char* ch = strchr(vm->argv[i], ' ');
+			if(ch == NULL)
+				printf("%s ", vm->argv[i]);
+			else
+				printf("\"%s\" ", vm->argv[i]);
+		}
+		printf("\n");
+
 		sprintf(cmd_result, "%d", vmid);
 		printf("%s\n", cmd_result);
 		callback(cmd_result, 0);
 	}
-	for(int i = 0; i < vm->nic_count; i++) {
-		free(vm->nics[i].dev);
+
+	for(int i = 0; i < vm.nic_count; i++) {
+		if(vm.nics[i].dev)
+			free(vm.nics[i].dev);
 	}
-	free(vm->argv);
-	free(vm->nics);
-	free(vm);
+
+	free(vm.argv);
 	return 0;
 }
 
@@ -1236,6 +1497,11 @@ Command commands[] = {
 		.name = "vnic",
 		.desc = "List of virtual network interface",
 		.func = cmd_vnic
+	},
+	{
+		.name = "interface",
+		.desc = "List of virtual network interface",
+		.func = cmd_interface
 	},
 	{
 		.name = "vlan",

@@ -3,6 +3,7 @@
 #include <net/ip.h>
 #include <net/icmp.h>
 #include <net/checksum.h>
+#include <net/interface.h>
 #include <util/map.h>
 
 bool icmp_process(NIC* nic, Packet* packet) {

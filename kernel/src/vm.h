@@ -16,10 +16,22 @@
 #define VM_STORAGE_SIZE_ALIGN	0x200000
 
 #define MAX_VM_COUNT            128
+
 typedef struct {
 	uint32_t	count;
 	void**		blocks;	// gmalloc(array), bmalloc(content)
 } Block;
+
+#define VM_MAX_MEMORY_SIZE	0x8000000		//128Mb
+#define VM_MAX_STORAGE_SIZE	0x8000000		//128Mb
+#define VM_MAX_NIC_COUNT	NIC_MAX_COUNT		
+
+#define NIC_DEFAULT_NICDEV		"eth0"
+#define NIC_DEFAULT_POOL_SIZE		0x200000	// 4Mb
+#define NIC_DEFAULT_BUDGET_SIZE		32
+#define NIC_DEFAULT_PADDING_SIZE	32
+#define NIC_DEFAULT_BUFFER_SIZE		1024
+#define NIC_DEFAULT_BANDWIDTH		1000000000	// 1Gbps
 
 typedef struct _VM {
 	uint32_t	id;

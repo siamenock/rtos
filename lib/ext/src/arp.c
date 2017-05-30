@@ -6,34 +6,63 @@
 #include <nic.h>
 
 #define ARP_TABLE		"net.arp.arptable"
-#define ARP_TABLE_GC		"net.arp.arptable.gc"
 #define ARP_TIMEOUT		(uint64_t)14400 * 1000000	// 4 hours  (us)
 
 #define GC_INTERVAL		(uint64_t)10 * 1000000	// 10 secs
 
 //TODO When load application in kernel, do set arp_table.
+inline void arp_table_reflash(ARPTable* table, uint64_t current) {
+	if(current < table->timeout)
+		return;
+
+	for(int i = 0; i < table->entity_count; i++) {
+recheck:
+		if(table->entity[i].timeout > current)
+			continue;
+
+		if(i == table->entity_count - 1) {
+			table->entity_count--;
+			break;
+		} else {
+			table->entity[i] = table->entity[--table->entity_count];
+			goto recheck;
+		}
+	}
+
+	table->timeout = current + GC_INTERVAL;
+}
+
 ARPTable* arp_get_table(NIC* nic) {
 	//TODO Add cache
 	static NIC* _nic = NULL;
-	static ARPTable* arp_table = NULL;
+	static ARPTable* table = NULL;
 
-	if(_nic == nic)
-		return arp_table;
-
-	int32_t arp_table_key = nic_config_key(nic, ARP_TABLE);
-	if(arp_table_key <= 0) {
-		arp_table_key = nic_config_alloc(nic, ARP_TABLE, sizeof(ARPTable));
-		if(arp_table_key <= 0)
-			return NULL;
-
-		arp_table = nic_config_get(nic, arp_table_key);
-		memset(arp_table, 0, sizeof(ARPTable));
+	uint64_t current = timer_us();
+	if(_nic == nic) {
+		arp_table_reflash(table, current);
+		return table;
 	}
 
-	_nic = nic;
-	arp_table = nic_config_get(nic, arp_table_key);
+	int32_t table_key = nic_config_key(nic, ARP_TABLE);
+	if(table_key <= 0) {
+		table_key = nic_config_alloc(nic, ARP_TABLE, sizeof(ARPTable));
+		if(table_key <= 0)
+			return NULL;
 
-	return arp_table;
+		table = nic_config_get(nic, table_key);
+		memset(table, 0, sizeof(ARPTable));
+
+		_nic = nic;
+
+		return table;
+	}
+
+	table = nic_config_get(nic, table_key);
+	arp_table_reflash(table, current);
+
+	_nic = nic;
+
+	return table;
 }
 
 // TODO
@@ -41,57 +70,66 @@ bool arp_table_destroy(NIC* nic) {
 	return true;
 }
 
-bool arp_table_update(ARPTable* arp_table, uint64_t mac, uint32_t addr, bool dynamic) {
-	//TODO Check
+bool arp_table_update(ARPTable* table, uint64_t mac, uint32_t addr, bool dynamic) {
 	uint64_t current = timer_us();
-	for(int i = 0; i < arp_table->arp_entity_count; i++) {
-		// Update
-		if(arp_table->arp_entity[i].addr == addr) {
-			if(dynamic) {
-			} else {
-				arp_table->arp_entity[i].mac = mac;
-				arp_table->arp_entity[i].timeout = current + ARP_TIMEOUT;
-			}
+	for(int i = 0; i < table->entity_count; i++) {
+		if(table->entity[i].addr == addr) {
+			if(!dynamic) {
+				table->entity[i].mac = mac;
+				table->entity[i].timeout = current + ARP_TIMEOUT;
+			} else if(table->entity[table->entity_count].dynamic == dynamic) {
+				table->entity[i].mac = mac;
+				table->entity[i].timeout = current + ARP_TIMEOUT;
+			} else
+				return false;
+
 			return true;
 		}
 	}
 
-	//TODO add new entry
+	if(table->entity_count >= ARP_ENTITY_MAX_COUNT)
+		return false;
+
+	table->entity[table->entity_count].mac = mac;
+	table->entity[table->entity_count].addr = addr;
+	table->entity[table->entity_count].dynamic = dynamic;
+	table->entity[table->entity_count++].timeout = current + ARP_TIMEOUT;
+
 	return true;
 }
 
-inline ARPEntity* arp_table_get_by_addr(ARPTable* arp_table, uint32_t addr) {
-	for(int i = 0; i < arp_table->arp_entity_count; i++) {
-		if(arp_table->arp_entity[i].addr == addr)
-			return &arp_table->arp_entity[i];
+inline ARPEntity* arp_table_get_by_addr(ARPTable* table, uint32_t addr) {
+	for(int i = 0; i < table->entity_count; i++) {
+		if(table->entity[i].addr == addr)
+			return &table->entity[i];
 	}
 
 	return NULL;
 }
 
-inline ARPEntity* arp_table_get_by_mac(ARPTable* arp_table, uint64_t mac) {
-	for(int i = 0; i < arp_table->arp_entity_count; i++) {
-		if(arp_table->arp_entity[i].mac == mac)
-			return &arp_table->arp_entity[i];
+inline ARPEntity* arp_table_get_by_mac(ARPTable* table, uint64_t mac) {
+	for(int i = 0; i < table->entity_count; i++) {
+		if(table->entity[i].mac == mac)
+			return &table->entity[i];
 	}
 
 	return NULL;
 }
 
-inline bool arp_table_remove(ARPTable* arp_table, uint32_t addr) {
+inline bool arp_table_remove(ARPTable* table, uint32_t addr) {
 	return true;
 }
 
 uint64_t arp_get_mac(NIC* nic, uint32_t destination, uint32_t source) {
-	ARPTable* arp_table = get_arp_table(nic);
-	if(!arp_table) {
-		arp_request(nic, destination, source);
+	ARPTable* table = arp_get_table(nic);
+	if(!table) {
+		arp_request0(nic, destination, source);
 		return 0xffffffffffff;
 	}
 
-	ARPEntity* entity = arp_table_get_by_mac(arp_table, destination);
+	ARPEntity* entity = arp_table_get_by_mac(table, destination);
 	if(!entity) {
-		arp_request(nic, destination, source);
+		arp_request0(nic, destination, source);
 		return 0xffffffffffff;
 	}
 
@@ -99,15 +137,12 @@ uint64_t arp_get_mac(NIC* nic, uint32_t destination, uint32_t source) {
 }
 
 uint32_t arp_get_ip(NIC* nic, uint64_t mac) {
-	ARPTable* arp_table = get_arp_table(nic);
-	ARPEntity* entity = arp_table_get_by_mac(arp_table, mac);
+	ARPTable* table = arp_get_table(nic);
+	ARPEntity* entity = arp_table_get_by_mac(table, mac);
 	if(!entity)
 		return 0;
 
 	return entity->addr;
-}
-
-void arp_set_reply_handler() {
 }
 
 bool arp_process(NIC* nic, Packet* packet) {
@@ -122,36 +157,12 @@ bool arp_process(NIC* nic, Packet* packet) {
 	if(!interface_get(nic, addr))
 		return false;
 
-	ARPTable* arp_table = get_arp_table(nic); //Drop?
-	if(!arp_table)
-		return false;
-
-	// GC
-// 	uint64_t gc_time = (uintptr_t)nic_config_get(packet->nic, ARP_TABLE_GC);
-// 	if(gc_time == 0 && !nic_config_contains(packet->nic, ARP_TABLE_GC)) {
-// 		gc_time = current + GC_INTERVAL;
-// 		if(!nic_config_put(packet->nic, ARP_TABLE_GC, (void*)(uintptr_t)gc_time))
-// 			return false;
-// 	}
-
-// 	if(gc_time < current) {
-// 		MapIterator iter;
-// 		map_iterator_init(&iter, arp_table);
-// 		while(map_iterator_has_next(&iter)) {
-// 			MapEntry* entry = map_iterator_next(&iter);
-// 			if(((ARPEntity*)entry->data)->timeout < current) {
-// 				__free(entry->data, packet->nic->pool);
-// 				map_iterator_remove(&iter);
-// 			}
-// 		}
-//
-// 		gc_time = current + GC_INTERVAL;
-// 		if(!nic_config_put(packet->nic, ARP_TABLE_GC, (void*)(uintptr_t)gc_time))
-// 			return false;
-// 	}
-
+	ARPTable* table = arp_get_table(nic);
 	switch(endian16(arp->operation)) {
 		case 1:	// Request
+			if(table)
+				arp_table_update(table, ether->smac, arp->spa, true);
+
 			ether->dmac = ether->smac;
 			ether->smac = endian48(nic->mac);
 			arp->operation = endian16(2);
@@ -161,17 +172,13 @@ bool arp_process(NIC* nic, Packet* packet) {
 			arp->spa = endian32(addr);
 
 			nic_tx(nic, packet);
-
-			//TODO map put
-
 			return true;
 		case 2: // Reply
 			;
 			uint64_t smac = endian48(arp->sha);
 			uint32_t sip = endian32(arp->spa);
-			//TODO map_put
-// 			entity->mac = smac;
-// 			entity->timeout = current + ARP_TIMEOUT;
+			if(table)
+				arp_table_update(table, smac, sip, true);
 			nic_free(packet);
 			return true;
 	}
@@ -179,10 +186,7 @@ bool arp_process(NIC* nic, Packet* packet) {
 	return false;
 }
 
-bool arp_request(NIC* nic, uint32_t destination, uint32_t source) {
-	if(!interface_get(nic, source))
-		return false;
-
+bool arp_request0(NIC* nic, uint32_t destination, uint32_t source) {
 	Packet* packet = nic_alloc(nic, sizeof(Ether) + sizeof(ARP));
 	if(!packet)
 		return false;
@@ -206,6 +210,31 @@ bool arp_request(NIC* nic, uint32_t destination, uint32_t source) {
 	packet->end = packet->start + sizeof(Ether) + sizeof(ARP);
 
 	return nic_tx(nic, packet);
+}
+
+bool arp_request(NIC* nic, uint32_t destination) {
+	IPv4InterfaceTable* table = interface_table_get(nic);
+	if(!table)
+		return false;
+
+	IPv4Interface* interface = NULL;
+	int offset = 1;
+	for(int i = 0; i < IPV4_INTERFACE_MAX_COUNT; i++) {
+		if(table->bitmap & offset) {
+			IPv4Interface* _interface = &table->interfaces[i];
+			if((_interface->address & _interface->netmask) == (destination & _interface->netmask)) {
+				interface = _interface;
+				break;
+			}
+		}
+
+		offset <<= 1;
+	}
+
+	if(!interface)
+		return false;
+
+	return arp_request0(nic, destination, interface->address);
 }
 
 bool arp_announce(NIC* nic, uint32_t source) {

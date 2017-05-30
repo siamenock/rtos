@@ -514,12 +514,14 @@ uint32_t vm_create(VMSpec* vm_spec) {
 	}
 
 	vm->argc = vm_spec->argc;
-	char* args = (void*)vm->argv + sizeof(char*) * vm_spec->argc;
-	for(int i = 0; i < vm_spec->argc; i++) {
-		vm->argv[i] = args;
-		int len = strlen(vm_spec->argv[i]) + 1;
-		memcpy(args, vm_spec->argv[i], len);
-		args += len;
+	if(vm->argc) {
+		char* args = (void*)vm->argv + sizeof(char*) * vm_spec->argc;
+		for(int i = 0; i < vm_spec->argc; i++) {
+			vm->argv[i] = args;
+			int len = strlen(vm_spec->argv[i]) + 1;
+			memcpy(args, vm_spec->argv[i], len);
+			args += len;
+		}
 	}
 
 	// Allocate core
@@ -539,13 +541,17 @@ uint32_t vm_create(VMSpec* vm_spec) {
 
 	if(j < vm->core_size) {
 		printf("Manager: Not enough core to allocate.\n");
-		vm_delete(vm, -1);
-		return 0;
+		goto fail;
 	}
 
 	// Allocate memory
 	uint32_t memory_size = vm_spec->memory_size;
 	memory_size = (memory_size + (VM_MEMORY_SIZE_ALIGN - 1)) & ~(VM_MEMORY_SIZE_ALIGN - 1);
+	if(memory_size > VM_MAX_MEMORY_SIZE) {
+		printf("Manager: VM Memory is too large\n");
+		goto fail;
+	}
+
 	vm->memory.count = memory_size / VM_MEMORY_SIZE_ALIGN;
 	vm->memory.blocks = gmalloc(vm->memory.count * sizeof(void*));
 	memset(vm->memory.blocks, 0x0, vm->memory.count * sizeof(void*));
@@ -553,14 +559,18 @@ uint32_t vm_create(VMSpec* vm_spec) {
 		vm->memory.blocks[i] = bmalloc(1);
 		if(!vm->memory.blocks[i]) {
 			printf("Manager: Not enough memory to allocate.\n");
-			vm_delete(vm, -1);
-			return 0;
+			goto fail;
 		}
 	}
 
 	// Allocate storage
 	uint32_t storage_size = vm_spec->storage_size;
 	storage_size = (storage_size + (VM_STORAGE_SIZE_ALIGN - 1)) & ~(VM_STORAGE_SIZE_ALIGN - 1);
+	if(storage_size > VM_MAX_STORAGE_SIZE) {
+		printf("Manager: VM STORAGE is too large\n");
+		goto fail;
+	}
+
 	vm->storage.count = storage_size / VM_STORAGE_SIZE_ALIGN;
 	vm->storage.blocks = gmalloc(vm->storage.count * sizeof(void*));
 	memset(vm->storage.blocks, 0x0, vm->storage.count * sizeof(void*));
@@ -568,12 +578,94 @@ uint32_t vm_create(VMSpec* vm_spec) {
 		vm->storage.blocks[i] = bmalloc(1);
 		if(!vm->storage.blocks[i]) {
 			printf("Manager: Not enough storage to allocate.\n");
-			vm_delete(vm, -1);
-			return 0;
+			goto fail;
+		}
+	}
+
+	// Allocate VNICs
+	NICSpec* nics = vm_spec->nics;
+	vm->nic_count = vm_spec->nic_count;
+	if(vm->nic_count > VM_MAX_NIC_COUNT) {
+		printf("Manager: VNIC is too many\n");
+		goto fail;
+	}
+
+	// VNIC Create
+	if(vm->nic_count) {
+		vm->nics = gmalloc(sizeof(VNIC) * vm->nic_count);
+		if(!vm->nics) {
+			printf("Manager: Can't allocate memory\n");
+			goto fail;
+		}
+
+		memset(vm->nics, 0, sizeof(VNIC) * vm->nic_count);
+		for(int i = 0; i < vm->nic_count; i++) {
+			NICDevice* nic_dev = nicdev_get(nics[i].dev ? : NIC_DEFAULT_NICDEV);
+			if(!nic_dev) {
+				printf("Manager: Invalid NIC device: %s.\n", nics[i].dev);
+				goto fail;
+			}
+
+			uint64_t mac = nics[i].mac;
+			if(mac == 0) {
+				do {
+					mac = timer_frequency() & 0x0fffffffffffL;
+					mac |= 0x02L << 40;	// Locally administrered
+				} while(nicdev_get_vnic_mac(nic_dev, mac) != NULL);
+			} else if(nicdev_get_vnic_mac(nic_dev, mac) != NULL) {
+				printf("Manager: The mac address already in use: %012lx.\n", mac);
+				goto fail;
+			}
+
+			uint64_t attrs[] = {
+				VNIC_MAC, mac,
+				VNIC_DEV, (uint64_t)nic_dev->name,
+				VNIC_BUDGET, nics[i].budget ? : NIC_DEFAULT_BUDGET_SIZE,
+				VNIC_POOL_SIZE, nics[i].pool_size ? : NIC_DEFAULT_POOL_SIZE,
+				VNIC_RX_BANDWIDTH, nics[i].input_bandwidth ? : NIC_DEFAULT_BANDWIDTH,
+				VNIC_TX_BANDWIDTH, nics[i].output_bandwidth ? : NIC_DEFAULT_BANDWIDTH,
+				VNIC_PADDING_HEAD, nics[i].padding_head ? : NIC_DEFAULT_PADDING_SIZE,
+				VNIC_PADDING_TAIL, nics[i].padding_tail ? : NIC_DEFAULT_PADDING_SIZE,
+				VNIC_RX_QUEUE_SIZE, nics[i].input_buffer_size ? : NIC_DEFAULT_BUFFER_SIZE,
+				VNIC_TX_QUEUE_SIZE, nics[i].output_buffer_size ? : NIC_DEFAULT_BUFFER_SIZE,
+				VNIC_SLOW_RX_QUEUE_SIZE, nics[i].slow_input_buffer_size ? : NIC_DEFAULT_BUFFER_SIZE,
+				VNIC_SLOW_TX_QUEUE_SIZE, nics[i].slow_output_buffer_size ? : NIC_DEFAULT_BUFFER_SIZE,
+				VNIC_NONE
+			};
+
+			VNIC* vnic = gmalloc(sizeof(VNIC));
+			if(!vnic) {
+				printf("Manager: Failed to allocate VNIC\n");
+				goto fail;
+			}
+
+			vnic->id = vnic_alloc_id();
+			vnic->nic_size = nics[i].pool_size ? : NIC_DEFAULT_POOL_SIZE;
+			vnic->nic = bmalloc(((nics[i].pool_size ? : NIC_DEFAULT_POOL_SIZE) + 0x200000 - 1) / 0x200000);
+			if(!vnic->nic) {
+				printf("Manager: Failed to allocate NIC in VNIC\n");
+				goto fail;
+			}
+
+			if(!vnic_init(vnic, attrs)) {
+				printf("Manager: Not enough VNIC to allocate: errno=%d.\n", errno);
+				goto fail;
+			}
+
+			extern int dispatcher_create_vnic(void* vnic);
+			if(dispatcher_create_vnic(vnic) < 0) {
+				printf("Manager: Failed to create VNIC in dispatcher module: errno=%d.\n", errno);
+				goto fail;
+			}
+
+			vm->nics[i] = vnic;
+
+			nicdev_register_vnic(nic_dev, vnic);
 		}
 	}
 
 	// Allocate vmid
+	// TODO fix
 	uint32_t vmid;
 	while(true) {
 		vmid = last_vmid++;
@@ -581,146 +673,17 @@ uint32_t vm_create(VMSpec* vm_spec) {
 		if(vmid != 0 && !map_contains(vms, (void*)(uint64_t)vmid)) {
 			vm->id = vmid;
 			if(!map_put(vms, (void*)(uint64_t)vmid, vm)) {
-				vm_delete(vm, -1);
-				return 0;
+				goto fail;
 			}
 			break;
 		}
 	}
 
-	// Allocate VNICs
-	NICSpec* nics = vm_spec->nics;
-	vm->nic_count = vm_spec->nic_count;
-	vm->nics = gmalloc(sizeof(VNIC) * vm->nic_count);
-	if(!vm->nics) {
-		map_remove(vms, (void*)(uint64_t)vmid);
-		vm_delete(vm, -1);
-		return 0;
-	}
-	memset(vm->nics, 0, sizeof(VNIC) * vm->nic_count);
-	printf("VM NIC count : %d\n", vm->nic_count);
-
-	for(int i = 0; i < vm->nic_count; i++) {
-#define NIC_DEFAULT_NICDEV		"eth0"
-#define NIC_DEFAULT_POOL_SIZE		0x200000	// 4Mb
-#define NIC_DEFAULT_BUDGET_SIZE		32
-#define NIC_DEFAULT_PADDING_SIZE	32
-#define NIC_DEFAULT_BUFFER_SIZE		1024
-#define NIC_DEFAULT_BANDWIDTH		1000000000	// 1Gbps
-
-		NICDevice* nic_dev = nicdev_get(nics[i].dev ? : NIC_DEFAULT_NICDEV);
-		if(!nic_dev) {
-			printf("Manager: Invalid NIC device: %s.\n", nics[i].dev);
-			map_remove(vms, (void*)(uint64_t)vmid);
-			vm_delete(vm, -1);
-			return 0;
-		}
-
-		uint64_t mac = nics[i].mac;
-		if(mac == 0) {
-			do {
-				mac = timer_frequency() & 0x0fffffffffffL;
-				mac |= 0x02L << 40;	// Locally administrered
-			} while(nicdev_get_vnic_mac(nic_dev, mac) != NULL);
-		} else if(nicdev_get_vnic_mac(nic_dev, mac) != NULL) {
-			printf("Manager: The mac address already in use: %012lx.\n", mac);
-			map_remove(vms, (void*)(uint64_t)vmid);
-			vm_delete(vm, -1);
-			return 0;
-		}
-
-		uint64_t attrs[] = {
-			VNIC_MAC, mac,
-			VNIC_DEV, (uint64_t)nic_dev->name,
-			VNIC_BUDGET, nics[i].budget ? : NIC_DEFAULT_BUDGET_SIZE,
-			VNIC_POOL_SIZE, nics[i].pool_size ? : NIC_DEFAULT_POOL_SIZE,
-			VNIC_RX_BANDWIDTH, nics[i].input_bandwidth ? : NIC_DEFAULT_BANDWIDTH,
-			VNIC_TX_BANDWIDTH, nics[i].output_bandwidth ? : NIC_DEFAULT_BANDWIDTH,
-			VNIC_PADDING_HEAD, nics[i].padding_head ? : NIC_DEFAULT_PADDING_SIZE,
-			VNIC_PADDING_TAIL, nics[i].padding_tail ? : NIC_DEFAULT_PADDING_SIZE,
-			VNIC_RX_QUEUE_SIZE, nics[i].input_buffer_size ? : NIC_DEFAULT_BUFFER_SIZE,
-			VNIC_TX_QUEUE_SIZE, nics[i].output_buffer_size ? : NIC_DEFAULT_BUFFER_SIZE,
-			VNIC_SLOW_RX_QUEUE_SIZE, nics[i].slow_input_buffer_size ? : NIC_DEFAULT_BUFFER_SIZE,
-			VNIC_SLOW_TX_QUEUE_SIZE, nics[i].slow_output_buffer_size ? : NIC_DEFAULT_BUFFER_SIZE,
-			VNIC_NONE
-		};
-
-		VNIC* vnic = gmalloc(sizeof(VNIC));
-		if(!vnic) {
-			printf("Manager: Failed to allocate VNIC\n");
-			map_remove(vms, (void*)(uint64_t)vmid);
-			vm_delete(vm, -1);
-			return 0;
-		}
-
-		vnic->id = vnic_alloc_id();
-		vnic->nic_size = nics[i].pool_size ? : NIC_DEFAULT_POOL_SIZE;
-		vnic->nic = bmalloc(((nics[i].pool_size ? : NIC_DEFAULT_POOL_SIZE) + 0x200000 - 1) / 0x200000);
-		if(!vnic->nic) {
-			printf("Manager: Failed to allocate NIC in VNIC\n");
-			map_remove(vms, (void*)(uint64_t)vmid);
-			vm_delete(vm, -1);
-			return 0;
-		}
-
-		if(!vnic_init(vnic, attrs)) {
-			printf("Manager: Not enough VNIC to allocate: errno=%d.\n", errno);
-			map_remove(vms, (void*)(uint64_t)vmid);
-			vm_delete(vm, -1);
-			return 0;
-		}
-
-		extern int dispatcher_create_vnic(void* vnic);
-		if(dispatcher_create_vnic(vnic) < 0) {
-			printf("Manager: Failed to create VNIC in dispatcher module: errno=%d.\n", errno);
-			map_remove(vms, (void*)(uint64_t)vmid);
-			vm_delete(vm, -1);
-			return 0;
-		}
-
-		vm->nics[i] = vnic;
-
-		nicdev_register_vnic(nic_dev, vnic);
-	}
-
-	// Dump info
-	printf("Manager: VM[%d] created(cores [\n", vmid);
-	for(int i = 0; i < vm->core_size; i++) {
-		printf("%d, ", mp_apic_id_to_processor_id(vm->cores[i]));
-		if(i + 1 < vm->core_size)
-			printf(", ");
-	}
-	printf("], %dMBs memory, %dMBs storage, VNICs: %d\n",
-		vm->memory.count * VM_MEMORY_SIZE_ALIGN / 0x100000,
-		vm->storage.count * VM_STORAGE_SIZE_ALIGN / 0x100000, vm->nic_count);
-
-	//Ok
-	for(int i = 0; i < vm->nic_count; i++) {
-		VNIC* nic = vm->nics[i];
-		printf("\t");
-		for(int j = 5; j >= 0; j--) {
-			printf("%02lx", (nic->mac >> (j * 8)) & 0xff);
-			if(j - 1 >= 0)
-				printf(":");
-			else
-				printf(" ");
-		}
-		/*
-		 *printf("%ldMbps/%ld, %ldMbps/%ld, %ldMBs\n", nic->input_bandwidth / 1000000, fifo_capacity(nic->nic->input_buffer) + 1, nic->output_bandwidth / 1000000, fifo_capacity(nic->nic->output_buffer) + 1, list_size(nic->pools) * 2);
-		 */
-	}
-
-	printf("\targs(%d): ", vm->argc);
-	for(int i = 0; i < vm->argc; i++) {
-		char* ch = strchr(vm->argv[i], ' ');
-		if(ch == NULL)
-			printf("%s ", vm->argv[i]);
-		else
-			printf("\"%s\" ", vm->argv[i]);
-	}
-	printf("\n");
-
 	return vmid;
+
+fail:
+	vm_delete(vm, -1);
+	return 0;
 }
 
 bool vm_destroy(uint32_t vmid) {

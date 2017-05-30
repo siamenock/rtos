@@ -6,22 +6,17 @@
 #include <errno.h>
 #include <net/ether.h>
 #undef IP_TTL
-#include <vnic.h>
 #include <net/ip.h>
 #include <net/arp.h>
 #include <net/icmp.h>
 #include <net/checksum.h>
-#include <net/udp.h>
-#include <net/tftp.h>
-#include <net/interface.h>
-#include <util/list.h>
-#include <util/ring.h>
 #include <util/event.h>
 #undef BYTE_ORDER
-#include <lwip/tcp.h>
 #include <netif/etharp.h>
 #include <arch/driver.h>
 #include <control/rpc.h>
+#include <net/interface.h>
+#include "gmalloc.h"
 #include "malloc.h"
 #include "mp.h"
 #include "shell.h"
@@ -36,7 +31,6 @@ extern NIC* __nics[NIC_MAX_COUNT];
 extern int __nic_count;
 
 static struct tcp_pcb* manager_server;
-static uint16_t manager_port = DEFAULT_MANAGER_PORT;
 
 // LwIP TCP callbacks
 typedef struct {
@@ -44,9 +38,6 @@ typedef struct {
 	List*		pbufs;
 	int		poll_count;
 } RPCData;
-
-static List* clients;	/* pcb */
-static List* actives;	/* rpc */
 
 static err_t manager_poll(void* arg, struct tcp_pcb* pcb);
 
@@ -61,10 +52,10 @@ static void rpc_free(RPC* rpc) {
 		pbuf_free(pbuf);
 	}
 	list_destroy(data->pbufs);
-	list_remove_data(actives, rpc);
+	list_remove_data(manager.actives, rpc);
 	free(rpc);
 
-	list_remove_data(clients, data->pcb);
+	list_remove_data(manager.clients, data->pcb);
 }
 
 static void manager_close(struct tcp_pcb* pcb, RPC* rpc, bool is_force) {
@@ -78,7 +69,7 @@ static void manager_close(struct tcp_pcb* pcb, RPC* rpc, bool is_force) {
 	if(rpc) {
 		rpc_free(rpc);
 	} else {
-		list_remove_data(clients, pcb);
+		list_remove_data(manager.clients, pcb);
 	}
 
 	if(is_force) {
@@ -103,8 +94,8 @@ static err_t manager_recv(void* arg, struct tcp_pcb* pcb, struct pbuf* p, err_t 
 		rpc_loop(rpc);
 		tcp_recved(pcb, p->len);
 		if(rpc_is_active(rpc)) {
-			if(list_index_of(actives, rpc, NULL) < 0) {
-				list_add(actives, rpc);
+			if(list_index_of(manager.actives, rpc, NULL) < 0) {
+				list_add(manager.actives, rpc);
 			}
 		}
 	}
@@ -140,8 +131,8 @@ static err_t manager_poll(void* arg, struct tcp_pcb* pcb) {
 }
 
 // Handlers
-static void vm_create_handler(RPC* rpc, VMSpec* vm, void* context, void(*callback)(RPC* rpc, uint32_t id)) {
-	uint32_t id = vm_create(vm);
+static void vm_create_handler(RPC* rpc, VMSpec* vm_spec, void* context, void(*callback)(RPC* rpc, uint32_t id)) {
+	uint32_t id = vm_create(vm_spec);
 	callback(rpc, id);
 }
 
@@ -180,7 +171,7 @@ typedef struct {
 static void status_setted(bool result, void* context) {
 	Data* data = context;
 
-	if(list_index_of(clients, data->pcb, NULL) >= 0) {
+	if(list_index_of(manager.clients, data->pcb, NULL) >= 0) {
 		data->callback(data->rpc, result);
 	}
 	free(data);
@@ -334,28 +325,15 @@ static err_t manager_accept(void* arg, struct tcp_pcb* pcb, err_t err) {
 	tcp_err(pcb, manager_err);
 	tcp_poll(pcb, manager_poll, 2);
 
-	list_add(clients, pcb);
+	list_add(manager.clients, pcb);
 
 	return ERR_OK;
 }
 
 // RPC Manager
-static Packet* rx_process(Packet* packet) {
-// 	if(shell_process(packet))
-// 		return NULL;
-// 	if(dhcp_process(packet))
-// 		return NULL;
-//	else if(rpc_process(packet))
-//		return NULL;
-//	else if(tftp_process(packet))
-//		return NULL;
-
-	return packet;
-}
-
 static void stdio_callback(uint32_t vmid, int thread_id, int fd, char* buffer, volatile size_t* head, volatile size_t* tail, size_t size) {
 	ListIterator iter;
-	list_iterator_init(&iter, clients);
+	list_iterator_init(&iter, manager.clients);
 	size_t len0, len1, len2;
 	bool wrapped;
 
@@ -392,62 +370,16 @@ static void stdio_callback(uint32_t vmid, int thread_id, int fd, char* buffer, v
 	}
 }
 
-static bool manager_server_open(struct netif* netif, uint16_t port) {
-	struct ip_addr ip_addr = netif->ip_addr;
-
-	manager_server = tcp_new();
-	err_t err = tcp_bind(manager_server, &ip_addr, port);
-	if(err != ERR_OK) {
-		printf("ERROR: Manager cannot bind TCP session: %d\n", err);
-
-		return false;
-	}
-
-	manager_server = tcp_listen(manager_server);
-	tcp_arg(manager_server, manager_server);
-
-	printf("Manager started: %d.%d.%d.%d:%d\n", ip_addr.addr & 0xff, (ip_addr.addr >> 8) & 0xff,
-		(ip_addr.addr >> 16) & 0xff, (ip_addr.addr >> 24) & 0xff, port);
-
-	tcp_accept(manager_server, manager_accept);
-
-	if(clients == NULL)
-		clients = list_create(NULL);
-
-	if(actives == NULL)
-		actives = list_create(NULL);
-
-	return true;
-}
-
-static bool manager_server_close() {
-	ListIterator iter;
-	list_iterator_init(&iter, clients);
-
-	while(list_iterator_has_next(&iter)) {
-		struct tcp_pcb* pcb = list_iterator_next(&iter);
-		RPC* rpc = pcb->callback_arg;
-		manager_close(pcb, rpc, true);
-	}
-
-	if(tcp_close(manager_server) != ERR_OK) {
-		printf("Cannot close manager server: %p", manager_server);
-
-		return false;
-	}
-	manager_server = NULL;
-
-	return true;
-}
-
 static bool manager_loop(void* context) {
+	//netif open
+	//netif close
 	ListIterator iter;
 	list_iterator_init(&iter, manager.netifs);
-	if(list_iterator_has_next(&iter)) {
+	while(list_iterator_has_next(&iter)) {
 		struct netif* netif = list_iterator_next(&iter);
 		NIC* nic = ((struct netif_private*)netif->state)->nic;
 		if(!nic_has_rx(nic))
-			return true;
+			continue;
 		
 		Packet* packet = nic_rx(nic);
 		if(packet) {
@@ -455,9 +387,9 @@ static bool manager_loop(void* context) {
 		}
 	}
 
-	if(!list_is_empty(actives)) {
+	if(!list_is_empty(manager.actives)) {
 		ListIterator iter;
-		list_iterator_init(&iter, actives);
+		list_iterator_init(&iter, manager.actives);
 		while(list_iterator_has_next(&iter)) {
 			RPC* rpc = list_iterator_next(&iter);
 			if(rpc_is_active(rpc)) {
@@ -477,37 +409,19 @@ static bool manager_timer(void* context) {
 	return true;
 }
 
-static struct netif* create_netif(NIC* nic, IPv4Interface* interface, NIC_DPI rx_process, NIC_DPI tx_process) {
-	struct netif* netif = gmalloc(sizeof(struct netif));
-	struct netif_private* private = gmalloc(sizeof(struct netif_private));
-
-	private->nic = nic;
-	private->rx_process = rx_process;
-	private->tx_process = tx_process;
-	
-	uint32_t ip = interface->address;
- 	uint32_t netmask = interface->netmask;
- 	uint32_t gw = interface->gateway;
-	
-	struct ip_addr ip2, netmask2, gw2;
-	IP4_ADDR(&ip2, (ip >> 24) & 0xff, (ip >> 16) & 0xff, (ip >> 8) & 0xff, (ip >> 0) & 0xff);
-	IP4_ADDR(&netmask2, (netmask >> 24) & 0xff, (netmask >> 16) & 0xff, (netmask >> 8) & 0xff, (netmask >> 0) & 0xff);
-	IP4_ADDR(&gw2, (gw >> 24) & 0xff, (gw >> 16) & 0xff, (gw >> 8) & 0xff, (gw >> 0) & 0xff);
-	
-	netif_add(netif, &ip2, &netmask2, &gw2, private, lwip_driver_init, ethernet_input);
-	
-	return netif;
-}
-
 //TODO gabage collection
-static bool create_default_nic() {
-	NICDevice* nicdev = nicdev_get_by_idx(0);
+VNIC* manager_create_vnic(char* name) {
+	if(manager.vnic_count > NIC_MAX_COUNT)
+		return NULL;
+
+	NICDevice* nicdev = nicdev_get(name);
 	if(!nicdev) {
 		printf("\tCannot create manager\n");
 		return false;
 	}
 
 	uint64_t attrs[] = {
+		//VNIC_MAC, nicdev->mac,
 		VNIC_MAC, nicdev->mac,
 		VNIC_DEV, (uint64_t)nicdev->name,
 		VNIC_BUDGET, 32,
@@ -542,169 +456,202 @@ static bool create_default_nic() {
 	if(vnic_id < 0)
 		return false;
 
-	manager.nics[manager.nic_count++] = vnic;
-	__nics[__nic_count++] = vnic->nic;
+	for(int i = 0; i < NIC_MAX_COUNT; i++) {
+		if(manager.vnics[i])
+			continue;
 
-	IPv4Interface* interface = interface_alloc(vnic->nic,
-			DEFAULT_MANAGER_IP, DEFAULT_MANAGER_NETMASK, DEFAULT_MANAGER_GW, true);
+		manager.vnics[i] = vnic;
+		manager.vnic_count++;
+		__nics[i] = vnic->nic;
+		__nic_count++;
+		break;
+	}
 
-	if(!interface)
+	return vnic;
+}
+
+bool manager_destroy_vnic(VNIC* vnic) {
+	for(int i = 0; i < NIC_MAX_COUNT; i++) {
+		if(manager.vnics[i] != vnic)
+			continue;
+
+		manager.vnics[i] = NULL;
+		manager.vnic_count--;
+		__nics[i] = NULL;
+		__nic_count++;
+		break;
+	}
+
+	NICDevice* nic_dev = nicdev_get(vnic->parent);
+	if(!nic_dev)
 		return false;
+
+	if(!nicdev_unregister_vnic(nic_dev, vnic->id))
+		return false;
+
+	bfree(vnic->nic);
+	gfree(vnic);
 
 	return true;
 }
 
+VNIC* manager_get_vnic(char* name) {
+	if(strncmp(name, "veth", 4))
+		return NULL;
+
+	char* index;
+	strtok_r(name + 4, ".", &index);
+	if(!is_uint8(index))
+		return NULL;
+
+	return manager.vnics[parse_uint8(index)];
+}
+
+static Packet* rx_process(Packet* packet) {
+	return packet;
+}
+
+static Packet* tx_process(Packet* packet) {
+	return packet;
+}
+
+struct netif* manager_create_netif(NIC* nic, uint32_t ip, uint32_t netmask, uint32_t gateway, bool is_default) {
+	IPv4Interface* interface = interface_alloc(nic,
+			ip, netmask, gateway, is_default);
+	if(!interface) {
+		return false;
+	}
+
+	struct netif* netif = malloc(sizeof(struct netif));
+	struct netif_private* private = malloc(sizeof(struct netif_private));
+
+	private->nic = nic;
+	private->rx_process = rx_process;
+	private->tx_process = tx_process;
+	
+	struct ip_addr ip2, netmask2, gateway2;
+	IP4_ADDR(&ip2, (ip >> 24) & 0xff, (ip >> 16) & 0xff, (ip >> 8) & 0xff, (ip >> 0) & 0xff);
+	IP4_ADDR(&netmask2, (netmask >> 24) & 0xff, (netmask >> 16) & 0xff, (netmask >> 8) & 0xff, (netmask >> 0) & 0xff);
+	IP4_ADDR(&gateway2, (gateway >> 24) & 0xff, (gateway >> 16) & 0xff, (gateway >> 8) & 0xff, (gateway >> 0) & 0xff);
+	
+	netif_add(netif, &ip2, &netmask2, &gateway2, private, lwip_driver_init, ethernet_input);
+
+	if(is_default)
+		netif_set_default(netif);
+
+	netif_set_up(netif);
+	list_add(manager.netifs, netif);
+
+	return netif;
+}
+
+bool manager_destroy_netif(struct netif* netif) {
+	return false;
+}
+
+struct netif* manager_get_netif(uint32_t ip) {
+	return NULL;
+}
+
+inline void manager_netif_set_ip(struct netif* netif, uint32_t ip) {
+	struct ip_addr ip2;
+	IP4_ADDR(&ip2, (ip >> 24) & 0xff, (ip >> 16) & 0xff, (ip >> 8) & 0xff, (ip >> 0) & 0xff);
+	netif_set_ipaddr(netif, &ip2);
+}
+
+inline void manager_netif_set_gateway(struct netif* netif, uint32_t gateway) {
+	struct ip_addr gateway2;
+	IP4_ADDR(&gateway2, (gateway >> 24) & 0xff, (gateway >> 16) & 0xff, (gateway >> 8) & 0xff, (gateway >> 0) & 0xff);
+	netif_set_gateway(netif, &gateway2);
+}
+
+inline void manager_netif_set_netmask(struct netif* netif, uint32_t netmask) {
+	struct ip_addr netmask2;
+	IP4_ADDR(&netmask2, (netmask >> 24) & 0xff, (netmask >> 16) & 0xff, (netmask >> 8) & 0xff, (netmask >> 0) & 0xff);
+	netif_set_netmask(netif, &netmask2);
+}
+
+struct tcp_pcb* manager_netif_server_open(struct netif* netif, uint16_t port) {
+	struct ip_addr ip_addr = netif->ip_addr;
+
+	struct tcp_pcb* tcp_pcb = tcp_new();
+	err_t err = tcp_bind(tcp_pcb, &ip_addr, port);
+	if(err != ERR_OK) {
+		printf("ERROR: Manager cannot bind TCP session: %d\n", err);
+
+		return false;
+	}
+
+	tcp_pcb = tcp_listen(tcp_pcb);
+	tcp_arg(tcp_pcb, tcp_pcb);
+
+	printf("Manager started: %d.%d.%d.%d:%d\n", ip_addr.addr & 0xff, (ip_addr.addr >> 8) & 0xff,
+		(ip_addr.addr >> 16) & 0xff, (ip_addr.addr >> 24) & 0xff, port);
+
+	tcp_accept(tcp_pcb, manager_accept);
+
+	return tcp_pcb;
+}
+
+bool manager_netif_server_close(struct tcp_pcb* tcp_pcb) {
+	ListIterator iter;
+	list_iterator_init(&iter, manager.clients);
+	while(list_iterator_has_next(&iter)) {
+		struct tcp_pcb* pcb = list_iterator_next(&iter);
+		RPC* rpc = pcb->callback_arg;
+		manager_close(pcb, rpc, true);
+	}
+
+	if(tcp_close(tcp_pcb) != ERR_OK) {
+		printf("Cannot close manager server: %p", tcp_pcb);
+
+		return false;
+	}
+
+	return true;
+}
+
+//TODO command
 int manager_init() {
 	lwip_init();
 	manager.netifs = list_create(NULL);
 	if(!manager.netifs)
 		return -1;
 
-	if(!create_default_nic())
+	manager.servers = list_create(NULL);
+	if(!manager.servers)
+		return -1;
+
+	manager.clients = list_create(NULL);
+	if(!manager.clients)
+		return -1;
+
+	manager.actives = list_create(NULL);
+	if(!manager.actives)
+		return -1;
+
+	VNIC* vnic = manager_create_vnic(MANAGER_DEFAULT_NICDEV);
+	if(!vnic)
 		return -2;
 
- 	for(int i = 0 ; i < __nic_count; i++) {
- 		NIC* nic = __nics[i];
- 		IPv4InterfaceTable* interface_table = interface_table_get(nic);
- 		if(!interface_table)
- 			return -3;
- 
- 		interface_table = interface_table_get(nic);
- 		for(int i = 0; i < interface_table->count; i++) {
- 			IPv4Interface* interface = &interface_table->interfaces[i];
- 
- 			struct netif* netif = create_netif(nic, interface, rx_process, NULL);
- 
- 			if(i == interface_table->default_idx)
- 				netif_set_default(netif);
- 
- 			netif_set_up(netif);
- 			list_add(manager.netifs, netif);
- 			manager_server_open(netif, DEFAULT_MANAGER_PORT);
- 		}
- 	}
+	//TODO: add manager init script
+	struct netif* netif = manager_create_netif(vnic->nic, MANAGER_DEFAULT_IP, MANAGER_DEFAULT_NETMASK, MANAGER_DEFAULT_GW, true);
+	if(!netif)
+		return -3;
 
-	event_idle_add(manager_loop, NULL);
-	event_timer_add(manager_timer, NULL, 100000, 100000);
+	struct tcp_pcb* pcb = manager_netif_server_open(netif, MANAGER_DEFAULT_PORT);
+	if(!pcb)
+		return -4;
+
+	manager_server = pcb;
+
+	if(!event_idle_add(manager_loop, NULL))
+		return -5;
+
+	if(!event_timer_add(manager_timer, NULL, 100000, 100000))
+		return -6;
+
 	vm_stdio_handler(stdio_callback);
 
 	return 0;
-}
-
-uint32_t manager_get_ip() {
-	return 0;
-}
-
-void manager_set_ip(uint32_t ip) {
-/*
- *        if(manager_vnic == NULL)
- *                return;
- *
- *        IPv4Interface* interface = nic_ip_get(manager_vnic->nic, manager_ip);
- *        if(!interface)
- *                return;
- *
- *        if(!nic_ip_add(manager_vnic->nic, ip))
- *                return;
- *
- *        IPv4Interface* _interface = nic_ip_get(manager_vnic->nic, ip);
- *        _interface->gateway = interface->gateway;
- *        _interface->netmask = interface->netmask;
- *        _interface->_default = interface->_default;
- *
- *        nic_ip_remove(manager_vnic->nic, manager_ip);
- *        manager_ip = ip;
- *
- *        struct ip_addr ip2;
- *        IP4_ADDR(&ip2, (ip >> 24) & 0xff, (ip >> 16) & 0xff, (ip >> 8) & 0xff, (ip >> 0) & 0xff);
- *        netif_set_ipaddr(manager_netif, &ip2);
- *
- *        manager_server_close();
- *        manager_server_open();
- */
-}
-
-uint16_t manager_open(uint16_t port) {
-}
-
-uint16_t manager_get_port() {
-	return manager_port;
-}
-
-void manager_set_port(uint16_t port) {
-/*
- *        if(manager_vnic == NULL)
- *                return;
- *
- *        if(!udp_port_alloc0(manager_vnic->nic, manager_ip, port))
- *                return;
- *
- *        udp_port_free(manager_vnic->nic, manager_ip, manager_port);
- *        manager_port = port;
- *
- *        manager_server_close();
- *        manager_server_open();
- */
-}
-
-uint32_t manager_get_gateway() {
-	return 0;
-}
-
-void manager_set_gateway(uint32_t gw) {
-/*
- *        if(manager_vnic == NULL)
- *                return;
- *
- *        IPv4Interface* interface = nic_ip_get(manager_vnic->nic, manager_ip);
- *        if(!interface)
- *                return;
- *
- *        interface->gateway = gw;
- *
- *        struct ip_addr gw2;
- *        IP4_ADDR(&gw2, (gw >> 24) & 0xff, (gw >> 16) & 0xff, (gw >> 8) & 0xff, (gw >> 0) & 0xff);
- *        netif_set_gw(manager_netif, &gw2);
- */
-}
-
-uint32_t manager_get_netmask() {
-/*
- *        if(manager_vnic == NULL)
- *                return 0;
- *
- *        IPv4Interface* interface = nic_ip_get(manager_vnic->nic, manager_ip);
- *        if(!interface)
- *                return 0;
- *
- *        return interface->netmask;
- */
-	return 0;
-}
-
-void manager_set_netmask(uint32_t nm) {
-/*
- *        if(manager_vnic == NULL)
- *                return;
- *
- *        IPv4Interface* interface = nic_ip_get(manager_vnic->nic, manager_ip);
- *        if(!interface)
- *                return;
- *
- *        interface->netmask = nm;
- *
- *        struct ip_addr nm2;
- *        IP4_ADDR(&nm2, (nm >> 24) & 0xff, (nm >> 16) & 0xff, (nm >> 8) & 0xff, (nm >> 0) & 0xff);
- *        netif_set_netmask(manager_netif, &nm2);
- */
-}
-
-void manager_set_interface() {
-// 	if(manager_vnic == NULL)
-// 		return;
-// 
-// 	manager_server_close();
-// 	lwip_nic_remove(manager_netif);
-// 	manager_netif = lwip_nic_init(manager_vnic->nic, manage, NULL);
-// 	manager_server_open();
 }

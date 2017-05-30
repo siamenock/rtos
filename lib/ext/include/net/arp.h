@@ -39,8 +39,9 @@ typedef struct _ARPEntity {
 
 #define ARP_ENTITY_MAX_COUNT	16
 typedef struct ARPTable {
-	uint16_t	arp_entity_count;
-	ARPEntity 	arp_entity[ARP_ENTITY_MAX_COUNT];
+	uint64_t	timeout;
+	uint16_t	entity_count;
+	ARPEntity 	entity[ARP_ENTITY_MAX_COUNT];
 } ARPTable;
 
 /**
@@ -68,8 +69,15 @@ bool arp_process(NIC* nic, Packet* packet);
  * @param source IP address of interface
  * @return true if ARP request is sent
  */
-bool arp_request(NIC* nic, uint32_t destination, uint32_t source);
-
+bool arp_request0(NIC* nic, uint32_t destination, uint32_t source);
+/**
+ * Broadcast ARP request (MAC address resolving).
+ *
+ * @param nic NIC reference to send ARP request
+ * @param destination IP address to resolve MAC address
+ * @return true if ARP request is sent
+ */
+bool arp_request(NIC* nic, uint32_t destination);
 /**
  * Announce IP and MAC address to hosts in the LAN.
  *

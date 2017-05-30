@@ -25,13 +25,25 @@ IPv4InterfaceTable* interface_table_get(NIC* nic) {
 
 IPv4Interface* interface_alloc(NIC* nic, uint32_t address, uint32_t netmask, uint32_t gateway, bool is_default) {
 	IPv4InterfaceTable* table = interface_table_get(nic);
-	if(!table)
+	if(!table) {
 		return NULL;
+	}
 
-	if(table->count >= IPV4_INTERFACE_MAX_COUNT)
+	if(table->bitmap == 0xff) {
 		return NULL;
+	}
 
-	IPv4Interface* interface = &table->interfaces[table->count++];
+	IPv4Interface* interface = NULL;
+	uint16_t offset = 1;
+	for(int i = 0; i < IPV4_INTERFACE_MAX_COUNT; i++) {
+		if(!(table->bitmap & offset)) {
+			table->bitmap |= offset;
+			interface = &table->interfaces[i];
+			break;
+		}
+
+		offset <<= 1;
+	}
 	interface->address = address;
 	interface->netmask = netmask;
 	interface->gateway = gateway;
@@ -48,19 +60,18 @@ bool interface_free(NIC* nic, uint32_t address) {
 	if(!table)
 		return false;
 
-	for(int i = 0; i < table->count; i++) {
-		if(address == table->interfaces[i].address) {
-			if(table->default_idx == i)
-				table->default_idx = 0;
+	if(table->bitmap == 0)
+		return false;
 
-			if((table->count - 1) == i) {
-				table->count--;
-				return true;
-			}
-
-			table->interfaces[i] = table->interfaces[--table->count];
+	int offset = 1;
+	for(int i = 0; i < IPV4_INTERFACE_MAX_COUNT; i++) {
+		if((table->bitmap & offset) &&
+				address == table->interfaces[i].address) {
+			table->bitmap ^= offset;
 			return true;
 		}
+
+		offset <<= 1;
 	}
 
 	return false;
@@ -69,20 +80,28 @@ bool interface_free(NIC* nic, uint32_t address) {
 IPv4Interface* interface_get_default(NIC* nic) {
 	IPv4InterfaceTable* table = interface_table_get(nic);
 
-	if(table->count > table->default_idx)
-		return &table->interfaces[table->default_idx];
+	if(table->bitmap == 0)
+		return NULL;
 
-	return NULL;
+	return &table->interfaces[table->default_idx];
 }
 
 IPv4Interface* interface_get(NIC* nic, uint32_t address) {
 	IPv4InterfaceTable* table = interface_table_get(nic);
 	if(!table)
-		return false;
+		return NULL;
 
-	for(int i = 0; i < table->count; i++) {
-		if(address == table->interfaces[i].address)
+	if(table->bitmap == 0)
+		return NULL;
+
+	int offset = 1;
+	for(int i = 0; i < IPV4_INTERFACE_MAX_COUNT; i++) {
+		if((table->bitmap & offset) &&
+				address == table->interfaces[i].address) {
 			return &table->interfaces[i];
+		}
+
+		offset <<= 1;
 	}
 
 	return NULL;
