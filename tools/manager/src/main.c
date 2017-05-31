@@ -258,7 +258,7 @@ int nicdev_init() {
 
 		NICInfo info;
 		NICDriver* driver = dev->driver;
-		driver->get_info(dev->id, &info);
+		driver->get_info(dev->priv, &info);
 
 		if(info.name[0] == '\0')
 			sprintf(info.name, "eth%d", index++);
