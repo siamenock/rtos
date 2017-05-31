@@ -24,7 +24,7 @@ bool icmp_process(NIC* nic, Packet* packet) {
 			case ICMP_TYPE_ECHO_REQUEST:
 				icmp->type = 0;
 				icmp->checksum = 0;
-				icmp->checksum = endian16(checksum(icmp, packet->end - packet->start - ETHER_LEN - IP_LEN));
+				icmp->checksum = endian16(checksum(icmp, packet->end - packet->start - ETHER_LEN - (ip->ihl * 4)));
 
 				swap32(ip->source, ip->destination);
 				ip->ttl = endian8(64);

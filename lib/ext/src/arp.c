@@ -11,7 +11,7 @@
 #define GC_INTERVAL		(uint64_t)10 * 1000000	// 10 secs
 
 //TODO When load application in kernel, do set arp_table.
-inline void arp_table_reflash(ARPTable* table, uint64_t current) {
+void arp_table_reflash(ARPTable* table, uint64_t current) {
 	if(current < table->timeout)
 		return;
 
@@ -98,7 +98,7 @@ bool arp_table_update(ARPTable* table, uint64_t mac, uint32_t addr, bool dynamic
 	return true;
 }
 
-inline ARPEntity* arp_table_get_by_addr(ARPTable* table, uint32_t addr) {
+ARPEntity* arp_table_get_by_addr(ARPTable* table, uint32_t addr) {
 	for(int i = 0; i < table->entity_count; i++) {
 		if(table->entity[i].addr == addr)
 			return &table->entity[i];
@@ -107,7 +107,7 @@ inline ARPEntity* arp_table_get_by_addr(ARPTable* table, uint32_t addr) {
 	return NULL;
 }
 
-inline ARPEntity* arp_table_get_by_mac(ARPTable* table, uint64_t mac) {
+ARPEntity* arp_table_get_by_mac(ARPTable* table, uint64_t mac) {
 	for(int i = 0; i < table->entity_count; i++) {
 		if(table->entity[i].mac == mac)
 			return &table->entity[i];
@@ -116,7 +116,7 @@ inline ARPEntity* arp_table_get_by_mac(ARPTable* table, uint64_t mac) {
 	return NULL;
 }
 
-inline bool arp_table_remove(ARPTable* table, uint32_t addr) {
+bool arp_table_remove(ARPTable* table, uint32_t addr) {
 	return true;
 }
 
