@@ -62,11 +62,18 @@ static int sock_write(RPC* rpc, void* buf, int size) {
 	}
 	#endif /* DEBUG */
 
-	if(len == -1) {
-		if(errno == EAGAIN)
-			return 0;
+	if(len < 0) {
+		if(errno == EAGAIN || errno == 0) {
+			int error;
+			unsigned int len = sizeof(error);
+			getsockopt(data->fd, SOL_SOCKET, SO_ERROR, &error, &len);
+			if(error) {
+				return -1;
+			}
 
-		return -1;
+			return 0;
+		} else
+			return -1;
 	} else if(len == 0) {
 		return -1;
 	} else {
