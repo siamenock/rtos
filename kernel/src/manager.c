@@ -495,19 +495,99 @@ bool manager_destroy_vnic(VNIC* vnic) {
 	return true;
 }
 
-VNIC* manager_get_vnic(char* name) {
-	if(strncmp(name, "veth", 4))
-		return NULL;
+typedef struct _ARPingContext {
+	NIC* nic;
+	uint32_t addr;
+	uint32_t count;
+	uint64_t time;
+} ARPingContext;
 
-	char* index;
-	strtok_r(name + 4, ".", &index);
-	if(!is_uint8(index))
-		return NULL;
+static bool arping_process(Packet* packet, void* context) {
+	ARPingContext* arping_context = context;
 
-	return manager.vnics[parse_uint8(index)];
+	Ether* ether = (Ether*)(packet->buffer + packet->start);
+	if(endian16(ether->type) != ETHER_TYPE_ARP)
+		return true;
+
+	ARP* arp = (ARP*)ether->payload;
+	switch(endian16(arp->operation)) {
+		case 2: // Reply
+			;
+			uint64_t smac = endian48(arp->sha);
+			uint32_t sip = endian32(arp->spa);
+
+			if(arping_context->addr == sip) {
+				uint32_t time = timer_ns() - arping_context->time;
+				uint32_t ms = time / 1000;
+				uint32_t ns = time - ms * 1000;
+
+				printf("Reply from %d.%d.%d.%d [%02x:%02x:%02x:%02x:%02x:%02x] %d.%dms\n",
+						(sip >> 24) & 0xff,
+						(sip >> 16) & 0xff,
+						(sip >> 8) & 0xff,
+						(sip >> 0) & 0xff,
+						(smac >> 40) & 0xff,
+						(smac >> 32) & 0xff,
+						(smac >> 24) & 0xff,
+						(smac >> 16) & 0xff,
+						(smac >> 8) & 0xff,
+						(smac >> 0) & 0xff,
+						ms, ns);
+			}
+			break;
+	}
+
+	if(!arping_context->count) {
+		free(arping_context);
+		return false;
+	}
+
+	return true;
+}
+
+typedef struct _ProcessContext {
+	bool (*process)(Packet* packet, void* context);
+	void* context;
+} ProcessContext;
+
+bool arping(void* context) {
+	ARPingContext* arping_context = context;
+	arping_context->time = timer_ns();
+	arp_request(arping_context->nic, arping_context->addr);
+	arping_context->count--;
+
+	return arping_context->count ? true : false;
+}
+
+//TODO netif includes fix rx_process_list
+List* rx_process_list;
+static bool rx_process_add_process(ProcessContext* context) {
+	return list_add(rx_process_list, context);
+}
+
+bool manager_arping(NIC* nic, uint32_t addr, uint32_t count) {
+	ARPingContext* arping_context = malloc(sizeof(ARPingContext));
+	arping_context->nic = nic;
+	arping_context->addr = addr;
+	arping_context->count = count;
+	event_timer_add(arping, arping_context, 0, 1000000);
+	
+	ProcessContext* process_context = malloc(sizeof(ProcessContext));
+	process_context->process = arping_process;
+	process_context->context = arping_context;
+	rx_process_add_process(process_context);
+	return true;
 }
 
 static Packet* rx_process(Packet* packet) {
+	ListIterator iter;
+	list_iterator_init(&iter, rx_process_list);
+	while(list_iterator_has_next(&iter)) {
+		ProcessContext* context = list_iterator_next(&iter);
+		if(!context->process(packet, context->context))
+			list_iterator_remove(&iter);
+	}
+
 	return packet;
 }
 
@@ -614,6 +694,7 @@ bool manager_netif_server_close(struct tcp_pcb* tcp_pcb) {
 //TODO command
 int manager_init() {
 	lwip_init();
+	rx_process_list = list_create(NULL);
 	manager.netifs = list_create(NULL);
 	if(!manager.netifs)
 		return -1;

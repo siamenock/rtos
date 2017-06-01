@@ -37,7 +37,6 @@ VNIC* manager_create_vnic(char* name);
  * @return boolean
  */
 bool manager_destroy_vnic(VNIC* vnic);
-VNIC* manager_get_vnic(char* name);
 
 struct netif* manager_create_netif(NIC* nic, uint32_t ip, uint32_t netmask, uint32_t gateway, bool is_default);
 bool manager_destroy_netif(struct netif* netif);
