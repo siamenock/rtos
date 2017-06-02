@@ -70,6 +70,8 @@ char* PAGE_TABLE_END;
 char* LOCAL_MALLOC_START;
 char* LOCAL_MALLOC_END;
 
+char* SHARED_ADDR;
+
 /*
  * Kernel data area (8M ~ 38M)
  *

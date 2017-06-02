@@ -6,6 +6,8 @@
 #include "port.h"
 #include "pci.h"
 #include "acpi.h"
+#include "mmap.h"
+#include "shared.h"
 
 // Ref: http://www.acpi.info/DOWNLOADS/ACPIspec50.pdf
 
@@ -169,7 +171,8 @@ void acpi_init() {
 					ProcessorLocalAPIC* local_apic = (ProcessorLocalAPIC*)(entry + i);
 					i += local_apic->record_length;
 					if(local_apic->flags) {
-						mp_processors[local_apic->apic_id] = 1;
+						Shared* shared = (Shared*)SHARED_ADDR;
+						shared->mp_processors[local_apic->apic_id] = 1;
 					}
 					break;
 				case IO_APIC:

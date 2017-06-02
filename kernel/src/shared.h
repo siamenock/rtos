@@ -14,8 +14,14 @@ typedef struct {
 	volatile uint8_t 	icc_queue_lock;
 } ICC;
 
+/**
+ * Shared Memeory Structure
+ *
+ * *IMPORTANT* If you change this structure, the relevant code
+ * in the entry.S file must also be changed.
+ */
 typedef struct {
-	volatile uint8_t	mp_cores[MP_MAX_CORE_COUNT];
+	volatile uint8_t	mp_processors[MP_MAX_CORE_COUNT];
 
 	volatile uint8_t    	sync;
 
@@ -26,8 +32,6 @@ typedef struct {
 
 	uint64_t		magic;
 } __attribute__ ((packed)) Shared;
-
-extern char SHARED_ADDR[];
 
 void shared_init();
 void shared_sync();
