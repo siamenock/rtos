@@ -6,6 +6,8 @@
 #include "driver/pci.h"
 #include "device.h"
 
+// PCI Configuration Space
+// Ref https://en.wikipedia.org/wiki/PCI_configuration_space#/media/File:Pci-config-space.svg
 #define PCI_VENDOR_ID			0x00
 #define PCI_DEVICE_ID			0x02
 #define PCI_COMMAND			0x04

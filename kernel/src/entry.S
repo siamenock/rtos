@@ -88,13 +88,14 @@ gdt_end:
 	.balign 16
 	.globl SHARED_ADDR
 SHARED_ADDR:
-	.fill 16, 1, 0
-	.byte 0
-	.quad 0
-	.byte 0
-	.byte 0
-	.quad 0
-	.quad SHARED_MAGIC
+	/* @see shared.h */
+	.fill 16, 1, 0	/* mp_processors[MP_MAX_CORE_COUNT] */
+	.byte 0 /* sync */
+	.quad 0 /* icc_pool */
+	.byte 0 /* icc_lock_alloc */
+	.byte 0 /* icc_lock_free */
+	.quad 0 /* icc_queues */
+	.quad SHARED_MAGIC /* magic */
 
 	/*
 	 * Description table area
