@@ -38,7 +38,12 @@
 #define MAX_VM_COUNT	128
 #define NEXT_ARGUMENTS()		i++; \
 					if(!(i < argc)) \
-						break;
+						break; \
+					else if(!strncmp(argv[i], "-", 1)) { \
+						i--; \
+						continue; \
+					}
+		
 
 static void print_byte_size(uint64_t byte_size) {
 	uint64_t size = 1;
@@ -95,6 +100,7 @@ static void print_vnic(VNIC* vnic, uint16_t vmid, uint16_t nic_index) {
 
 	printf("Parent %s\n", vnic->parent);
 	print_vnic_metadata(vnic);
+	printf("\n");
 }
 
 static void print_interface(VNIC* vnic, uint16_t vmid, uint16_t nic_index) {
@@ -590,7 +596,7 @@ static int cmd_interface(int argc, char** argv, void(*callback)(char* result, in
 			if(vnic_index > vm->nic_count)
 				return -2;
 
-			vnic = vm->nics[parse_uint8(vnic_index)];
+			vnic = vm->nics[parse_uint16(vnic_index)];
 		} else { //Manager VNIC
 			vnic = manager.vnics[parse_uint8(vnic_index)];
 		}
@@ -651,34 +657,50 @@ static int cmd_interface(int argc, char** argv, void(*callback)(char* result, in
 }
 
 static int cmd_vlan(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
-	if(argc != 3) {
+	if(argc < 3) {
 		printf("Wrong number of arguments\n");
 		return -1;
 	}
 
-	NICDevice* nicdev = nicdev_get(argv[2]);
-	if(!nicdev) {
-		printf("Cannot found Device\n");
-		return -2;
-	}
+	for(int i = 1; i < argc; i++) {
+		if(!strcmp(argv[i], "add")) {
+			NEXT_ARGUMENTS();
+			NICDevice* nicdev = nicdev_get(argv[i]);
+			if(!nicdev) {
+				printf("Cannot Found Device!\n");
+				return -2;
+			}
 
-	if(!is_uint16(argv[3])) {
-		printf("VLAN ID wrong\n");
-		return -3;
-	}
-	uint16_t vid = parse_uint16(argv[3]);
+			NEXT_ARGUMENTS();
+			if(!is_uint16(argv[i])) {
+				printf("VLAN ID Wrong!\n");
+				return -3;
+			}
+			uint16_t vid = parse_uint16(argv[i]);
 
-	if(vid == 0 || vid > 4096) {
-		printf("VLAN ID wrong\n");
-		return -3;
-	}
+			if(vid == 0 || vid > 4096) {
+				printf("VLAN ID Wrong!\n");
+				return -3;
+			}
+			NICDevice* vlan_nicdev = nicdev_add_vlan(nicdev, vid);
+			if(!vlan_nicdev)
+				return -3;
 
-	if(!strcmp(argv[1], "add")) {
-		nicdev_add_vlan(nicdev, vid);
-	} else if(!strcmp(argv[1], "remove")) {
-		nicdev_remove_vlan(nicdev, vid);
-	} else
-		return -1;
+			printf("Create VLAN NIC: %s\n", vlan_nicdev->name);
+		} else if(!strcmp(argv[i], "remove")) {
+			NEXT_ARGUMENTS();
+			NICDevice* nicdev = nicdev_get(argv[i]);
+			if(!nicdev) {
+				printf("Cannot Found Device!\n");
+				return -2;
+			}
+			if(!nicdev_remove_vlan(nicdev)) {
+				printf("Cannot Remove VLAN NIC!\n");
+			}
+		} else if(!strcmp(argv[i], "set")) {
+		} else
+			return -1;
+	}
 
 	return 0;
 }
@@ -776,7 +798,7 @@ static int cmd_arping(int argc, char** argv, void(*callback)(char* result, int e
 		return CMD_STATUS_WRONG_NUMBER;
 	}
 
-	NIC* nic;
+	NIC* nic = NULL;
 	uint32_t addr = 0;
 	uint32_t count = 1;
 
@@ -923,9 +945,9 @@ static int cmd_create(int argc, char** argv, void(*callback)(char* result, int e
 
 			vm.storage_size = parse_uint32(argv[i]);
 		} else if(strcmp(argv[i], "-n") == 0) {
-			NEXT_ARGUMENTS();
-
 			NICSpec* nic = &(vm.nics[vm.nic_count++]);
+
+			NEXT_ARGUMENTS();
 			char* next;
 			char* token = strtok_r(argv[i], ",", &next);
 			while(token) {

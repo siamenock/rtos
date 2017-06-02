@@ -6,13 +6,21 @@
 #define MAX_NIC_DEVICE_COUNT	128
 #define MAX_NIC_NAME_LEN	16
 
-typedef struct {
+typedef struct _NICDevice{
 	char		name[MAX_NIC_NAME_LEN];
 	uint64_t	mac;
+	uint16_t	vlan_proto; ///< VLAN Protocol
+	uint16_t	vlan_tci;   ///< VLAN TCI
+
 	void*		driver;
 	void*		priv;
 
 	VNIC*		vnics[MAX_VNIC_COUNT];
+
+	uint16_t	round; //FIXME: current nicdev only support round robin schedule
+
+	struct _NICDevice* next;
+	struct _NICDevice* prev;
 } NICDevice;
 
 typedef struct {
@@ -26,11 +34,15 @@ typedef struct {
 
 typedef struct {
 	int		(*init)(void* device, void* data);
-	void		(*destroy)(void* priv);
-	int		(*poll)(void* priv);
-	void		(*get_status)(void* priv, NICStatus* status);
-	bool		(*set_status)(void* priv, NICStatus* status);
-	void		(*get_info)(void* priv, NICInfo* info);
+	void		(*destroy)(NICDevice* nicdev);
+	int 		(*xmit)(NICDevice* nicdev);
+
+	void		(*get_status)(NICDevice* nicdev, NICStatus* status);
+	bool		(*set_status)(NICDevice* nicdev, NICStatus* status);
+	void		(*get_info)(NICDevice* nicdev, NICInfo* info);
+
+	bool 		(*add_vid)(NICDevice* nicdev, uint16_t vid);
+	bool 		(*remove_vid)(NICDevice* nicdev, uint16_t vid);
 } NICDriver;
 
 int nicdev_get_count();
@@ -38,17 +50,36 @@ NICDevice* nicdev_create();
 void nicdev_destroy(NICDevice* dev);
 int nicdev_register(NICDevice* dev);
 NICDevice* nicdev_unregister(const char* name);
-NICDevice* nicdev_unregister(const char* name);
+
+/**
+ * @param index NIC Device index
+ * 
+ * @return NIC Device
+ */
 NICDevice* nicdev_get_by_idx(int idx);
+
+/**
+ * @param name NIC Device name
+ * 
+ * @return NIC Device
+ */
 NICDevice* nicdev_get(const char* name);
 int nicdev_poll();
 void nicdev_free(Packet* packet);
 
-int nicdev_register_vnic(NICDevice* dev, VNIC* vnic);
-VNIC* nicdev_unregister_vnic(NICDevice* dev, uint32_t id);
-VNIC* nicdev_get_vnic(NICDevice* dev, uint32_t id);
-VNIC* nicdev_get_vnic_mac(NICDevice* dev, uint64_t mac);
-VNIC* nicdev_update_vnic(NICDevice* dev, VNIC* src_vnic);
+/**
+ * Register VNIC to NICDevice
+ *
+ * @param nicdev NIC Device
+ * @param vnic Virtual NIC
+ *
+ * @param vnic id
+ */
+int nicdev_register_vnic(NICDevice* nicdev, VNIC* vnic);
+VNIC* nicdev_unregister_vnic(NICDevice* nicdev, uint32_t id);
+VNIC* nicdev_get_vnic(NICDevice* nicdev, uint32_t id);
+VNIC* nicdev_get_vnic_mac(NICDevice* nicdev, uint64_t mac);
+VNIC* nicdev_update_vnic(NICDevice* nicdev, VNIC* src_vnic);
 
 enum NICDEV_PROCESS_RESULT {
 	NICDEV_PROCESS_COMPLETE,
@@ -100,4 +131,18 @@ int nicdev_rx0(NICDevice* dev, void* data, size_t size, void* data_optional, siz
  */
 int nicdev_tx(NICDevice* dev, bool (*process)(Packet* packet, void* context), void* context);
 
+/**
+ * @param dev NIC Device
+ * @param TCI
+ *
+ * @return result of NIC Device
+ */
+NICDevice* nicdev_add_vlan(NICDevice* nicdev, uint16_t id);
+
+/**
+ * @param dev NIC Device
+ *
+ * @return result of vlan remove
+ */
+bool nicdev_remove_vlan(NICDevice* dev);
 #endif /* __NICDEV_H__ */

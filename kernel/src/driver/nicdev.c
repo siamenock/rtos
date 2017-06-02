@@ -28,35 +28,70 @@ typedef struct _Ether {
 
 static NICDevice* nic_devices[MAX_NIC_DEVICE_COUNT]; //key string
 
-int nicdev_get_count() {
-	for(int i = 0; i < MAX_NIC_DEVICE_COUNT; i++) {
-		if(!nic_devices[i])
-			return i;
+static int nicdev_get_count0(NICDevice* nicdev) {
+	int sum = 0;
+	while(nicdev) {
+		sum++;
+		nicdev = nicdev->next;
 	}
 
-	return MAX_NIC_DEVICE_COUNT;
+	return sum;
 }
 
-NICDevice* nicdev_create() {
-	return gmalloc(sizeof(NICDevice));
+int nicdev_get_count() {
+	int sum = 0;
+	for(int i = 0; i < MAX_NIC_DEVICE_COUNT; i++) {
+		if(!nic_devices[i])
+			return sum;
+
+		sum += nicdev_get_count0(nic_devices[i]);
+	}
+
+	return 0;
 }
 
-void nicdev_destroy(NICDevice* dev) {
-	gfree(dev);
+static NICDevice* nicdev_get0(NICDevice* nicdev, const char* name) {
+	if(!strncmp(nicdev->name, name, MAX_NIC_NAME_LEN))
+		return nicdev;
+	else if(nicdev->next)
+		return nicdev_get0(nicdev->next, name);
+
+	return NULL;
 }
 
-int nicdev_register(NICDevice* dev) {
-	//Check name
-	//
+NICDevice* nicdev_get(const char* name) {
+	int i;
+	for(i = 0; i < MAX_NIC_DEVICE_COUNT; i++) {
+		if(!nic_devices[i])
+			return NULL;
+
+		NICDevice* nicdev = nicdev_get0(nic_devices[i], name);
+		if(nicdev)
+			return nicdev;
+	}
+
+	return NULL;
+}
+
+static bool nicdev_schedule(void* context) {
+	NICDevice* nicdev = (NICDevice*)context;
+	((NICDriver*)nicdev->driver)->xmit(nicdev);
+	return true;
+}
+
+int nicdev_register(NICDevice* nicdev) {
+	if(nicdev_get(nicdev->name))
+		return -1;
+
 	int i;
 	for(i = 0; i < MAX_NIC_DEVICE_COUNT; i++) {
 		if(!nic_devices[i]) {
-			nic_devices[i] = dev;
+			nic_devices[i] = nicdev;
+			//FIXME
+			// when NICDevice has any vnic, don't add to event.
+			event_busy_add(nicdev_schedule, nicdev);
 			return 0;
 		}
-
-		if(!strncmp(nic_devices[i]->name, dev->name, MAX_NIC_NAME_LEN))
-			return -1;
 	}
 
 	return -2;
@@ -80,6 +115,7 @@ NICDevice* nicdev_unregister(const char* name) {
 				}
 			}
 
+			//FIXME remove event nicdev
 			return dev;
 		}
 	}
@@ -87,56 +123,51 @@ NICDevice* nicdev_unregister(const char* name) {
 	return NULL;
 }
 
-NICDevice* nicdev_get_by_idx(int idx) {
-	if(idx >= MAX_NIC_DEVICE_COUNT)
+static NICDevice* nicdev_get_by_idx0(NICDevice* nicdev, int* idx) {
+	if(!(*idx))
+		return nicdev;
+
+	*idx -= 1;
+
+	if(!nicdev->next)
 		return NULL;
 
-	return nic_devices[idx];
+	return nicdev_get_by_idx0(nicdev->next, idx);
 }
 
-NICDevice* nicdev_get(const char* name) {
-	int i;
-	for(i = 0; i < MAX_NIC_DEVICE_COUNT; i++) {
+NICDevice* nicdev_get_by_idx(int _index) {
+	int index = _index;
+	for(int i = 0; i < MAX_NIC_DEVICE_COUNT; i++) {
 		if(!nic_devices[i])
 			return NULL;
 
-		if(!strncmp(nic_devices[i]->name, name, MAX_NIC_NAME_LEN))
-			return nic_devices[i];
+		NICDevice* nicdev = nicdev_get_by_idx0(nic_devices[i], &index);
+		if(nicdev)
+			return nicdev;
 	}
 
 	return NULL;
 }
 
-int nicdev_poll() {
-	int poll_count = 0;
-	for(int i = 0; i < MAX_NIC_DEVICE_COUNT; i++) {
-		NICDevice* dev = nic_devices[i];
-		if(!dev)
-			break;
-
-		NICDriver* driver = dev->driver;
-		poll_count += driver->poll(dev->priv);
-	}
-
-	return poll_count;
-}
-
-int nicdev_register_vnic(NICDevice* dev, VNIC* vnic) {
+int nicdev_register_vnic(NICDevice* nicdev, VNIC* vnic) {
 	int i;
 	for(i = 0; i < MAX_VNIC_COUNT; i++) {
-		if(!dev->vnics[i]) {
-			dev->vnics[i] = vnic;
+		if(!nicdev->vnics[i]) {
+			nicdev->vnics[i] = vnic;
+			vnic->vlan_proto = nicdev->vlan_proto;
+			vnic->vlan_tci = nicdev->vlan_tci;
+
 			return vnic->id;
 		}
 
-		if(dev->vnics[i]->mac == vnic->mac)
+		if(nicdev->vnics[i]->mac == vnic->mac)
 			return -1;
 	}
 
 	return -2;
 }
 
-VNIC* nicdev_unregister_vnic(NICDevice* dev, uint32_t id) {
+VNIC* nicdev_unregister_vnic(NICDevice* nicdev, uint32_t id) {
 	VNIC* vnic;
 	int i, j;
 
@@ -144,14 +175,14 @@ VNIC* nicdev_unregister_vnic(NICDevice* dev, uint32_t id) {
 		if(!nic_devices[i])
 			return NULL;
 
-		if(dev->vnics[i]->id == id) {
+		if(nicdev->vnics[i]->id == id) {
 			//Shift
-			vnic = dev->vnics[i];
-			dev->vnics[i] = NULL;
+			vnic = nicdev->vnics[i];
+			nicdev->vnics[i] = NULL;
 			for(j = i; j + 1 < MAX_VNIC_COUNT; j++) {
-				if(dev->vnics[j + 1]) {
-					dev->vnics[j] = dev->vnics[j + 1];
-					dev->vnics[j + 1] = NULL;
+				if(nicdev->vnics[j + 1]) {
+					nicdev->vnics[j] = nicdev->vnics[j + 1];
+					nicdev->vnics[j + 1] = NULL;
 				}
 			}
 
@@ -162,37 +193,37 @@ VNIC* nicdev_unregister_vnic(NICDevice* dev, uint32_t id) {
 	return NULL;
 }
 
-VNIC* nicdev_get_vnic(NICDevice* dev, uint32_t id) {
-	if(!dev)
+VNIC* nicdev_get_vnic(NICDevice* nicdev, uint32_t id) {
+	if(!nicdev)
 		return NULL;
 
 	for(int i = 0; i < MAX_VNIC_COUNT; i++) {
-		if(dev->vnics[i]->id == id)
-			return dev->vnics[i];
+		if(nicdev->vnics[i]->id == id)
+			return nicdev->vnics[i];
 	}
 
 	return NULL;
 }
 
-VNIC* nicdev_get_vnic_mac(NICDevice* dev, uint64_t mac) {
-	if(!dev)
+VNIC* nicdev_get_vnic_mac(NICDevice* nicdev, uint64_t mac) {
+	if(!nicdev)
 		return NULL;
 
 	for(int i = 0; i < MAX_VNIC_COUNT; i++) {
-		if(dev->vnics[i]->mac == mac)
-			return dev->vnics[i];
+		if(nicdev->vnics[i]->mac == mac)
+			return nicdev->vnics[i];
 	}
 
 	return NULL;
 }
 
-VNIC* nicdev_update_vnic(NICDevice* dev, VNIC* src_vnic) {
-	VNIC* dst_vnic = nicdev_get_vnic(dev, src_vnic->id);
+VNIC* nicdev_update_vnic(NICDevice* nicdev, VNIC* src_vnic) {
+	VNIC* dst_vnic = nicdev_get_vnic(nicdev, src_vnic->id);
 	if(!dst_vnic)
 		return NULL;
 
 	if(dst_vnic->mac != src_vnic->mac) {
-		if(nicdev_get_vnic_mac(dev, src_vnic->mac))
+		if(nicdev_get_vnic_mac(nicdev, src_vnic->mac))
 			return NULL;
 
 		dst_vnic->mac = src_vnic->mac;
@@ -331,7 +362,10 @@ static bool transmitter(Packet* packet, void* context) {
  *
  * @return number of packets proccessed
  */
-int nicdev_tx(NICDevice* dev,
+//FIXME: Need VNIC Scheduling.
+//If device buffer is full, last vnic in array can't send packet.
+//Task = budget
+int nicdev_tx(NICDevice* nicdev,
 		bool (*process)(Packet* packet, void* context), void* context) {
 	Packet* packet;
 	VNIC* vnic;
@@ -342,11 +376,12 @@ int nicdev_tx(NICDevice* dev,
 		.process = process,
 		.context = context};
 
-	//TODO lock
-	for(int i = 0; i < MAX_VNIC_COUNT; i++) {
-		vnic = dev->vnics[i];
-		if(!vnic)
+	for(; nicdev->round < MAX_VNIC_COUNT; nicdev->round++) {
+		vnic = nicdev->vnics[nicdev->round];
+		if(!vnic) {
+			nicdev->round = 0;
 			break;
+		}
 
 		budget = vnic->budget;
 		while(budget--) {
@@ -368,4 +403,76 @@ void nicdev_free(Packet* packet) {
 	// TODO
 	for(int i = 0; i < MAX_VNIC_COUNT; ++i) {
 	}
+}
+
+NICDevice* nicdev_add_vlan(NICDevice* nicdev, uint16_t id) {
+	if(((NICDriver*)nicdev->driver)->add_vid) {
+		if(!((NICDriver*)nicdev->driver)->add_vid(nicdev, id))
+			return NULL;
+	}
+
+	NICDevice* vlan_nicdev = gmalloc(sizeof(NICDevice));
+	memset(vlan_nicdev, 0, sizeof(NICDevice));
+	sprintf(vlan_nicdev->name, "%s.%d", nicdev->name, id);
+	if(nicdev_get(vlan_nicdev->name)) {
+		gfree(vlan_nicdev);
+		return NULL;
+	}
+	vlan_nicdev->mac = nicdev->mac;
+	vlan_nicdev->vlan_proto = ETHER_TYPE_8021Q;
+	vlan_nicdev->vlan_tci = endian16(id);
+	vlan_nicdev->driver = nicdev->driver;
+	vlan_nicdev->priv = nicdev->priv;
+
+	NICDevice* next = nicdev;
+	while(1) {
+		if(next->next) {
+			if((endian16(next->next->vlan_tci) & 0xfff) < id) {
+				next = next->next;
+				continue;
+			}
+
+			next->next->prev = vlan_nicdev;
+			vlan_nicdev->next = next->next;
+
+			next->next = vlan_nicdev;
+			vlan_nicdev->prev = next;
+			break;
+		} else {
+			//Add last
+			next->next = vlan_nicdev;
+			vlan_nicdev->prev = next;
+			vlan_nicdev->next = NULL;
+			break;
+		}
+	}
+
+	event_busy_add(nicdev_schedule, vlan_nicdev);
+	return vlan_nicdev;
+}
+
+bool nicdev_remove_vlan(NICDevice* nicdev) {
+	// Check has nicdevice
+	for(int i = 0; i < MAX_NIC_DEVICE_COUNT; i++) {
+		NICDevice* dev = nic_devices[i];
+		if(dev)
+			return false;
+		else
+			break;
+	}
+
+	if(nicdev->vlan_proto != ETHER_TYPE_8021Q)
+			return false;
+
+	if(((NICDriver*)nicdev->driver)->remove_vid) {
+		((NICDriver*)nicdev->driver)->remove_vid(nicdev, endian16(nicdev->vlan_tci) & 0xfff);
+	}
+
+	gfree(nicdev);
+	//FIXME remove event nicdev
+	return false;
+}
+
+bool nicdev_set_flag(NICDevice* nicdev, uint8_t pcp, uint8_t dei) {
+	return true;
 }

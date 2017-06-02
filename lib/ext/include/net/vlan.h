@@ -1,8 +1,6 @@
 #ifndef __NET_VLAN_H__
 #define __NET_VLAN_H__
 
-#include <net/packet.h>
-
 /**
  * @file
  * IEEE 802.1Q

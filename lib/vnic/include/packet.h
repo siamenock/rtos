@@ -21,6 +21,9 @@
 typedef struct _Packet {
 	uint64_t	time;	    ///< epoch timestamp
 
+	uint16_t	vlan_proto; ///< VLAN Protocol
+	uint16_t	vlan_tci;   ///< VLAN TCI
+
 	// Actual packet data size: end-start
 	uint16_t	start;	    ///< start offset
 	uint16_t	end;	    ///< end offset

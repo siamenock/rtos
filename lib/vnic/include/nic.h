@@ -69,6 +69,8 @@ typedef struct _NIC {
 	uint64_t	magic;			///< A magic value to verify that the NIC object was found correctly
 	uint32_t	id;			///< NIC unique ID (unique ID in RTOS; copied from VNIC)
 	uint64_t	mac;			///< MAC Address
+	uint16_t	vlan_proto; 		///< VLAN Protocol
+	uint16_t	vlan_tci;   		///< VLAN TCI
 
 	uint64_t	rx_bandwidth;		///< Rx bandwith limit (bps)
 	uint64_t	tx_bandwidth;		///< Tx bandwith limit (bps)

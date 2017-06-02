@@ -60,8 +60,6 @@ static void ap_timer_init() {
 }
 
 static bool idle0_event(void* data) {
-	nicdev_poll(); 
-
 	// #ifdef VFIO_ENABLED
 	// 	// Poll FIO
 	// #define MAX_VM_COUNT	128
@@ -90,7 +88,7 @@ static bool idle0_event(void* data) {
 	// 	for(int i = 0; i < 1000; i++)
 	// 		asm volatile("nop");
 
-	//idle_time += cpu_tsc() - time;
+	// idle_time += cpu_tsc() - time;
 	return true;
 }
 
@@ -418,12 +416,12 @@ void main() {
 	}
 
 	mp_sync(); // Barrier #3
-	/*
-	 *if(apic_id == 0) {
-	 *        while(exec("/boot/init.psh") > 0)
-	 *                event_loop();
-	 *}
-	 */
+
+// 	if(apic_id == 0) {
+// 	        while(exec("/boot/init.psh") > 0)
+// 	                event_loop();
+// 	}
+
 	while(1) {
 		event_loop();
 	}
