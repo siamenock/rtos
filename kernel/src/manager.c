@@ -10,12 +10,15 @@
 #include <net/arp.h>
 #include <net/icmp.h>
 #include <net/checksum.h>
+#include <timer.h>
 #include <util/event.h>
 #undef BYTE_ORDER
 #include <netif/etharp.h>
 #include <arch/driver.h>
 #include <control/rpc.h>
 #include <net/interface.h>
+#include <lwip/init.h>
+#include <lwip/netif.h>
 #include "gmalloc.h"
 #include "malloc.h"
 #include "mp.h"
@@ -567,15 +570,32 @@ static bool rx_process_add_process(ProcessContext* context) {
 
 bool manager_arping(NIC* nic, uint32_t addr, uint32_t count) {
 	ARPingContext* arping_context = malloc(sizeof(ARPingContext));
+	if(!arping_context)
+		return false;
+
 	arping_context->nic = nic;
 	arping_context->addr = addr;
 	arping_context->count = count;
-	event_timer_add(arping, arping_context, 0, 1000000);
+	uint64_t event_id = event_timer_add(arping, arping_context, 0, 1000000);
+	if(!event_id) {
+		free(arping_context);
+		return false;
+	}
 	
 	ProcessContext* process_context = malloc(sizeof(ProcessContext));
+	if(!process_context) {
+		free(arping_context);
+		event_timer_remove(event_id);
+		return false;
+	}
+
 	process_context->process = arping_process;
 	process_context->context = arping_context;
-	rx_process_add_process(process_context);
+	if(!rx_process_add_process(process_context)) {
+		free(arping_context);
+		event_timer_remove(event_id);
+		free(process_context);
+	}
 	return true;
 }
 
@@ -642,7 +662,7 @@ inline void manager_netif_set_ip(struct netif* netif, uint32_t ip) {
 inline void manager_netif_set_gateway(struct netif* netif, uint32_t gateway) {
 	struct ip_addr gateway2;
 	IP4_ADDR(&gateway2, (gateway >> 24) & 0xff, (gateway >> 16) & 0xff, (gateway >> 8) & 0xff, (gateway >> 0) & 0xff);
-	netif_set_gateway(netif, &gateway2);
+	netif_set_gw(netif, &gateway2);
 }
 
 inline void manager_netif_set_netmask(struct netif* netif, uint32_t netmask) {
@@ -691,7 +711,7 @@ bool manager_netif_server_close(struct tcp_pcb* tcp_pcb) {
 	return true;
 }
 
-//TODO command
+//TODO: Move commands about manager to here
 int manager_init() {
 	lwip_init();
 	rx_process_list = list_create(NULL);

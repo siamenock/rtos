@@ -11,9 +11,9 @@ typedef enum {
 	VM_STATUS_INVALID	= -1,
 } VMStatus;
 
-#define VM_MAX_NIC_COUNT	64
-#define VM_MAX_ARGC		256
-#define VM_MAX_ARGV		4096
+#define VMSPEC_MAX_NIC_COUNT	64
+#define VMSPEC_MAX_ARGC		256
+#define VMSPEC_MAX_ARGV		4096
 
 #define NICSPEC_DEVICE_MAC	((uint64_t)1 << 48)
 

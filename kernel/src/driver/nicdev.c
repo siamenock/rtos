@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <string.h>
+#include <util/event.h>
 
 #include "gmalloc.h"
 #include "nicdev.h"
@@ -372,7 +374,6 @@ static bool transmitter(Packet* packet, void* context) {
 //Task = budget
 int nicdev_tx(NICDevice* nicdev,
 		bool (*process)(Packet* packet, void* context), void* context) {
-	Packet* packet;
 	VNIC* vnic;
 	int budget;
 	int count = 0;

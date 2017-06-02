@@ -134,10 +134,10 @@ static void print_interface(VNIC* vnic, uint16_t vmid, uint16_t nic_index) {
 
 		if(interface) {
 			uint32_t ip = interface->address;
-			uint32_t mask = interface->netmask;
-			uint32_t gw = interface->gateway;
 			printf("%12sinet addr:%d.%d.%d.%d  ", "", (ip >> 24) & 0xff, (ip >> 16) & 0xff, (ip >> 8) & 0xff, (ip >> 0) & 0xff);
+			uint32_t mask = interface->netmask;
 			printf("\tMask:%d.%d.%d.%d\n", (mask >> 24) & 0xff, (mask >> 16) & 0xff, (mask >> 8) & 0xff, (mask >> 0) & 0xff);
+			//uint32_t gw = interface->gateway;
 			//printf("%12sGateway:%d.%d.%d.%d\n", "", (gw >> 24) & 0xff, (gw >> 16) & 0xff, (gw >> 8) & 0xff, (gw >> 0) & 0xff);
 		}
 
@@ -347,7 +347,20 @@ static int cmd_manager(int argc, char** argv, void(*callback)(char* result, int 
 		} else if(!strcmp("destroy", argv[i])) {
 			NEXT_ARGUMENTS();
 
-			if(!manager_destroy_vnic(argv[i]))
+			uint16_t vmid;
+			uint16_t vnic_index;
+			uint16_t interface_index;
+			if(!parse_vnic_interface(argv[i], &vmid, &vnic_index, &interface_index))
+				return -i;
+
+			if(vmid)
+				return -i;
+
+			VNIC* vnic = manager.vnics[vnic_index];
+			if(!vnic)
+				return -i;
+
+			if(!manager_destroy_vnic(vnic))
 				printf("fail\n");
 
 			return 0;
@@ -589,16 +602,16 @@ static int cmd_interface(int argc, char** argv, void(*callback)(char* result, in
 		VNIC* vnic;
 		if(vmid) { //Virtual Machine VNIC
 			extern Map* vms;
-			VM* vm = map_get(vms, (uint64_t)vmid);
+			VM* vm = map_get(vms, (void*)(uint64_t)vmid);
 			if(!vm)
 				return -2;
 
 			if(vnic_index > vm->nic_count)
 				return -2;
 
-			vnic = vm->nics[parse_uint16(vnic_index)];
+			vnic = vm->nics[vnic_index];
 		} else { //Manager VNIC
-			vnic = manager.vnics[parse_uint8(vnic_index)];
+			vnic = manager.vnics[vnic_index];
 		}
 
 		if(!vnic)

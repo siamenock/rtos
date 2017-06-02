@@ -13,7 +13,6 @@ void idt_init() {
 	idtr->base = (uint64_t)IDT_ADDR;
 	ID* id = (ID*)VIRTUAL_TO_PHYSICAL(IDT_ADDR);
 
-	uint64_t __offset;
  	ID_INIT(id[0], (uint64_t)isr_0, 0x08, 1, 0x0e, 0, 1);	// Segment: 0x08, IST: 1, Type: Interrupt, DPL: 0, P: 1
  	ID_INIT(id[1], (uint64_t)isr_1, 0x08, 1, 0x0e, 0, 1);
  	ID_INIT(id[2], (uint64_t)isr_2, 0x08, 1, 0x0e, 0, 1);

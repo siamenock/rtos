@@ -158,8 +158,8 @@ int pci_get_entrys(PCI_Bus_Entry* bus_entry) {
 				uint16_t function_count = bus_entry[bus_count].slot_entry[slot_count].function_count;
 				slot_has_function = true;
 
-				uint16_t device_id = _pci_read16(bus, slot, function, PCI_DEVICE_ID, false);
-				uint8_t header_type = _pci_read8(bus, slot, function, PCI_HEADER_TYPE, false);
+// 				uint16_t device_id = _pci_read16(bus, slot, function, PCI_DEVICE_ID, false);
+// 				uint8_t header_type = _pci_read8(bus, slot, function, PCI_HEADER_TYPE, false);
 
 				
 				bus_entry[bus_count].slot_entry[slot_count].function_entry[function_count].function = function;

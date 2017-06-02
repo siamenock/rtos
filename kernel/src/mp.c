@@ -5,6 +5,7 @@
 #include "mp.h"
 #include "shared.h"
 #include "msr.h"
+#include "amp.h"
 
 // Ref: http://www.cs.cmu.edu/~410/doc/intel-mp.pdf
 // Ref: http://www.intel.com/design/pentium/datashts/24201606.pdf
