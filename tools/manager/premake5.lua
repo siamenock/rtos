@@ -2,10 +2,10 @@ workspace "Penguin"
     configurations { "Debug", "Release" }
 
     configurations "Debug"
-        flags { "Symbols" }
+		symbols "On"
 
     configurations "Release"
-        flags { "Optimize" }
+		optimize "On"
 
     language "C"
     warnings "Extra"
@@ -26,12 +26,19 @@ workspace "Penguin"
         targetname "manager"
         targetdir "."
         files { "src/**.h", "src/**.c", "src/**.asm" }
-        includedirs { "../../include", "../../include/ipv4" }
-        libdirs { "." }
-        links { "core_linux", "rt", "vnic", "tlsf" }
+        includedirs { "../../lib/include" }
+        libdirs { ".", "build" }
+        links { "ext", "rt", "vnic", "tlsf" }
 
         -- Make version header
         prebuildcommands {
             '../mkver.sh > ../src/version.h'
+        }
+
+		-- Copy libraries into the build directory
+        prelinkcommands {
+            'cp ../../../lib/libext.a .',
+            'cp ../../../lib/libvnic.a .',
+            'cp ../../../lib/libtlsf.a .'
         }
 
