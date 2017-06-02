@@ -8,6 +8,7 @@
 #include "asm.h"
 #include "apic.h"
 #include "mp.h"
+#include "mmap.h"
 #include "shared.h"
 #include "gmalloc.h"
 #include "task.h"

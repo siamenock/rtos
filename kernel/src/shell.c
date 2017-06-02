@@ -1,5 +1,6 @@
 #include <util/cmd.h>
 #include "stdio.h"
+#include "string.h"
 #include "driver/charin.h"
 #include "driver/charout.h"
 #include "version.h"

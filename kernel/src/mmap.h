@@ -41,6 +41,7 @@ extern char IDT_END_ADDR[];
 extern char KERNEL_TEXT_AREA_START[];
 extern char KERNEL_TEXT_AREA_END[];
 #define KERNEL_TEXT_AREA_SIZE		(KERNEL_TEXT_AREA_END - KERNEL_TEXT_AREA_START)
+extern char SHARED_ADDR[]; /// Global address of shared memeory structure
 
 /**
  * Kernel data area (6M ~ 8M)

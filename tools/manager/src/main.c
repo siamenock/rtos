@@ -14,6 +14,7 @@
 #include "icc.h"
 #include "mapping.h"
 #include "shared.h"
+#include "driver/console.h"
 #include "gmalloc.h"
 #include "vm.h"
 #include "manager.h"
@@ -74,6 +75,8 @@ static int symbols_init() {
 
 		{ &LOCAL_MALLOC_START, "LOCAL_MALLOC_START" },
 		{ &LOCAL_MALLOC_END, "LOCAL_MALLOC_END" },
+
+		{ &SHARED_ADDR, "SHARED_ADDR" },
 	};
 
 	int count = sizeof(mmap_symbols) / (sizeof(char*) * 2);
@@ -130,6 +133,16 @@ static int dummy_entry() {
 // 
 // 	return 0;
 	return 0;
+}
+
+static void _cpubrand(char* cpu_brand) {
+	uint32_t* p = (uint32_t*)cpu_brand;
+	uint32_t eax = 0x80000002;
+	for(int i = 0; i < 12; i += 4) {
+		asm volatile("cpuid"
+			: "=a"(p[i + 0]), "=b"(p[i + 1]), "=c"(p[i + 2]), "=d"(p[i + 3])
+			: "a"(eax++));
+	}
 }
 
 // TODO: Fix Timer init libary
@@ -215,7 +228,7 @@ static void _timer_init(char* cpu_brand) {
 }
 
 static Device* devices[MAX_NIC_DEVICE_COUNT];
-static NICDevice* nicdev_create(NICInfo* info) {
+static NICDevice* _nicdev_create(NICInfo* info) {
 	extern uint64_t manager_mac;
 	NICDevice* nic_device = gmalloc(sizeof(NICDevice));
 	if(!nic_device)
@@ -242,11 +255,6 @@ static NICDevice* nicdev_create(NICInfo* info) {
 	return nic_device;
 }
 
-static void nicdev_destroy(NICDevice* dev) {
-	nicdev_unregister(dev->name);
-	gfree(dev);
-}
-
 int nicdev_init() {
 	Device* dev;
 	int index = 0;
@@ -263,7 +271,7 @@ int nicdev_init() {
 		if(info.name[0] == '\0')
 			sprintf(info.name, "eth%d", index++);
 
-		NICDevice* nic_dev = nicdev_create(&info);
+		NICDevice* nic_dev = _nicdev_create(&info);
 		if(!nic_dev)
 			return -1;
 
@@ -349,6 +357,8 @@ int main(int argc, char** argv) {
 	malloc_init();
 
 	printf("\nInitializing timer...\n");
+
+	char cpu_brand[4 * 4 * 3 + 1];
 	_timer_init(cpu_brand);
 
 	printf("\nWake-Up Multi processor...\n");

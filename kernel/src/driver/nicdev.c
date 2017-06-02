@@ -1,3 +1,5 @@
+#include <stdio.h>
+
 #include "gmalloc.h"
 #include "nicdev.h"
 
@@ -293,9 +295,9 @@ inline static void packet_dump(void* _data, size_t size) {
 
 		if(packet_debug_switch | NICDEV_DEBUG_PACKET_DUMP) {
 			uint8_t* data = (uint8_t*)_data;
-			for(int i = 0 ; i < size;) {
+			for(size_t i = 0 ; i < size;) {
 				printf("\t0x%04x:\t", i);
-				for(int j = 0; j < 16 && i < size; j++, i++) {
+				for(size_t j = 0; j < 16 && i < size; j++, i++) {
 					printf("%02x ", data[i] & 0xff);
 				}
 				printf("\n");
@@ -314,6 +316,9 @@ int nicdev_rx0(NICDevice* dev, void* data, size_t size,
 	Ether* eth = data;
 	int i;
 	VNIC* vnic;
+
+	if(size + size_optional < sizeof(Ether))
+		return NICDEV_PROCESS_PASS;
 	uint64_t dmac = endian48(eth->dmac);
 
 	//TODO lock
