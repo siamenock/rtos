@@ -850,7 +850,7 @@ void vm_status_set(uint32_t vmid, int status, VM_STATUS_CALLBACK callback, void*
 	}
 }
 
-int vm_status_get(uint32_t vmid) {
+VMStatus vm_status_get(uint32_t vmid) {
 	VM* vm = map_get(vms, (void*)(uint64_t)vmid);
 	if(!vm)
 		return -1;
