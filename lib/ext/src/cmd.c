@@ -5,8 +5,11 @@
 #include <util/map.h>
 #include <util/fifo.h>
 
+static Map* cmds = NULL;
 static Map* variables = NULL;
 static char* variable = NULL;
+
+CommandHistory cmd_history;
 char cmd_result[CMD_RESULT_SIZE];
 
 static int cmd_print(char* cmd) {
@@ -34,7 +37,7 @@ static int cmd_print(char* cmd) {
 			putchar(' ');
 
 		// Description
-			printf("%s\n", commands[i].desc);
+		printf("%s\n", commands[i].desc);
 
 		// Arguments
 		if(commands[i].args != NULL) {
@@ -159,13 +162,13 @@ static Command* cmd_get(int argc, char** argv) {
 	if(argc == 0)
 		return NULL;
 
-        for(int i = 0; commands[i].name != NULL; i++) {
-                if(strcmp(argv[0], commands[i].name) == 0) {
-                        return &commands[i];
-                }
-        }
+	for(int i = 0; commands[i].name != NULL; i++) {
+		if(strcmp(argv[0], commands[i].name) == 0) {
+			return &commands[i];
+		}
+	}
 
-        return NULL;
+	return NULL;
 }
 
 void cmd_update_var(char* result, int exit_status) {
@@ -177,17 +180,12 @@ void cmd_update_var(char* result, int exit_status) {
 
 	if(exit_status == 0) {
 		if(variable) {
+			char* value = strlen(result) ? strdup(result) : strdup("(nil)");
 			if(map_contains(variables, variable)) {
 				free(map_get(variables, variable));
-				if(strlen(result) > 0)
-					map_update(variables, variable, strdup(result));
-				else
-					map_update(variables, variable, strdup("(nil)"));
+				map_update(variables, variable, value);
 			} else {
-				if(strlen(result) > 0)
-					map_put(variables, strdup(variable), strdup(result));
-				else
-					map_put(variables, strdup(variable), strdup("(nil)"));
+				map_put(variables, variable, value);
 			}
 		}
 	}
@@ -261,24 +259,34 @@ static char* cmd_history_get_later() {
 	return cmd_history_get(--cmd_history.index);
 }
 
-#define HISTORY_SIZE 30
 
-CommandHistory cmd_history = {
-	.index = -1, // Initial index value
-	.using = cmd_history_using,
-	.reset = cmd_history_reset,
-	.save = cmd_history_save,
-	.count = cmd_history_count,
-	.get_past = cmd_history_get_past,
-	.get_current = cmd_history_get_current,
-	.get_later = cmd_history_get_later,
-};
 
 void cmd_init(void) {
+	cmds = map_create(16, map_string_hash, map_string_equals, NULL);
 	variables = map_create(16, map_string_hash, map_string_equals, NULL);
 	map_put(variables, strdup("$?"), strdup("(nil)"));
 	map_put(variables, strdup("$nil"), strdup("(nil)"));
-	cmd_history.histories = fifo_create(HISTORY_SIZE, NULL);
+
+	cmd_history.index	= -1;
+	cmd_history.using	= cmd_history_using;
+	cmd_history.reset	= cmd_history_reset;
+	cmd_history.save	= cmd_history_save;
+	cmd_history.count	= cmd_history_count;
+	cmd_history.get_past	= cmd_history_get_past;
+	cmd_history.get_current	= cmd_history_get_current;
+	cmd_history.get_later	= cmd_history_get_later;
+	cmd_history.histories	= fifo_create(CMD_HISTORY_SIZE, NULL);
+}
+
+bool cmd_register(Command* c) {
+	if(!c || !c->name)
+		return false;
+	return map_put(cmds, c->name, c);
+}
+
+void cmd_unregister(Command* c) {
+	if(c && c->name)
+		map_remove(cmds, c);
 }
 
 int cmd_exec(char* line, void(*callback)(char* result, int exit_status)) {
