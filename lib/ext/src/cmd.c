@@ -6,33 +6,43 @@
 #include <util/map.h>
 #include <util/fifo.h>
 
-static Map* __commands  = NULL;
+static Command __commands[CMD_MAX] = {};
+static size_t __commands_size = 0;
 static Map* __variables = NULL;
 static char* variable = NULL;
-
 CommandHistory cmd_history;
 char cmd_result[CMD_RESULT_SIZE];
 
+static int cmd_echo(int argc, char** argv, void(*callback)(char* result, int exit_status));
+static Command cmds[] = {
+	{
+		.name = "help",
+		.desc = "Show this message.",
+		.func = cmd_help
+	},
+	{
+		.name = "echo",
+		.desc = "Echo arguments.",
+		.args = "[variable: string]*",
+		.func = cmd_echo
+	},
+};
+
 static int cmd_print(char* name) {
-	if(map_size(__commands) <= 0)
+	if(__commands_size == 0)
 		return -1;
 
 	size_t command_len = 0;
 
-	MapIterator it;
-	map_iterator_init(&it, __commands);
-	while(map_iterator_has_next(&it)) {
-		MapEntry* entry = map_iterator_next(&it);
-		Command* c = entry->data;
+	for(size_t i = 0; i < __commands_size; ++i) {
+		Command* c = &__commands[i];
 		size_t len = strlen(c->name);
 		command_len = len > command_len ? len : command_len;
 	}
 
 	bool found = false;
-	map_iterator_init(&it, __commands);
-	while(map_iterator_has_next(&it)) {
-		MapEntry* entry = map_iterator_next(&it);
-		Command* c = entry->data;
+	for(size_t i = 0; i < __commands_size; ++i) {
+		Command* c = &__commands[i];
 		if(name && strcmp(c->name, name) != 0)
 			continue;
 
@@ -90,6 +100,20 @@ int cmd_help(int argc, char** argv, void(*callback)(char* result, int exit_statu
 fail:
 	if(callback)
 		callback((char*)"false", 0);
+
+	return 0;
+}
+
+static int cmd_echo(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	int pos = 0;
+	for(int i = 1; i < argc; i++) {
+		pos += sprintf(cmd_result + pos, "%s", argv[i]) - 1;
+		if(i + 1 < argc) {
+			cmd_result[pos++] = ' ';
+		}
+	}
+	printf("%s\n", cmd_result);
+	callback(cmd_result, 0);
 
 	return 0;
 }
@@ -165,9 +189,13 @@ static bool cmd_parse_arg(int argc, char** argv) {
 }
 
 static Command* cmd_get(int argc, char** argv) {
-	if(argc && argv[0])
-		return map_get(__commands, argv[0]);
+	if(!argc || !argv[0])
+		return NULL;
 
+	for(size_t i = 0 ; i < __commands_size; ++i) {
+		if(strcmp(__commands[i].name, argv[0]) == 0)
+			return &__commands[i];
+	}
 	return NULL;
 }
 
@@ -262,7 +290,6 @@ static char* cmd_history_get_later() {
 
 
 void cmd_init(void) {
-	__commands = map_create(16, map_string_hash, map_string_equals, NULL);
 	__variables = map_create(16, map_string_hash, map_string_equals, NULL);
 	map_put(__variables, strdup("$?"), strdup("(nil)"));
 	map_put(__variables, strdup("$nil"), strdup("(nil)"));
@@ -276,22 +303,26 @@ void cmd_init(void) {
 	cmd_history.get_current	= cmd_history_get_current;
 	cmd_history.get_later	= cmd_history_get_later;
 	cmd_history.histories	= fifo_create(CMD_HISTORY_SIZE, NULL);
+
+	cmd_register(cmds, sizeof(cmds) / sizeof(cmds[0]));
 }
 
 bool cmd_register(Command* commands, size_t length) {
+	// At this point, kernel is not ready to perform
+	// print and/or malloc function
 	if(!commands || !length)
 		return false;
 
 	for(size_t i = 0; i < length; ++i) {
-		if(commands[i].name)
-			map_put(__commands, commands[i].name, &commands[i]);
+		if(commands[i].name) {
+			__commands[__commands_size++] = commands[i];
+		}
 	}
 	return true;
 }
 
 void cmd_unregister(Command* command) {
-	if(command && command->name)
-		map_remove(__commands, command);
+	// TODO
 }
 
 int cmd_exec(char* line, void(*callback)(char* result, int exit_status)) {

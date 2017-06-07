@@ -12,6 +12,7 @@
 #define RTC_DATE(v)	(((v) >> 8) & 0xff)
 #define RTC_WEEK(v)	(((v) >> 0) & 0xff)
 
+void rtc_init();
 uint32_t rtc_time();	// 0xff0000: hour, 0xff00: minute, 0xff: second
 uint32_t rtc_date();	// 0xff000000: year, 0xff0000: month, 0xff00: day of month, 0xff: day of week
 

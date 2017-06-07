@@ -23,6 +23,7 @@ typedef struct {
 	void**		blocks;	// gmalloc(array), bmalloc(content)
 } Block;
 
+#define VM_MAX_VM_COUNT	128
 #define VM_MAX_MEMORY_SIZE	0x8000000		//128Mb
 #define VM_MAX_STORAGE_SIZE	0x8000000		//128Mb
 #define VM_MAX_NIC_COUNT	NIC_MAX_COUNT

@@ -6,9 +6,10 @@
 #include <errno.h>
 #include <util/map.h>
 #include <util/ring.h>
+#include <util/cmd.h>
 #include <net/md5.h>
 #include <timer.h>
-#include <file.h>
+#include "file.h"
 #include <vnic.h>
 #include "icc.h"
 #include "vm.h"
@@ -19,6 +20,8 @@
 #include "shared.h"
 #include "mmap.h"
 #include "driver/nicdev.h"
+#include "driver/disk.h"
+#include "driver/fs.h"
 
 static uint32_t	last_vmid = 1;
 // FIXME: change to static
@@ -51,6 +54,92 @@ typedef struct {
 static Core cores[MP_MAX_CORE_COUNT];
 
 static VM_STDIO_CALLBACK stdio_callback;
+
+static int cmd_md5(int argc, char** argv, void(*callback)(char* result, int exit_status));
+static int cmd_create(int argc, char** argv, void(*callback)(char* result, int exit_status));
+static int cmd_vm_destroy(int argc, char** argv, void(*callback)(char* result, int exit_status));
+static int cmd_vm_list(int argc, char** argv, void(*callback)(char* result, int exit_status));
+static int cmd_upload(int argc, char** argv, void(*callback)(char* result, int exit_status));
+static int cmd_status_set(int argc, char** argv, void(*callback)(char* result, int exit_status));
+static int cmd_status_get(int argc, char** argv, void(*callback)(char* result, int exit_status));
+static int cmd_stdio(int argc, char** argv, void(*callback)(char* result, int exit_status));
+static int cmd_mount(int argc, char** argv, void(*callback)(char* result, int exit_status));
+static Command commands[] = {
+	{
+		.name = "create",
+		.desc = "Create VM",
+		.args = "[-c core_count:u8] [-m memory_size:u32] [-s storage_size:u32] "
+			"[-n [mac:u64],[dev:str],[ibuf:u32],[obuf:u32],[iband:u64],[oband:u64],[hpad:u16],[tpad:u16],[pool:u32] ] "
+			"[-a args:str] -> vmid ",
+		.func = cmd_create
+	},
+	{
+		.name = "destroy",
+		.desc = "Destroy VM",
+		.args = "vmid:u32 -> bool",
+		.func = cmd_vm_destroy
+	},
+	{
+		.name = "list",
+		.desc = "Print a list of VM IDs",
+		.args = " -> u64[]",
+		.func = cmd_vm_list
+	},
+	{
+		.name = "upload",
+		.desc = "Upload file",
+		.args = "vmid:u32 path:str -> bool",
+		.func = cmd_upload
+	},
+	{
+		.name = "md5",
+		.desc = "MD5 storage",
+		.args = "vmid:u32 [size:u64] -> str",
+		.func = cmd_md5
+	},
+	{
+		.name = "start",
+		.desc = "Start VM",
+		.args = "vmid:u32 -> bool",
+		.func = cmd_status_set
+	},
+	{
+		.name = "pause",
+		.desc = "Pause VM",
+		.args = "vmid:u32 -> bool",
+		.func = cmd_status_set
+	},
+	{
+		.name = "resume",
+		.desc = "Resume VM",
+		.args = "vmid:u32 -> bool",
+		.func = cmd_status_set
+	},
+	{
+		.name = "stop",
+		.desc = "Stop VM",
+		.args = "vmid:u32 -> bool",
+		.func = cmd_status_set
+	},
+	{
+		.name = "status",
+		.desc = "Get VM's status",
+		.args = "vmid:u32 -> str{start|pause|stop|invalid}",
+		.func = cmd_status_get
+	},
+	{
+		.name = "stdin",
+		.desc = "Write stdin to vm",
+		.args = "vmid:u32 thread_id:u8 msg:str -> bool",
+		.func = cmd_stdio
+	},
+	{
+		.name = "mount",
+		.desc = "Mount file system",
+		.args = "-t fs_type:str{bfs|ext2|fat} device:str path:str -> bool",
+		.func = cmd_mount
+	},
+};
 
 static void icc_started(ICC_Message* msg) {
 	Core* core = &cores[msg->apic_id];
@@ -494,6 +583,8 @@ void vm_init() {
 	}
 
 	event_idle_add(vm_loop, NULL);
+
+	cmd_register(commands, sizeof(commands) / sizeof(commands[0]));
 }
 
 uint32_t vm_create(VMSpec* vm_spec) {
@@ -991,3 +1082,492 @@ ssize_t vm_stdio(uint32_t vmid, int thread_id, int fd, const char* str, size_t s
 void vm_stdio_handler(VM_STDIO_CALLBACK callback) {
 	stdio_callback = callback;
 }
+
+
+// makerj
+static int cmd_md5(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	if(argc < 2)
+		return CMD_STATUS_WRONG_NUMBER;
+	if(!is_uint32(argv[1]))
+		return -1;
+	if(argc == 3 && !is_uint64(argv[2]))
+		return -2;
+
+	uint32_t vmid = parse_uint32(argv[1]);
+	uint64_t size = argc == 3 ? parse_uint64(argv[2]) : vm_get(vmid)->used_size;
+	uint32_t md5sum[4];
+
+	bool ret = vm_storage_md5(vmid, size, md5sum);
+	if(!ret) {
+		sprintf(cmd_result, "(nil)");
+		printf("Cannot md5 checksum\n");
+	} else {
+		char* p = (char*)cmd_result;
+		for(int i = 0; i < 16; i++, p += 2) {
+			sprintf(p, "%02x", ((uint8_t*)md5sum)[i]);
+		}
+		*p = '\0';
+	}
+	printf("%s\n", cmd_result);
+
+	if(ret)
+		callback(cmd_result, 0);
+
+	return 0;
+}
+
+char* strtok(char* argv, const char* delim) {
+	char* ptr = strstr(argv, delim);
+	if(!ptr)
+		return NULL;
+	memset(ptr, 0, strlen(delim));
+
+	return argv;
+}
+
+char* strtok_r(char* argv, const char* delim, char** next) {
+	char* res = strtok(argv, delim);
+	if(!res) {
+		*next = NULL;
+		return argv;
+	}
+
+	*next = res + strlen(res) + strlen(delim);
+	return res;
+}
+
+static int cmd_create(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	// Default value
+	VMSpec vm;
+	memset(&vm, 0, sizeof(VMSpec));
+	vm.core_size = 1;
+	vm.memory_size = 0x1000000;		/* 16MB */
+	vm.storage_size = 0x1000000;		/* 16MB */
+
+	NICSpec nics[VM_MAX_NIC_COUNT];
+	memset(nics, 0, sizeof(NICSpec) * VM_MAX_NIC_COUNT);
+	vm.nics = nics;
+
+	vm.argc = 0;
+	vm.argv = malloc(sizeof(char*) * CMD_MAX_ARGC);
+	memset(vm.argv, 0, sizeof(char*) * CMD_MAX_ARGC);
+
+	for(int i = 1; i < argc; i++) {
+		if(strcmp(argv[i], "-c") == 0) {
+			NEXT_ARGUMENTS();
+
+			if(!is_uint8(argv[i])) {
+				printf("Core must be uint8\n");
+				return -1;
+			}
+
+			vm.core_size = parse_uint8(argv[i]);
+		} else if(strcmp(argv[i], "-m") == 0) {
+			NEXT_ARGUMENTS();
+
+			if(!is_uint32(argv[i])) {
+				printf("Memory must be uint32\n");
+				return -1;
+			}
+
+			vm.memory_size = parse_uint32(argv[i]);
+		} else if(strcmp(argv[i], "-s") == 0) {
+			NEXT_ARGUMENTS();
+
+			if(!is_uint32(argv[i])) {
+				printf("Storage must be uint32\n");
+				return -1;
+			}
+
+			vm.storage_size = parse_uint32(argv[i]);
+		} else if(strcmp(argv[i], "-n") == 0) {
+			NICSpec* nic = &(vm.nics[vm.nic_count++]);
+
+			NEXT_ARGUMENTS();
+			char* next;
+			char* token = strtok_r(argv[i], ",", &next);
+			while(token) {
+				char* value;
+				token = strtok_r(token, "=", &value);
+				if(strcmp(token, "mac") == 0) {
+					if(!is_uint64(value)) {
+						printf("Mac must be uint64\n");
+						return -1;
+					}
+					nic->mac = parse_uint64(token);
+				} else if(strcmp(token, "dev") == 0) {
+					nic->dev = malloc(strlen(token + 1));
+					strcpy(nic->dev, value);
+				} else if(strcmp(token, "ibuf") == 0) {
+					if(!is_uint32(value)) {
+						printf("Ibuf must be uint32\n");
+						return -1;
+					}
+					nic->input_buffer_size = parse_uint32(value);
+				} else if(strcmp(token, "obuf") == 0) {
+					if(!is_uint32(value)) {
+						printf("Obuf must be uint32\n");
+						return -1;
+					}
+					nic->output_buffer_size = parse_uint32(value);
+				} else if(strcmp(token, "iband") == 0) {
+					if(!is_uint64(value)) {
+						printf("Iband must be uint64\n");
+						return -1;
+					}
+					nic->input_bandwidth = parse_uint64(value);
+				} else if(strcmp(token, "oband") == 0) {
+					if(!is_uint64(value)) {
+						printf("Oband must be uint64\n");
+						return -1;
+					}
+					nic->output_bandwidth = parse_uint64(value);
+				} else if(strcmp(token, "hpad") == 0) {
+					if(!is_uint16(value)) {
+						printf("Iband must be uint16\n");
+						return -1;
+					}
+					nic->padding_head = parse_uint16(value);
+				} else if(strcmp(token, "tpad") == 0) {
+					if(!is_uint16(value)) {
+						printf("Oband must be uint16\n");
+						return -1;
+					}
+					nic->padding_tail = parse_uint16(value);
+				} else if(strcmp(token, "pool") == 0) {
+					if(!is_uint32(value)) {
+						printf("Pool must be uint32\n");
+						return -1;
+					}
+					nic->pool_size = parse_uint32(value);
+				} else {
+					i--;
+					break;
+				}
+
+				token = strtok_r(next, ",", &next);
+			}
+		} else if(strcmp(argv[i], "-a") == 0) {
+			NEXT_ARGUMENTS();
+
+			for( ; i < argc; i++) {
+				vm.argv[vm.argc++] = argv[i];
+			}
+		}
+	}
+
+	uint32_t vmid = vm_create(&vm);
+	if(vmid == 0) {
+		callback(NULL, -1);
+	} else {
+		VM* vm = vm_get(vmid);
+
+		printf("Manager: VM[%d] created(cores [\n", vm->id);
+		for(int i = 0; i < vm->core_size; i++) {
+			printf("%d, ", mp_apic_id_to_processor_id(vm->cores[i]));
+			if(i + 1 < vm->core_size)
+				printf(", ");
+		}
+		printf("], %dMBs memory, %dMBs storage, VNICs: %d\n",
+				vm->memory.count * VM_MEMORY_SIZE_ALIGN / 0x100000,
+				vm->storage.count * VM_STORAGE_SIZE_ALIGN / 0x100000, vm->nic_count);
+
+		//Ok
+		for(int i = 0; i < vm->nic_count; i++) {
+			VNIC* vnic = vm->nics[i];
+			printf("\t");
+			for(int j = 5; j >= 0; j--) {
+				printf("%02lx", (vnic->mac >> (j * 8)) & 0xff);
+				if(j - 1 >= 0)
+					printf(":");
+				else
+					printf(" ");
+			}
+			printf("%ldMbps/%ld, %ldMbps/%ld, %ldMBs\n", vnic->rx_bandwidth / 1000000, vnic->rx.size, vnic->tx_bandwidth / 1000000, vnic->tx.size, vnic->nic_size / (1024 * 1024));
+		}
+
+		printf("\targs(%d): ", vm->argc);
+		for(int i = 0; i < vm->argc; i++) {
+			char* ch = strchr(vm->argv[i], ' ');
+			if(ch == NULL)
+				printf("%s ", vm->argv[i]);
+			else
+				printf("\"%s\" ", vm->argv[i]);
+		}
+		printf("\n");
+
+		sprintf(cmd_result, "%d", vmid);
+		printf("%s\n", cmd_result);
+		callback(cmd_result, 0);
+	}
+
+	for(int i = 0; i < vm.nic_count; i++) {
+		if(vm.nics[i].dev)
+			free(vm.nics[i].dev);
+	}
+
+	free(vm.argv);
+	return 0;
+}
+
+static int cmd_vm_destroy(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	if(argc < 1) {
+		return CMD_STATUS_WRONG_NUMBER;
+	}
+
+	if(!is_uint32(argv[1])) {
+		return -1;
+	}
+
+	uint32_t vmid = parse_uint32(argv[1]);
+	bool ret = vm_destroy(vmid);
+
+	if(ret) {
+		printf("Vm destroy success\n");
+		callback("true", 0);
+	} else {
+		printf("Vm destroy success\n");
+		callback("false", -1);
+	}
+	return 0;
+}
+
+static int cmd_vm_list(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	uint32_t vmids[VM_MAX_VM_COUNT];
+	int len = vm_list(vmids, VM_MAX_VM_COUNT);
+
+	char* p = cmd_result;
+
+	if(len <= 0) {
+		printf("VM not found\n");
+		callback("false", 0);
+		return 0;
+	}
+
+	for(int i = 0; i < len; i++) {
+		p += sprintf(p, "%lu", vmids[i]) - 1;
+		if(i + 1 < len) {
+			*p++ = ' ';
+		} else {
+			*p++ = '\0';
+		}
+	}
+
+	printf("%s\n", cmd_result);
+	callback(cmd_result, 0);
+	return 0;
+}
+
+static int cmd_upload(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	if(argc < 3) {
+		return CMD_STATUS_WRONG_NUMBER;
+	}
+
+	if(!is_uint32(argv[1])) {
+		return -1;
+	}
+
+	uint32_t vmid = parse_uint32(argv[1]);
+
+	// Attach root directory for full path
+	char file_name[FILE_MAX_NAME_LEN];
+	file_name[0] = '/';
+	strcpy(&file_name[1], argv[2]);
+
+	int fd = open(file_name, "r");
+	if(fd < 0) {
+		printf("Cannot open file: %s\n", file_name);
+		return 1;
+	}
+
+	int offset = 0;
+	int len;
+	char buf[4096];
+	while((len = read(fd, buf, 4096)) > 0) {
+		if(vm_storage_write(vmid, buf, offset, len) != len) {
+			printf("Upload fail : %s\n", file_name);
+			callback("false", -1);
+			return -1;
+		}
+
+		offset += len;
+	}
+
+	printf("Upload success : %s\n", vmid);
+	callback("true", 0);
+	return 0;
+}
+
+static void status_setted(bool result, void* context) {
+	void (*callback)(char* result, int exit_status) = context;
+	callback(result ? "true" : "false", 0);
+}
+
+static int cmd_status_set(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	if(argc < 2) {
+		return CMD_STATUS_WRONG_NUMBER;
+	}
+	if(!is_uint32(argv[1])) {
+		callback("invalid", -1);
+		return -1;
+	}
+
+	uint32_t vmid = parse_uint32(argv[1]);
+	int status = 0;
+	if(strcmp(argv[0], "start") == 0) {
+		status = VM_STATUS_START;
+	} else if(strcmp(argv[0], "pause") == 0) {
+		status = VM_STATUS_PAUSE;
+	} else if(strcmp(argv[0], "resume") == 0) {
+		status = VM_STATUS_RESUME;
+	} else if(strcmp(argv[0], "stop") == 0) {
+		status = VM_STATUS_STOP;
+	} else {
+		printf("%s\n: command not found\n", argv[0]);
+		callback("invalid", -1);
+		return -1;
+	}
+
+	shell_sync();
+
+	vm_status_set(vmid, status, status_setted, callback);
+
+	return 0;
+}
+
+static int cmd_status_get(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	if(argc < 2) {
+		return CMD_STATUS_WRONG_NUMBER;
+	}
+
+	if(!is_uint32(argv[1])) {
+		return -1;
+	}
+
+	uint32_t vmid = parse_uint32(argv[1]);
+	extern Map* vms;
+	VM* vm = map_get(vms, (void*)(uint64_t)vmid);
+	if(!vm) {
+		printf("VM not found\n");
+		return -1;
+	}
+
+	void print_vm_status(int status) {
+		switch(status) {
+			case VM_STATUS_START:
+				printf("start");
+				callback("start", 0);
+				break;
+			case VM_STATUS_PAUSE:
+				printf("pause");
+				callback("pause", 0);
+				break;
+			case VM_STATUS_STOP:
+				printf("stop");
+				callback("stop", 0);
+				break;
+			default:
+				printf("invalid");
+				callback("invalid", -1);
+				break;
+		}
+	}
+
+	printf("VM ID: %d\n", vmid);
+	printf("Status: ");
+	print_vm_status(vm->status);
+	printf("\n");
+	printf("Core size: %d\n", vm->core_size);
+	printf("Core: ");
+	for(int i = 0; i < vm->core_size; i++) {
+		printf("[%d] ", vm->cores[i]);
+	}
+	printf("\n");
+
+	return 0;
+}
+
+
+static int cmd_stdio(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	if(argc < 3) {
+		printf("Argument is not enough\n");
+		return -1;
+	}
+	if(!is_uint32(argv[1])) {
+		printf("VM ID is wrong\n");
+		return -1;
+	}
+	if(!is_uint8(argv[2])) {
+		printf("Thread ID is wrong\n");
+		return -2;
+	}
+
+	uint32_t vmid =  parse_uint32(argv[1]);
+	uint8_t thread_id = parse_uint8(argv[2]);
+	for(int i = 3; i < argc; i++) {
+		printf("%s\n", argv[i]);
+		ssize_t len = vm_stdio(vmid, thread_id, 0, argv[i], strlen(argv[i]) + 1);
+		if(!len) {
+			printf("stdio fail\n");
+			return -i;
+		}
+	}
+
+	return 0;
+}
+
+static int cmd_mount(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	if(argc < 5) {
+		printf("Argument is not enough\n");
+		return -1;
+	}
+
+	uint8_t type;
+	uint8_t disk;
+	uint8_t number;
+	uint8_t partition;
+
+	if(strcmp(argv[1], "-t") != 0) {
+		printf("Argument is wrong\n");
+		return -2;
+	}
+
+	if(strcmp(argv[2], "bfs") == 0 || strcmp(argv[2], "BFS") == 0) {
+		type = FS_TYPE_BFS;
+	} else if(strcmp(argv[2], "ext2") == 0 || strcmp(argv[2], "EXT2") == 0) {
+		type = FS_TYPE_EXT2;
+	} else if(strcmp(argv[2], "fat") == 0 || strcmp(argv[2], "FAT") == 0) {
+		type = FS_TYPE_FAT;
+	} else {
+		printf("%s type is not supported\n", argv[2]);
+		return -3;
+	}
+
+	if(argv[3][0] == 'v') {
+		disk = DISK_TYPE_VIRTIO_BLK;
+	} else if(argv[3][0] == 's') {
+		disk = DISK_TYPE_USB;
+	} else if(argv[3][0] == 'h') {
+		disk = DISK_TYPE_PATA;
+	} else {
+		printf("%c type is not supported\n", argv[3][0]);
+		return -3;
+	}
+
+	number = argv[3][2] - 'a';
+	if(number > 8) {
+		printf("Disk number cannot exceed %d\n", DISK_AVAIL_DEVICES);
+		return -4;
+	}
+
+	partition = argv[3][3] - '1';
+	if(partition > 3) {
+		printf("Partition number cannot exceed 4\n");
+		return -5;
+	}
+
+	fs_mount(disk << 16 | number, partition, type, argv[4]);
+
+	return -2;
+}
+

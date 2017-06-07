@@ -1,5 +1,7 @@
+#include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
+#include <util/cmd.h>
 #include <timer.h>
 #include "cpu.h"
 #include "mp.h"
@@ -8,6 +10,21 @@
 #include "acpi.h"
 #include "mmap.h"
 #include "shared.h"
+
+static int acpi_cmd_reboot(int argc, char** argv, void(*callback)(char* result, int exit_status));
+static int acpi_cmd_shutdown(int argc, char** argv, void(*callback)(char* result, int exit_status));
+static Command acpi_cmds[] = {
+	{
+		.name = "reboot",
+		.desc = "Reboot the node.",
+		.func = acpi_cmd_reboot
+	},
+	{
+		.name = "shutdown",
+		.desc = "Shutdown the node.",
+		.func = acpi_cmd_shutdown
+	},
+};
 
 // Ref: http://www.acpi.info/DOWNLOADS/ACPIspec50.pdf
 
@@ -207,6 +224,8 @@ void acpi_init() {
 		
 		slp_typb = *s5_addr << 10;
 	}
+
+	cmd_register(acpi_cmds, sizeof(acpi_cmds) / sizeof(acpi_cmds[0]));
 }
 
 static void acpi_enable() {
@@ -240,3 +259,29 @@ void acpi_shutdown() {
 	if(fadt->pm1b_control_block)
 		port_out16(fadt->pm1b_control_block, slp_typb | (1 << 13));
 }
+
+static int acpi_cmd_reboot(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	asm volatile("cli");
+
+	uint8_t code;
+	do {
+		code = port_in8(0x64);	// Keyboard Control
+		if(code & 0x01)
+			port_in8(0x60);	// Keyboard I/O
+	} while(code & 0x02);
+
+	port_out8(0x64, 0xfe);	// Reset command
+
+	while(1)
+		asm("hlt");
+
+	return 0;
+}
+
+static int acpi_cmd_shutdown(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	printf("Shutting down\n");
+	acpi_shutdown();
+
+	return 0;
+}
+

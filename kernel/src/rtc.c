@@ -1,6 +1,9 @@
+#include "stdio.h"
 #include "asm.h"
 #include "port.h"
 #include "rtc.h"
+
+#include <util/cmd.h>
 
 
 #define RTC_ADDRESS		0x70
@@ -16,6 +19,35 @@
 #define RTC_ADDR_YEAR		0x09
 
 #define BCD(v)	(((((v) >> 4) & 0x0f) * 10) + ((v) & 0x0f))
+
+
+static const char* months[] = {
+	"???", "Jan",  "Feb", "Mar", "Apr", "May", "Jun", "Jul",  "Aug", "Sep", "Oct", "Nov", "Dec",
+};
+static const char* weeks[] = {
+	"???", "Sun", "Mon",  "Tue", "Wed", "Thu", "Fri", "Sat",
+};
+static int cmd_date(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	uint32_t date = rtc_date();
+	uint32_t time = rtc_time();
+
+	printf("%s %s %d %02d:%02d:%02d UTC %d\n",
+			weeks[RTC_WEEK(date)], months[RTC_MONTH(date)], RTC_DATE(date),
+			RTC_HOUR(time), RTC_MINUTE(time), RTC_SECOND(time), 2000 + RTC_YEAR(date));
+
+	return 0;
+}
+static Command commands[] = {
+	{
+		.name = "date",
+		.desc = "Print current date and time.",
+		.func = cmd_date
+	},
+};
+
+void rtc_init() {
+	cmd_register(commands, sizeof(commands) / sizeof(commands[0]));
+}
 
 // 0xff0000: hour, 0xff00: minute, 0xff: second
 uint32_t rtc_time() {

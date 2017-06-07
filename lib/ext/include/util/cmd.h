@@ -3,6 +3,7 @@
 
 #include <util/fifo.h>
 
+#define CMD_MAX				64
 #define CMD_MAX_ARGC		256
 #define CMD_RESULT_SIZE		4096
 #define CMD_STATUS_WRONG_NUMBER -1000
@@ -10,10 +11,19 @@
 #define CMD_VARIABLE_NOT_FOUND	-2000
 #define	CMD_HISTORY_SIZE	30
 
+#define NEXT_ARGUMENTS()			\
+	i++;					\
+	if(!(i < argc))				\
+		break;				\
+	else if(!strncmp(argv[i], "-", 1)) {	\
+		i--;				\
+	    	continue;			\
+	}
+
 typedef struct {
-	char* name;
-	char* desc;
-	char* args;
+	const char* name;
+	const char* desc;
+	const char* args;
 	int (*func)(int argc, char** argv, void(*callback)(char* result, int exit_status));
 } Command;
 

@@ -2,6 +2,7 @@
 #include <byteswap.h>
 
 #include <util/ring.h>
+#include <util/cmd.h>
 
 #include "pnkc.h"
 #include "port.h"
@@ -41,11 +42,21 @@ Device* device_stderr;
 
 #define DEFAULT_ATTRIBUTE	0x07
 
+static int clear(int argc, char** argv, void(*callback)(char* result, int exit_status));
+static Command commands[] = {
+	{
+		.name = "clear",
+		.desc = "Clear screen.",
+		.func = clear
+	},
+};
+
 void stdio_init(uint8_t apic_id, void* buffer, size_t size) {
 	if(apic_id == 0) {
 		CharOutInit data = { .buf = buffer, .len = size, .is_capture = apic_id == 0, .is_render = apic_id == 0 };
 		device_stdin = device_register(console_in_type, &console_in_driver, NULL, NULL);
 		device_stderr = device_stdout = device_register(console_out_type, &console_out_driver, NULL, &data);
+		cmd_register(commands, sizeof(commands) / sizeof(commands[0]));
 	} else {
 		// TODO: char in redirector
 		device_stdin = device_register(stdin_type, &stdin_driver, NULL, NULL);
@@ -816,4 +827,10 @@ uint32_t ntohl(uint32_t netlong) {
 
 uint16_t ntohs(uint16_t netshort) {
 	return bswap_16(netshort);
+}
+
+static int clear(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	printf("\f");
+
+	return 0;
 }

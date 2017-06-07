@@ -4,6 +4,7 @@
 #include <errno.h>
 
 // Core
+#include <util/cmd.h>
 #include <util/event.h>
 
 // Kernel
@@ -36,6 +37,8 @@
 #include "shared.h"
 #include "pnkc.h"
 #include "mmap.h"
+#include "version.h"
+#include "rtc.h"
 
 // Drivers
 #include "driver/nicdev.h"
@@ -106,6 +109,20 @@ static bool idle_hlt_event(void* data) {
 
 	return true;
 }
+
+static int print_version(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	printf("%d.%d.%d-%s\n", VERSION_MAJOR, VERSION_MINOR, VERSION_MICRO, VERSION_TAG);
+
+	return 0;
+}
+
+static Command commands[] = {
+	{
+		.name = "version",
+		.desc = "Print the kernel version.",
+		.func = print_version
+	},
+};
 
 static void context_switch() {
 	// Set exception handlers
@@ -285,6 +302,9 @@ void main() {
 	malloc_init();
 
 	shared_init();
+
+	rtc_init();
+
 	mp_sync();	// Barrier #1
 	if(apic_id == 0) {
 		printf("\nPacketNgin ver 2.0.\n");
@@ -421,6 +441,8 @@ void main() {
 // 	        while(exec("/boot/init.psh") > 0)
 // 	                event_loop();
 // 	}
+
+	cmd_register(commands, sizeof(commands) / sizeof(commands[0]));
 
 	while(1) {
 		event_loop();
