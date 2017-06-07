@@ -29,13 +29,13 @@ typedef struct {
 	char*	(*get_later)();		///< Get later executed command
 } CommandHistory;
 
-extern Command		commands[];
+//extern Command	commands[]; // obsoleted
 extern CommandHistory	cmd_history;
 extern char		cmd_result[];
 
 extern void cmd_init();
-extern bool cmd_register(Command* c);
-extern void cmd_unregister(Command* c);
+extern bool cmd_register(Command* commands, size_t length);
+extern void cmd_unregister(Command* command);
 extern int cmd_help(int argc, char** argv, void(*callback)(char* result, int exit_status));
 extern int cmd_exec(char* line, void(*callback)(char* result, int exit_status));
 extern void cmd_update_var(char* result, int exit_status);

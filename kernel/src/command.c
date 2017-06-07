@@ -230,16 +230,6 @@ static int cmd_echo(int argc, char** argv, void(*callback)(char* result, int exi
 	return 0;
 }
 
-static int cmd_sleep(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
-	uint32_t time = 1;
-	if(argc >= 2 && is_uint32(argv[1])) {
-		time = parse_uint32(argv[1]);
-	}
-	timer_mwait(time);
-
-	return 0;
-}
-
 static char* months[] = {
 	"???",
 	"Jan",
@@ -537,31 +527,27 @@ static int cmd_nic(int argc, char** argv, void(*callback)(char* result, int exit
 }
 
 static int cmd_vnic(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
-	if(argc == 1) {
-		for(int i = 0; i < NIC_MAX_COUNT; i++) {
-			VNIC* vnic = manager.vnics[i];	// gmalloc, ni_create
-			if(!vnic)
-				continue;
+	for(int i = 0; i < NIC_MAX_COUNT; i++) {
+		VNIC* vnic = manager.vnics[i];	// gmalloc, ni_create
+		if(!vnic)
+			continue;
 
-			print_vnic(vnic, 0, i);
+		print_vnic(vnic, 0, i);
+	}
+
+	extern Map* vms;
+	MapIterator iter;
+	map_iterator_init(&iter, vms);
+	while(map_iterator_has_next(&iter)) {
+		MapEntry* entry = map_iterator_next(&iter);
+		uint16_t vmid = (uint16_t)(uint64_t)entry->key;
+		VM* vm = entry->data;
+
+		for(int i = 0; i < vm->nic_count; i++) {
+			VNIC* vnic = vm->nics[i];
+			print_vnic(vnic, vmid, i);
 		}
-
-		extern Map* vms;
-		MapIterator iter;
-		map_iterator_init(&iter, vms);
-		while(map_iterator_has_next(&iter)) {
-			MapEntry* entry = map_iterator_next(&iter);
-			uint16_t vmid = (uint16_t)(uint64_t)entry->key;
-			VM* vm = entry->data;
-
-			for(int i = 0; i < vm->nic_count; i++) {
-				VNIC* vnic = vm->nics[i];
-				print_vnic(vnic, vmid, i);
-			}
-			printf("\n");
-		}
-
-		return 0;
+		printf("\n");
 	}
 
 	return 0;
@@ -725,9 +711,8 @@ static int cmd_version(int argc, char** argv, void(*callback)(char* result, int 
 }
 
 static int cmd_turbo(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
-	if(argc > 2) {
+	if(argc != 1 && argc != 2)
 		return CMD_STATUS_WRONG_NUMBER;
-	}
 
 	uint64_t perf_status = msr_read(MSR_IA32_PERF_STATUS);
 	perf_status = ((perf_status & 0xff00) >> 8);
@@ -858,23 +843,18 @@ static int cmd_arping(int argc, char** argv, void(*callback)(char* result, int e
 }
 
 static int cmd_md5(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
-	if(argc < 3) {
+	if(argc < 2)
 		return CMD_STATUS_WRONG_NUMBER;
-	}
-
-	if(!is_uint32(argv[1])) {
+	if(!is_uint32(argv[1]))
 		return -1;
-	}
-
-	if(!is_uint64(argv[2])) {
+	if(argc == 3 && !is_uint64(argv[2]))
 		return -2;
-	}
 
 	uint32_t vmid = parse_uint32(argv[1]);
-	uint64_t size = parse_uint64(argv[2]);
+	uint64_t size = argc == 3 ? parse_uint64(argv[2]) : vm_get(vmid)->used_size;
 	uint32_t md5sum[4];
-	bool ret = vm_storage_md5(vmid, size, md5sum);
 
+	bool ret = vm_storage_md5(vmid, size, md5sum);
 	if(!ret) {
 		sprintf(cmd_result, "(nil)");
 		printf("Cannot md5 checksum\n");
@@ -1277,10 +1257,6 @@ static int cmd_stdio(int argc, char** argv, void(*callback)(char* result, int ex
 		printf("Argument is not enough\n");
 		return -1;
 	}
-
-	uint32_t id;
-	uint8_t thread_id;
-
 	if(!is_uint32(argv[1])) {
 		printf("VM ID is wrong\n");
 		return -1;
@@ -1290,12 +1266,11 @@ static int cmd_stdio(int argc, char** argv, void(*callback)(char* result, int ex
 		return -2;
 	}
 
-	id = parse_uint32(argv[1]);
-	thread_id = parse_uint8(argv[2]);
-
+	uint32_t vmid =  parse_uint32(argv[1]);
+	uint8_t thread_id = parse_uint8(argv[2]);
 	for(int i = 3; i < argc; i++) {
 		printf("%s\n", argv[i]);
-		ssize_t len = vm_stdio(id, thread_id, 0, argv[i], strlen(argv[i]) + 1);
+		ssize_t len = vm_stdio(vmid, thread_id, 0, argv[i], strlen(argv[i]) + 1);
 		if(!len) {
 			printf("stdio fail\n");
 			return -i;
@@ -1393,8 +1368,10 @@ Command commands[] = {
 	},
 	{
 		.name = "turbo",
-		.desc = "Turbo Boost Enable/Disable",
-		.args = "[on/off]",
+		.desc = "Manage Turbo Boost.\n"
+			"If the switch argument is not given, the turbo boost status is printed.\n"
+			"otherwise, turbo boost will be enabled/disabled.",
+		.args = "[switch: str{on|off}]",
 		.func = cmd_turbo
 	},
 	{
@@ -1409,12 +1386,6 @@ Command commands[] = {
 		.func = cmd_echo
 	},
 	{
-		.name = "sleep",
-		.desc = "Sleep n seconds",
-		.args = "[n: uint32]",
-		.func = cmd_sleep
-	},
-	{
 		.name = "date",
 		.desc = "Print current date and time.",
 		.func = cmd_date
@@ -1426,7 +1397,7 @@ Command commands[] = {
 	},
 	{
 		.name = "nic",
-		.desc = "List, up, down, manager of network interface ",
+		.desc = "Print a list of network interface",
 		.func = cmd_nic
 	},
 	{
@@ -1442,7 +1413,8 @@ Command commands[] = {
 	{
 		.name = "vlan",
 		.desc = "Add or remove vlan",
-		.args = "[device name][vid]",
+		.args = "add nicdev_name vlan_id:u16\n"
+			"remove device_name",
 		.func = cmd_vlan
 	},
 	{
@@ -1456,92 +1428,88 @@ Command commands[] = {
 		.func = cmd_shutdown
 	},
 	{
-		.name = "halt",
-		.desc = "Shutdown the node.",
-		.func = cmd_shutdown
-	},
-	{
 		.name = "arping",
 		.desc = "ARP ping to the host.",
-		.args = "(address) [\"-c\" (count)]",
+		.args = "address \"-I\" nic_name [\"-c\" count:u32]",
 		.func = cmd_arping
 	},
 	{
 		.name = "create",
 		.desc = "Create VM",
-		.args = "vmid: uint32, core: (number: int) memory: (size: uint32) storage: (size: uint32) [nic: mac: (addr: uint64) ibuf: (size: uint32) obuf: (size: uint32) iband: (size: uint64) oband: (size: uint64) pool: (size: uint32)]* [args: [string]+ ]",
+		.args = "[-c core_count:u8] [-m memory_size:u32] [-s storage_size:u32] "
+			"[-n [mac:u64],[dev:str],[ibuf:u32],[obuf:u32],[iband:u64],[oband:u64],[hpad:u16],[tpad:u16],[pool:u32] ] "
+			"[-a args:str] -> vmid ",
 		.func = cmd_create
 	},
 	{
 		.name = "destroy",
 		.desc = "Destroy VM",
-		.args = "result: bool, vmid: uint32",
+		.args = "vmid:u32 -> bool",
 		.func = cmd_vm_destroy
 	},
 	{
 		.name = "list",
-		.desc = "List VM",
-		.args = "result: uint64[]",
+		.desc = "Print a list of VM IDs",
+		.args = " -> u64[]",
 		.func = cmd_vm_list
 	},
 	{
 		.name = "upload",
 		.desc = "Upload file",
-		.args = "result: bool, vmid: uint32 path: string",
+		.args = "vmid:u32 path:str -> bool",
 		.func = cmd_upload
 	},
 	{
 		.name = "md5",
 		.desc = "MD5 storage",
-		.args = "result: hex16 string, vmid: uint32 size: uint64",
+		.args = "vmid:u32 [size:u64] -> str",
 		.func = cmd_md5
 	},
 	{
 		.name = "start",
 		.desc = "Start VM",
-		.args = "result: bool, vmid: uint32",
+		.args = "vmid:u32 -> bool",
 		.func = cmd_status_set
 	},
 	{
 		.name = "pause",
 		.desc = "Pause VM",
-		.args = "result: bool, vmid: uint32",
+		.args = "vmid:u32 -> bool",
 		.func = cmd_status_set
 	},
 	{
 		.name = "resume",
 		.desc = "Resume VM",
-		.args = "result: bool, vmid: uint32",
+		.args = "vmid:u32 -> bool",
 		.func = cmd_status_set
 	},
 	{
 		.name = "stop",
 		.desc = "Stop VM",
-		.args = "result: bool, vmid: uint32",
+		.args = "vmid:u32 -> bool",
 		.func = cmd_status_set
 	},
 	{
 		.name = "status",
 		.desc = "Get VM's status",
-		.args = "result: string(\"start\", \"pause\", or \"stop\") vmid: uint32",
+		.args = "vmid:u32 -> str{start|pause|stop|invalid}",
 		.func = cmd_status_get
 	},
 	{
 		.name = "stdin",
 		.desc = "Write stdin to vm",
-		.args = "result: bool, vmid: uint32 thread_id: uint8 msg: string",
+		.args = "vmid:u32 thread_id:u8 msg:str -> bool",
 		.func = cmd_stdio
 	},
 	{
 		.name = "mount",
 		.desc = "Mount file system",
-		.args = "result: bool, [\"-t\" (type)] device: string dir: string",
+		.args = "-t fs_type:str{bfs|ext2|fat} device:str path:str -> bool",
 		.func = cmd_mount
 	},
 	{
 		.name = "dump",
 		.desc = "Packet dump",
-		.args = "TODO",
 		.func = cmd_dump
 	},
 	{
