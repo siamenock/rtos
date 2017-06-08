@@ -6,14 +6,15 @@ CFLAGS = -O2
 all: libvnic.a
 
 CC=gcc
-CFLAGS=-I include -O2 -Wall -std=c99
+CFLAGS=-I include -O2 -Wall -mcmodel=large -fno-stack-protector -fno-common
 
-SRCS=lock.c vnic.c asm.asm
+SRCS=lock.c vnic.c nic.c asm.asm
 OBJS=$(addsuffix .o, $(addprefix obj/, $(basename $(SRCS))))
 TESTS=$(addsuffix _test.o, $(addprefix obj/, $(basename $(SRCS))))
 
 libvnic.a: $(OBJS)
 	ar rcv $@ $^
+	cp $@ ../
 
 obj/asm.o: src/asm.asm
 	-mkdir -p obj

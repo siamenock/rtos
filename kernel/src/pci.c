@@ -17,7 +17,7 @@
 #define MMIO(bus, slot, function, reg)		(((uint64_t)bus << 20) | ((uint64_t)slot << 15) | ((uint64_t)function << 12) | ((uint64_t)reg))
 #define PORTIO(bus, slot, function, reg)	((1 << 31) | (bus << 16) | (slot << 11) | (function << 8) | (reg & 0xfc))
 
-#define PCI_DUMP		0
+#define PCI_DUMP		1
 
 void* pci_mmio[PCI_MAX_BUS];
 
@@ -158,8 +158,8 @@ int pci_get_entrys(PCI_Bus_Entry* bus_entry) {
 				uint16_t function_count = bus_entry[bus_count].slot_entry[slot_count].function_count;
 				slot_has_function = true;
 
-				uint16_t device_id = _pci_read16(bus, slot, function, PCI_DEVICE_ID, false);
-				uint8_t header_type = _pci_read8(bus, slot, function, PCI_HEADER_TYPE, false);
+// 				uint16_t device_id = _pci_read16(bus, slot, function, PCI_DEVICE_ID, false);
+// 				uint8_t header_type = _pci_read8(bus, slot, function, PCI_HEADER_TYPE, false);
 
 				
 				bus_entry[bus_count].slot_entry[slot_count].function_entry[function_count].function = function;

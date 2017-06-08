@@ -2,7 +2,6 @@ How to Build PacketNgin RTOS
 ============================
 This document describes required packages and steps to build PacketNgin RTOS.
 
-
 Requirements 
 ------------
 You need to install these packages below first. Theses packages are based on 

@@ -115,6 +115,7 @@ struct _RPC {
 // Client side APIs
 #ifdef LINUX
 RPC* rpc_open(const char* host, int port, int timeout);
+void rpc_close(RPC* rpc);
 RPC* rpc_listen(int port);
 RPC* rpc_accept(RPC* rpc);
 bool rpc_is_closed(RPC* rpc);

@@ -1,19 +1,25 @@
 #include "asm.h"
 #include "mp.h"
+#include "mmap.h"
 
 #include "gdt.h"
 
 void gdt_init() {
 	// GDTWR
 	// 1MB ~ +264KB : Page table
-	GDTR* gdtr = (GDTR*)GDTR_ADDR;
+	// NOTE: Although kernel load GDTR reigster by virutal address,
+	//	 we must access GDTR physically to write here.
+	GDTR* gdtr = (GDTR*)VIRTUAL_TO_PHYSICAL(GDTR_ADDR);
 	GDTR_INIT(*gdtr);
-	gdtr->limit = GDT_END_ADDR - GDT_ADDR - 1; 	// null, Kernel code segment, kernel data segment, task segment
-	gdtr->base = GDT_ADDR;
+	// Null, Kernel code segment, Kernel data segment, Task segment
+	gdtr->limit = GDT_END_ADDR - GDT_ADDR - 1; 	
+	gdtr->base = (uint64_t)GDT_ADDR;
 	
 	// Segments
 	int i = 0;
-	SD8* sd8 = (SD8*)GDT_ADDR;
+	// NOTE: Although kernel load GDT by virutal address,
+	//	 we must access GDT physically to write here.
+	SD8* sd8 = (SD8*)VIRTUAL_TO_PHYSICAL(GDT_ADDR);
 	SD8_INIT(sd8[i]);		// null segment
 	i++;
 	
@@ -64,7 +70,7 @@ void gdt_init() {
 	SD16* sd16 = (SD16*)&sd8[i];
 	for(int j = 0; j < MP_MAX_CORE_COUNT; j++) {	// 16 cores
 		SD16_INIT(sd16[j]);			// TSS segment
-		SD16_BASE(sd16[j], TSS_ADDR + j * sizeof(TSS));		// 1MB + sizeof(GDT)
+		SD16_BASE(sd16[j], (uint64_t)TSS_ADDR + j * sizeof(TSS));		// 1MB + sizeof(GDT)
 		SD16_LIMIT(sd16[j], sizeof(TSS) - 1);	// 104 bytes
 		sd16[j].type = 0x09;			// 1001 = Code, Execute-Only, accessed
 		sd16[j].dpl = 0;
@@ -74,16 +80,18 @@ void gdt_init() {
 }
 
 void gdt_load() {
-	GDTR* gdtr = (GDTR*)GDTR_ADDR;
+	GDTR* gdtr = (GDTR*)VIRTUAL_TO_PHYSICAL(GDTR_ADDR);
 	lgdt(gdtr);
 }
 
 void tss_init() {
-	TSS* tss = (TSS*)TSS_ADDR;
+	// NOTE: Although kernel load TSS reigster by virutal address,
+	//	 we must access TSS physically to write here.
+	TSS* tss = (TSS*)VIRTUAL_TO_PHYSICAL(TSS_ADDR);
 	for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
 		TSS_INIT(tss[i]);
-		tss[i].ist[0] = PHYSICAL_TO_VIRTUAL(0x600000 - 0x50000); // Kernel interrupt stack
-		tss[i].ist[1] = PHYSICAL_TO_VIRTUAL(0x600000 - 0x58000); // User interrupt stack
+		tss[i].ist[0] = (uint64_t)KERNEL_INTR_STACK_END; // Kernel interrupt stack
+		tss[i].ist[1] = (uint64_t)USER_INTR_STACK_END; // User interrupt stack
 		tss[i].io_map = 0xffff;	// Not using I/O map
 	}
 }

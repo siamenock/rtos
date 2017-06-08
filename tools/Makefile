@@ -1,16 +1,12 @@
 .PHONY: all clean
 
-all: pnkc/pnkc smap/smap
+all: pnkc/pnkc smap/smap #console/console 
 
 pnkc/pnkc:
 	make -C pnkc
 
 smap/smap:
 	make -C smap
-
-# TODO: compile only at config=linux
-console:
-	make -C console
 
 umpn:
 	make -C umpn

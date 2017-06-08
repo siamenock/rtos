@@ -12,7 +12,7 @@
 	+315K?	: kernel.bin (grub module)
 	+1M	: initrd.img (grub module)
 
-2MB		: Kernel text area
+4MB		: Kernel text area
 	+256KB?	: Kernel (PNKC, .text)
 	+25KB?	: Kernel (.rodata)
 	+32KB?	: Kernel.smap (8 bytes aligned)
@@ -32,7 +32,7 @@ e.g.	-1MB -> 0xffffffff80100000
 
 -0MB ~ -1MB	: BIOS area, mapped to 0MB ~ 1MB
 
--1MB ~ -2MB	: Description table area, mapped to 1MB ~ 2MB
+-2MB ~ -3MB	: Description table area, mapped to 2MB ~ 3MB
 		: GDT (1976B)
 	16B	: GDTR
 	40B	: Segment Descriptor
@@ -47,23 +47,23 @@ e.g.	-1MB -> 0xffffffff80100000
 	
 	nB?	: Shared
 
--2MB ~ -4MB	: Kernel text area, mapped to 2MB ~ 4MB
+-4MB ~ -6MB	: Kernel text area, mapped to 4MB ~ 6MB
 	+256KB?	: Kernel (PNKC, .text)
 	+25KB?	: Kernel (.rodata)
 	+32KB?	: Kernel.smap (8 bytes aligned)
 	+2KB?	: multiboot2 tags (8 bytes aligned)
 	+n?	: modules (8 bytes aligned)
 
--4MB + -2MB * apicid: Kernel data area, mappped to 4MB + 2MB * apicid + +2MB
+-6MB + -2MB * apicid: Kernel data area, mappped to 6MB + 2MB * apicid + +2MB
 	+200KB?	: Kernel (.data, .bss)
-	...	: Local malloc
 	64KB	: VGA buffer
 	32KB	: User interrupt stack
 	32KB	: Kernel interrupt stack
 	64KB	: Kernel stack
 	256KB	: TLB
+	...	: Local malloc
 
--4MB + -2MB * 16: Initial RAM disk area, mapped to 36MB ~ +sizeof initrd.img
+-6MB + -2MB * 16: Initial RAM disk area, mapped to 38MB ~ +sizeof initrd.img
 
 extras		: Block malloc (including not unused kernel data area)
 		  Global malloc includes fragments from BIOS, Description table, 

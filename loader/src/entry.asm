@@ -1,8 +1,10 @@
 ; Ref: http://os.phil-opp.com/
 ; Ref: http://download-mirror.savannah.gnu.org/releases/grub/phcoder/multiboot.pdf
 
-%define STACK_SIZE	256
-%define CORE_COUNT	16
+%define	GDTR		    0x$GDTR$	        ; gdtr - 0x10000
+%define PROTECTEDMODE	0x$PROTECTMODE$		; protectedmode
+%define STACK_SIZE	    256
+%define CORE_COUNT	    16
 
 global start
 global gdtr
@@ -105,9 +107,9 @@ next:
 	push	eax
 	extern	main
 	call	main
-
-	jmp	0x08:0x200000   ; Jump to kernel64
-
+	
+	jmp	0x08:0x400000   ; Jump to kernel64
+	
 .loop:
 	hlt
 	jmp .loop
@@ -133,10 +135,12 @@ align 8, db 0
 
 	dw	0x0000			; padding for GDTR
 
+align 8
 gdtr:
 	dw	gdtend - gdt - 1	; GDT size
-	dd	gdt ; GDT address
+	dd	gdt; GDT address
 
+align 8
 gdt:
 	; null descriptor
 	dw	0x0000

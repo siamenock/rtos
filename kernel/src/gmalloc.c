@@ -1,145 +1,94 @@
 #include <stdio.h>
-#include <string.h>
-#include <util/list.h>
+#include <stdint.h>
 #include <tlsf.h>
-#include <malloc.h>
-#include <_malloc.h>
-#include "malloc.h"
-#include "idt.h"
-#include "pnkc.h"
-#include "mp.h"
-#include "shared.h"
-#include "multiboot2.h"
+#include "mmap.h"
 #include "gmalloc.h"
-
-void* gmalloc_pool;
+#include "shared.h"
+#include <util/list.h>
+#include <malloc.h>
+#include "smap.h"
+#include "idt.h"
+#include "e820.h"
+#include "pnkc.h"
 
 uint32_t bmalloc_count;
-uint64_t* bmalloc_pool;
 
-static struct multiboot_tag_mmap* find_mmap() {
-	PNKC* pnkc = (PNKC*)(0x200200 - sizeof(PNKC));
-	uintptr_t addr = 0x200000 + (((uintptr_t)pnkc->smap_offset + (uintptr_t)pnkc->smap_size + 7) & ~7);
-	uintptr_t end = addr + *(uint32_t*)addr;
-	addr += 8;
+typedef struct _BmallocPool {
+	bool		used;
+	bool		head;
+	int		count;
+	uint64_t	pool;
+} BmallocPool;
 
-	while(addr < end) {
-		struct multiboot_tag* tag = (struct multiboot_tag*)addr;
-		switch(tag->type) {
-			case MULTIBOOT_TAG_TYPE_END:
-				return NULL;
-			case MULTIBOOT_TAG_TYPE_CMDLINE:
-			case MULTIBOOT_TAG_TYPE_BOOT_LOADER_NAME:
-			case MULTIBOOT_TAG_TYPE_MODULE:
-			case MULTIBOOT_TAG_TYPE_BASIC_MEMINFO:
-			case MULTIBOOT_TAG_TYPE_BOOTDEV:
-				break;
-			case MULTIBOOT_TAG_TYPE_MMAP:
-				return (struct multiboot_tag_mmap*)tag;
-			case MULTIBOOT_TAG_TYPE_VBE:
-			case MULTIBOOT_TAG_TYPE_FRAMEBUFFER:
-			case MULTIBOOT_TAG_TYPE_ELF_SECTIONS:
-			case MULTIBOOT_TAG_TYPE_APM:
-			case MULTIBOOT_TAG_TYPE_EFI32:
-			case MULTIBOOT_TAG_TYPE_EFI64:
-			case MULTIBOOT_TAG_TYPE_SMBIOS:
-			case MULTIBOOT_TAG_TYPE_ACPI_OLD:
-			case MULTIBOOT_TAG_TYPE_ACPI_NEW:
-			case MULTIBOOT_TAG_TYPE_NETWORK:
-			case MULTIBOOT_TAG_TYPE_EFI_MMAP:
-			case MULTIBOOT_TAG_TYPE_EFI_BS:
-				break;
-		}
+BmallocPool* bmalloc_pool;
+void* gmalloc_pool;
 
-		addr = (addr + tag->size + 7) & ~7;
-	}
-	return NULL;
-}
-
-void gmalloc_init(uintptr_t ramdisk_addr, uint32_t ramdisk_size) {
+void gmalloc_init() {
+	/* Gmalloc pool area : IDT_END_ADDR */
 	uint64_t start = VIRTUAL_TO_PHYSICAL(IDT_END_ADDR);
-	uint64_t end = VIRTUAL_TO_PHYSICAL((uint64_t)shared);
+	uint64_t end = VIRTUAL_TO_PHYSICAL(DESC_TABLE_AREA_END);
 
 	init_memory_pool(end - start, (void*)start, 0);
 
 	gmalloc_pool = (void*)start;
 
-	// Reserved memory blocks
-	typedef struct {
-		uintptr_t start;
-		uintptr_t end;
-	} Block;
-
-	Block reserved[4 + MP_MAX_CORE_COUNT];
+	// TODO: Check array size
+	Block reserved[3 + MP_MAX_CORE_COUNT + 1 + 1];
 	int reserved_count = 0;
-	reserved[reserved_count].start = 0x00;		// IVT & BDA
-	reserved[reserved_count].end = 0x4ff;
+
+	reserved[reserved_count].start = VIRTUAL_TO_PHYSICAL(BIOS_AREA_START);
+	reserved[reserved_count].end = VIRTUAL_TO_PHYSICAL(BIOS_AREA_END);
 	reserved_count++;
 
-	reserved[reserved_count].start = 0x100000;	// Description table
-	reserved[reserved_count].end = 0x200000;
+	reserved[reserved_count].start = VIRTUAL_TO_PHYSICAL(DESC_TABLE_AREA_START);
+	reserved[reserved_count].end = VIRTUAL_TO_PHYSICAL(DESC_TABLE_AREA_END);
 	reserved_count++;
 
-	reserved[reserved_count].start = 0x200000;	// Kernel global
-	reserved[reserved_count].end = 0x400000;
+	reserved[reserved_count].start = VIRTUAL_TO_PHYSICAL(KERNEL_TEXT_AREA_START);
+	reserved[reserved_count].end = VIRTUAL_TO_PHYSICAL(KERNEL_TEXT_AREA_END);
 	reserved_count++;
 
-	reserved[reserved_count].start = ramdisk_addr;	// RAM disk
-	reserved[reserved_count].end = ramdisk_addr + ramdisk_size;
-	reserved_count++;
-
-	uint8_t* core_map = mp_core_map();
+	printf("\tReserved AP Space\n");
+	uint8_t* core_map = mp_processor_map();
 	for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
-		if(core_map[i] == MP_CORE_INVALID)
-			continue;
+ 		if(core_map[i] == MP_CORE_INVALID)
+ 			continue;
 
-		reserved[reserved_count].start = 0x400000 + 0x200000 * i;
-		reserved[reserved_count].end = 0x400000 + 0x200000 * (i + 1);
+		reserved[reserved_count].start = VIRTUAL_TO_PHYSICAL(KERNEL_DATA_AREA_START)
+			+ KERNEL_DATA_AREA_SIZE * i;
+		reserved[reserved_count].end = VIRTUAL_TO_PHYSICAL(KERNEL_DATA_AREA_START)
+			+ KERNEL_DATA_AREA_SIZE * (i + 1);
 		reserved_count++;
 	}
 
-	// Find mmap infomation structure
-	struct multiboot_tag_mmap* mmap = find_mmap();
-	if(!mmap) {
-		printf("MMAP information not found!\n");
-		while(1) asm("hlt");
-	}
+	//TODO fix here
+	//Multi Kernel don't use pnkc
+ 	PNKC* pnkc = (PNKC*)(0x200000 - sizeof(PNKC));
+ 	reserved[reserved_count].start = (uint64_t)pnkc;
+ 	reserved[reserved_count].end = (uint64_t)pnkc + sizeof(PNKC);
+ 	reserved_count++;
 
-	int count = (mmap->size - 8) / mmap->entry_size;
+	//FIXME
+	reserved[reserved_count].start = VIRTUAL_TO_PHYSICAL(RAMDISK_START);
+	reserved[reserved_count].end = VIRTUAL_TO_PHYSICAL(RAMDISK_START + (pnkc->initrd_end - pnkc->initrd_start));
+	reserved_count++;
 
-	// Print MMAP information and find available blocks
-	List* blocks = list_create(NULL);
-	printf("System memory map\n");
-	for(int i = 0; i < count; i++) {
-		struct multiboot_mmap_entry* entry = &mmap->entries[i];
-		char* type;
-		switch(entry->type) {
-			case MULTIBOOT_MEMORY_AVAILABLE:
-				type = "Memory";
-				Block* block = malloc(sizeof(Block));
-				block->start = entry->addr;
-				block->end = entry->addr + entry->len;
-				list_add(blocks, block);
-				break;
-			case MULTIBOOT_MEMORY_RESERVED:
-				type = "Reserved";
-				break;
-			case MULTIBOOT_MEMORY_ACPI_RECLAIMABLE:
-				type = "ACPI";
-				break;
-			case MULTIBOOT_MEMORY_NVS:
-				type = "NVS";
-				break;
-			case MULTIBOOT_MEMORY_BADRAM:
-				type = "Disabled";
-				break;
-			default:
-				type = "Unknown";
+	// Relocate to physical to determine physical memory map
+	void relocate(Block* blocks, int count) {
+		for(int i = 0; i < count; i++) {
+			Block* r = &reserved[i];
+			r->start += PHYSICAL_OFFSET;
+			r->end += PHYSICAL_OFFSET;
 		}
+	}
+	relocate(reserved, reserved_count);
 
-		printf("\t0x%016lx - 0x%016lx: %s(%d)\n", entry->addr, entry->addr + entry->len, type, entry->type);
+	for(int i = 0; i < reserved_count; i++) {
+		Block* r = &reserved[i];
+		printf("\t\tReserved[%02d] : %p ~ %p\n", i, r->start, r->end);
 	}
 
+	List* blocks = e820_get_mem_blocks();
 	// Remove reserved blocks
 	for(size_t i = 0; i < list_size(blocks); i++) {
 		Block* b = list_get(blocks, i);
@@ -168,24 +117,32 @@ void gmalloc_init(uintptr_t ramdisk_addr, uint32_t ramdisk_size) {
 		}
 	}
 
-	// Extend gmalloc pool
+	printf("\tExtend gmalloc pool\n");
 	ListIterator iter;
 	list_iterator_init(&iter, blocks);
 	while(list_iterator_has_next(&iter)) {
 		Block* b = list_iterator_next(&iter);
+
+		// Relocate to virtual to acually set malloc pool
+		b->start -= PHYSICAL_OFFSET;
+		b->end -= PHYSICAL_OFFSET;
+
 		uintptr_t start = (b->start + 0x200000 - 1) & ~((uintptr_t)0x200000 - 1);
 		uintptr_t end = b->end & ~((uintptr_t)0x200000 - 1);
 
 		if(start >= end) {
+			printf("\t\t0x%016lx - 0x%016lx\n", b->start, b->end - b->start);
 			add_new_area((void*)b->start, b->end - b->start, gmalloc_pool);
 			b->start = b->end = 0;
 		} else {
 			if(start > b->start) {
+				printf("\t\t0x%016lx - 0x%016lx\n", b->start, start - b->start);
 				add_new_area((void*)b->start, start - b->start, gmalloc_pool);
 				b->start = start;
 			}
 
 			if(end < b->end) {
+				printf("\t\t0x%016lx - 0x%016lx\n", end, b->end - end);
 				add_new_area((void*)end, b->end - end, gmalloc_pool);
 				b->end = end;
 			}
@@ -199,7 +156,7 @@ void gmalloc_init(uintptr_t ramdisk_addr, uint32_t ramdisk_size) {
 		}
 	}
 
-	// extend bmalloc pool
+	printf("\tExtend bmallc pool\n");
 	Block* pop() {
 		uintptr_t last_start = UINTPTR_MAX;
 		int last_index = -1;
@@ -222,15 +179,16 @@ void gmalloc_init(uintptr_t ramdisk_addr, uint32_t ramdisk_size) {
 			return NULL;
 	}
 
-	bmalloc_pool = malloc(sizeof(uint64_t) * bmalloc_count);
+	bmalloc_pool = malloc(sizeof(BmallocPool) * bmalloc_count);
 	uint32_t bmalloc_index = 0;
 	Block* block = pop();
 	while(block) {
 		uintptr_t start = block->start;
 		uintptr_t end = block->end;
+		printf("\t\t0x%016lx - 0x%016lx\n", start, end);
 
 		while(start < end) {
-			bmalloc_pool[bmalloc_index++] = start;
+			bmalloc_pool[bmalloc_index++].pool = start;
 			start += 0x200000;
 		}
 
@@ -247,8 +205,7 @@ void gmalloc_init(uintptr_t ramdisk_addr, uint32_t ramdisk_size) {
 		printf("%s: %d.%dMB ", message, mb, kb);
 	}
 
-	printf("Memory pool: ");
-	print_pool("local", malloc_total());
+	printf("\tMemory pool: ");
 	print_pool("global", gmalloc_total());
 	print_pool("block", bmalloc_total());
 	printf("\n");
@@ -265,16 +222,15 @@ inline size_t gmalloc_used() {
 inline void* gmalloc(size_t size) {
 	do {
 		void* ptr = malloc_ex(size, gmalloc_pool);
-		if(ptr)
+		if(ptr) {
 			return ptr;
-
-		// TODO: print to stderr
-		printf("WARN: Not enough global memory!!!\n");
+		}
 
 		void* block = bmalloc(1);
 		if(!block) {
 			// TODO: print to stderr
 			printf("ERROR: Not enough block memory!!!\n");
+			while(1);
 			return NULL;
 		}
 
@@ -294,28 +250,53 @@ inline void* gcalloc(uint32_t nmemb, size_t size) {
 	return calloc_ex(nmemb, size, gmalloc_pool);
 }
 
+static inline bool is_linear(BmallocPool* bmalloc_pool, int count) {
+	for(int i = 0; i < count; i++)
+		if(bmalloc_pool[i].used)
+			return false;
+
+	return true;
+}
+
+static inline void set_used(BmallocPool* bmalloc_pool, int count) {
+	bmalloc_pool[0].head = true;
+	bmalloc_pool[0].count = count;
+
+	for(int i = 0; i < count; i++)
+		bmalloc_pool[i].used = true;
+}
+
+static inline void clear_used(BmallocPool* bmalloc_pool) {
+	for(int i = 0; i < bmalloc_pool[0].count; i++)
+		bmalloc_pool[i].used = false;
+
+	bmalloc_pool[0].head = false;
+	bmalloc_pool[0].count = 0;
+}
+
 void* bmalloc(int count) {
 	for(size_t i = 0; i < bmalloc_count; i++) {
-		if(!(bmalloc_pool[i] & 0x01)) {
-			void* ptr = (void*)bmalloc_pool[i];
-			bmalloc_pool[i] |= 0x01;
-			return ptr;
+		if(!bmalloc_pool[i].used) {
+			if(is_linear(&bmalloc_pool[i], count)) {
+				set_used(&bmalloc_pool[i], count);
+				return (void*)bmalloc_pool[i].pool;
+			}
+
+			i += count;
 		}
 	}
 
-	// TODO: print to stderr
 	printf("Not enough block memory!!!");
+	while(1);
 
 	return NULL;
 }
 
 void bfree(void* ptr) {
-	uint64_t addr = (uint64_t)ptr;
-	addr &= 0x01;
-
 	for(size_t i = 0; i < bmalloc_count; i++) {
-		if(bmalloc_pool[i] == addr) {
-			bmalloc_pool[i] ^= 0x01;
+		if((void*)bmalloc_pool[i].pool == ptr) {
+			if(bmalloc_pool[i].head)
+				clear_used(&bmalloc_pool[i]);
 			break;
 		}
 	}
@@ -328,7 +309,7 @@ size_t bmalloc_total() {
 size_t bmalloc_used() {
 	size_t size = 0;
 	for(size_t i = 0; i < bmalloc_count; i++) {
-		if(bmalloc_pool[i] & 0x01) {
+		if(bmalloc_pool[i].used) {
 			size += 0x200000;
 		}
 	}

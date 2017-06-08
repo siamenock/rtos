@@ -1,6 +1,7 @@
 #include <string.h>
 #include <strings.h>
 #include <malloc.h>
+#include <fcntl.h>
 #include "control/rpc.h"
 
 struct {
@@ -218,7 +219,6 @@ static int write_vm(RPC* rpc, VMSpec* vm) {
 	WRITE(write_uint16(rpc, vm->nic_count));
 	for(int i = 0; i < vm->nic_count; i++) {
 		WRITE(write_uint64(rpc, vm->nics[i].mac));
-		//WRITE(write_uint32(rpc, vm->nics[i].port));
 		WRITE(write_string(rpc, vm->nics[i].dev));
 		WRITE(write_uint32(rpc, vm->nics[i].input_buffer_size));
 		WRITE(write_uint32(rpc, vm->nics[i].output_buffer_size));
@@ -253,8 +253,8 @@ static int read_vm(RPC* rpc, VMSpec** vm2) {
 	if(!vm) {
 		return -10;
 	}
-	bzero(vm, sizeof(VMSpec));
-
+	memset(vm, 0x0, sizeof(VMSpec));
+	
 	void failed() {
 		if(vm)
 			vm_free(vm);
@@ -266,58 +266,66 @@ static int read_vm(RPC* rpc, VMSpec** vm2) {
 	READ2(read_uint32(rpc, &vm->storage_size), failed);
 	READ2(read_uint16(rpc, &vm->nic_count), failed);
 
-	vm->nics = malloc(vm->nic_count * sizeof(NICSpec));
-	if(!vm->nics) {
-		failed();
-		return -10;
-	}
-	for(int i = 0; i < vm->nic_count; i++) {
-		READ2(read_uint64(rpc, &vm->nics[i].mac), failed);
-		//READ2(read_uint32(rpc, &vm->nics[i].port), failed);
-		char* ch;
-		uint16_t len2;
-		READ2(read_string(rpc, &ch, &len2), failed);
-		vm->nics[i].dev = (char*)malloc(len2 + 1);
-		bzero(vm->nics[i].dev, len2 + 1);
-		memcpy(vm->nics[i].dev, ch, len2);
+	if(vm->nic_count) {
+		vm->nics = malloc(vm->nic_count * sizeof(NICSpec));
+		if(!vm->nics) {
+			failed();
+			return -10;
+		}
+		memset(vm->nics, 0, vm->nic_count * sizeof(NICSpec));
+		for(int i = 0; i < vm->nic_count; i++) {
+			READ2(read_uint64(rpc, &vm->nics[i].mac), failed);
+			char* ch;
+			uint16_t len2;
+			READ2(read_string(rpc, &ch, &len2), failed);
+			vm->nics[i].dev = (char*)malloc(len2 + 1);
+			if(!vm->nics[i].dev) {
+				failed();
+				return -10;
+			}
+			memset(vm->nics[i].dev, 0x0, len2 + 1);
+			memcpy(vm->nics[i].dev, ch, len2);
 
-		READ2(read_uint32(rpc, &vm->nics[i].input_buffer_size), failed);
-		READ2(read_uint32(rpc, &vm->nics[i].output_buffer_size), failed);
-		READ2(read_uint64(rpc, &vm->nics[i].input_bandwidth), failed);
-		READ2(read_uint64(rpc, &vm->nics[i].output_bandwidth), failed);
-		READ2(read_uint8(rpc, &vm->nics[i].padding_head), failed);
-		READ2(read_uint8(rpc, &vm->nics[i].padding_tail), failed);
-		READ2(read_uint32(rpc, &vm->nics[i].pool_size), failed);
+			READ2(read_uint32(rpc, &vm->nics[i].input_buffer_size), failed);
+			READ2(read_uint32(rpc, &vm->nics[i].output_buffer_size), failed);
+			READ2(read_uint64(rpc, &vm->nics[i].input_bandwidth), failed);
+			READ2(read_uint64(rpc, &vm->nics[i].output_bandwidth), failed);
+			READ2(read_uint8(rpc, &vm->nics[i].padding_head), failed);
+			READ2(read_uint8(rpc, &vm->nics[i].padding_tail), failed);
+			READ2(read_uint32(rpc, &vm->nics[i].pool_size), failed);
+		}
 	}
 
 	READ2(read_uint16(rpc, &vm->argc), failed);
 
-	int rbuf_read = rpc->rbuf_read;
-	int argv_size = sizeof(char**) * vm->argc;
-	for(int i = 0; i < vm->argc; i++) {
-		uint16_t len2;
-		READ2(read_string(rpc, NULL, &len2), failed);
+	if(vm->argc) {
+		int rbuf_read = rpc->rbuf_read;
+		int argv_size = sizeof(char**) * vm->argc;
+		for(int i = 0; i < vm->argc; i++) {
+			uint16_t len2;
+			READ2(read_string(rpc, NULL, &len2), failed);
 
-		argv_size += len2 + 1;
-	}
+			argv_size += len2 + 1;
+		}
 
-	vm->argv = malloc(argv_size);
-	if(!vm->argv) {
-		failed();
-		return -2;
-	}
-	bzero(vm->argv, argv_size);
-	char* str = (void*)vm->argv + sizeof(char**) * vm->argc;
+		vm->argv = malloc(argv_size);
+		if(!vm->argv) {
+			failed();
+			return -2;
+		}
+		memset(vm->argv, 0x0, argv_size);
+		char* str = (void*)vm->argv + sizeof(char**) * vm->argc;
 
-	rpc->rbuf_read = rbuf_read;
-	for(int i = 0; i < vm->argc; i++) {
-		char* ch;
-		uint16_t len2;
-		READ2(read_string(rpc, &ch, &len2), failed);
+		rpc->rbuf_read = rbuf_read;
+		for(int i = 0; i < vm->argc; i++) {
+			char* ch;
+			uint16_t len2;
+			READ2(read_string(rpc, &ch, &len2), failed);
 
-		vm->argv[i] = str;
-		memcpy(str, ch, len2);
-		str += len2 + 1;
+			vm->argv[i] = str;
+			memcpy(str, ch, len2);
+			str += len2 + 1;
+		}
 	}
 
 	*vm2 = vm;
@@ -432,13 +440,12 @@ void rpc_vm_create_handler(RPC* rpc, void(*handler)(RPC* rpc, VMSpec* vm, void* 
 	rpc->vm_create_handler_context = context;
 }
 
-
 static void vm_create_handler_callback(RPC* rpc, uint32_t id) {
 	INIT2();
-
+	
 	WRITE2(write_uint16(rpc, RPC_TYPE_VM_CREATE_RES));
 	WRITE2(write_uint32(rpc, id));
-
+	
 	RETURN2();
 }
 
@@ -447,7 +454,6 @@ static int vm_create_req_handler(RPC* rpc) {
 
 	VMSpec* vm;
 	READ(read_vm(rpc, &vm));
-
 	if(rpc->vm_create_handler) {
 		rpc->vm_create_handler(rpc, vm, rpc->vm_create_handler_context, vm_create_handler_callback);
 	} else {
@@ -498,10 +504,10 @@ void rpc_vm_get_handler(RPC* rpc, void(*handler)(RPC* rpc, uint32_t id, void* co
 
 static void vm_get_handler_callback(RPC* rpc, VMSpec* vm) {
 	INIT2();
-
+	
 	WRITE2(write_uint16(rpc, RPC_TYPE_VM_GET_RES));
 	WRITE2(write_vm(rpc, vm));
-
+	
 	RETURN2();
 }
 
@@ -510,7 +516,6 @@ static int vm_get_req_handler(RPC* rpc) {
 
 	uint32_t id;
 	READ(read_uint32(rpc, &id));
-
 	if(rpc->vm_get_handler) {
 		rpc->vm_get_handler(rpc, id, rpc->vm_get_handler_context, vm_get_handler_callback);
 	} else {
@@ -555,10 +560,10 @@ void rpc_vm_set_handler(RPC* rpc, void(*handler)(RPC* rpc, VMSpec* vm, void* con
 
 static void vm_set_handler_callback(RPC* rpc, bool result) {
 	INIT2();
-
+	
 	WRITE2(write_uint16(rpc, RPC_TYPE_VM_SET_RES));
 	WRITE2(write_bool(rpc, result));
-
+	
 	RETURN2();
 }
 
@@ -567,7 +572,6 @@ static int vm_set_req_handler(RPC* rpc) {
 
 	VMSpec* vm;
 	READ(read_vm(rpc, &vm));
-
 	if(rpc->vm_set_handler) {
 		rpc->vm_set_handler(rpc, vm, rpc->vm_set_handler_context, vm_set_handler_callback);
 	} else {
@@ -586,10 +590,10 @@ int rpc_vm_destroy(RPC* rpc, uint32_t id, bool(*callback)(bool result, void* con
 
 	WRITE(write_uint16(rpc, RPC_TYPE_VM_DELETE_REQ));
 	WRITE(write_uint32(rpc, id));
-
+	
 	rpc->vm_destroy_callback = callback;
 	rpc->vm_destroy_context = context;
-
+	
 	RETURN();
 }
 
@@ -598,7 +602,6 @@ static int vm_destroy_res_handler(RPC* rpc) {
 
 	bool result = false;
 	READ(read_bool(rpc, &result));
-
 	if(rpc->vm_destroy_callback && !rpc->vm_destroy_callback(result, rpc->vm_destroy_context)) {
 		rpc->vm_destroy_callback = NULL;
 		rpc->vm_destroy_context = NULL;
@@ -615,10 +618,10 @@ void rpc_vm_destroy_handler(RPC* rpc, void(*handler)(RPC* rpc, uint32_t id, void
 
 static void vm_destroy_handler_callback(RPC* rpc, bool result) {
 	INIT2();
-
+	
 	WRITE2(write_uint16(rpc, RPC_TYPE_VM_DELETE_RES));
 	WRITE2(write_bool(rpc, result));
-
+	
 	RETURN2();
 }
 
@@ -627,7 +630,6 @@ static int vm_destroy_req_handler(RPC* rpc) {
 
 	uint32_t id;
 	READ(read_uint32(rpc, &id));
-
 	if(rpc->vm_destroy_handler) {
 		rpc->vm_destroy_handler(rpc, id, rpc->vm_destroy_handler_context, vm_destroy_handler_callback);
 	} else {
@@ -672,16 +674,15 @@ void rpc_vm_list_handler(RPC* rpc, void(*handler)(RPC* rpc, int size, void* cont
 
 static void vm_list_handler_callback(RPC* rpc, uint32_t* ids, int size) {
 	INIT2();
-
+	
 	WRITE2(write_uint16(rpc, RPC_TYPE_VM_LIST_RES));
 	WRITE2(write_bytes(rpc, ids, sizeof(uint32_t) * size));
-
+	
 	RETURN2();
 }
 
 static int vm_list_req_handler(RPC* rpc) {
 	INIT();
-
 	_size++;	// To avoid rollback
 
 	if(rpc->vm_list_handler) {
@@ -943,7 +944,6 @@ static void storage_download_handler_callback(RPC* rpc, void* buf, int32_t size)
 		WRITE2(write_uint16(rpc, RPC_TYPE_STORAGE_DOWNLOAD_RES));
 		WRITE2(write_uint32(rpc, rpc->storage_download_offset));
 		WRITE2(write_bytes(rpc, buf, size));
-
 		rpc->storage_download_offset += size;
 	} else {
 		WRITE2(write_uint16(rpc, RPC_TYPE_STORAGE_DOWNLOAD_RES));
@@ -1276,190 +1276,3 @@ void rpc_vm_dump(VMSpec* vm) {
 	}
 	printf("\n");
 }
-
-#ifdef LINUX
-#define DEBUG 0
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <signal.h>
-#include <errno.h>
-
-typedef struct {
-	int	fd;
-} RPCData;
-
-static int sock_read(RPC* rpc, void* buf, int size) {
-	RPCData* data = (RPCData*)rpc->data;
-	int len = recv(data->fd, buf, size, MSG_DONTWAIT);
-	#if DEBUG
-	if(len > 0) {
-		printf("Read: ");
-		for(int i = 0; i < len; i++) {
-			printf("%02x ", ((uint8_t*)buf)[i]);
-		}
-		printf("\n");
-	}
-	#endif /* DEBUG */
-
-	if(len == -1) {
-		if(errno == EAGAIN)
-			return 0;
-
-		return -1;
-	} else if(len == 0) {
-		return -1;
-	} else {
-		return len;
-	}
-}
-
-static int sock_write(RPC* rpc, void* buf, int size) {
-	RPCData* data = (RPCData*)rpc->data;
-	int len = send(data->fd, buf, size, MSG_DONTWAIT);
-	#if DEBUG
-	if(len > 0) {
-		printf("Write: ");
-		for(int i = 0; i < len; i++) {
-			printf("%02x ", ((uint8_t*)buf)[i]);
-		}
-		printf("\n");
-	}
-	#endif /* DEBUG */
-
-	if(len == -1) {
-		if(errno == EAGAIN)
-			return 0;
-
-		return -1;
-	} else if(len == 0) {
-		return -1;
-	} else {
-		return len;
-	}
-}
-
-static void sock_close(RPC* rpc) {
-	RPCData* data = (RPCData*)rpc->data;
-	close(data->fd);
-	data->fd = -1;
-}
-
-RPC* rpc_open(const char* host, int port, int timeout) {
-	int fd = socket(AF_INET, SOCK_STREAM, 0);
-	if(fd < 0) {
-		return NULL;
-	}
-
-	void handler(int signo) {
-		// Do nothing just interrupt
-	}
-
-	struct sigaction sigact, old_sigact;
-	sigact.sa_handler = handler;
-	sigemptyset(&sigact.sa_mask);
-	sigact.sa_flags = SA_INTERRUPT;
-
-	if(sigaction(SIGALRM, &sigact, &old_sigact) < 0) {
-		close(fd);
-		return NULL;
-	}
-
-	struct sockaddr_in addr;
-	bzero(&addr, sizeof(struct sockaddr_in));
-	addr.sin_family = AF_INET;
-	addr.sin_addr.s_addr = inet_addr(host);
-	addr.sin_port = htons(port);
-
-	alarm(timeout);
-
-	if(connect(fd, (struct sockaddr*)&addr, sizeof(struct sockaddr_in)) < 0) {
-		alarm(0);
-		sigaction(SIGALRM, &old_sigact, NULL);
-		close(fd);
-		return NULL;
-	}
-
-	alarm(0);
-
-	if(sigaction(SIGALRM, &old_sigact, NULL) < 0) {
-		close(fd);
-		return NULL;
-	}
-
-	RPC* rpc = malloc(sizeof(RPC) + sizeof(RPCData));
-	rpc->read = sock_read;
-	rpc->write = sock_write;
-	rpc->close = sock_close;
-
-	RPCData* data = (RPCData*)rpc->data;
-	data->fd = fd;
-
-	return rpc;
-}
-
-RPC* rpc_listen(int port) {
-	int fd = socket(AF_INET, SOCK_STREAM, 0);
-	if(fd < 0) {
-		return NULL;
-	}
-
-	bool reuse = true;
-	setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
-
-	struct sockaddr_in addr;
-	bzero(&addr, sizeof(struct sockaddr_in));
-	addr.sin_family = AF_INET;
-	addr.sin_addr.s_addr = htonl(INADDR_ANY);
-	addr.sin_port = htons(port);
-
-	if(bind(fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-		return NULL;
-	}
-
-	RPC* rpc = malloc(sizeof(RPC) + sizeof(RPCData));
-	bzero(rpc, sizeof(RPC));
-	RPCData* data = (RPCData*)rpc->data;
-	data->fd = fd;
-
-	return rpc;
-}
-
-RPC* rpc_accept(RPC* srpc) {
-	RPCData* data = (RPCData*)srpc->data;
-
-	if(listen(data->fd, 5) < 0) {
-		return NULL;
-	}
-
-	struct sockaddr_in caddr;
-	socklen_t len = sizeof(struct sockaddr_in);
-	int fd = accept(data->fd, (struct sockaddr*)&caddr, &len);
-	if(fd < 0) {
-		return NULL;
-	}
-
-	RPC* rpc = malloc(sizeof(RPC) + sizeof(RPCData));
-	memcpy(rpc, srpc, sizeof(RPC));
-	rpc->ver = 0;
-	rpc->rbuf_read = 0;
-	rpc->rbuf_index = 0;
-	rpc->wbuf_index = 0;
-	rpc->read = sock_read;
-	rpc->write = sock_write;
-	rpc->close = sock_close;
-
-	data = (RPCData*)rpc->data;
-	data->fd = fd;
-
-	return rpc;
-}
-
-bool rpc_is_closed(RPC* rpc) {
-	RPCData* data = (RPCData*)rpc->data;
-	return data->fd < 0;
-
-}
-#endif /* LINUX */

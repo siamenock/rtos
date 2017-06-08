@@ -206,7 +206,7 @@ void load_gdt(uint8_t apic_id) {
 
 /**
  * TLB size: 256KB
- * TLB address: 6MB + apic_id * 2MB - 256KB
+ * TLB address: 8MB + apic_id * 2MB - 256KB
  * TLB Blocks(4K blocks)
  * TLB[0] => l2
  * TLB[1] => l3u
@@ -215,7 +215,7 @@ void load_gdt(uint8_t apic_id) {
  * TLB[62~63] => l4k
  */
 void init_page_tables(uint8_t apic_id) {
-	uint32_t base = 0x600000 + apic_id * 0x200000 - 0x40000;
+	uint32_t base = 0x800000 + apic_id * 0x200000 - 0x40000;
 	if(apic_id == 0)
 		log_32("Initializing page table: 0x", base);
 
@@ -277,17 +277,15 @@ void init_page_tables(uint8_t apic_id) {
 	}
 
 	// Kernel global area(code, rodata, modules, gmalloc)
-	l4k[1].exb = 0;
-
+	l4k[2].exb = 0;
+	
 	// Kernel local area(malloc, TLB, TS, data, bss, stack)
-	l4k[2 + apic_id] = l4k[2];
-
-	l4k[2].base = 2 + apic_id;	// 2 * (2 + apic_id)MB
-	l4k[2].p = 1;
-	l4k[2].us = 0;
-	l4k[2].rw = 1;
-	l4k[2].ps = 1;
-
+	l4k[3].base = 3 + apic_id;	// 2 * (2 + apic_id)MB
+	l4k[3].p = 1;
+	l4k[3].us = 0;
+	l4k[3].rw = 1;
+	l4k[3].ps = 1;
+	
 	if(apic_id == 0)
 		log_pass();
 }
@@ -334,6 +332,8 @@ void copy_kernel(uint8_t apic_id) {
 	uint32_t size = (uint32_t)(kernel_end - kernel_start);
 
 	PNKC* pnkc = (PNKC*)pos;
+	pnkc->initrd_start = initrd_start;
+	pnkc->initrd_end = initrd_end;
 	pos += sizeof(PNKC);
 
 	if(apic_id == 0) {
@@ -350,27 +350,27 @@ void copy_kernel(uint8_t apic_id) {
 		log("Copying kernel:\n");
 	}
 
+	uint32_t multiboot_temp_addr = 0x2a00000;	// Behind the RAM disk area
 
 	// Copy Ramdisk
 	if(apic_id == 0) {
-		//print("\n    Ramdisk 0x");
-// #define RAMDISK_ADDR	(0x400000 + 0x200000 * MP_MAX_CORE_COUNT)
-		//print_32(0x2400000); print(" ("); print_32(initrd_end - initrd_start); print(") ");
-		copy((void*)0x2400000, (void*)initrd_start, initrd_end - initrd_start, 1);
+		copy((void*)0x2600000, (void*)initrd_start, initrd_end - initrd_start, 0);
+		pnkc->initrd_start = 0x2600000;
+		pnkc->initrd_end = 0x2600000 + initrd_end - initrd_start;
 	}
 
 	// FIXME: caculate size of ramdisk
-	uint32_t multiboot_temp_addr = 0x2800000;	// Behind the RAM disk area (+4MB)
 	// Clean
 	if(apic_id == 0) {
 		// Temporarily copy multiboot info
 		copy((void*)multiboot_temp_addr, (void*)multiboot2_addr, *(uint32_t*)multiboot2_addr, 1);
 
 		print("    clean 0x00200000 (00400000): ");
-		clean((void*)0x200000, 0x200000, apic_id);
+		//clean((void*)0x200000, 0x200000, apic_id);
 	}
-	clean((void*)(0x200000 + 0x200000 * (apic_id + 1)), apic_id == 0 ? 0x400000 : 0x200000, apic_id);
 
+	clean((void*)(0x600000 + 0x200000 * (apic_id)), 0x200000, apic_id);
+	
 	// Copy .text
 	if(apic_id == 0) {
 		print("\n    .text 0x");
@@ -400,7 +400,7 @@ void copy_kernel(uint8_t apic_id) {
 		print("\n    .data: 0x");
 		print_32(0x400000 + pnkc->data_offset); print(" ("); print_32(pnkc->data_size); print(") ");
 	}
-	copy((void*)(0x200000 + 0x200000 * (apic_id + 1)) + pnkc->data_offset, pos, pnkc->data_size, apic_id);
+	copy((void*)(0x400000 + 0x200000 * (apic_id)) + pnkc->data_offset, pos, pnkc->data_size, apic_id);
 	pos += pnkc->data_size;
 
 	// .bss is already inited
@@ -408,8 +408,8 @@ void copy_kernel(uint8_t apic_id) {
 	// Write PNKC
 	if(apic_id == 0) {
 		print("\n    PNKC: 0x");
-		print_32(0x200200 - sizeof(PNKC)); print(" ("); print_32(sizeof(PNKC)); print(") ");
-		copy((void*)(0x200200 /* Kernel entry end */ - sizeof(PNKC)), pnkc, sizeof(PNKC), apic_id);
+		print_32(0x200000 - sizeof(PNKC)); print(" ("); print_32(sizeof(PNKC)); print(") ");
+		copy((void*)(0x200000 /* Kernel entry end */ - sizeof(PNKC)), pnkc, sizeof(PNKC), apic_id);
 	}
 
 	// Write multiboot2 tags
@@ -444,7 +444,7 @@ void activate_pae(uint8_t apic_id) {
 }
 
 void activate_pml4(uint8_t apic_id) {
-	uint32_t pml4 = 0x5c0000 + 0x200000 * apic_id;
+	uint32_t pml4 = 0x7c0000 + 0x200000 * apic_id;
 	asm volatile("movl %0, %%cr3" : : "r"(pml4));
 
 	if(apic_id == 0) {
@@ -564,10 +564,10 @@ void main(uint32_t magic, uint32_t addr) {
 		activate_aps();
 
 		// 64bit kernel arguments
-		*(uint32_t*)(0x5c0000 - 0x400) = initrd_start;
-		*(uint32_t*)(0x5c0000 - 0x400 + 8) = initrd_end;
-
-		print("Jump to 64bit kernel: 0x00200000");
+		//*(uint32_t*)(0x5c0000 - 0x400) = initrd_start;
+		//*(uint32_t*)(0x5c0000 - 0x400 + 8) = initrd_end;
+		
+		print("Jump to 64bit kernel: 0x00400000");
 		tab(75);
 	} else {
 		copy_kernel(apic_id);

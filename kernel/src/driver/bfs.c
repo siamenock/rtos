@@ -363,14 +363,14 @@ typedef struct {
 	List* read_buffers;
 } ReadTickContext;
 
-static bool read_tick(void* context) {
-	ReadTickContext* read_tick_ctx = context;
-	List* read_buffers = read_tick_ctx->read_buffers;
-	read_callback(read_buffers, read_tick_ctx->count, read_tick_ctx->context);
-	free(read_tick_ctx);
-	
-	return false;
-}
+// static bool read_tick(void* context) {
+// 	ReadTickContext* read_tick_ctx = context;
+// 	List* read_buffers = read_tick_ctx->read_buffers;
+// 	read_callback(read_buffers, read_tick_ctx->count, read_tick_ctx->context);
+// 	free(read_tick_ctx);
+// 	
+// 	return false;
+// }
 
 static int bfs_read_async(FileSystemDriver* driver, void* _file, size_t size, bool(*callback)(List* blocks, int success, void* context), void* context) {
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))

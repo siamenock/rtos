@@ -11,18 +11,20 @@ typedef enum {
 	VM_STATUS_INVALID	= -1,
 } VMStatus;
 
-#define VM_MAX_NIC_COUNT	64
-#define VM_MAX_ARGC		256
-#define VM_MAX_ARGV		4096
+#define VMSPEC_MAX_NIC_COUNT	64
+#define VMSPEC_MAX_ARGC		256
+#define VMSPEC_MAX_ARGV		4096
 
 #define NICSPEC_DEVICE_MAC	((uint64_t)1 << 48)
 
 typedef struct {
 	uint64_t	mac;
-	//uint32_t	port;
 	char*		dev;
+	uint16_t	budget;
 	uint32_t	input_buffer_size;
 	uint32_t	output_buffer_size;
+	uint32_t	slow_input_buffer_size;
+	uint32_t	slow_output_buffer_size;
 	uint8_t		padding_head;
 	uint8_t		padding_tail;
 	uint64_t	input_bandwidth;

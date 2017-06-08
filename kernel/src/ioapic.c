@@ -6,8 +6,13 @@
 #include "acpi.h"
 #include "ioapic.h"
 
-uint64_t _ioapic_address;
+static uint64_t _ioapic_address;
 static uint8_t redirection_map[24];
+
+bool parse_iae(MP_IOAPICEntry* entry, void* context) {
+	_ioapic_address = (uint64_t)entry->io_apic_address;
+	return true;
+}
 
 static bool parse_fps(MP_FloatingPointerStructure* entry, void* context) {
 	*(uint8_t*)context = entry->feature[1];
@@ -68,9 +73,16 @@ static bool parse_iso(InterruptSourceOverride* entry, void* context) {
 
 void ioapic_init() {
 	// Disable PIC mode
+	MP_Parser parser = {
+		.parse_iae = parse_iae
+	};
+
+	mp_parse_fps(&parser, NULL);
+
 	uint8_t feature1;
 
-	MP_Parser parser = { .parse_fps = parse_fps };
+	bzero(&parser, sizeof(MP_Parser));
+	parser.parse_fps = parse_fps;
 	mp_parse_fps(&parser, &feature1);
 
 	if(feature1 & 0x80) {
@@ -84,6 +96,8 @@ void ioapic_init() {
 		redirection_map[i] = 0xff;
 		uint64_t redirection = ioapic_read64(IOAPIC_IDX_REDIRECTION_TABLE + i * 2);
 		redirection |= APIC_IM_DISABLED;
+		uint32_t* c = (uint32_t*)&redirection;
+		printf("%02d : %x %x\n", i, c[0], c[1]);
 		ioapic_write64(IOAPIC_IDX_REDIRECTION_TABLE + i * 2, redirection);
 	}
 

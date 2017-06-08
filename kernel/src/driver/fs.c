@@ -1,6 +1,5 @@
 #include "string.h"
 #include "fs.h"
-#include "pata.h"
 #include "disk.h"
 #include "../cpu.h"
 #include <malloc.h>

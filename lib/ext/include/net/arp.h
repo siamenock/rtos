@@ -3,8 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <net/packet.h>
-#include <net/nic.h>
+#include <nic.h>
 
 /**
  * @file
@@ -30,13 +29,37 @@ typedef struct _ARP {
 
 extern uint64_t ARP_TIMEOUT;		///< ARP timeout of ARP table
 
+typedef struct _ARPEntity {
+	uint64_t	mac;
+	uint32_t	addr;
+	uint64_t	timeout;
+
+	bool		dynamic;
+} ARPEntity;
+
+#define ARP_ENTITY_MAX_COUNT	16
+typedef struct ARPTable {
+	uint64_t	timeout;
+	uint16_t	entity_count;
+	ARPEntity 	entity[ARP_ENTITY_MAX_COUNT];
+} ARPTable;
+
+/**
+ * Get ARP Table
+ *
+ * @param NIC
+ * @return ARP Table
+ */
+ARPTable* arp_get_table(NIC* nic);
+
+#define ARP_PROCESS()
 /**
  * Process ARP packet.
  *
  * @param packet the packet to process
  * @return ture if ARP packet is processed (packet must not be reused)
  */
-bool arp_process(Packet* packet);
+bool arp_process(NIC* nic, Packet* packet);
 
 /**
  * Broadcast ARP request (MAC address resolving).
@@ -46,8 +69,15 @@ bool arp_process(Packet* packet);
  * @param source IP address of interface
  * @return true if ARP request is sent
  */
-bool arp_request(NIC* nic, uint32_t destination, uint32_t source);
-
+bool arp_request0(NIC* nic, uint32_t destination, uint32_t source);
+/**
+ * Broadcast ARP request (MAC address resolving).
+ *
+ * @param nic NIC reference to send ARP request
+ * @param destination IP address to resolve MAC address
+ * @return true if ARP request is sent
+ */
+bool arp_request(NIC* nic, uint32_t destination);
 /**
  * Announce IP and MAC address to hosts in the LAN.
  *

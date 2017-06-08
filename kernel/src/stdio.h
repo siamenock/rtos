@@ -1,6 +1,7 @@
 #ifndef __STDIO_H__
 #define __STDIO_H__
 
+#include <stdio.h>
 #include <stddef.h>
 #include <stdbool.h>
 #include <util/types.h>
@@ -25,12 +26,10 @@ extern size_t __stderr_size;
 	
 void stdio_init(uint8_t apic_id, void* buffer, size_t size);
 
-void stdio_print(const char* str, int row, int col);
-void stdio_print_32(uint32_t v, int row, int col);
-void stdio_print_64(uint64_t v, int row, int col);
-
-int stdio_putchar(const char ch);
 void stdio_scancode(int code);
 int stdio_getchar();
+int stdio_putchar(const char ch);
+
+int printf(const char* format, ...);
 
 #endif /* __STDIO_H__ */

@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <string.h>
 #include <elf.h>
+#include <fio.h>
 #include "file.h"
 #include "pnkc.h"
 #include "page.h"
@@ -24,13 +25,13 @@ void* modules[MAX_MODULE_COUNT];
 // TODO: Data to separated area
 void module_init() {
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
-	PNKC* pnkc = (PNKC*)(0x200200 - sizeof(PNKC));
+	PNKC* pnkc = (PNKC*)(0x200000 - sizeof(PNKC));
 	
 	void* addr = (void*)0x200000 + (((uintptr_t)pnkc->smap_offset + (uintptr_t)pnkc->smap_size + 7) & ~7);
 	addr += *(uint32_t*)addr;
 	addr = (void*)PHYSICAL_TO_VIRTUAL((uintptr_t)addr);
 	
-	void* buffer = bmalloc(); // 2MB buffer in memory
+	void* buffer = bmalloc(1); // 2MB buffer in memory
 	if(!buffer) 
 		return;
 	

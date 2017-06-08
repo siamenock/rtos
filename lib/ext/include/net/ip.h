@@ -1,7 +1,7 @@
 #ifndef __NET_IP_H__
 #define __NET_IP_H__
 
-#include <net/packet.h>
+#include <packet.h>
 
 /**
  * @file

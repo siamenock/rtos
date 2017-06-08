@@ -1,11 +1,30 @@
+#include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
+#include <util/cmd.h>
 #include <timer.h>
 #include "cpu.h"
 #include "mp.h"
 #include "port.h"
 #include "pci.h"
 #include "acpi.h"
+#include "mmap.h"
+#include "shared.h"
+
+static int acpi_cmd_reboot(int argc, char** argv, void(*callback)(char* result, int exit_status));
+static int acpi_cmd_shutdown(int argc, char** argv, void(*callback)(char* result, int exit_status));
+static Command acpi_cmds[] = {
+	{
+		.name = "reboot",
+		.desc = "Reboot the node.",
+		.func = acpi_cmd_reboot
+	},
+	{
+		.name = "shutdown",
+		.desc = "Shutdown the node.",
+		.func = acpi_cmd_shutdown
+	},
+};
 
 // Ref: http://www.acpi.info/DOWNLOADS/ACPIspec50.pdf
 
@@ -161,6 +180,7 @@ void acpi_init() {
 	if(madt) {
 		int length = madt->length - sizeof(MADT);
 		uint8_t* entry = madt->entry;
+		uint8_t processor_count = 0;
 
 		for(int i = 0; i < length;) {
 			switch(*(entry + i)) {
@@ -169,7 +189,8 @@ void acpi_init() {
 					ProcessorLocalAPIC* local_apic = (ProcessorLocalAPIC*)(entry + i);
 					i += local_apic->record_length;
 					if(local_apic->flags) {
-						mp_cores[local_apic->apic_id] = 1;
+						Shared* shared = (Shared*)SHARED_ADDR;
+						shared->mp_processors[local_apic->apic_id] = processor_count++;
 					}
 					break;
 				case IO_APIC:
@@ -204,26 +225,30 @@ void acpi_init() {
 		
 		slp_typb = *s5_addr << 10;
 	}
+
+	cmd_register(acpi_cmds, sizeof(acpi_cmds) / sizeof(acpi_cmds[0]));
 }
 
 static void acpi_enable() {
-	if(port_in16(fadt->pm1a_control_block) != 0)
+	if(port_in16(fadt->pm1a_control_block) != 0) {
+		while(1);
 		return;	// Already enabled
+	}
 	
 	port_out8(fadt->smi_command_port, fadt->acpi_enable);
-	for(int i = 0; i < 300; i++) {
+	for(int i = 0; i < 3000; i++) {
 		if(port_in16(fadt->pm1a_control_block) == 1)
 			break;
-		
-		timer_mwait(10);
+	
+		//timer_mwait(10);
 	}
 	
 	if(fadt->pm1b_control_block) {
-		for(int i = 0; i < 300; i++) {
+		for(int i = 0; i < 3000; i++) {
 			if(port_in16(fadt->pm1a_control_block) == 1)
 				break;
 			
-			timer_mwait(10);
+			//timer_mwait(10);
 		}
 	}
 }
@@ -235,3 +260,29 @@ void acpi_shutdown() {
 	if(fadt->pm1b_control_block)
 		port_out16(fadt->pm1b_control_block, slp_typb | (1 << 13));
 }
+
+static int acpi_cmd_reboot(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	asm volatile("cli");
+
+	uint8_t code;
+	do {
+		code = port_in8(0x64);	// Keyboard Control
+		if(code & 0x01)
+			port_in8(0x60);	// Keyboard I/O
+	} while(code & 0x02);
+
+	port_out8(0x64, 0xfe);	// Reset command
+
+	while(1)
+		asm("hlt");
+
+	return 0;
+}
+
+static int acpi_cmd_shutdown(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	printf("Shutting down\n");
+	acpi_shutdown();
+
+	return 0;
+}
+

@@ -2,7 +2,7 @@ project 'ext'
     kind 'StaticLib'
 
     build.compileProperty('x86_64')
-    build.linkingProperty { 'hal', 'tlsf' }
+    build.linkingProperty { 'hal', 'tlsf', 'vnic' }
     build.targetPath('..')
 
     filter { 'configurations:linux' }

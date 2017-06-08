@@ -2,19 +2,24 @@ project 'kernel'
     kind 'ConsoleApp'
 
     build.compileProperty('x86_64')
-    build.linkingProperty { 'hal', 'ext', 'tlsf', 'lwip' }
+    removefiles { 'src/**.S' }
+
+    build.linkingProperty { 'hal', 'ext', 'tlsf', 'lwip', 'vnic' }
 
     targetname  'kernel.elf'
     linkoptions { '-T elf_x86_64.ld -e main' }
 
     -- Make version header
-    prebuildcommands '../scripts/mkver.sh > src/version.h'
+    prebuildcommands {'../scripts/mkver.sh > src/version.h',
+			'gcc -D__ASSEMBLY__ -o obj/entry.o -c src/entry.S' }
 
     filter 'configurations:debug'
         removefiles { 'src/test/**.c', 'src/test/**.asm' }
 
     filter 'configurations:release'
         removefiles { 'src/test/**.c', 'src/test/**.asm' }
+
+    filter {}
 
 --[[
    [        filter 'configurations:Debug'

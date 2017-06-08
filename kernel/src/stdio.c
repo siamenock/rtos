@@ -2,6 +2,7 @@
 #include <byteswap.h>
 
 #include <util/ring.h>
+#include <util/cmd.h>
 
 #include "pnkc.h"
 #include "port.h"
@@ -12,10 +13,6 @@
 #include "driver/stdout.h"
 
 #include "stdio.h"
-
-struct _IO_FILE* stdin;
-struct _IO_FILE* stdout;
-struct _IO_FILE* stderr;
 
 #define BUFFER_SIZE	4096
 
@@ -45,12 +42,21 @@ Device* device_stderr;
 
 #define DEFAULT_ATTRIBUTE	0x07
 
+static int clear(int argc, char** argv, void(*callback)(char* result, int exit_status));
+static Command commands[] = {
+	{
+		.name = "clear",
+		.desc = "Clear screen.",
+		.func = clear
+	},
+};
+
 void stdio_init(uint8_t apic_id, void* buffer, size_t size) {
-	CharOutInit data = { .buf = buffer, .len = size, .is_capture = apic_id == 0, .is_render = apic_id == 0 };
-	
 	if(apic_id == 0) {
+		CharOutInit data = { .buf = buffer, .len = size, .is_capture = apic_id == 0, .is_render = apic_id == 0 };
 		device_stdin = device_register(console_in_type, &console_in_driver, NULL, NULL);
 		device_stderr = device_stdout = device_register(console_out_type, &console_out_driver, NULL, &data);
+		cmd_register(commands, sizeof(commands) / sizeof(commands[0]));
 	} else {
 		// TODO: char in redirector
 		device_stdin = device_register(stdin_type, &stdin_driver, NULL, NULL);
@@ -69,76 +75,6 @@ void stdio_render(uint8_t apic_id) {
 	driver->scroll(device->id, 0);
 }
 */
-
-void stdio_print(const char* str, int row, int col) {
-	char* video = (char*)0xb8000 + (row * 160) + col * 2;
-	while(*str != 0) {
-		*(video++) = *str;
-		*(video++) = DEFAULT_ATTRIBUTE;
-		str++;
-	}
-}
-
-#define HEX(v)  (((v) & 0x0f) > 9 ? ((v) & 0x0f) - 10 + 'a' : ((v) & 0x0f) + '0')
-
-void stdio_print_32(uint32_t v, int row, int col) {
-	char* video = (char*)0xb8000 + (row * 160) + col * 2;
-	
-	*video++ = HEX(v >> 28);
-	*video++ = DEFAULT_ATTRIBUTE;
-	*video++ = HEX(v >> 24);
-	*video++ = DEFAULT_ATTRIBUTE;
-	*video++ = HEX(v >> 20);
-	*video++ = DEFAULT_ATTRIBUTE;
-	*video++ = HEX(v >> 16);
-	*video++ = DEFAULT_ATTRIBUTE;
-	*video++ = HEX(v >> 12);
-	*video++ = DEFAULT_ATTRIBUTE;
-	*video++ = HEX(v >> 8);
-	*video++ = DEFAULT_ATTRIBUTE;
-	*video++ = HEX(v >> 4);
-	*video++ = DEFAULT_ATTRIBUTE;
-	*video++ = HEX(v >> 0);
-	*video++ = DEFAULT_ATTRIBUTE;
-}
-
-void stdio_print_64(uint64_t v, int row, int col) {
-	char* video = (char*)0xb8000 + (row * 160) + col * 2;
-	
-	*video++ = HEX(v >> 60);
-	*video++ = DEFAULT_ATTRIBUTE;
-	*video++ = HEX(v >> 56);
-	*video++ = DEFAULT_ATTRIBUTE;
-	*video++ = HEX(v >> 52);
-	*video++ = DEFAULT_ATTRIBUTE;
-	*video++ = HEX(v >> 48);
-	*video++ = DEFAULT_ATTRIBUTE;
-	*video++ = HEX(v >> 44);
-	*video++ = DEFAULT_ATTRIBUTE;
-	*video++ = HEX(v >> 40);
-	*video++ = DEFAULT_ATTRIBUTE;
-	*video++ = HEX(v >> 36);
-	*video++ = DEFAULT_ATTRIBUTE;
-	*video++ = HEX(v >> 32);
-	*video++ = DEFAULT_ATTRIBUTE;
-	
-	*video++ = HEX(v >> 28);
-	*video++ = DEFAULT_ATTRIBUTE;
-	*video++ = HEX(v >> 24);
-	*video++ = DEFAULT_ATTRIBUTE;
-	*video++ = HEX(v >> 20);
-	*video++ = DEFAULT_ATTRIBUTE;
-	*video++ = HEX(v >> 16);
-	*video++ = DEFAULT_ATTRIBUTE;
-	*video++ = HEX(v >> 12);
-	*video++ = DEFAULT_ATTRIBUTE;
-	*video++ = HEX(v >> 8);
-	*video++ = DEFAULT_ATTRIBUTE;
-	*video++ = HEX(v >> 4);
-	*video++ = DEFAULT_ATTRIBUTE;
-	*video++ = HEX(v >> 0);
-	*video++ = DEFAULT_ATTRIBUTE;
-}
 
 void stdio_dump(int coreno, int fd, char* buffer, volatile size_t* head, volatile size_t* tail, size_t size) {
 #define HEX(v)	(((v) & 0x0f) > 9 ? ((v) & 0x0f) - 10 + 'a' : ((v) & 0x0f) + '0')
@@ -341,16 +277,16 @@ static bool numlock;
 static bool scrolllock;
 static int extention;
 
-int _IO_putc(int ch, struct _IO_FILE* fp) {
-	uint8_t c = ch;
-	if(fp == stdout) {
-		return write1((void*)&c, 1);
-	} else if(fp == stderr) {
-		write2((void*)&c, 1);
-	}
-
-	return -1;
-}
+// int _IO_putc(int ch, struct _IO_FILE* fp) {
+// 	uint8_t c = ch;
+// 	if(fp == stdout) {
+// 		return write1((void*)&c, 1);
+// 	} else if(fp == stderr) {
+// 		write2((void*)&c, 1);
+// 	}
+// 
+// 	return -1;
+// }
 
 static void led() {
 	port_out8(0x60, 
@@ -594,51 +530,51 @@ int vsprintf(char *str, const char *format, va_list va) {
 	}
 
 	void print_unsigned_integer(unsigned int value, char a, int base) {
-		char* str0 = str;
-		do {
-			int mod = value % base;
-			if(mod >= 10)
-				*str++ = a + mod - 10;
-			else
-				*str++ = '0' + mod;
-
-			value /= base;
-		} while(value != 0);
-
-		while(str - str0 < width) {
-			*str++ = fill;
-		}
-
-		int half = (str - str0) / 2;
-		for(int i = 0; i < half; i++) {
-			char tmp = str0[i];
-			str0[i] = str[-i - 1];
-			str[-i - 1] = tmp;
-		}
+ 		char* str0 = str;
+ 		do {
+ 			int mod = value % base;
+ 			if(mod >= 10)
+ 				*str++ = a + mod - 10;
+ 			else
+ 				*str++ = '0' + mod;
+ 
+ 			value /= base;
+ 		} while(value != 0);
+ 
+ 		while(str - str0 < width) {
+ 			*str++ = fill;
+ 		}
+ 
+ 		int half = (str - str0) / 2;
+ 		for(int i = 0; i < half; i++) {
+ 			char tmp = str0[i];
+ 			str0[i] = str[-i - 1];
+ 			str[-i - 1] = tmp;
+ 		}
 	}
 
 	void print_unsigned_long(unsigned long value, char a, int base) {
-		char* str0 = str;
-		do {
-			int mod = value % base;
-			if(mod >= 10)
-				*str++ = a + mod - 10;
-			else
-				*str++ = '0' + mod;
-
-			value /= base;
-		} while(value != 0);
-
-		while(str - str0 < width) {
-			*str++ = fill;
-		}
-
-		int half = (str - str0) / 2;
-		for(int i = 0; i < half; i++) {
-			char tmp = str0[i];
-			str0[i] = str[-i - 1];
-			str[-i - 1] = tmp;
-		}
+ 		char* str0 = str;
+ 		do {
+ 			int mod = value % base;
+ 			if(mod >= 10)
+ 				*str++ = a + mod - 10;
+ 			else
+ 				*str++ = '0' + mod;
+ 
+ 			value /= base;
+ 		} while(value != 0);
+ 
+ 		while(str - str0 < width) {
+ 			*str++ = fill;
+ 		}
+ 
+ 		int half = (str - str0) / 2;
+ 		for(int i = 0; i < half; i++) {
+ 			char tmp = str0[i];
+ 			str0[i] = str[-i - 1];
+ 			str[-i - 1] = tmp;
+ 		}
 	}
 
 	void print_double(double value) {
@@ -805,7 +741,9 @@ int sprintf(char *str, const char *format, ...) {
 	return len;
 }
 
-int __sprintf_chk(char *str, int flag, size_t slen, const char *format, ...) {
+//int __sprintf_chk(char *__restrict __s, int flag, char *str, const char *format, ...) {
+int __sprintf_chk (char *__restrict str, int __flag, size_t __slen,
+			  const char *__restrict format, ...) {
 	va_list va;
 	va_start(va, format);
 	int len = vsprintf(str, format, va);
@@ -889,4 +827,10 @@ uint32_t ntohl(uint32_t netlong) {
 
 uint16_t ntohs(uint16_t netshort) {
 	return bswap_16(netshort);
+}
+
+static int clear(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	printf("\f");
+
+	return 0;
 }

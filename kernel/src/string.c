@@ -182,3 +182,6 @@ char* strcpy(char *dest, const char *src) {
 	return __memcpy(dest, src, strlen(src) + 1);
 }
 
+char* strncpy(char *dest, const char *src, size_t len) {
+	return __memcpy(dest, src, len);
+}

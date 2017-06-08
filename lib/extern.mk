@@ -63,8 +63,8 @@ libvnic.a: vnic/libvnic.a
 doc:
 	make -C core
 
-clean:
-	rm -f libc.a libm.a libz.a libssl.a libcrypto.a libexpat.a libxdr.a
+clean: 
+	rm -f libc.a libm.a libz.a libssl.a libcrypto.a libexpat.a libxdr.a libvnic.a
 
 cleanall: clean
 	-make -C newlib distclean

@@ -76,14 +76,14 @@ char* task_symbols[] = {
 typedef struct {
 	uint64_t	fpu[64];
 	uint64_t	cpu[24];
-	
+
 	bool		is_fpu_inited;
-	
+
 	List*		mmap;
 	List*		resources;
 	uint64_t	symbols[SYM_END];
 	uint64_t	stack;
-	
+
 	uint8_t		padding[0] __attribute__((aligned(16)));
 } Task;
 
@@ -98,13 +98,14 @@ void ts_clear();
 static uint32_t current_task;
 static uint32_t last_fpu_task = (uint32_t)-1;
 
+
 static void device_not_available_handler(uint64_t vector, uint64_t error_code) {
 	ts_clear();
-	
+
 	if(last_fpu_task != (uint32_t)-1) {
 		fxsave(tasks[last_fpu_task].fpu);
 	}
-	
+
 	Task* task = &tasks[current_task];
 	if(task->is_fpu_inited) {
 		fxrstor(task->fpu);
@@ -112,7 +113,7 @@ static void device_not_available_handler(uint64_t vector, uint64_t error_code) {
 		finit();
 		task->is_fpu_inited = true;
 	}
-	
+
 	last_fpu_task = current_task;
 }
 
@@ -120,27 +121,27 @@ void task_init() {
 	ts_clear();
 	finit();
 	tasks[0].is_fpu_inited = true;
-	
+
 	apic_register(7, device_not_available_handler);
 }
 
 uint32_t task_create() {
 	uint32_t id = 1;
-	
+
 	bzero(&tasks[id], sizeof(Task));
-	
+
 	tasks[id].cpu[CTX_CS] = 0x20 | 0x03;	// Code segment, PL=3
 	tasks[id].cpu[CTX_DS] = 0x18 | 0x03;	// Data segment, PL=3
 	tasks[id].cpu[CTX_ES] = 0x18 | 0x03;	// Data segment, PL=3
 	tasks[id].cpu[CTX_FS] = 0x18 | 0x03;	// Data segment, PL=3
 	tasks[id].cpu[CTX_GS] = 0x18 | 0x03;	// Data segment, PL=3
 	tasks[id].cpu[CTX_SS] = 0x18 | 0x03;	// Data segment, PL=3
-	
+
 	tasks[id].cpu[CTX_RFLAGS] = 0x0200;	// Enable interrupt
-	
+
 	tasks[id].mmap = list_create(NULL);
 	tasks[id].resources = list_create(NULL);
-	
+
 	return id;
 }
 
@@ -168,18 +169,20 @@ void* task_addr(uint32_t id, uint32_t symbol) {
 	return (void*)tasks[id].symbols[symbol];
 }
 
+extern uint64_t PHYSICAL_OFFSET;
+
 void task_mmap(uint32_t id, uint64_t vaddr, uint64_t paddr, bool is_user, bool is_writable, bool is_executable, char* desc) {
 	list_add(tasks[id].mmap, (void*)vaddr);
-	
+
 	uint64_t idx = vaddr >> 21;
-	PAGE_L4U[idx].base = paddr >> 21;
+	PAGE_L4U[idx].base = (paddr >> 21) + (PHYSICAL_OFFSET >> 21);
 	PAGE_L4U[idx].us = !!is_user;
 	PAGE_L4U[idx].rw = !!is_writable;
 	PAGE_L4U[idx].exb = !is_executable;
-	
-	printf("Task: virtual memory map: %dMB -> %dMB %c%c%c %s\n", idx * 2, PAGE_L4U[idx].base * 2, 
-		PAGE_L4U[idx].us ? 'r' : '-', 
-		PAGE_L4U[idx].rw ? 'w' : '-', 
+
+	printf("Task: virtual memory map: %dMB -> %dMB %c%c%c %s\n", idx * 2, PAGE_L4U[idx].base * 2,
+		PAGE_L4U[idx].us ? 'r' : '-',
+		PAGE_L4U[idx].rw ? 'w' : '-',
 		PAGE_L4U[idx].exb ? '-' : 'x',
 		desc);
 }
@@ -193,29 +196,28 @@ void task_resource(uint32_t id, uint8_t type, void* data) {
 	resource->type = type;
 	resource->data = data;
 	list_add(tasks[id].resources, resource);
-	
+
 	switch(type) {
 		case RESOURCE_NI:
 			;
 			bool is_first = true;
 			VNIC* vnic = (VNIC*)data;
-			
-			ListIterator iter;
-			list_iterator_init(&iter, vnic->pools);
-			while(list_iterator_has_next(&iter)) {
-				uint64_t vaddr = (uint64_t)list_iterator_next(&iter);
-				
+
+			int count = vnic->nic_size / 0x200000;
+			uint64_t vaddr = (uint64_t)vnic->nic;
+
+			while(count--) {
 				uint64_t idx = vaddr >> 21;
-				PAGE_L4U[idx].base = idx;
+				PAGE_L4U[idx].base = idx + (PHYSICAL_OFFSET >> 21);
 				PAGE_L4U[idx].us = 1;
 				PAGE_L4U[idx].rw = 1;
 				PAGE_L4U[idx].exb = 1;
-				
+
 				if(is_first) {
-					printf("Task: virtual memory map : %dMB -> %dMB %c%c%c %s[%02x:%02x:%02x:%02x:%02x:%02x]\n", 
-						idx * 2, PAGE_L4U[idx].base * 2, 
-						PAGE_L4U[idx].us ? 'r' : '-', 
-						PAGE_L4U[idx].rw ? 'w' : '-', 
+					printf("Task: virtual memory map : %dMB -> %dMB %c%c%c %s[%02x:%02x:%02x:%02x:%02x:%02x]\n",
+						idx * 2, PAGE_L4U[idx].base * 2,
+						PAGE_L4U[idx].us ? 'r' : '-',
+						PAGE_L4U[idx].rw ? 'w' : '-',
 						PAGE_L4U[idx].exb ? '-' : 'x',
 						"VNIC",
 						(vnic->mac >> 40) & 0xff,
@@ -224,16 +226,18 @@ void task_resource(uint32_t id, uint8_t type, void* data) {
 						(vnic->mac >> 16) & 0xff,
 						(vnic->mac >> 8) & 0xff,
 						(vnic->mac >> 0) & 0xff);
-					
+
 					is_first = false;
 				} else {
-					printf("Task: virtual memory map : %dMB -> %dMB %c%c%c %s\n", 
-						idx * 2, PAGE_L4U[idx].base * 2, 
-						PAGE_L4U[idx].us ? 'r' : '-', 
-						PAGE_L4U[idx].rw ? 'w' : '-', 
+					printf("Task: virtual memory map : %dMB -> %dMB %c%c%c %s\n",
+						idx * 2, PAGE_L4U[idx].base * 2,
+						PAGE_L4U[idx].us ? 'r' : '-',
+						PAGE_L4U[idx].rw ? 'w' : '-',
 						PAGE_L4U[idx].exb ? '-' : 'x',
 						"VNIC");
 				}
+
+				vaddr += 0x200000;
 			}
 			task_refresh_mmap();
 			break;
@@ -245,62 +249,64 @@ void task_destroy(uint32_t id) {
 	while(list_size(tasks[id].mmap) > 0) {
 		uint64_t vaddr = (uint64_t)list_remove_first(tasks[id].mmap);
 		uint64_t idx = vaddr >> 21;
-		
+
 		bfree((void*)((uint64_t)PAGE_L4U[idx].base << 21));
-		
-		PAGE_L4U[idx].base = idx;
+
+		PAGE_L4U[idx].base = idx + (PHYSICAL_OFFSET >> 21);
 		PAGE_L4U[idx].us = 0;
 		PAGE_L4U[idx].rw = 1;
 		PAGE_L4U[idx].exb = 1;
-		
-		printf("Task: virtual memory map: %dMB -> %dMB %c%c%c\n", idx * 2, PAGE_L4U[idx].base * 2, 
-			PAGE_L4U[idx].us ? 'r' : '-', 
-			PAGE_L4U[idx].rw ? 'w' : '-', 
+
+		printf("Task: virtual memory map: %dMB -> %dMB %c%c%c\n", idx * 2, PAGE_L4U[idx].base * 2,
+			PAGE_L4U[idx].us ? 'r' : '-',
+			PAGE_L4U[idx].rw ? 'w' : '-',
 			PAGE_L4U[idx].exb ? '-' : 'x');
 	}
-	
+
 	list_destroy(tasks[id].mmap);
 	tasks[id].mmap = NULL;
-	
+
 	// Restore resource
-	while(list_size(tasks[id].resources) > 0) {
-		Resource* resource = list_remove_first(tasks[id].resources);
-		ListIterator iter;
-		
-		switch(resource->type) {
-			case RESOURCE_NI:
-				list_iterator_init(&iter, ((VNIC*)resource->data)->pools);
-				while(list_iterator_has_next(&iter)) {
-					uint64_t vaddr = (uint64_t)list_iterator_next(&iter);
-					uint64_t idx = vaddr >> 21;
-					
-					PAGE_L4U[idx].base = idx;
-					PAGE_L4U[idx].us = 0;
-					PAGE_L4U[idx].rw = 1;
-					PAGE_L4U[idx].exb = 0;
-					
-					printf("Task: virtual memory map: %dMB -> %dMB %c%c%c %s\n", idx * 2, PAGE_L4U[idx].base * 2, 
-						PAGE_L4U[idx].us ? 'r' : '-', 
-						PAGE_L4U[idx].rw ? 'w' : '-', 
-						PAGE_L4U[idx].exb ? '-' : 'x',
-						"VNIC");
-				}
-				break;
-		}
-		free(resource);
-	}
-	
+/*
+ *        while(list_size(tasks[id].resources) > 0) {
+ *                Resource* resource = list_remove_first(tasks[id].resources);
+ *                ListIterator iter;
+ *
+ *                switch(resource->type) {
+ *                        case RESOURCE_NI:
+ *                                list_iterator_init(&iter, ((VNIC*)resource->data)->pools);
+ *                                while(list_iterator_has_next(&iter)) {
+ *                                        uint64_t vaddr = (uint64_t)list_iterator_next(&iter);
+ *                                        uint64_t idx = vaddr >> 21;
+ *
+ *                                        PAGE_L4U[idx].base = idx + (PHYSICAL_OFFSET >> 21);;
+ *                                        PAGE_L4U[idx].us = 0;
+ *                                        PAGE_L4U[idx].rw = 1;
+ *                                        PAGE_L4U[idx].exb = 0;
+ *
+ *                                        printf("Task: virtual memory map: %dMB -> %dMB %c%c%c %s\n", idx * 2, PAGE_L4U[idx].base * 2,
+ *                                                PAGE_L4U[idx].us ? 'r' : '-',
+ *                                                PAGE_L4U[idx].rw ? 'w' : '-',
+ *                                                PAGE_L4U[idx].exb ? '-' : 'x',
+ *                                                "VNIC");
+ *                                }
+ *                                break;
+ *                }
+ *                free(resource);
+ *        }
+ *
+ */
 	list_destroy(tasks[id].resources);
 	tasks[id].resources = NULL;
-	
+
 	refresh_cr3();
-	
+
 	if(id == last_fpu_task)
 		last_fpu_task = (uint32_t)-1;
-	
+
 	if(id == current_task) {
 		current_task = (uint32_t)-1;
-		
+
 		task_switch(0);
 	}
 }
@@ -313,16 +319,26 @@ void task_switch(uint32_t id) {
 	if(id == (uint32_t)-1) {
 		id = 0;
 	}
-	
+
 	uint32_t old_task = current_task;
 	current_task = id;
-	
+
+/*
+ *        printf("Task %d to %d\n", old_task, current_task);
+ *        printf("Last FPU %d\n", last_fpu_task);
+ *
+ *        printf("Task Old \n");
+ *        task_dump(old_task);
+ *        printf("Task New \n");
+ *        task_dump(current_task);
+ *
+ */
 	if(current_task == last_fpu_task) {
 		ts_clear();
 	} else {
 		ts_set();
 	}
-	
+
 	void _context_switch(void* prev, void* next);
 	_context_switch(old_task == (uint32_t)-1 ? NULL : tasks[old_task].cpu, tasks[current_task].cpu);
 }
@@ -337,7 +353,7 @@ uint64_t task_get_stack(uint32_t id) {
 
 void task_dump(uint32_t id) {
 	#define CPU(i) tasks[id].cpu[i]
-	
+
 	printf("gs: %08x\tfs: %08x, es: %08x, ds: %08x\n", CPU(0), CPU(1), CPU(2), CPU(3));
 	printf("r15: %08x\tr14: %08x, r13: %08x, r12: %08x\n", CPU(4), CPU(5), CPU(6), CPU(7));
 	printf("r11: %08x\tr10: %08x, r9: %08x, r8: %08x\n", CPU(8), CPU(9), CPU(10), CPU(11));

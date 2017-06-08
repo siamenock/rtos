@@ -1,7 +1,7 @@
 #ifndef __NET_TCP_H__
 #define __NET_TCP_H__
 
-#include <net/nic.h>
+#include <nic.h>
 
 /**
  * @file
@@ -51,20 +51,10 @@ typedef struct _TCP_Pseudo {
  * Allocate TCP port number which associated with NI.
  *
  * @param nic NIC reference
- * @param addr
  * @param port
  * @return true if port alloc success
  */
-bool tcp_port_alloc0(NIC* nic, uint32_t addr, uint16_t port);
-
-/**
- * Allocate TCP port number which associated with NI.
- *
- * @param nic NIC reference
- * @param addr
- * @return port number
- */
-uint16_t tcp_port_alloc(NIC* nic, uint32_t addr);
+bool tcp_port_alloc(NIC* nic, uint16_t port);
 
 /**
  * Free TCP port number.
@@ -72,8 +62,9 @@ uint16_t tcp_port_alloc(NIC* nic, uint32_t addr);
  * @param nic NIC reference
  * @param addr
  * @param port port number to free
+ * @raeturn true if port free success
  */
-void tcp_port_free(NIC* nic, uint32_t addr, uint16_t port);
+bool tcp_port_free(NIC* nic, uint16_t port);
 
 /**
  * Set TCP checksum, and do IP packing.

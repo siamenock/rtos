@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#define BSP_APIC_ID_OFFSET  1
+
 #define MP_MAX_CORE_COUNT	16
 #define MP_CORE_INVALID		255
 
@@ -117,15 +119,13 @@ typedef struct {
 	bool(*parse_cbasme)(MP_CompatabilityBusAddressSpaceModifierEntry*, void*);
 } MP_Parser;
 
-uint8_t mp_cores[MP_MAX_CORE_COUNT];
-
 void mp_init();
 uint8_t mp_apic_id();
-uint8_t mp_core_id();
-uint8_t mp_apic_id_to_core_id(uint8_t apic_id);
-uint8_t mp_core_count();
+uint8_t mp_processor_id();
+uint8_t mp_apic_id_to_processor_id(uint8_t apic_id);
+uint8_t mp_processor_count();
 void mp_sync();
 void mp_parse_fps(MP_Parser* parser, void* context);
-uint8_t* mp_core_map();
+uint8_t* mp_processor_map();
 
 #endif /* __MP_H__ */

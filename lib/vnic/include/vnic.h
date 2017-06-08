@@ -1,174 +1,277 @@
 #ifndef __VNIC_H__
 #define __VNIC_H__
 
-#include <stddef.h>
-#include <stdbool.h>
-#include <stdint.h>
+#include "nic.h"
 
-#define VNIC_MAX_COUNT		64
-#define VNIC_MAX_LINKS		8
-#define VNIC_CHUNK_SIZE		64
-#define VNIC_MAX_SIZE		(16 * 1024 * 1024)	// 16MB
-#define VNIC_HEADER_SIZE	(64 * 1024)		// 64KB
-
-#define VNIC_MAGIC_HEADER	0x0A38E56586468C01LL	// PacketNgin vNIC 01(version)
+#define MAX_VNIC_COUNT		8
 
 /**
- * @file
- * Virtual Network Interface Controller (vNIC) host API
+ * @file Virtual NIC
  */
 
-// Host API
-typedef struct _Packet {
-	uint64_t	time;
-	
-	uint16_t	start;
-	uint16_t	end;
-	uint16_t	size;
-	
-	uint8_t		buffer[0];
-} Packet;
+/**
+ * VNIC attributes to create or update VNIC.
+ * @see vm_create() for how this value is used
+ */
+typedef enum {
+	VNIC_NONE = 0,			///< End of attributes
+	VNIC_ID,			///< NIC ID
+	VNIC_BUDGET,			///< Maximum poll count without swithing to another VNIC
 
-typedef struct _VNIC_Queue {
-	uint32_t	base;
-	uint32_t	head;
-	uint32_t	tail;
-	uint32_t	size;
-	volatile uint8_t rlock;
-	volatile uint8_t wlock;
-} VNIC_Queue;
+	VNIC__MAND_STRT,
+	VNIC_DEV,			///< Device of Network Interface
+	VNIC_MAC,			///< MAC address
+	VNIC_POOL_SIZE,			///< NI's total memory size
+	VNIC_RX_BANDWIDTH,		///< Input bandwidth in bps
+	VNIC_TX_BANDWIDTH,		///< Output bandwidth in bps
+	VNIC_PADDING_HEAD,		///< Minimum padding head of packet payload buffer
+	VNIC_PADDING_TAIL,		///< Minimum padding tail of packet payload buffer
+	VNIC__MAND_END,
 
-typedef struct _VNIC_Pool {
-	uint32_t	bitmap;
-	uint32_t	count;
-	uint32_t	pool;
-	uint32_t	index;
-	uint32_t	used;
-	volatile uint8_t lock;
-} VNIC_Pool;
+	VNIC_RX_QUEUE_SIZE,		///< Number of input buffer size, the packet count
+	VNIC_TX_QUEUE_SIZE,		///< Number of output buffer size, the packet count
+	VNIC_SLOW_RX_QUEUE_SIZE,	///< Number of input slowpath buffer size, the packet count
+	VNIC_SLOW_TX_QUEUE_SIZE,	///< Number of input slowpath buffer size, the packet count
+	VNIC_MIN_BUFFER_SIZE,		///< Minimum packet payload buffer size which includes padding
+	VNIC_MAX_BUFFER_SIZE,		///< Maximum packet payload buffer size which includes padding
+
+	VNIC_RX_ACCEPT_ALL,		///< To accept all packets to receive
+	VNIC_RX_ACCEPT,			///< List of accept MAC addresses to receive
+	VNIC_TX_ACCEPT_ALL,		///< To accept all packets to send
+	VNIC_TX_ACCEPT,			///< List of accept MAC addresses to send
+} VNICAttributes;
 
 /**
- * VNIC Memory Map
- *
- * VNIC_MAGIC_HEADER (8 bytes)
- * Metadata (bandwidth, pdding, queue, pool)
- * Config
- * Fast path rx queue
- * Fast path tx queue
- * Slow path rx queue
- * Slow path tx queue
- * Packet pool bitmap
- * Packet payload pool
+ * VNIC Error Codes
+ */
+typedef enum _VNICError {
+	VNIC_ERROR_NOERROR = 0,
+	VNIC_ERROR_ATTRIBUTE_MISSING,	    ///<Mandatory attributes not specified
+	VNIC_ERROR_ATTRIBUTE_CONFLICT,	    ///<Conflict attributes speicifed
+	VNIC_ERROR_ATTRIBUTE_INVALID,	    ///<Invalid attributes speicifed
+	VNIC_ERROR_INVALID_BASE,	    ///<Base pointer is not pointing correct memory location
+	VNIC_ERROR_INVALID_POOLSIZE,	    ///<Pool size is not multiple of 2MB
+	VNIC_ERROR_NO_MEMEORY,		    ///<Not enough memory
+	VNIC_ERROR_RESOURCE_NOT_AVAILABLE,  ///<Resource is not temporary available
+	VNIC_ERROR_NO_ID_AVAILABLE,	    ///<There is no more id for vnic
+	VNIC_ERROR_OPERATION_FAILED,	    ///<Failed to execute command successfully
+	VNIC_ERROR_UNSUPPORTED,		    ///<Unsupported operation were requested
+} VNICError;
+
+/**
+ * Virtual NIC
  */
 typedef struct _VNIC {
-	// 2MBs aligned
-	uint64_t	magic;
+	// Management
+	NIC*		nic;			    ///< Base address of assosicated NIC (assigned by VM)
+	uint32_t	nic_size;		    ///< Pool size of associated NIC (multiples of 2MB)
+	char		parent[MAX_NIC_NAME_LEN];   ///< Name of parent NICDevice
+	NICPool		pool;			    ///< Pool of this VNIC
 
-	uint32_t	id;	// VNIC unique ID (unique ID in RTOS)
-	
-	uint64_t	mac;
-	
-	uint64_t	rx_bandwidth;
-	uint64_t	tx_bandwidth;
-	
-	uint16_t	padding_head;
-	uint16_t	padding_tail;
-	
-	VNIC_Queue	rx;
-	VNIC_Queue	tx;
-	
-	VNIC_Queue	srx;
-	VNIC_Queue	stx;
-	
-	VNIC_Pool	pool;
-	
-	uint32_t	config_head[0];
-	uint32_t	config_tail[0] __attribute__((__aligned__(VNIC_HEADER_SIZE)));
-	
-	// rx queue (8 bytes aligned)
-	// tx queue (8 bytes aligned)
-	// slow rx queue (8 bytes aligned)
-	// slow tx queue (8 bytes aligned)
-	// pool bitmap (8 bytes aligned)
-	// pool (VNIC_CHUNK_SIZE(64) bytges aligned)
+	// Information
+	uint64_t	magic;			///< Magic
+	uint32_t	id;			///< NIC unique ID (unique ID in RTOS)
+	uint64_t	mac;			///< MAC Address. (copied from NIC)
+	uint16_t	vlan_proto; 		///< VLAN Protocol
+	uint16_t	vlan_tci;   		///< VLAN TCI
+	uint16_t	budget;			///< Polling limit
+
+	// Buffers
+	NICQueue	rx;			///< Rx queue
+	NICQueue	tx;			///< Tx queue
+	NICQueue	srx;			///< Rx Queue for slowpath
+	NICQueue	stx;			///< Tx Queue for slowpath
+
+	// Statistics
+	uint64_t	input_bytes;		///< Total input bytes
+	uint64_t	input_packets;		///< Total input packets
+	uint64_t	input_drop_bytes;	///< Total dropped input bytes
+	uint64_t	input_drop_packets;	///< Total dropped input packets
+	uint64_t	output_bytes;		///< Total output bytes
+	uint64_t	output_packets;		///< Total output packets
+	uint64_t	output_drop_bytes;	///< Total dropped output bytes
+	uint64_t	output_drop_packets;	///< Total dropped output packets
+
+	uint16_t	padding_head;		///< Leading padding of packet buffer
+	uint16_t	padding_tail;		///< Trailing padding of packet buffer
+
+	// Constraint
+	uint64_t	rx_bandwidth;		///< Rx threshold
+	uint64_t	tx_bandwidth;		///< Tx threshold
+	uint64_t	rx_wait;		///< Amount of time to wait to adjust the rx bandwidth
+	uint64_t	rx_wait_grace;		///< Amount of time to wait to adjust the rx bandwidth gracefully
+	uint64_t	tx_wait;		///< Amount of time to wait to adjust the tx bandwidth
+	uint64_t	tx_wait_grace;		///< Amount of time to wait to adjust the tx bandwidth gracefully
+	uint64_t	rx_closed;		///< The next receivable frequency
+	uint64_t	tx_closed;		///< The next transmittable frequency
 } VNIC;
 
-int vnic_count();
-VNIC* vnic_get(int index);
-VNIC* vnic_get_by_id(uint32_t id);
-
-Packet* vnic_alloc(VNIC* vnic, uint16_t size);
-bool vnic_free(Packet* packet);
-
-bool vnic_has_rx(VNIC* vnic);
-Packet* vnic_rx(VNIC* vnic);
-uint32_t vnic_rx_size(VNIC* vnic);
-
-bool vnic_has_srx(VNIC* vnic);
-Packet* vnic_srx(VNIC* vnic);
-uint32_t vnic_srx_size(VNIC* vnic);
-
-bool vnic_tx(VNIC* vnic, Packet* packet);
-bool vnic_try_tx(VNIC* vnic, Packet* packet);
-bool vnic_tx_dup(VNIC* vnic, Packet* packet);
-bool vnic_has_tx(VNIC* vnic);
-uint32_t vnic_tx_size(VNIC* vnic);
-
-bool vnic_stx(VNIC* vnic, Packet* packet);
-bool vnic_try_stx(VNIC* vnic, Packet* packet);
-bool vnic_stx_dup(VNIC* vnic, Packet* packet);
-bool vnic_has_stx(VNIC* vnic);
-uint32_t vnic_stx_size(VNIC* vnic);
-
-size_t vnic_pool_used(VNIC* vnic);
-size_t vnic_pool_free(VNIC* vnic);
-size_t vnic_pool_total(VNIC* vnic);
-
-int32_t vnic_config_alloc(VNIC* vnic, char* name, uint16_t size);
-void vnic_config_free(VNIC* vnic, uint16_t key);
-int32_t vnic_config_key(VNIC* vnic, char* name);
-void* vnic_config_get(VNIC* vnic, uint16_t key);
-uint16_t vnic_config_size(VNIC* vnic, uint16_t key);
-uint32_t vnic_config_available(VNIC* vnic);
-uint32_t vnic_config_total(VNIC* vnic);
-
-// Driver API
+/**
+ * Initialize internal timer for VNIC module
+ *
+ * @param freq_per_sec Timer frequency per seconds
+ */
+void vnic__init_timer(uint64_t freq_per_sec);
 
 /**
- * Initialize VNIC memory map
+ * Initialize VNIC
  *
- * VNIC metadata (magic, mac, ...)
- * Fast path rx queue
- * Fast path tx queue
- * Slow path rx queue
- * Slow path tx queue
- * Malloc bitmap
- * Malloc pool
+ * @param vnic Virtual NIC
+ * @param attrs Attributes used to initialize the VNIC.
+ * This array must have the required attributes and end with VNIC_NONE
  *
- * @param base 2MBs aligned
- * @param size multiples of 2MBs
- * @return 0 succeed
- * @return 1 the base address is not aligned in 2MBs
- * @return 2 the size is not rounded up 2MBs
+ * @return true if initialization succeeded
  */
-int vnic_driver_init(uint32_t id, uint64_t mac, void* base, size_t size, 
-		uint64_t rx_bandwidth, uint64_t tx_bandwidth, 
-		uint16_t padding_head, uint16_t padding_tail, 
-		uint32_t rx_queue_size, uint32_t tx_queue_size, 
-		uint32_t srx_queue_size, uint32_t stx_queue_size);
+bool vnic_init(VNIC* vnic, uint64_t* attrs);
 
-bool vnic_driver_has_rx(VNIC* vnic);
-bool vnic_driver_rx(VNIC* vnic, uint8_t* buf1, size_t size1, uint8_t* buf2, size_t size2);
-bool vnic_driver_rx2(VNIC* vnic, Packet* packet);
+/**
+ * Generate a new ID for the VNIC
+ *
+ * @return ID if a new ID is generated. -1 on failure
+ */
+int vnic_alloc_id();
 
-bool vnic_driver_has_srx(VNIC* vnic);
-bool vnic_driver_srx(VNIC* vnic, uint8_t* buf1, size_t size1, uint8_t* buf2, size_t size2);
-bool vnic_driver_srx2(VNIC* vnic, Packet* packet);
+/**
+ * Returns ID
+ * @param id ID to return
+ */
+void vnic_free_id(int id);
 
-bool vnic_driver_has_tx(VNIC* vnic);
-Packet* vnic_driver_tx(VNIC* vnic);
+/**
+ * Allocate packet buffer
+ *
+ * @param vnic Virtual NIC
+ * @param size buffer size
+ *
+ * @return newly created packet
+ */
+Packet* vnic_alloc(VNIC* vnic, size_t size);
 
-bool vnic_driver_has_stx(VNIC* vnic);
-Packet* vnic_driver_stx(VNIC* vnic);
+/**
+ * Free packet buffer
+ *
+ * @param vnic VNIC that owns the packet
+ * @param packet Packet created using the vnic_alloc API function
+ */
+bool vnic_free(VNIC* vnic, Packet* packet);
+
+/**
+ * Update the attributes of the VNIC
+ *
+ * @param nic Virtual NIC
+ * @param attrs attributes used to update the VNIC.
+ *
+ * @return VNIC_ERROR_NOERROR for success, error number for failure
+ */
+VNICError vnic_update(VNIC* nic, uint64_t* attrs);
+
+// Fastpath Rx/Tx
+/**
+ * Check if there is received data
+ *
+ * @param vnic Virtual NIC
+ *
+ * @return true if VNIC has data
+ */
+bool vnic_has_rx(VNIC* vnic);
+
+/**
+ * Receive a packet data
+ * This function is mainly called to pass the packet received from NICDev to the VNIC
+
+ * @param vnic Virtual NIC
+ * @param buf1 packet data
+ * @param size1 packet data length
+ * @param buf2 optional packet data
+ * @param size2 optional packet data length
+ *
+ * @return VNIC_ERROR_NOERROR for success, error number for failure
+ */
+VNICError vnic_rx(VNIC* vnic, uint8_t* buf1, size_t size1, uint8_t* buf2, size_t size2);
+
+/**
+ * Receive a Packet
+ * This function is used to exchange data between VNICs
+ *
+ * @param vnic Virtual NIC
+ * @param packet packet
+ *
+ * @return zero(VNIC_ERROR_NOERROR) for success, nonzero for failure
+ */
+VNICError vnic_rx2(VNIC* vnic, Packet* packet);
+
+/**
+ * Check if there is data available for transmission.
+ *
+ * @param vnic Virtual NIC
+ *
+ * @return true if VNIC has data for transmission
+ */
+bool vnic_has_tx(VNIC* vnic);
+
+/**
+ * Sends queued packets
+ *
+ * @param vnic Virtual NIC
+ * @param transmitter Driver function that transmit packets
+ * @param transmitter_context Driver function context
+ *
+ * @return VNIC_ERROR_NOERROR for success,
+ * VNIC_ERROR_RESOURCE_NOT_AVAILABLE and VNIC_ERROR_OPERATION_FAILED for failure
+ */
+VNICError vnic_tx(VNIC* vnic, bool (*transmitter)(Packet*, void*), void* transmitter_context);
+
+// Slowpath Rx/Tx
+/**
+ * Check if there is received slowpath data
+ *
+ * @param vnic Virtual NIC
+ *
+ * @return true if VNIC has slowpath data
+ */
+bool vnic_has_srx(VNIC* vnic);
+
+/**
+ * Receive a slowpath packet data
+ * This function is mainly called to pass the packet received from NICDev to the VNIC
+
+ * @param vnic Virtual NIC
+ * @param buf1 packet data
+ * @param size1 packet data length
+ * @param buf2 optional packet data
+ * @param size2 optional packet data length
+ *
+ * @return zero(VNIC_ERROR_NOERROR) for success, nonzero for failure
+ */
+bool vnic_srx(VNIC* vnic, uint8_t* buf1, size_t size1, uint8_t* buf2, size_t size2);
+
+/**
+ * Receive a slowpath packet
+ * This function is used to exchange data between VNICs belonging to the same VM
+ *
+ * @param vnic Virtual NIC
+ * @param packet packet
+ *
+ * @return zero(VNIC_ERROR_NOERROR) for success, nonzero for failure
+ */
+bool vnic_srx2(VNIC* vnic, Packet* packet);
+
+/**
+ * Check if there is slowpath data available for transmission.
+ *
+ * @param vnic Virtual NIC
+ *
+ * @return true if VNIC has data for transmission
+ */
+bool vnic_has_stx(VNIC* vnic);
+
+/**
+ * Sends the queued slowpath data to the VNIC
+ *
+ * @param vnic Virtual NIC
+ *
+ * @return transmitted packet
+ */
+Packet* vnic_stx(VNIC* vnic);
 
 #endif /* __VNIC_H__ */

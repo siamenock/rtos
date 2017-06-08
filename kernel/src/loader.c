@@ -9,7 +9,7 @@
 #include <fio.h>
 #include <file.h>
 #include "page.h"
-#include "vfio.h"
+//#include "vfio.h"
 #include "task.h"
 #include "mp.h"
 
@@ -40,16 +40,15 @@ uint32_t loader_load(VM* vm) {
 	void* gmalloc_pool = NULL;
 	uint32_t id = load(vm, &malloc_pool, &gmalloc_pool);
 	if(id == (uint32_t)-1)
-		return (uint32_t)-1;
+		return (uint32_t)-2;
 
 	load_symbols(vm, id);
 
 	if(!relocate(vm, malloc_pool, gmalloc_pool, id))
-		return (uint32_t)-1;
+		return (uint32_t)-3;
 
-	if(!load_args(vm, malloc_pool, id)) {
+	if(!load_args(vm, malloc_pool, id))
 		printf("Loader: WARN: Cannot load argc and argv\n");
-	}
 
 	return id;
 }
@@ -256,9 +255,8 @@ static bool load_args(VM* vm, void* malloc_pool, uint32_t task_id) {
 	Elf64_Phdr* phdr = (Elf64_Phdr*)(vm->storage.blocks[0] + ehdr->e_phoff);
 
 	size_t len = sizeof(char*) * vm->argc;
-	for(int i = 0; i < vm->argc; i++) {
+	for(int i = 0; i < vm->argc; i++)
 		len += strlen(vm->argv[i]) + 1;
-	}
 
 	void* vaddr = NULL;
 
@@ -380,7 +378,7 @@ static bool relocate(VM* vm, void* malloc_pool, void* gmalloc_pool, uint32_t tas
 			*(uint64_t*)task_addr(task_id, SYM_STDOUT) = (uint64_t)__stdout;
 			*(size_t*)task_addr(task_id, SYM_STDOUT_SIZE) = 4096;
 		} else {
-			errno = 0x31;
+			errno = 0x32;
 			return false;
 		}
 
@@ -389,43 +387,46 @@ static bool relocate(VM* vm, void* malloc_pool, void* gmalloc_pool, uint32_t tas
 			*(uint64_t*)task_addr(task_id, SYM_STDERR) = (uint64_t)__stderr;
 			*(size_t*)task_addr(task_id, SYM_STDERR_SIZE) = 4096;
 		} else {
-			errno = 0x31;
+			errno = 0x33;
 			return false;
 		}
 
+		// TODO: implement FIO
 		// FIO allocation : Only one FIO is needed in a VM
-		FIO* user_fio;
-		if(!vm->fio) {
-			user_fio = fio_create(gmalloc_pool);
-
-			vm->fio = __malloc(sizeof(VFIO), gmalloc_pool);
-			vm->fio->input_buffer = __malloc(sizeof(FIFO), gmalloc_pool);
-			vm->fio->output_buffer = __malloc(sizeof(FIFO), gmalloc_pool);
-
-			vm->fio->input_buffer->head = 0;
-			vm->fio->input_buffer->tail = 0;
-			vm->fio->input_buffer->size = FIO_INPUT_BUFFER_SIZE;
-			vm->fio->input_buffer->array = (void**)TRANSLATE_TO_PHYSICAL((uint64_t)user_fio->input_buffer->array);
-
-			vm->fio->output_buffer->head = 0;
-			vm->fio->output_buffer->tail = 0;
-			vm->fio->output_buffer->size = FIO_OUTPUT_BUFFER_SIZE;
-			vm->fio->output_buffer->array = (void**)TRANSLATE_TO_PHYSICAL((uint64_t)user_fio->output_buffer->array);
-
-			vm->fio->input_addr = (FIFO*)TRANSLATE_TO_PHYSICAL((uint64_t)user_fio->input_buffer);
-			vm->fio->output_addr = (FIFO*)TRANSLATE_TO_PHYSICAL((uint64_t)user_fio->output_buffer);
-			vm->fio->input_buffer = (FIFO*)TRANSLATE_TO_PHYSICAL((uint64_t)vm->fio->input_buffer);
-			vm->fio->output_buffer = (FIFO*)TRANSLATE_TO_PHYSICAL((uint64_t)vm->fio->output_buffer);
-			vm->fio->user_fio = (FIO*)TRANSLATE_TO_PHYSICAL((uint64_t)user_fio);
-			vm->fio = (VFIO*)TRANSLATE_TO_PHYSICAL((uint64_t)vm->fio);
-		}
-
-		if(user_fio) {
-			*(uint64_t*)task_addr(task_id, SYM_FIO) = (uint64_t)user_fio;
-		} else {
-			errno = 0x31;
-			return false;
-		}
+/*
+ *                FIO* user_fio;
+ *                if(!vm->fio) {
+ *                        user_fio = fio_create(gmalloc_pool);
+ *
+ *                        vm->fio = __malloc(sizeof(VFIO), gmalloc_pool);
+ *                        vm->fio->input_buffer = __malloc(sizeof(FIFO), gmalloc_pool);
+ *                        vm->fio->output_buffer = __malloc(sizeof(FIFO), gmalloc_pool);
+ *
+ *                        vm->fio->input_buffer->head = 0;
+ *                        vm->fio->input_buffer->tail = 0;
+ *                        vm->fio->input_buffer->size = FIO_INPUT_BUFFER_SIZE;
+ *                        vm->fio->input_buffer->array = (void**)TRANSLATE_TO_PHYSICAL((uint64_t)user_fio->input_buffer->array);
+ *
+ *                        vm->fio->output_buffer->head = 0;
+ *                        vm->fio->output_buffer->tail = 0;
+ *                        vm->fio->output_buffer->size = FIO_OUTPUT_BUFFER_SIZE;
+ *                        vm->fio->output_buffer->array = (void**)TRANSLATE_TO_PHYSICAL((uint64_t)user_fio->output_buffer->array);
+ *
+ *                        vm->fio->input_addr = (FIFO*)TRANSLATE_TO_PHYSICAL((uint64_t)user_fio->input_buffer);
+ *                        vm->fio->output_addr = (FIFO*)TRANSLATE_TO_PHYSICAL((uint64_t)user_fio->output_buffer);
+ *                        vm->fio->input_buffer = (FIFO*)TRANSLATE_TO_PHYSICAL((uint64_t)vm->fio->input_buffer);
+ *                        vm->fio->output_buffer = (FIFO*)TRANSLATE_TO_PHYSICAL((uint64_t)vm->fio->output_buffer);
+ *                        vm->fio->user_fio = (FIO*)TRANSLATE_TO_PHYSICAL((uint64_t)user_fio);
+ *                        vm->fio = (VFIO*)TRANSLATE_TO_PHYSICAL((uint64_t)vm->fio);
+ *                }
+ *
+ *                if(user_fio) {
+ *                        *(uint64_t*)task_addr(task_id, SYM_FIO) = (uint64_t)user_fio;
+ *                } else {
+ *                        errno = 0x31;
+ *                        return false;
+ *                }
+ */
 	}
 
 	if(task_addr(task_id, SYM_GMALLOC_POOL)) {

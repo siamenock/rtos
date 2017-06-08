@@ -27,7 +27,7 @@ Map* map_create(size_t initial_capacity, uint64_t(*hash)(void*), bool(*equals)(v
 		return NULL;
 	}
 
-	bzero(map->table, sizeof(List*) * capacity);
+	memset(map->table, 0x0, sizeof(List*) * capacity);
 	map->capacity = capacity;
 	map->threshold = THRESHOLD(capacity);
 	map->size = 0;
@@ -74,7 +74,7 @@ bool map_put(Map* map, void* key, void* data) {
 		map2.table = __malloc(sizeof(List*) * capacity, map->pool);
 		if(!map2.table)
 			return false;
-		bzero(map2.table, sizeof(List*) * capacity);
+		memset(map2.table, 0x0, sizeof(List*) * capacity);
 		map2.capacity = capacity;
 		map2.threshold = THRESHOLD(capacity);
 		map2.size = 0;

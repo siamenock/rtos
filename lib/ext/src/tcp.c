@@ -1,62 +1,19 @@
-#include <time.h>
-#include <net/interface.h>
 #include <net/ether.h>
 #include <net/ip.h>
+#include <net/port.h>
 #include <net/tcp.h>
 #include <net/checksum.h>
-#include <util/map.h>
 
-bool tcp_port_alloc0(NIC* nic, uint32_t addr, uint16_t port) {
-	IPv4Interface* interface = nic_ip_get(nic, addr);
-	if(!interface)
-		return false;
+#define TCP_PORT_TABLE		"net.ip.tcp.porttable"
 
-	if(!interface->tcp_ports) {
-		interface->tcp_ports = set_create(64, set_uint64_hash, set_uint64_equals, nic->pool);
-		if(!interface->tcp_ports)
-			return false;
-	}
-
-	if(set_contains(interface->tcp_ports, (void*)(uintptr_t)port))
-		return false;
-
-	return set_put(interface->tcp_ports, (void*)(uintptr_t)port);
+bool tcp_port_alloc(NIC* nic, uint16_t port) {
+	uint8_t* port_map = port_map_get(nic, TCP_PORT_TABLE);
+	return port_alloc(port_map, port);
 }
 
-uint16_t tcp_port_alloc(NIC* nic, uint32_t addr) {
-	IPv4Interface* interface = nic_ip_get(nic, addr);
-	if(!interface)
-		return 0;
-
-	if(!interface->tcp_ports) {
-		interface->tcp_ports = set_create(64, set_uint64_hash, set_uint64_equals, nic->pool);
-		if(!interface->tcp_ports)
-			return 0;
-	}
-
-	uint16_t port = interface->tcp_next_port;
-	if(port < 49152)
-		port = 49152;
-	
-	while(set_contains(interface->tcp_ports, (void*)(uintptr_t)port)) {
-		if(++port < 49152)
-			port = 49152;
-	}	
-
-	if(!set_put(interface->tcp_ports, (void*)(uintptr_t)port))
-		return 0;
-	
-	interface->tcp_next_port = port;
-	
-	return port;
-}
-
-void tcp_port_free(NIC* nic, uint32_t addr, uint16_t port) {
-	IPv4Interface* interface = nic_ip_get(nic, addr);
-	if(interface == NULL)
-		return;
-	
-	set_remove(interface->tcp_ports, (void*)(uintptr_t)port);
+bool tcp_port_free(NIC* nic, uint16_t port) {
+	uint8_t* port_map = port_map_get(nic, TCP_PORT_TABLE);
+	return port_free(port_map, port);
 }
 
 void tcp_pack(Packet* packet, uint16_t tcp_body_len) {
