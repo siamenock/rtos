@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
 #include <malloc.h>
@@ -5,43 +6,62 @@
 #include <util/map.h>
 #include <util/fifo.h>
 
-static Map* variables = NULL;
+static Command __commands[CMD_MAX] = {};
+static size_t __commands_size = 0;
+static Map* __variables = NULL;
 static char* variable = NULL;
+CommandHistory cmd_history;
 char cmd_result[CMD_RESULT_SIZE];
 
-static int cmd_print(char* cmd) {
-	int command_len = 0;
-	for(int i = 0; commands[i].name != NULL; i++) {
-		int len = strlen(commands[i].name);
+static int cmd_echo(int argc, char** argv, void(*callback)(char* result, int exit_status));
+static Command cmds[] = {
+	{
+		.name = "help",
+		.desc = "Show this message.",
+		.func = cmd_help
+	},
+	{
+		.name = "echo",
+		.desc = "Echo arguments.",
+		.args = "[variable: string]*",
+		.func = cmd_echo
+	},
+};
+
+static int cmd_print(char* name) {
+	if(__commands_size == 0)
+		return -1;
+
+	size_t command_len = 0;
+
+	for(size_t i = 0; i < __commands_size; ++i) {
+		Command* c = &__commands[i];
+		size_t len = strlen(c->name);
 		command_len = len > command_len ? len : command_len;
 	}
 
-	if(command_len == 0)
-		// No commands at all
-		return -1;
-
 	bool found = false;
-	for(int i = 0; commands[i].name != NULL; i++) {
-		if(cmd)
-			if(strcmp(commands[i].name, cmd))
-				continue;
+	for(size_t i = 0; i < __commands_size; ++i) {
+		Command* c = &__commands[i];
+		if(name && strcmp(c->name, name) != 0)
+			continue;
 
 		// Name
-		printf("%s", commands[i].name);
-		int len = strlen(commands[i].name);
+		printf("%s", c->name);
+		int len = strlen(c->name);
 		len = command_len - len + 2;
 		for(int j = 0; j < len; j++)
 			putchar(' ');
 
 		// Description
-			printf("%s\n", commands[i].desc);
+		printf("%s\n", c->desc);
 
 		// Arguments
-		if(commands[i].args != NULL) {
-			for(int j = 0; j < command_len + 2; j++)
+		if(c->args != NULL) {
+			for(size_t j = 0; j < command_len + 2; j++)
 				putchar(' ');
 
-			printf("%s\n", commands[i].args);
+			printf("%s\n", c->args);
 		}
 
 		if(!found)
@@ -72,15 +92,28 @@ int cmd_help(int argc, char** argv, void(*callback)(char* result, int exit_statu
 		goto fail;
 	}
 
-success:
-	if(callback != NULL)
-		callback("true", 0);
+	if(callback)
+		callback((char*)"true", 0);
 
 	return 0;
 
 fail:
-	if(callback != NULL)
-		callback("false", 0);
+	if(callback)
+		callback((char*)"false", 0);
+
+	return 0;
+}
+
+static int cmd_echo(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
+	int pos = 0;
+	for(int i = 1; i < argc; i++) {
+		pos += sprintf(cmd_result + pos, "%s", argv[i]) - 1;
+		if(i + 1 < argc) {
+			cmd_result[pos++] = ' ';
+		}
+	}
+	printf("%s\n", cmd_result);
+	callback(cmd_result, 0);
 
 	return 0;
 }
@@ -145,10 +178,10 @@ static void cmd_parse_var(int* argc, char** argv) {
 static bool cmd_parse_arg(int argc, char** argv) {
 	for(int i = 0; i < argc; i++) {
 		if(argv[i][0] == '$') {
-			if(!map_contains(variables, argv[i])) {
+			if(!map_contains(__variables, argv[i])) {
 				return false;
 			} else {
-				argv[i] = map_get(variables, argv[i]);
+				argv[i] = map_get(__variables, argv[i]);
 			}
 		}
 	}
@@ -156,38 +189,31 @@ static bool cmd_parse_arg(int argc, char** argv) {
 }
 
 static Command* cmd_get(int argc, char** argv) {
-	if(argc == 0)
+	if(!argc || !argv[0])
 		return NULL;
 
-        for(int i = 0; commands[i].name != NULL; i++) {
-                if(strcmp(argv[0], commands[i].name) == 0) {
-                        return &commands[i];
-                }
-        }
-
-        return NULL;
+	for(size_t i = 0 ; i < __commands_size; ++i) {
+		if(strcmp(__commands[i].name, argv[0]) == 0)
+			return &__commands[i];
+	}
+	return NULL;
 }
 
 void cmd_update_var(char* result, int exit_status) {
 	char buf[16];
 	sprintf(buf, "%d", exit_status);
 
-	free(map_get(variables, "$?"));
-	map_update(variables, "$?", strdup(buf));
+	free(map_get(__variables, "$?"));
+	map_update(__variables, "$?", strdup(buf));
 
 	if(exit_status == 0) {
 		if(variable) {
-			if(map_contains(variables, variable)) {
-				free(map_get(variables, variable));
-				if(strlen(result) > 0)
-					map_update(variables, variable, strdup(result));
-				else
-					map_update(variables, variable, strdup("(nil)"));
+			char* value = strlen(result) ? strdup(result) : strdup("(nil)");
+			if(map_contains(__variables, variable)) {
+				free(map_get(__variables, variable));
+				map_update(__variables, variable, value);
 			} else {
-				if(strlen(result) > 0)
-					map_put(variables, strdup(variable), strdup(result));
-				else
-					map_put(variables, strdup(variable), strdup("(nil)"));
+				map_put(__variables, variable, value);
 			}
 		}
 	}
@@ -261,24 +287,42 @@ static char* cmd_history_get_later() {
 	return cmd_history_get(--cmd_history.index);
 }
 
-#define HISTORY_SIZE 30
 
-CommandHistory cmd_history = {
-	.index = -1, // Initial index value
-	.using = cmd_history_using,
-	.reset = cmd_history_reset,
-	.save = cmd_history_save,
-	.count = cmd_history_count,
-	.get_past = cmd_history_get_past,
-	.get_current = cmd_history_get_current,
-	.get_later = cmd_history_get_later,
-};
 
 void cmd_init(void) {
-	variables = map_create(16, map_string_hash, map_string_equals, NULL);
-	map_put(variables, strdup("$?"), strdup("(nil)"));
-	map_put(variables, strdup("$nil"), strdup("(nil)"));
-	cmd_history.histories = fifo_create(HISTORY_SIZE, NULL);
+	__variables = map_create(16, map_string_hash, map_string_equals, NULL);
+	map_put(__variables, strdup("$?"), strdup("(nil)"));
+	map_put(__variables, strdup("$nil"), strdup("(nil)"));
+
+	cmd_history.index	= -1;
+	cmd_history.using	= cmd_history_using;
+	cmd_history.reset	= cmd_history_reset;
+	cmd_history.save	= cmd_history_save;
+	cmd_history.count	= cmd_history_count;
+	cmd_history.get_past	= cmd_history_get_past;
+	cmd_history.get_current	= cmd_history_get_current;
+	cmd_history.get_later	= cmd_history_get_later;
+	cmd_history.histories	= fifo_create(CMD_HISTORY_SIZE, NULL);
+
+	cmd_register(cmds, sizeof(cmds) / sizeof(cmds[0]));
+}
+
+bool cmd_register(Command* commands, size_t length) {
+	// At this point, kernel is not ready to perform
+	// print and/or malloc function
+	if(!commands || !length)
+		return false;
+
+	for(size_t i = 0; i < length; ++i) {
+		if(commands[i].name) {
+			__commands[__commands_size++] = commands[i];
+		}
+	}
+	return true;
+}
+
+void cmd_unregister(Command* command) {
+	// TODO
 }
 
 int cmd_exec(char* line, void(*callback)(char* result, int exit_status)) {

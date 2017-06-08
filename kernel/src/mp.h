@@ -119,8 +119,6 @@ typedef struct {
 	bool(*parse_cbasme)(MP_CompatabilityBusAddressSpaceModifierEntry*, void*);
 } MP_Parser;
 
-extern uint8_t mp_processors[MP_MAX_CORE_COUNT];
-
 void mp_init();
 uint8_t mp_apic_id();
 uint8_t mp_processor_id();
