@@ -73,6 +73,8 @@ static __always_inline void init_page_tables(uint8_t apic_id, uint64_t offset) {
 		l4u[i].rw = 1;
 		l4u[i].ps = 1;
 	}
+	// Local APIC address (0xfee00000: 0x7F7(PFN))
+	l4u[0x7f7].base = 0x7f7;
 
 	// Kernel global area(gmalloc, segment descriptor, IDT, code, rodata)
 	// Mapping 256MB to kernel

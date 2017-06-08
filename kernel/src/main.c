@@ -48,7 +48,7 @@
 #include "driver/console.h"
 
 static void ap_timer_init() {
-	extern const uint64_t TIMER_FREQUENCY_PER_SEC;
+	extern uint64_t TIMER_FREQUENCY_PER_SEC;
 	extern uint64_t __timer_ms;
 	extern uint64_t __timer_us;
 	extern uint64_t __timer_ns;
@@ -270,6 +270,9 @@ static void fixup_page_table(uint8_t apic_id, uint64_t offset) {
 }
 
 void main() {
+	shared_init();
+	amp_init(NULL);
+	mp_sync();	// Barrier #0
 	mp_init();
 
 	uint64_t apic_id = mp_apic_id();
@@ -284,7 +287,6 @@ void main() {
 
 	malloc_init();
 
-	shared_init();
 	mp_sync();	// Barrier #1
 	if(apic_id == 0) {
 		printf("\nPacketNgin ver 2.0.\n");
@@ -389,7 +391,7 @@ void main() {
 		printf("Initializing shell...\n");
 		shell_init();
 
-		event_busy_add(idle0_event, NULL);
+		//event_busy_add(idle0_event, NULL);
 	} else {
 		mp_sync();	// Barrier #2
 		ap_timer_init();
@@ -417,10 +419,10 @@ void main() {
 
 	mp_sync(); // Barrier #3
 
-// 	if(apic_id == 0) {
-// 	        while(exec("/boot/init.psh") > 0)
-// 	                event_loop();
-// 	}
+	// 	if(apic_id == 0) {
+	// 	        while(exec("/boot/init.psh") > 0)
+	// 	                event_loop();
+	// 	}
 
 	while(1) {
 		event_loop();

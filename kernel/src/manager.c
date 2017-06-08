@@ -715,15 +715,15 @@ bool manager_netif_server_close(struct tcp_pcb* tcp_pcb) {
 int manager_init() {
 	lwip_init();
 	rx_process_list = list_create(NULL);
-	manager.netifs = list_create(NULL);
+	manager.netifs = list_create(NULL); //lwip
 	if(!manager.netifs)
 		return -1;
 
-	manager.servers = list_create(NULL);
+	manager.servers = list_create(NULL); //lwip server pcb
 	if(!manager.servers)
 		return -1;
 
-	manager.clients = list_create(NULL);
+	manager.clients = list_create(NULL); //lwip client pcb
 	if(!manager.clients)
 		return -1;
 

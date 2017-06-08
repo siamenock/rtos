@@ -62,11 +62,13 @@ void gmalloc_init() {
 	}
 
 	//TODO fix here
-	PNKC* pnkc = (PNKC*)(0x200000 - sizeof(PNKC));
-	reserved[reserved_count].start = (uint64_t)pnkc;
-	reserved[reserved_count].end = (uint64_t)pnkc + sizeof(PNKC);
-	reserved_count++;
+	//Multi Kernel don't use pnkc
+ 	PNKC* pnkc = (PNKC*)(0x200000 - sizeof(PNKC));
+ 	reserved[reserved_count].start = (uint64_t)pnkc;
+ 	reserved[reserved_count].end = (uint64_t)pnkc + sizeof(PNKC);
+ 	reserved_count++;
 
+	//FIXME
 	reserved[reserved_count].start = VIRTUAL_TO_PHYSICAL(RAMDISK_START);
 	reserved[reserved_count].end = VIRTUAL_TO_PHYSICAL(RAMDISK_START + (pnkc->initrd_end - pnkc->initrd_start));
 	reserved_count++;

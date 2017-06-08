@@ -230,7 +230,7 @@ int netlink_init() {
 						device->index = netdev_count;
 						device->driver.init = init;
 						device->driver.get_info = get_info;
-						device->driver.poll = poll;
+						//device->driver.poll = poll;
 
 						device_register(DEVICE_TYPE_NIC, &device->driver,
 							NULL, &netdev_count);
@@ -247,5 +247,3 @@ int netlink_init() {
 
 	return 0;
 }
-
-

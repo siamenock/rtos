@@ -21,8 +21,6 @@
 #define ETHER_MULTICAST		((uint64_t)1 << 40)	///< MAC address is multicast
 #define ID_BUFFER_SIZE		(MAX_NIC_DEVICE_COUNT * 8)
 
-extern int strncmp(const char* s, const char* d, size_t size);
-
 typedef struct _Ether {
 	uint64_t dmac: 48;			///< Destination address (endian48)
 	uint64_t smac: 48;			///< Destination address (endian48)
@@ -79,7 +77,9 @@ NICDevice* nicdev_get(const char* name) {
 
 static bool nicdev_schedule(void* context) {
 	NICDevice* nicdev = (NICDevice*)context;
-	((NICDriver*)nicdev->driver)->xmit(nicdev);
+	if(nicdev->driver && ((NICDriver*)nicdev->driver)->xmit)
+		((NICDriver*)nicdev->driver)->xmit(nicdev);
+
 	return true;
 }
 

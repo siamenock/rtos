@@ -89,7 +89,7 @@ gdt_end:
 	.globl SHARED_ADDR
 SHARED_ADDR:
 	/* @see shared.h */
-	.fill 16, 1, 0	/* mp_processors[MP_MAX_CORE_COUNT] */
+	.fill 16, 1, 0xff 	/* mp_processors[MP_MAX_CORE_COUNT] */
 	.byte 0 /* sync */
 	.quad 0 /* icc_pool */
 	.byte 0 /* icc_lock_alloc */

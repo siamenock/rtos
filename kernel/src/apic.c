@@ -2,6 +2,7 @@
 #include <stddef.h>
 #include <timer.h>
 #include "version.h"
+#include "msr.h"
 #include "mp.h"
 #include "port.h"
 #include "asm.h"
@@ -69,6 +70,8 @@ static void dummy_timer_handler(uint64_t vector, uint64_t error_code) {
 }
 
 void apic_init() {
+	_apic_address = msr_read(MSR_IA32_APIC_BASE) & 0xFFFFF000;
+
 	apic_register(32, dummy_timer_handler);
 
 	apic_write32(APIC_REG_SIVR, apic_read32(APIC_REG_SIVR) | 0x100);

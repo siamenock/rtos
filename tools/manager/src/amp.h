@@ -1,1 +1,1 @@
-void amp_init(long kernel_tart_address);
+../../../kernel/src/amp.h

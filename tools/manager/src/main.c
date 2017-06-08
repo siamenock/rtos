@@ -9,6 +9,7 @@
 
 #include <util/event.h>
 #include <timer.h>
+#include "mmap.h"
 
 #include "apic.h"
 #include "icc.h"
@@ -34,8 +35,10 @@
 #include "dispatcher.h"
 #include "driver/nicdev.h"
 #include "param.h"
+#include "symbols.h"
 
-static int symbols_init() {
+char* QWER;
+static int kernel_symbols_init() {
 	void* mmap_symbols[][2] = {
 		{ &DESC_TABLE_AREA_START, "DESC_TABLE_AREA_START"},
 		{ &DESC_TABLE_AREA_END, "DESC_TABLE_AREA_END"},
@@ -86,52 +89,11 @@ static int symbols_init() {
 			printf("Can't Get Symbol Address: \"%s\"", mmap_symbols[i][1]);
 			return -1;
 		}
-		*(char**)mmap_symbols[i][0] = (char*)symbol_addr;
-		//printf("\tSymbol \"%s\" : %p\n", mmap_symbols[i][1], symbol_addr);
+		char** test = (char**)mmap_symbols[i][0];
+		*test = (char*)symbol_addr;
+		printf("\tSymbol \"%s\" : %p %p %p\n", mmap_symbols[i][1], symbol_addr, test, *test);
 	}
 
-	return 0;
-}
-
-static int dummy_entry() {
-// 	int fd = open_mem(O_RDWR);
-// 	struct boot_params* _boot_params = map_boot_param(fd);
-// 	if(!_boot_params) {
-// 		printf("Can't Open Boot Parameter\n");
-// 		return -1;
-// 	}
-// 
-// 	uint64_t symbol_addr = elf_get_symbol("boot_params");
-// 	if(!symbol_addr) {
-// 		printf("Can't Get Symbol Address: \"boot_params\"\n");
-// 		return -2;
-// 	}
-// 	struct boot_params* boot_params = (struct boot_params*)VIRTUAL_TO_PHYSICAL(symbol_addr);
-// 	printf("\tboot_params: %p\n", boot_params);
-// 	memcpy(boot_params, _boot_params, sizeof(struct boot_params));
-// 	unmap_boot_param(_boot_params);
-// 	close_mem(fd);
-// 
-// 	symbol_addr = elf_get_symbol("boot_command_line");
-// 	if(!symbol_addr) {
-// 		printf("Can't Get Symbol Address: \"boot_command_line\"");
-// 	}
-// 	char* boot_command_line = (char*)VIRTUAL_TO_PHYSICAL(symbol_addr);
-// 	printf("\tboot_command_line: %p\n", boot_command_line);
-// 	strcpy(boot_command_line, _boot_command_line);
-// 
-// 	/*
-// 	 *symbol_addr = elf_get_symbol("kernel_start_address");
-// 	 *if(!symbol_addr) {
-// 	 *        printf("Can't Get Symbol Address: \"kernel_start_address\"\n");
-// 	 *        return -2;
-// 	 *}
-// 	 *uint64_t* _kernel_start_address = (uint64_t*)VIRTUAL_TO_PHYSICAL(symbol_addr);
-// 	 *printf("kernel_start_address: %p\n", _kernel_start_address);
-// 	 **_kernel_start_address = (uint64_t)kernel_start_address;
-// 	 */
-// 
-// 	return 0;
 	return 0;
 }
 
@@ -195,6 +157,13 @@ static void _timer_init(char* cpu_brand) {
 		_frequency = time_tsc0 - time_tsc1;
 	}
 
+	//TODO timer init
+	//How to initialize timer in linux application????
+	extern uint64_t TIMER_FREQUENCY_PER_SEC;
+	extern uint64_t __timer_ms;
+	extern uint64_t __timer_us;
+	extern uint64_t __timer_ns;
+
 	printf("\tFreqeuncy : %lx\n", _frequency);
 	unsigned long symbol_addr = elf_get_symbol("TIMER_FREQUENCY_PER_SEC");
 	if(!symbol_addr) {
@@ -202,6 +171,7 @@ static void _timer_init(char* cpu_brand) {
 	}
 	uint64_t* _TIMER_FREQUENCY_PER_SEC = (uint64_t*)VIRTUAL_TO_PHYSICAL(symbol_addr);
 	*_TIMER_FREQUENCY_PER_SEC = _frequency;
+	TIMER_FREQUENCY_PER_SEC = _frequency;
 
 	symbol_addr = elf_get_symbol("__timer_ms");
 	if(!symbol_addr) {
@@ -210,6 +180,7 @@ static void _timer_init(char* cpu_brand) {
 	uint64_t* ___timer_ms = (uint64_t*)VIRTUAL_TO_PHYSICAL(symbol_addr);
 	printf("\ttimer_ms symbol address: %p - %p\n", symbol_addr, ___timer_ms);
 	*___timer_ms = _frequency / 1000;
+	__timer_ms = _frequency / 1000;
 	printf("\ttimer_ms: %x \n", *___timer_ms);
 
 	symbol_addr = elf_get_symbol("__timer_us");
@@ -218,6 +189,7 @@ static void _timer_init(char* cpu_brand) {
 	}
 	uint64_t* ___timer_us = (uint64_t*)VIRTUAL_TO_PHYSICAL(symbol_addr);
 	*___timer_us = *___timer_ms / 1000;
+	__timer_us = __timer_ms / 1000;
 
 	symbol_addr = elf_get_symbol("__timer_ns");
 	if(!symbol_addr) {
@@ -225,6 +197,7 @@ static void _timer_init(char* cpu_brand) {
 	}
 	uint64_t* ___timer_ns = (uint64_t*)VIRTUAL_TO_PHYSICAL(symbol_addr);
 	*___timer_ns = *___timer_us / 1000;
+	__timer_ns = __timer_us / 1000;
 }
 
 static Device* devices[MAX_NIC_DEVICE_COUNT];
@@ -320,38 +293,30 @@ int main(int argc, char** argv) {
 		return ret;
 	}
 
-	printf("\nLoading %s...\n", kernel_elf);
-	ret = elf_load(kernel_elf);
-	if(ret)
-		return ret;
-
-	printf("\nCopying kernel image...\n");
-	ret = elf_copy(kernel_elf, kernel_start_address);
-	if(ret) {
-		printf("\tFailed to copy kernel image by kexec\n");
-		return ret;
-	}
-
-	printf("\nInitiliazing mmap symbols...\n");
-	ret = symbols_init(kernel_elf);
-	if(ret)
-		return ret;
-
+// 	printf("\nLoading %s...\n", kernel_elf);
+// 	ret = elf_load(kernel_elf);
+// 	if(ret)
+// 		return ret;
 	printf("\nInitializing memory mapping... \n");
 	PHYSICAL_OFFSET = kernel_start_address - 0x400000;
 	ret = mapping_memory();
 	if(ret)
 		return ret;
 
-	printf("\nInitializing dummy entry\n");
-	ret = dummy_entry();
+	printf("\nCopying kernel image...\n");
+	ret = elf_copy(kernel_elf, kernel_start_address);
+	if(ret) {
+		printf("\tFailed to copy kernel image\n");
+		return ret;
+	}
+
+	printf("\nInitiliazing symbols table...\n");
+	symbols_init();
+
+	printf("\nInitiliazing Kernel symbols...\n");
+	ret = kernel_symbols_init();
 	if(ret)
 		return ret;
-
-// 	printf("\ninitializing multicore processor...\n");
-// 	mp_init0();
-	printf("\nInitializing shared memory area...\n");
-	shared_init();
 
 	printf("\nInitializing malloc area...\n");
 	malloc_init();
@@ -361,11 +326,17 @@ int main(int argc, char** argv) {
 	char cpu_brand[4 * 4 * 3 + 1];
 	_timer_init(cpu_brand);
 
+	printf("\nInitializing shared memory area...\n");
+	shared_init();
+
 	printf("\nWake-Up Multi processor...\n");
 	amp_init(kernel_start_address);
-
+	mp_sync();	// Barrier #0
+	/**
+	 * Step 1. Kernel main
+	 */
 	printf("\nInitializing mulitiprocessing...\n");
-	mp_init();
+	mp_init(); //Can't mp_init, Linux user application can't mmap bios memory space
 
 	printf("\nInitializing cpu...\n");
 	cpu_init();

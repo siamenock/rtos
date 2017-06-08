@@ -27,12 +27,14 @@ int manager_init();
 
 /**
  * Create a manager vnic
+ *
  * @param NIC Device Name
  * @return VNIC
  */
 VNIC* manager_create_vnic(char* name);
 /**
  * Destroy a manager vnic
+ *
  * @param VNIC
  * @return boolean
  */
@@ -51,5 +53,15 @@ void manager_set_netmask(uint32_t nm);
 void manager_set_interface();
 struct tcp_pcb* manager_netif_server_open(struct netif* netif, uint16_t port);
 bool manager_netif_server_close(struct tcp_pcb* tcp_pcb);
+
+/**
+ * Send Arping Request
+ *
+ * @param nic NIC
+ * @param addr Destination Address
+ * @param count Seding count
+ * @result boolean
+ */
+bool manager_arping(NIC* nic, uint32_t addr, uint32_t count);
 
 #endif /* __MANAGER_H__ */

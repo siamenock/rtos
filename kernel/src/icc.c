@@ -9,6 +9,7 @@
 #include "apic.h"
 #include "mp.h"
 #include "mmap.h"
+#include "page.h"
 #include "shared.h"
 #include "gmalloc.h"
 #include "task.h"
@@ -23,7 +24,7 @@ static ICC_Handler icc_events[ICC_EVENTS_COUNT];
 
 static bool icc_event(void* context) {
 	uint8_t apic_id = mp_apic_id();
-	Shared* shared = (Shared*)SHARED_ADDR;
+	Shared* shared = (Shared*)VIRTUAL_TO_PHYSICAL(SHARED_ADDR);
 	FIFO* icc_queue = shared->icc_queues[apic_id].icc_queue;
 
 	if(fifo_empty(icc_queue))
@@ -53,7 +54,7 @@ static bool icc_event(void* context) {
 
 static void icc(uint64_t vector, uint64_t err) {
 	uint8_t apic_id = mp_apic_id();
-	Shared* shared = (Shared*)SHARED_ADDR;
+	Shared* shared = (Shared*)VIRTUAL_TO_PHYSICAL(SHARED_ADDR);
 	FIFO* icc_queue = shared->icc_queues[apic_id].icc_queue;
 	ICC_Message* icc_msg = fifo_peek(icc_queue, 0);
 
@@ -82,7 +83,7 @@ void icc_init() {
 	uint8_t processor_count = mp_processor_count();
 	extern void* gmalloc_pool;
 	uint8_t apic_id = mp_apic_id();
-	Shared* shared = (Shared*)SHARED_ADDR;
+	Shared* shared = (Shared*)VIRTUAL_TO_PHYSICAL(SHARED_ADDR);
 
 	if(apic_id == 0) {
 		int icc_max = processor_count * processor_count;
@@ -107,7 +108,6 @@ void icc_init() {
 	}
 
 	event_busy_add(icc_event, NULL);
-
 	apic_register(48, icc);
 }
 

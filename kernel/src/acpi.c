@@ -163,6 +163,7 @@ void acpi_init() {
 	if(madt) {
 		int length = madt->length - sizeof(MADT);
 		uint8_t* entry = madt->entry;
+		uint8_t processor_count = 0;
 
 		for(int i = 0; i < length;) {
 			switch(*(entry + i)) {
@@ -172,7 +173,7 @@ void acpi_init() {
 					i += local_apic->record_length;
 					if(local_apic->flags) {
 						Shared* shared = (Shared*)SHARED_ADDR;
-						shared->mp_processors[local_apic->apic_id] = 1;
+						shared->mp_processors[local_apic->apic_id] = processor_count++;
 					}
 					break;
 				case IO_APIC:

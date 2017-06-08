@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include <sys/time.h>
 #include <util/event.h>
+#include <termios.h>
 #include "input.h"
 #include "../stdio.h"
 
@@ -13,11 +14,10 @@ static int init(void* device, void* data) {
 	if(output_enabled)
 		return 0; // Already enabled 
 
-	system("stty -echo");
-
-	static fd_set stdin;
-	FD_ZERO(&stdin);
-	FD_SET(STDIN_FILENO, &stdin);
+	struct termios termios;
+	tcgetattr(STDIN_FILENO, &termios);
+	termios.c_lflag &= ~(ICANON | ECHO);
+	tcsetattr(STDIN_FILENO, TCSANOW, &termios);
 
 	output_enabled = true;
 	return 0;
@@ -32,6 +32,8 @@ static int _write(int id, const char* buf, int len) {
 		return -1;
 
 	while(len) {
+		//FIXME stdout bug???
+		//Can't flush stdout buffer
 		len -= write(STDOUT_FILENO, buf, len);
 	}
 
@@ -80,7 +82,10 @@ static bool event(void* context) {
 	tv.tv_usec = 0;
 	char a;
 
-	fd_set temp = *(fd_set*)context;
+	fd_set temp;
+	fsync(STDIN_FILENO);
+	FD_ZERO(&temp);
+	FD_SET(STDIN_FILENO, &temp);
 	int ret = select(STDIN_FILENO + 1, (fd_set*)&temp, NULL, NULL, &tv);
 	if(ret == -1) {
 		perror("Selector error");

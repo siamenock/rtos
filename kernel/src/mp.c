@@ -1,4 +1,6 @@
 #include <string.h>
+#include "page.h"
+#include "mmap.h"
 #include "acpi.h"
 #include "page.h"
 #include "lock.h"
@@ -14,51 +16,25 @@
 // Ref: http://www.singlix.com/trdos/UNIX_V1/xv6/lapic.c
 
 
-static uint8_t apic_id;		// APIC ID
 static uint8_t processor_id;
 static uint8_t processor_count;
 
-extern uint64_t _ioapic_address;
-extern uint64_t _apic_address;
-
-bool parse_iae(MP_IOAPICEntry* entry, void* context) {
-	_ioapic_address = (uint64_t)entry->io_apic_address;
-	return true;
-}
-
 void mp_init() {
 	// Map IA32_APIC_BASE_MSR(0x1B) to virtual memory
-	_apic_address = msr_read(MSR_IA32_APIC_BASE) & 0xFFFFF000;
 
 	// Get APIC ID
-	apic_id = get_apic_id();
+	uint8_t apic_id = amp_get_apic_id();
 	// Analyze floating pointer structure
 	//   Get IO APIC address
 	//   Other core APIC IDs
-	MP_Parser parser = {
-		.parse_iae = parse_iae
-	};
-
-	mp_parse_fps(&parser, NULL);
-
-	Shared* shared = (Shared*)SHARED_ADDR;
-
-	acpi_init();
-
+	Shared* shared = (Shared*)VIRTUAL_TO_PHYSICAL(SHARED_ADDR);
 	// Calculate core ID
-	processor_id = 0;
-	for(int i = 0; i < apic_id; i++) {
-		if(shared->mp_processors[i])
-			processor_id++;
-	}
+	processor_id = shared->mp_processors[apic_id];
 
 	// Calculate core count
-	processor_count = 0;
 	for(int i = 0; i < MP_MAX_CORE_COUNT; i++) {
-		if(shared->mp_processors[i])
-			shared->mp_processors[i] = processor_count++;
-		else
-			shared->mp_processors[i] = MP_CORE_INVALID;
+		if(shared->mp_processors[i] != 0xff)
+			processor_count++;
 	}
 }
 
@@ -67,7 +43,7 @@ void mp_sync() {
 }
 
 uint8_t mp_apic_id() {
-	return apic_id;
+	return amp_get_apic_id();
 }
 
 uint8_t mp_processor_id() {
@@ -75,7 +51,7 @@ uint8_t mp_processor_id() {
 }
 
 uint8_t mp_apic_id_to_processor_id(uint8_t apic_id) {
-	Shared* shared = (Shared*)SHARED_ADDR;
+	Shared* shared = (Shared*)VIRTUAL_TO_PHYSICAL(SHARED_ADDR);
 	return shared->mp_processors[apic_id];
 }
 
@@ -194,6 +170,6 @@ void mp_parse_fps(MP_Parser* parser, void* context) {
 }
 
 uint8_t* mp_processor_map() {
-	Shared* shared = (Shared*)SHARED_ADDR;
+	Shared* shared = (Shared*)VIRTUAL_TO_PHYSICAL(SHARED_ADDR);
 	return (uint8_t*)shared->mp_processors;
 }
