@@ -1,0 +1,1 @@
+../../../kernel/src/manager_core.h
