@@ -139,3 +139,4 @@ help:
 	@echo "	test			- Execute runtime-tests (QEMU)"
 	@echo "	vb			- Run by VirtualBox"
 	@echo ""
+	@echo "For more information, see http://industriousone.com/premake/quick-start"
