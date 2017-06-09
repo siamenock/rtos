@@ -12,6 +12,7 @@
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
 #include <linux/if_arp.h>
+#include <util/event.h>
 
 #include "driver/nicdev.h"
 #include "device.h"
@@ -20,37 +21,6 @@
 #define MAX_NET_DEVICES		8
 
 /* PacketNgin wrapper struct for linux net_device */
-typedef struct {
-	int		index;
-	NICStatus 	status;
-	NICInfo 	info;
-	NICDriver	driver;
-} NetDevice;
-
-static NetDevice* devices[MAX_NET_DEVICES];
-static int netdev_count = 0;
-
-static int init(void* device, void* data) {
-	int index = *(int *)data;
-	if(!devices[index]) {
-		printf("Invalid net device to be initialized\n");
-		return -1;
-	}
-
-	return devices[index]->index;
-}
-
-static void get_info(int id, NICInfo* info) {
-	memset(&info->mac, 0x0, ETH_ALEN);
-	info->mac = devices[id]->info.mac;
-
-	strncpy(info->name, devices[id]->info.name, sizeof(info->name));
-}
-
-static int poll(int id) {
-	return 0;
-}
-
 typedef struct nl_req_s nl_req_t;
 
 struct nl_req_s {
@@ -76,7 +46,7 @@ static inline const char *ll_addr_n2a(const unsigned char *addr,
 	return buf;
 }
 
-static void rtnl_link(struct nlmsghdr *h, NetDevice* device) {
+static void rtnl_link(struct nlmsghdr *h, NICDevice* nicdev) {
 	struct ifinfomsg *iface;
 	struct rtattr *attribute;
 	int len;
@@ -90,16 +60,13 @@ static void rtnl_link(struct nlmsghdr *h, NetDevice* device) {
 			case IFLA_IFNAME:
 				;
 				char* name = RTA_DATA(attribute);
-				printf("\t%d: ", iface->ifi_index);
-				printf("%s:\n", name);
-				strncpy(device->info.name, name, sizeof(device->info.name));
+				strncpy(nicdev->name, name, MAX_NIC_NAME_LEN);
 				break;
 
 			case IFLA_MTU:
 				;
 				int mtu = *(int *)RTA_DATA(attribute);
-				printf("\t\tMTU %u\n", mtu);
-				device->status.mtu = mtu;
+				//device->status.mtu = mtu;
 				break;
 
 			case IFLA_ADDRESS:
@@ -107,17 +74,11 @@ static void rtnl_link(struct nlmsghdr *h, NetDevice* device) {
 				char buf[64];
 				uint8_t* mac = RTA_DATA(attribute);
 
-				memset(&device->info.mac, 0x0, ETH_ALEN);
 				for(int i = 0; i < ETH_ALEN; i++) {
-					device->info.mac |=
+					nicdev->mac |=
 						(uint64_t)mac[i] << (ETH_ALEN - i - 1) * 8;
 				}
 
-				printf("\t\tAddress %s\n",
-						ll_addr_n2a(RTA_DATA(attribute),
-							RTA_PAYLOAD(attribute),
-							iface->ifi_type,
-							buf, sizeof(buf)));
 				break;
 
 			default:
@@ -126,18 +87,86 @@ static void rtnl_link(struct nlmsghdr *h, NetDevice* device) {
 	}
 }
 
-static bool interface_filtered(struct ifinfomsg *iface) {
-	if((iface->ifi_flags & IFF_UP) != IFF_UP) {
-		printf("\tInterface filtered : not available\n");
+static bool interface_up_check(struct ifinfomsg *iface) {
+	if((iface->ifi_flags & IFF_UP))
 		return true;
-	}
 
+	return false;
+}
+
+static bool interface_loopback_filtered(struct ifinfomsg *iface) {
 	if((iface->ifi_flags & IFF_LOOPBACK) == IFF_LOOPBACK) {
-		printf("\tInterface filtered : loopback interface\n");
 		return true;
 	}
 
 	return false;
+}
+
+bool netlink_event(void* context) {
+	int fd = (int)(uint64_t)context;
+	int len;
+	struct iovec io_reply;
+	struct sockaddr_nl kernel;
+	struct msghdr rtnl_reply;
+	char reply[IFLIST_REPLY_BUFFER];
+
+	memset(&io_reply, 0, sizeof(io_reply));
+	memset(&kernel, 0, sizeof(kernel));
+	memset(&rtnl_reply, 0, sizeof(rtnl_reply));
+
+	io_reply.iov_base = reply;
+	io_reply.iov_len = IFLIST_REPLY_BUFFER;
+
+	kernel.nl_family = AF_NETLINK;
+
+	rtnl_reply.msg_iov = &io_reply;
+	rtnl_reply.msg_iovlen = 1;
+	rtnl_reply.msg_name = &kernel;
+	rtnl_reply.msg_namelen = sizeof(kernel);
+
+	len = recvmsg(fd, &rtnl_reply, MSG_DONTWAIT);
+	if(len > 0) {
+		struct nlmsghdr *msg_ptr;
+		for(msg_ptr = (struct nlmsghdr *) reply; NLMSG_OK(msg_ptr, len);
+				msg_ptr = NLMSG_NEXT(msg_ptr, len)) {
+			NICDevice* nicdev;
+			struct ifinfomsg *iface;
+			iface = NLMSG_DATA(msg_ptr);
+
+			if (interface_loopback_filtered(iface))
+				continue;
+
+			switch(msg_ptr->nlmsg_type) {
+				case NLMSG_DONE: /* NLMSG_DONE */
+					return true;
+					break;
+				case RTM_NEWLINK:
+					;
+					nicdev = malloc(sizeof(NICDevice));
+					memset(nicdev, 0, sizeof(NICDevice));
+					rtnl_link(msg_ptr, nicdev);
+					if(interface_up_check(iface)) {
+						if(nicdev_register(nicdev) < 0)
+							break;
+
+						printf("Register: %s\n", nicdev->name);
+						//FIXME: dispatcher register nic
+					} else {
+						if(!nicdev_unregister(nicdev->name))
+							break;
+
+						printf("Unregister: %s\n", nicdev->name);
+						//FIXME: dispatcher unregister nic
+						free(nicdev);
+					}
+					break;
+				default:
+					break;
+			}
+		}
+	}
+
+	return true;
 }
 
 // FIXME: refactor netlink function
@@ -150,17 +179,15 @@ int netlink_init() {
 	struct iovec io;
 
 	nl_req_t req;
-	char reply[IFLIST_REPLY_BUFFER];
 
 	pid_t pid = getpid();
-	int end = 0;
 
 	fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
 
 	memset(&local, 0, sizeof(local));
 	local.nl_family = AF_NETLINK;
 	local.nl_pid = pid;
-	local.nl_groups = 0;
+	local.nl_groups = RTNLGRP_LINK;
 
 	if(bind(fd, (struct sockaddr *) &local, sizeof(local)) < 0) {
 		perror("Failed to bind rtnetlink socket\n");
@@ -175,7 +202,7 @@ int netlink_init() {
 
 	req.hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtgenmsg));
 	req.hdr.nlmsg_type = RTM_GETLINK;
-	req.hdr.nlmsg_flags = NLM_F_REQUEST | NLM_F_DUMP;
+	req.hdr.nlmsg_flags = NLM_F_REQUEST | NLM_F_ATOMIC | NLM_F_DUMP;
 	req.hdr.nlmsg_seq = 1;
 	req.hdr.nlmsg_pid = pid;
 	req.gen.rtgen_family = AF_PACKET;
@@ -188,62 +215,7 @@ int netlink_init() {
 	rtnl_msg.msg_namelen = sizeof(kernel);
 
 	sendmsg(fd, (struct msghdr *) &rtnl_msg, 0);
-
-	while(!end) {
-		int len;
-		struct nlmsghdr *msg_ptr;
-
-		struct msghdr rtnl_reply;
-		struct iovec io_reply;
-
-		memset(&io_reply, 0, sizeof(io_reply));
-		memset(&rtnl_reply, 0, sizeof(rtnl_reply));
-
-		io.iov_base = reply;
-		io.iov_len = IFLIST_REPLY_BUFFER;
-		rtnl_reply.msg_iov = &io;
-		rtnl_reply.msg_iovlen = 1;
-		rtnl_reply.msg_name = &kernel;
-		rtnl_reply.msg_namelen = sizeof(kernel);
-
-		len = recvmsg(fd, &rtnl_reply, 0);
-		if(len) {
-			for(msg_ptr = (struct nlmsghdr *) reply; NLMSG_OK(msg_ptr, len);
-					msg_ptr = NLMSG_NEXT(msg_ptr, len)) {
-				switch(msg_ptr->nlmsg_type) {
-					case 3:		/* NLMSG_DONE */
-						end++;
-						break;
-					case 16:	/* RTM_NEWLINK */
-						;
-						struct ifinfomsg *iface;
-						iface = NLMSG_DATA(msg_ptr);
-
-						if(interface_filtered(iface))
-							break;
-
-						devices[netdev_count] = malloc(sizeof(NetDevice));
-						NetDevice* device = devices[netdev_count];
-
-						rtnl_link(msg_ptr, device);
-
-						device->index = netdev_count;
-						device->driver.init = init;
-						device->driver.get_info = get_info;
-						//device->driver.poll = poll;
-
-						device_register(DEVICE_TYPE_NIC, &device->driver,
-							NULL, &netdev_count);
-						netdev_count++;
-						break;
-					default:
-						break;
-				}
-			}
-		}
-	}
-
-	close(fd);
+	event_idle_add(netlink_event, (void*)(uint64_t)fd);
 
 	return 0;
 }
