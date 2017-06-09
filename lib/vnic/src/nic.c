@@ -376,7 +376,7 @@ int32_t nic_config_alloc(NIC* nic, char* name, uint16_t size) {
 	uint32_t req = 1 + ((len + sizeof(uint32_t) - 1) / sizeof(uint32_t)) + (((uint32_t)size + sizeof(uint32_t) - 1) / sizeof(uint32_t)); // heder + round(name) + round(blocks)
 	
 	// Check name is already allocated
-	for(uint32_t* p = nic->config_head; p < nic->config_tail; ) {
+	for(uint32_t* p = (uint32_t*)nic->config_head; p < (uint32_t*)nic->config_tail; ) {
 		uint16_t len2 = *p >> 16;
 		uint16_t count2 = *p & 0xffff;
 		
@@ -392,11 +392,11 @@ int32_t nic_config_alloc(NIC* nic, char* name, uint16_t size) {
 	}
 	
 	// Check available space
-	for(uint32_t* p = nic->config_head; p < nic->config_tail; ) {
+	for(uint32_t* p = (uint32_t*)nic->config_head; p < (uint32_t*)nic->config_tail; ) {
 		if(*p == 0) {
 			bool found = true;
 			for(int i = 0; i < req; i++) {
-				if(p >= nic->config_tail) {
+				if(p >= (uint32_t*)nic->config_tail) {
 					return -2;
 				}
 				
@@ -441,7 +441,7 @@ int32_t nic_config_key(NIC* nic, char* name) {
 	if(len > 255)
 		return -1;
 	
-	for(uint32_t* p = nic->config_head; p < nic->config_tail; ) {
+	for(uint32_t* p = (uint32_t*)nic->config_head; p < (uint32_t*)nic->config_tail; ) {
 		if(*p == 0) {
 			p++;
 		} else {
@@ -460,14 +460,14 @@ int32_t nic_config_key(NIC* nic, char* name) {
 }
 
 void* nic_config_get(NIC* nic, uint16_t key) {
-	uint32_t* header = &nic->config_head[key];
+	uint32_t* header = (uint32_t*)&nic->config_head[key];
 	uint16_t len = *header >> 16;
 	
 	return header + 1 + (len + sizeof(uint32_t) - 1) / sizeof(uint32_t);
 }
 
 uint16_t nic_config_size(NIC* nic, uint16_t key) {
-	uint32_t* header = &nic->config_head[key];
+	uint32_t* header = (uint32_t*)&nic->config_head[key];
 	uint16_t len = *header >> 16;
 	uint16_t count = *header & 0xffff;
 	
@@ -477,7 +477,7 @@ uint16_t nic_config_size(NIC* nic, uint16_t key) {
 uint32_t nic_config_available(NIC* nic) {
 	uint32_t count = 0;
 	
-	for(uint32_t* p = nic->config_head; p < nic->config_tail; ) {
+	for(uint32_t* p = (uint32_t*)nic->config_head; p < (uint32_t*)nic->config_tail; ) {
 		if(*p == 0) {
 			p++;
 			count++;

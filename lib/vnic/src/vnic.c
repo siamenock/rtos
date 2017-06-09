@@ -158,7 +158,7 @@ bool vnic_init(VNIC* vnic, uint64_t* attrs) {
 
 	strncpy(vnic->parent, (char*)get_value(attrs, VNIC_DEV), MAX_NIC_NAME_LEN);
 	vnic->nic->id = vnic->id;
-	vnic->budget = get_value(attrs, VNIC_BUDGET) > 32 ? : 32;
+	vnic->budget = get_value(attrs, VNIC_BUDGET) ? : 32;
 	vnic->magic = vnic->nic->magic;
 	vnic->mac = vnic->nic->mac;
 	vnic->pool.bitmap = vnic->nic->pool.bitmap;
