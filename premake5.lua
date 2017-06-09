@@ -11,6 +11,7 @@ workspace 'PacketNgin'
     filter {}
 
 include 'lib'
+include 'tools'
 include 'loader'
 include 'kernel'
 include 'drivers'

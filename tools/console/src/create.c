@@ -34,8 +34,8 @@ static int vm_create(int argc, char* argv[]) {
 	vm.memory_size = 0x1000000;	// 16MB
 	vm.storage_size = 0x1000000;	// 16MB
 	vm.nic_count = 0;
-	NICSpec nics[VM_MAX_NIC_COUNT];
-	memset(nics, 0, sizeof(NICSpec) * VM_MAX_NIC_COUNT);
+	NICSpec nics[VMSPEC_MAX_NIC_COUNT];
+	memset(nics, 0, sizeof(NICSpec) * VMSPEC_MAX_NIC_COUNT);
 	vm.nics = nics;
 	vm.argc = 0;
 	//char* _args[VM_MAX_ARGC];

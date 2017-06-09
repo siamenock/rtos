@@ -10,10 +10,10 @@ workspace "Utility"
     buildoptions { "-DLINUX -std=gnu99", "-Wno-unused", "-Wno-format", "-Wno-unused-result", "-Wno-unused-parameter" }
 
     targetdir "bin"
-    includedirs { "$(HOME)/penguin/include", "$(HOME)/penguin/include/ipv4" }
-    links { "umpn" }
+    includedirs { "../../lib/include", "include" }
+    libdirs { "../../lib/ext/", "../../lib/tlsf/", "../../lib/hal/" }
+    links { "ext", "tlsf", "hal" }
     files { "src/rpc.c" }
-    libdirs { "." }
 
     project "connect"
         kind "ConsoleApp"
