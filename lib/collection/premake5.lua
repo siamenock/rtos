@@ -1,3 +1,7 @@
+configurations { 'linux' }
+
+include 'testcollection'
+
 project 'collection'
     kind 'StaticLib'
 
@@ -7,15 +11,6 @@ project 'collection'
 
     buildoptions    '-fms-extensions'
 
-project 'collectiontest'
-    kind 'ConsoleApp'
-    language 'C'
-	location '.'
-
-    includedirs "include"
-	files { "test/**.h", "test/**.c" }
-    links { 'collection' }
-
-	postbuildcommands { "%{cfg.buildtarget.abspath}" } -- run tester
-    buildoptions    '-fms-extensions'
-
+    postbuildcommands {
+        'make -C testcollection'
+    }

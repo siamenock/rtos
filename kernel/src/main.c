@@ -15,6 +15,7 @@
 #include "page.h"
 #include "stdio.h"
 #include "port.h"
+#include "amp.h"
 #include "mp.h"
 #include "cpu.h"
 #include "gdt.h"
@@ -62,38 +63,38 @@ static void ap_timer_init() {
 	__timer_ns = *(uint64_t*)VIRTUAL_TO_PHYSICAL((uint64_t)&__timer_ns);
 }
 
-static bool idle0_event(void* data) {
-	// #ifdef VFIO_ENABLED
-	// 	// Poll FIO
-	// #define MAX_VM_COUNT	128
-	// 	uint32_t vmids[MAX_VM_COUNT];
-	// 	int vm_count = vm_list(vmids, MAX_VM_COUNT);
-	// 	for(int i = 0; i < vm_count; i++) {
-	// 		VM* vm = vm_get(vmids[i]);
-	// 		VFIO* fio = vm->fio;
-	// 		if(!fio)
-	// 			continue;
-	// 
-	// 		if(!fio->input_addr)
-	// 			continue;
-	// 
-	// 		// Check if user changed request_id on purpose, and fix it
-	// 		if(fio->user_fio->request_id != fio->request_id + fifo_size(fio->input_addr))
-	// 			fio->user_fio->request_id = fio->request_id + fifo_size(fio->input_addr);
-	// 
-	// 		// Check if there's something in the input fifo
-	// 		if(fifo_size(fio->input_addr) > 0)
-	// 			vfio_poll(vm);
-	// 	}
-	// #endif
-	// 
-	// 	// idle
-	// 	for(int i = 0; i < 1000; i++)
-	// 		asm volatile("nop");
-
-	// idle_time += cpu_tsc() - time;
-	return true;
-}
+// static bool idle0_event(void* data) {
+// #ifdef VFIO_ENABLED
+// 	// Poll FIO
+// #define MAX_VM_COUNT	128
+// 	uint32_t vmids[MAX_VM_COUNT];
+// 	int vm_count = vm_list(vmids, MAX_VM_COUNT);
+// 	for(int i = 0; i < vm_count; i++) {
+// 		VM* vm = vm_get(vmids[i]);
+// 		VFIO* fio = vm->fio;
+// 		if(!fio)
+// 			continue;
+// 
+// 		if(!fio->input_addr)
+// 			continue;
+// 
+// 		// Check if user changed request_id on purpose, and fix it
+// 		if(fio->user_fio->request_id != fio->request_id + fifo_size(fio->input_addr))
+// 			fio->user_fio->request_id = fio->request_id + fifo_size(fio->input_addr);
+// 
+// 		// Check if there's something in the input fifo
+// 		if(fifo_size(fio->input_addr) > 0)
+// 			vfio_poll(vm);
+// 	}
+// #endif
+// 
+// 	// idle
+// 	for(int i = 0; i < 1000; i++)
+// 		asm volatile("nop");
+// 
+// 	idle_time += cpu_tsc() - time;
+// 	return true;
+// }
 
 static bool idle_monitor_event(void* data) {
 	static uint8_t trigger;
@@ -288,7 +289,7 @@ static void fixup_page_table(uint8_t apic_id, uint64_t offset) {
 
 void main() {
 	shared_init();
-	amp_init(NULL);
+	amp_init((uint64_t)NULL);
 	mp_sync();	// Barrier #0
 	mp_init();
 
