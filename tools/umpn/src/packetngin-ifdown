@@ -1,2 +1,0 @@
-sudo ifconfig br100 down
-sudo brctl delbr br100
