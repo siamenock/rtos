@@ -16,6 +16,7 @@
 
 #include "driver/nicdev.h"
 #include "device.h"
+#include "dispatcher.h"
 
 #define IFLIST_REPLY_BUFFER	8192
 #define MAX_NET_DEVICES		8
@@ -126,10 +127,11 @@ bool netlink_event(void* context) {
 
 	len = recvmsg(fd, &rtnl_reply, MSG_DONTWAIT);
 	if(len > 0) {
+		int error;
 		struct nlmsghdr *msg_ptr;
-		for(msg_ptr = (struct nlmsghdr *) reply; NLMSG_OK(msg_ptr, len);
-				msg_ptr = NLMSG_NEXT(msg_ptr, len)) {
+		for(msg_ptr = (struct nlmsghdr *) reply; NLMSG_OK(msg_ptr, len); msg_ptr = NLMSG_NEXT(msg_ptr, len)) {
 			NICDevice* nicdev;
+			NICDevice* nicdev_internal;
 			struct ifinfomsg *iface;
 			iface = NLMSG_DATA(msg_ptr);
 
@@ -141,23 +143,27 @@ bool netlink_event(void* context) {
 					return true;
 					break;
 				case RTM_NEWLINK:
-					;
 					nicdev = malloc(sizeof(NICDevice));
 					memset(nicdev, 0, sizeof(NICDevice));
 					rtnl_link(msg_ptr, nicdev);
 					if(interface_up_check(iface)) {
-						if(nicdev_register(nicdev) < 0)
-							break;
+						// Register resources
+						error = nicdev_register(nicdev);
+						if(error) break;
+						error = dispatcher_create_nic(nicdev);
+						if(error) break;
 
 						printf("Register: %s\n", nicdev->name);
-						//FIXME: dispatcher register nic
 					} else {
-						if(!nicdev_unregister(nicdev->name))
-							break;
+						// Unregister resources
+						nicdev_internal = nicdev_unregister(nicdev->name);
+						if(!nicdev_internal) break;
+						error = dispatcher_destroy_nic(nicdev);
+						if(error) break;
 
 						printf("Unregister: %s\n", nicdev->name);
-						//FIXME: dispatcher unregister nic
 						free(nicdev);
+						free(nicdev_internal);
 					}
 					break;
 				default:
