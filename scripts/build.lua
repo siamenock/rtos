@@ -77,7 +77,7 @@ local function compileProperty(arch)
 		format = 'elf32'
 	elseif(arch == 'x86_64') then
 		format = 'elf64'
-                buildoptions '-mcmodel=kernel'
+                -- buildoptions '-mcmodel=kernel'
 	end
 
     assemblyProperty(format);

@@ -113,14 +113,6 @@ struct _RPC {
 };
 
 // Client side APIs
-#ifdef LINUX
-RPC* rpc_open(const char* host, int port, int timeout);
-void rpc_close(RPC* rpc);
-RPC* rpc_listen(int port);
-RPC* rpc_accept(RPC* rpc);
-bool rpc_is_closed(RPC* rpc);
-#endif /* LINUX */
-
 int rpc_hello(RPC* rpc, bool(*callback)(void* context), void* context);
 
 int rpc_vm_create(RPC* rpc, VMSpec* vm, bool(*callback)(uint32_t id, void* context), void* context);

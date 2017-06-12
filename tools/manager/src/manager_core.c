@@ -12,8 +12,9 @@
 #include <unistd.h>
 #include <_malloc.h>
 #include <fcntl.h>
+#include <util/event.h>
 
-#include "rpc.h"
+#include "manager.h"
 #include "manager_core.h"
 
 typedef struct {
@@ -21,20 +22,33 @@ typedef struct {
 	struct	sockaddr_in caddr;
 } RPCData;
 
-static err_t *core_accept(RPC* rpc);
+static List* actives;	/* rpc */
 
-bool manager_core_init(err_t (*_accept)(RPC* rpc)) {
-	if(!manager_server_open()) {
-		printf("\tFailed to open manager server\n");
+Manager manager;
 
-		return false;
+bool rpc_is_closed(RPC* rpc);
+static bool manager_loop(void* context) {
+	if(!list_is_empty(actives)) {
+		ListIterator iter;
+		list_iterator_init(&iter, actives);
+		while(list_iterator_has_next(&iter)) {
+			RPC* rpc = list_iterator_next(&iter);
+			if(!rpc_is_closed(rpc))
+				rpc_loop(rpc);
+			else
+				list_remove_data(actives, rpc);
+		}
 	}
 
+	return true;
+}
+
+static int (*core_accept)(RPC* rpc);
+
+bool manager_core_init(int (*_accept)(RPC* rpc)) {
 	printf("\tManager RPC server opened\n");
 
 	event_idle_add(manager_loop, NULL);
-
-	vm_stdio_handler(stdio_callback);
 
 	core_accept = _accept;
 
@@ -116,58 +130,6 @@ void handler(int signo) {
 	// Do nothing just interrupt
 }
 
-extern void* __malloc_pool;
-RPC* rpc_open(const char* host, int port, int timeout) {
-	int fd = socket(AF_INET, SOCK_STREAM, 0);
-
-	if(fd < 0) {
-		return NULL;
-	}
-
-	struct sigaction sigact, old_sigact;
-	sigact.sa_handler = handler;
-	sigemptyset(&sigact.sa_mask);
-	sigact.sa_flags = SA_INTERRUPT;
-
-	if(sigaction(SIGALRM, &sigact, &old_sigact) < 0) {
-		close(fd);
-		return NULL;
-	}
-
-	struct sockaddr_in addr;
-	memset(&addr, 0x0, sizeof(struct sockaddr_in));
-	addr.sin_family = AF_INET;
-	addr.sin_addr.s_addr = inet_addr(host);
-	addr.sin_port = htons(port);
-
-	alarm(timeout);
-
-	if(connect(fd, (struct sockaddr*)&addr, sizeof(struct sockaddr_in)) < 0) {
-		alarm(0);
-		sigaction(SIGALRM, &old_sigact, NULL);
-		close(fd);
-		return NULL;
-	}
-
-	alarm(0);
-
-	if(sigaction(SIGALRM, &old_sigact, NULL) < 0) {
-		close(fd);
-		return NULL;
-	}
-
-	RPC* rpc = malloc(sizeof(RPC) + sizeof(RPCData));
-	memset(rpc, 0, sizeof(RPC) + sizeof(RPCData));
-	rpc->read = sock_read;
-	rpc->write = sock_write;
-	rpc->close = sock_close;
-
-	RPCData* data = (RPCData*)rpc->data;
-	data->fd = fd;
-
-	return rpc;
-}
-
 bool rpc_is_closed(RPC* rpc) {
 	RPCData* data = (RPCData*)rpc->data;
 	return data->fd < 0;
@@ -221,55 +183,7 @@ static bool callback_hello(void* context) {
 	return true;
 }
 
-RPC* rpc_connect(char* host, int port, int timeout, bool keep_session) {
-	RPC* rpc = rpc_open(host, port, timeout);
-	if(rpc == NULL)
-		return NULL;
-
-	struct timeval tv;
-	gettimeofday(&tv, NULL);
-
-	HelloContext* context_hello = malloc(sizeof(HelloContext));
-	if(context_hello == NULL) {
-		rpc_close(rpc);
-		return NULL;
-	}
-	memset(context_hello, 0, sizeof(HelloContext));
-
-	context_hello->current = tv.tv_sec * 1000 * 1000 + tv.tv_usec;
-	context_hello->count = 1;
-	context_hello->rpc = rpc;
-	context_hello->keep_session = keep_session;
-
-	rpc_hello(rpc, callback_hello, context_hello);
-
-	return rpc;
-}
-
-RPCSession* rpc_session() {
-	RPCSession* session = malloc(sizeof(RPCSession));
-	if(!session)
-		return NULL;
-	memset(session, 0, sizeof(RPCSession));
-
-	session->host = getenv("MANAGER_IP");
-	if(!session->host)
-		return NULL;
-
-	char* port = getenv("MANAGER_PORT");
-	if(!port)
-		return NULL;
-	session->port = atoi(port);
-
-	return session;
-}
-
-static char buf[0x200000];
-void rpc_init() {
-	__malloc_init(buf, 0x200000);
-}
-
-RPC* rpc_listen(int port) {
+RPCData* rpc_listen(int port) {
        int fd = socket(AF_INET, SOCK_STREAM, 0);
        if(fd < 0) {
                return NULL;
@@ -289,33 +203,30 @@ RPC* rpc_listen(int port) {
                return NULL;
        }
 
-       RPC* rpc = malloc(sizeof(RPC) + sizeof(RPCData));
-       memset(rpc, 0x0, sizeof(RPC));
-       RPCData* data = (RPCData*)rpc->data;
-       data->fd = fd;
+       RPCData* rpc_data = malloc(sizeof(RPCData));
+       memset(rpc_data, 0x0, sizeof(RPCData));
+       rpc_data->fd = fd;
+	   rpc_data->caddr = addr;
 
-       return rpc;
+       return rpc_data;
 }
 
-RPC* rpc_accept(RPC* srpc) {
-       RPCData* data = (RPCData*)srpc->data;
-
-       if(listen(data->fd, 5) < 0) {
+static RPC* rpc_accept(RPCData* rpc_data) {
+       if(listen(rpc_data->fd, 5) < 0) {
                return NULL;
        }
        
        // TODO: would rather change to nonblock socket
-       int rc = fcntl(data->fd, F_SETFL, fcntl(data->fd, F_GETFL, 0) | O_NONBLOCK);
+       int rc = fcntl(rpc_data->fd, F_SETFL, fcntl(rpc_data->fd, F_GETFL, 0) | O_NONBLOCK);
        if(rc < 0)
                perror("Failed to modifiy socket to nonblock\n");
                    
        socklen_t len = sizeof(struct sockaddr_in);
        struct sockaddr_in addr;
-       int fd = accept(data->fd, (struct sockaddr*)&addr, &len);
+       int fd = accept(rpc_data->fd, (struct sockaddr*)&addr, &len);
        if(fd < 0) return NULL;
 
        RPC* rpc = malloc(sizeof(RPC) + sizeof(RPCData));
-       memcpy(rpc, srpc, sizeof(RPC));
        rpc->ver = 0;
        rpc->rbuf_read = 0;
        rpc->rbuf_index = 0;
@@ -324,34 +235,27 @@ RPC* rpc_accept(RPC* srpc) {
        rpc->write = sock_write;
        rpc->close = sock_close;
 
-       data = (RPCData*)rpc->data;
+       RPCData* data = (RPCData*)rpc->data;
        memcpy(&data->caddr, &addr, sizeof(struct sockaddr_in));
        data->fd = fd;
 
        return rpc;
 }
 
-typedef struct {
-	int     fd;
-	struct  sockaddr_in caddr;
-} RPCData;
-
-static List* actives;	/* rpc */
-
-
-static bool manager_accept_loop(void* rpc) {
+static bool manager_accept_loop(void* _rpc_data) {
 	// RPC socket is nonblocking
-	RPC* crpc = rpc_accept((RPC*)rpc);
+	RPCData* rpc_data = _rpc_data;
+	RPC* crpc = rpc_accept(rpc_data);
 	if(!crpc)
 		return true;
 
-	accept(crpc);
+	core_accept(crpc);
 
 	if(list_index_of(actives, crpc, NULL) < 0)
 		list_add(actives, crpc);
 
 	RPCData* data = (RPCData*)crpc->data;
-	//printf("Connection opened : %s\n", inet_ntoa(data->caddr.sin_addr));
+	printf("Connection opened : %s\n", inet_ntoa(data->caddr.sin_addr));
 
 	return true;
 }
@@ -362,8 +266,8 @@ bool manager_core_server_close(ManagerCore* manager_core) {
 ManagerCore* manager_core_server_open(uint16_t port) {
 	ManagerCore* manager_core = malloc(sizeof(ManagerCore));
 
-	RPC* rpc = rpc_listen(port);
-	if(!rpc) {
+	RPCData* rpc_data = rpc_listen(port);
+	if(!rpc_data) {
 		perror("\tFailed to listen RPC server socket");
 		return NULL;
 	}
@@ -371,23 +275,7 @@ ManagerCore* manager_core_server_open(uint16_t port) {
 	if(actives == NULL)
 		actives = list_create(NULL);
 
-	event_idle_add(manager_accept_loop, (void*)rpc);
+	event_idle_add(manager_accept_loop, (void*)rpc_data);
 
 	return manager_core;
-}
-
-static bool manager_loop(void* context) {
-	if(!list_is_empty(actives)) {
-		ListIterator iter;
-		list_iterator_init(&iter, actives);
-		while(list_iterator_has_next(&iter)) {
-			RPC* rpc = list_iterator_next(&iter);
-			if(!rpc_is_closed(rpc))
-				rpc_loop(rpc);
-			else
-				list_remove_data(actives, rpc);
-		}
-	}
-
-	return true;
 }

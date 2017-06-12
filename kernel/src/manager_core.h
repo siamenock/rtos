@@ -11,7 +11,7 @@ typedef struct _ManagerCore {
  *
  * @return success
  */
-bool manager_core_init(err_t (*accept)(RPC* rpc));
+bool manager_core_init(int (*accept)(RPC* rpc));
 
 /**
  * Manager Core TCP Server open

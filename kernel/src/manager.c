@@ -15,8 +15,6 @@
 #include <util/cmd.h>
 #include <util/map.h>
 #undef BYTE_ORDER
-#include <netif/etharp.h>
-#include <arch/driver.h>
 #include <control/rpc.h>
 #include <net/interface.h>
 #include "gmalloc.h"
@@ -146,7 +144,7 @@ static void storage_md5_handler(RPC* rpc, uint32_t id, uint64_t size, void* cont
 	callback(rpc, ret, md5sum);
 }
 
-static err_t manager_accept(RPC* rpc) {
+static int manager_accept(RPC* rpc) {
 	rpc_vm_create_handler(rpc, vm_create_handler, NULL);
 	rpc_vm_get_handler(rpc, vm_get_handler, NULL);
 	rpc_vm_set_handler(rpc, vm_set_handler, NULL);
@@ -159,7 +157,7 @@ static err_t manager_accept(RPC* rpc) {
 	rpc_stdio_handler(rpc, stdio_handler, NULL);
 	rpc_storage_md5_handler(rpc, storage_md5_handler, NULL);
 
-	return ERR_OK;
+	return 0;
 }
 
 static void stdio_callback(uint32_t vmid, int thread_id, int fd, char* buffer, volatile size_t* head, volatile size_t* tail, size_t size) {

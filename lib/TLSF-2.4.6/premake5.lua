@@ -7,6 +7,7 @@ project 'tlsf'
 
     removefiles         { 'examples/*' }
 
+    buildoptions        { "-fpic" }
     buildoptions        { '-Wextra -Wwrite-strings' }
     buildoptions        { '-Wstrict-prototypes -Wmissing-prototypes' }
     buildoptions        { '-Wno-long-long -Wstrict-aliasing=1' }

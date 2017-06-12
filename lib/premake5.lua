@@ -1,5 +1,3 @@
-configurations { 'linux' }
-
 include 'hal'
 include 'tlsf'
 include 'ext'

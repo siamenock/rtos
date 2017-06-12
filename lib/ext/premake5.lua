@@ -5,6 +5,8 @@ project 'ext'
     build.linkingProperty { 'hal', 'tlsf', 'vnic' }
     build.targetPath('..')
 
+    buildoptions { "-fpic" }
+
     filter { 'configurations:linux' }
         defines     { 'LINUX' }
         removefiles { 'src/malloc.c' }
