@@ -150,7 +150,7 @@ bool netlink_event(void* context) {
 						// Register resources
 						error = nicdev_register(nicdev);
 						if(error) break;
-						error = dispatcher_create_nic(nicdev);
+						error = dispatcher_create_nicdev(nicdev);
 						if(error) break;
 
 						printf("Register: %s\n", nicdev->name);
@@ -158,7 +158,7 @@ bool netlink_event(void* context) {
 						// Unregister resources
 						nicdev_internal = nicdev_unregister(nicdev->name);
 						if(!nicdev_internal) break;
-						error = dispatcher_destroy_nic(nicdev);
+						error = dispatcher_destroy_nicdev(nicdev);
 						if(error) break;
 
 						printf("Unregister: %s\n", nicdev->name);

@@ -8,8 +8,8 @@
 int dispatcher_init(void);
 int dispatcher_exit(void);
 
-int dispatcher_create_nic(void* nic);
-int dispatcher_destroy_nic(void* nic);
+int dispatcher_create_nicdev(void* nicdev);
+int dispatcher_destroy_nicdev(void* nicdev);
 
 int dispatcher_create_vnic(void* vnic);
 int dispatcher_destroy_vnic(void* vnic);

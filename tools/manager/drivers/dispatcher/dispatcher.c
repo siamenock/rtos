@@ -384,7 +384,7 @@ static long dispatcher_ioctl(struct file *f, unsigned int ioctl,
 
 	// TODO: return right errno
 	switch (ioctl) {
-		case DISPATCHER_CREATE_NIC:
+		case DISPATCHER_CREATE_NICDEV:
 			printk("Register NIC on dispatcher device %p\n", argp);
 			_nic_device = (NICDevice *)argp;
 			dev = __dev_get_by_name(&init_net, _nic_device->name);
@@ -410,7 +410,7 @@ static long dispatcher_ioctl(struct file *f, unsigned int ioctl,
 
 			return 0;
 
-		case DISPATCHER_DESTROY_NIC:
+		case DISPATCHER_DESTROY_NICDEV:
 			//name
 			printk("Unregister NIC on dispatcher device\n");
 			nic_device = (NICDevice *)argp;

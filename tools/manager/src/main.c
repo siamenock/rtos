@@ -248,7 +248,7 @@ int nicdev_init() {
 		if(!nic_dev)
 			return -1;
 
-		if(dispatcher_create_nic(nic_dev) < 0)
+		if(dispatcher_create_nicdev(nic_dev) < 0)
 			return -2;
 
 		nic_dev->driver = driver;
