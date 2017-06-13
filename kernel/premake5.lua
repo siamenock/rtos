@@ -2,6 +2,7 @@ project 'kernel'
     kind 'ConsoleApp'
 	defines { 'PACKETNGIN_SINGLE' }
 
+    buildoptions { '-mcmodel=kernel' }
     build.compileProperty('x86_64')
     removefiles { 'src/**.S' }
 
