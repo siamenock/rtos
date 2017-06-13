@@ -12,12 +12,12 @@
 #define MANAGER_DEFAULT_PORT	1111
 
 typedef struct _Manager {
-	int		vnic_count;
-	VNIC*		vnics[NIC_MAX_COUNT];	// gmalloc, ni_create
-	List* 		netifs;
-	List*		servers;
-	List* 		clients;
-	List* 		actives;
+	int	vnic_count;
+	VNIC*	vnics[MAX_VNIC_COUNT];	// gmalloc, ni_create
+	List* 	netifs;
+	List*	servers;
+	List* 	clients;
+	List* 	actives;
 } Manager;
 
 extern Manager manager;

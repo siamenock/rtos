@@ -45,14 +45,14 @@ static bool manager_loop(void* context) {
 
 static int (*core_accept)(RPC* rpc);
 
-bool manager_core_init(int (*_accept)(RPC* rpc)) {
+int manager_core_init(int (*_accept)(RPC* rpc)) {
 	printf("\tManager RPC server opened\n");
 
 	event_idle_add(manager_loop, NULL);
 
 	core_accept = _accept;
 
-	return true;
+	return 0;
 }
 
 static int sock_read(RPC* rpc, void* buf, int size) {

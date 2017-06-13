@@ -66,7 +66,7 @@ static void status_setted(bool result, void* context) {
 	if(list_index_of(manager.clients, rpc, NULL) >= 0) {
 		data->callback(rpc, result);
 	}
-	
+
 	free(data);
 }
 
@@ -201,39 +201,34 @@ static void stdio_callback(uint32_t vmid, int thread_id, int fd, char* buffer, v
 static ManagerCore* manager_core;
 
 static int cmd_manager(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
-	//TODO error handle
 	for(int i = 1; i < argc; i++) {
 		if(!strcmp("open", argv[i])) {
 			NEXT_ARGUMENTS();
+			if(!is_uint16(argv[i])) return -i;
 
-			if (!is_uint16(argv[i])) return -i;
-			
-			uint16_t port = parse_uint16(argv[i]);
-
-			manager_core = manager_core_server_open(port);
-
-			if (!manager_core) {
-				printf("open: failed\n");
-
-				return -i;
+			if(manager_core) {
+				printf("manager is already opened\n");
+				return -1;
 			}
-					
+
+			uint16_t port = parse_uint16(argv[i]);
+			manager_core = manager_core_server_open(port);
+			if(!manager_core) {
+				printf("open: failed\n");
+				return -2;
+			}
 			return 0;
 		} else if(!strcmp("close", argv[i])) {
-			if (!manager_core) {
+			if(!manager_core) {
 				printf("close: failed. no manager opened\n");
-
-				return -i;
+				return -2;
 			}
 
 			manager_core_server_close(manager_core);
-
 			manager_core = NULL;
-
 			return 0;
 		}
 	}
-
 	return 0;
 }
 
@@ -248,11 +243,23 @@ static Command commands[] = {
 // Entry Point of Manager
 // it calls each manager_core_init() `manager_core.c` of kernel's and tools/manager's
 int manager_init() {
-	manager_core_init(manager_accept);
+	int error;
 
-	vm_stdio_handler(stdio_callback); 
-	
-	cmd_register(commands, sizeof(commands) / sizeof(commands[0]));
+	error = manager_core_init(manager_accept);
+	if(error) return -1;
+	printf("step1---------------------------------\n");
 
+	manager_core = manager_core_server_open(MANAGER_DEFAULT_PORT);
+	if(!manager_core) return -2;
+	printf("step2---------------------------------\n");
+
+	vm_stdio_handler(stdio_callback);
+	printf("step3---------------------------------\n");
+
+	error = cmd_register(commands, sizeof(commands) / sizeof(commands[0]));
+	if(error) return -3;
+	printf("step4---------------------------------\n");
+
+	printf("Manager Initialized\n");
 	return 0;
 }

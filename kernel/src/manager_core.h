@@ -1,31 +1,39 @@
 #ifndef __MANAGER_CORE_H__
 #define __MANAGER_CORE_H__
 
+#include <stdint.h>
+#include <stdbool.h>
+
+#include <control/rpc.h>
+
+/**
+ * Core metadata
+ */
 typedef struct _ManagerCore {
-	uint16_t port;
-	void* data;
+	uint16_t	port; ///< tcp port
+	void*		data; ///< `fd` on linux stack, `pcb` on lwip stack
 } ManagerCore;
 
 /**
- * Manager Core initialize
+ * Initialize manager core
  *
- * @return success
+ * @return zero for success, nonzero for failure
  */
-bool manager_core_init(int (*accept)(RPC* rpc));
+int manager_core_init(int (*accept)(RPC* rpc));
 
 /**
- * Manager Core TCP Server open
+ * Open manager core server
  *
- * @param port tcp port number
- * @return ManagerCore
+ * @param port server port number (tcp port)
+ * @return ManagerCore for success, NULL for failure
  */
 ManagerCore* manager_core_server_open(uint16_t port);
 
 /**
- * Manager Core TCP Server close
+ * Close manager core server
  *
  * @param manager_core core data
- * @return success
+ * @return true for success, false for failure
  */
 bool manager_core_server_close(ManagerCore* manager_core);
 

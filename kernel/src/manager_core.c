@@ -1,12 +1,41 @@
-#include <lwip/init.h>
-#include <lwip/netif.h>
+#include <string.h>
+#include <errno.h>
+#include <stdlib.h>
 
+// PacketNgin
+#include <util/cmd.h>
+#include <util/types.h>
+#include <util/map.h>
+#include <util/event.h>
+#include <timer.h>
+#include <net/interface.h>
+#include <net/ether.h>
+#include <net/arp.h>
+#include <nic.h>
+#include <vnic.h>
+#include "gmalloc.h"
+#include "manager.h"
 #include "manager_core.h"
+#include "driver/nicdev.h"
+#include "vm.h"
+
+// lwip
+#include <netif/etharp.h>
+#include <lwip/init.h>
+#include <lwip/ip.h>
+#include <lwip/tcp.h>
+#include <lwip/netif.h>
+#include <arch/driver.h>
+
+
+extern NIC* __nics[MAX_VNIC_COUNT];
+extern int __nic_count;
+
 
 Manager manager;
-
-extern NIC* __nics[NIC_MAX_COUNT];
-extern int __nic_count;
+static struct netif* netif;
+static List* rx_process_list; // TODO netif includes fix rx_process_list
+static err_t (*core_accept)(RPC* rpc);
 
 // LwIP TCP callbacks
 typedef struct {
@@ -27,92 +56,30 @@ typedef struct _ProcessContext {
 	void* context;
 } ProcessContext;
 
-static err_t *core_accept(RPC* rpc);
+/* struct netif* manager_create_netif(NIC* nic, uint32_t ip, uint32_t netmask, uint32_t gateway, bool is_default); */
+/* bool manager_destroy_netif(struct netif* netif); */
 
-/**
- * Create a manager vnic
- *
- * @param NIC Device Name
- * @return VNIC
- */
-VNIC* manager_create_vnic(char* name);
-/**
- * Destroy a manager vnic
- *
- * @param VNIC
- * @return boolean
- */
-bool manager_destroy_vnic(VNIC* vnic);
+/* uint32_t manager_netif_get_ip(); */
+/* void manager_netif_set_ip(struct netif* netif, uint32_t ip); */
 
-struct netif* manager_create_netif(NIC* nic, uint32_t ip, uint32_t netmask, uint32_t gateway, bool is_default);
-bool manager_destroy_netif(struct netif* netif);
+/* uint32_t manager_netif_get_port(); */
+/* void manager_netif_set_port(uint16_t port); */
 
-uint32_t manager_netif_get_ip();
-void manager_netif_set_ip(struct netif* netif, uint32_t ip);
+/* uint32_t manager_netif_get_gateway(); */
+/* void manager_netif_set_gateway(uint32_t gw); */
 
-uint32_t manager_netif_get_port();
-void manager_netif_set_port(uint16_t port);
+/* uint32_t manager_netif_get_netmask(); */
+/* void manager_netif_set_netmask(uint32_t nm); */
 
-uint32_t manager_netif_get_gateway();
-void manager_netif_set_gateway(uint32_t gw);
+/* void manager_netif_set_interface(); */
 
-uint32_t manager_netif_get_netmask();
-void manager_netif_set_netmask(uint32_t nm);
+static int pcb_read(RPC* rpc, void* buf, int size);
+static int pcb_write(RPC* rpc, void* buf, int size);
+static void pcb_close(RPC* rpc);
 
-void manager_netif_set_interface();
-
-struct tcp_pcb* manager_netif_server_open(struct netif* netif, uint16_t port);
-bool manager_netif_server_close(struct tcp_pcb* tcp_pcb);
-
-/**
- * Send Arping Request
- *
- * @param nic NIC
- * @param addr Destination Address
- * @param count Seding count
- * @result boolean
- */
-bool manager_arping(NIC* nic, uint32_t addr, uint32_t count);
-
-bool manager_core_init(err_t (*_accept)(RPC* rpc)) {
-	lwip_init();
-
-	rx_process_list = list_create(NULL);
-	manager.netifs = list_create(NULL); //lwip
-	if(!manager.netifs)
-		return -1;
-
-	manager.servers = list_create(NULL); //lwip server pcb
-	if(!manager.servers)
-		return -1;
-
-	manager.clients = list_create(NULL); //lwip client pcb
-	if(!manager.clients)
-		return -1;
-
-	manager.actives = list_create(NULL);
-	if(!manager.actives)
-		return -1;
-
-	VNIC* vnic = manager_create_vnic(MANAGER_DEFAULT_NICDEV);
-	if(!vnic)
-		return -2;
-
-	//TODO: add manager init script
-	struct netif* netif = manager_create_netif(vnic->nic, MANAGER_DEFAULT_IP, MANAGER_DEFAULT_NETMASK, MANAGER_DEFAULT_GW, true);
-	if(!netif)
-		return -3;
-
-	if(!event_idle_add(manager_core_loop, NULL))
-		return -5;
-
-	if(!event_timer_add(manager_core_timer, NULL, 100000, 100000))
-		return -6;
-
-	cmd_register(commands, sizeof(commands) / sizeof(commands[0]));
-
-    core_accept = _accept;
-}
+static err_t manager_recv(void* arg, struct tcp_pcb* pcb, struct pbuf* p, err_t err);
+static void manager_err(void* arg, err_t err);
+static err_t manager_poll(void* arg, struct tcp_pcb* pcb);
 
 static void print_byte_size(uint64_t byte_size) {
 	uint64_t size = 1;
@@ -320,15 +287,14 @@ static void rpc_free(RPC* rpc) {
 	list_remove_data(manager.clients, data->pcb);
 }
 
-//TODO gabage collection
-static VNIC* manager_create_vnic(char* name) {
-	if(manager.vnic_count > NIC_MAX_COUNT)
+static VNIC* manager_create_vnic(char* nicdev_name) {
+	if(manager.vnic_count > MAX_VNIC_COUNT)
 		return NULL;
 
-	NICDevice* nicdev = nicdev_get(name);
+	NICDevice* nicdev = nicdev_get(nicdev_name);
 	if(!nicdev) {
 		printf("\tCannot create manager\n");
-		return false;
+		return NULL;
 	}
 
 	uint64_t attrs[] = {
@@ -350,24 +316,24 @@ static VNIC* manager_create_vnic(char* name) {
 
 	VNIC* vnic = gmalloc(sizeof(VNIC));
 	if(!vnic)
-		return false;
+		goto fail;
 	memset(vnic, 0, sizeof(VNIC));
 
-	vnic->id = vnic_alloc_id();
-	vnic->nic_size = 0x200000;
 	vnic->nic = bmalloc(1);
 	if(!vnic->nic)
-		return false;
+		goto fail;
+	vnic->id = vnic_alloc_id();
+	vnic->nic_size = 0x200000;
 	memset(vnic->nic, 0, 0x200000);
 
 	if(!vnic_init(vnic, attrs))
-		return false;
+		goto fail;
 
 	int vnic_id = nicdev_register_vnic(nicdev, vnic);
 	if(vnic_id < 0)
-		return false;
+		return NULL;
 
-	for(int i = 0; i < NIC_MAX_COUNT; i++) {
+	for(int i = 0; i < MAX_VNIC_COUNT; i++) {
 		if(manager.vnics[i])
 			continue;
 
@@ -379,9 +345,15 @@ static VNIC* manager_create_vnic(char* name) {
 	}
 
 	return vnic;
+
+fail:
+	if(vnic)
+		gfree(vnic);
+	if(vnic && vnic->nic)
+		bfree(vnic->nic);
 }
 
-bool manager_destroy_vnic(VNIC* vnic) {
+static bool manager_destroy_vnic(VNIC* vnic) {
 	for(int i = 0; i < NIC_MAX_COUNT; i++) {
 		if(manager.vnics[i] != vnic)
 			continue;
@@ -449,7 +421,7 @@ static bool arping_process(Packet* packet, void* context) {
 	return true;
 }
 
-bool arping(void* context) {
+static bool arping(void* context) {
 	ARPingContext* arping_context = context;
 	arping_context->time = timer_ns();
 	arp_request(arping_context->nic, arping_context->addr);
@@ -458,13 +430,11 @@ bool arping(void* context) {
 	return arping_context->count ? true : false;
 }
 
-//TODO netif includes fix rx_process_list
-List* rx_process_list;
 static bool rx_process_add_process(ProcessContext* context) {
 	return list_add(rx_process_list, context);
 }
 
-bool manager_arping(NIC* nic, uint32_t addr, uint32_t count) {
+static bool manager_arping(NIC* nic, uint32_t addr, uint32_t count) {
 	ARPingContext* arping_context = malloc(sizeof(ARPingContext));
 	if(!arping_context)
 		return false;
@@ -477,7 +447,7 @@ bool manager_arping(NIC* nic, uint32_t addr, uint32_t count) {
 		free(arping_context);
 		return false;
 	}
-	
+
 	ProcessContext* process_context = malloc(sizeof(ProcessContext));
 	if(!process_context) {
 		free(arping_context);
@@ -524,12 +494,12 @@ struct netif* manager_create_netif(NIC* nic, uint32_t ip, uint32_t netmask, uint
 	private->nic = nic;
 	private->rx_process = rx_process;
 	private->tx_process = tx_process;
-	
+
 	struct ip_addr ip2, netmask2, gateway2;
 	IP4_ADDR(&ip2, (ip >> 24) & 0xff, (ip >> 16) & 0xff, (ip >> 8) & 0xff, (ip >> 0) & 0xff);
 	IP4_ADDR(&netmask2, (netmask >> 24) & 0xff, (netmask >> 16) & 0xff, (netmask >> 8) & 0xff, (netmask >> 0) & 0xff);
 	IP4_ADDR(&gateway2, (gateway >> 24) & 0xff, (gateway >> 16) & 0xff, (gateway >> 8) & 0xff, (gateway >> 0) & 0xff);
-	
+
 	netif_add(netif, &ip2, &netmask2, &gateway2, private, lwip_driver_init, ethernet_input);
 
 	if(is_default)
@@ -541,12 +511,60 @@ struct netif* manager_create_netif(NIC* nic, uint32_t ip, uint32_t netmask, uint
 	return netif;
 }
 
-bool manager_destroy_netif(struct netif* netif) {
+static bool manager_destroy_netif(struct netif* netif) {
 	return false;
 }
 
 struct netif* manager_get_netif(uint32_t ip) {
 	return NULL;
+}
+
+static err_t manager_accept(void* arg, struct tcp_pcb* pcb, err_t err) {
+	struct tcp_pcb_listen* server = arg;
+	tcp_accepted(server);
+	//printf("Accepted: %p\n", pcb);
+
+	RPC* rpc = malloc(sizeof(RPC) + sizeof(RPCData));
+	bzero(rpc, sizeof(RPC) + sizeof(RPCData));
+	rpc->read = pcb_read;
+	rpc->write = pcb_write;
+	rpc->close = pcb_close;
+
+	core_accept(rpc);
+	RPCData* data = (RPCData*)rpc->data;
+	data->pcb = pcb;
+	data->pbufs = list_create(NULL);
+
+	tcp_arg(pcb, rpc);
+	tcp_recv(pcb, manager_recv);
+	tcp_err(pcb, manager_err);
+	tcp_poll(pcb, manager_poll, 2);
+
+	list_add(manager.clients, pcb);
+
+	return ERR_OK;
+}
+
+static void manager_close(struct tcp_pcb* pcb, RPC* rpc, bool is_force) {
+	printf("Close connection: %p\n", pcb);
+	tcp_arg(pcb, NULL);
+	tcp_sent(pcb, NULL);
+	tcp_recv(pcb, NULL);
+	tcp_err(pcb, NULL);
+	tcp_poll(pcb, NULL, 0);
+
+	if(rpc) {
+		rpc_free(rpc);
+	} else {
+		list_remove_data(manager.clients, pcb);
+	}
+
+	if(is_force) {
+		tcp_abort(pcb);
+	} else if(tcp_close(pcb) != ERR_OK) {
+		printf("Cannot close pcb: %p %p\n", pcb, rpc);
+		//tcp_poll(pcb, manager_poll, 2);
+	}
 }
 
 inline void manager_netif_set_ip(struct netif* netif, uint32_t ip) {
@@ -589,7 +607,7 @@ struct tcp_pcb* manager_netif_server_open(struct netif* netif, uint16_t port) {
 	return tcp_pcb;
 }
 
-bool manager_netif_server_close(struct tcp_pcb* tcp_pcb) {
+static bool manager_netif_server_close(struct tcp_pcb* tcp_pcb) {
 	ListIterator iter;
 	list_iterator_init(&iter, manager.clients);
 	while(list_iterator_has_next(&iter)) {
@@ -607,7 +625,7 @@ bool manager_netif_server_close(struct tcp_pcb* tcp_pcb) {
 	return true;
 }
 
-bool manager_core_loop(void* context) {
+static bool manager_core_loop(void* context) {
 	ListIterator iter;
 	list_iterator_init(&iter, manager.netifs);
 	while(list_iterator_has_next(&iter)) {
@@ -615,11 +633,10 @@ bool manager_core_loop(void* context) {
 		NIC* nic = ((struct netif_private*)netif->state)->nic;
 		if(!nic_has_rx(nic))
 			continue;
-		
+
 		Packet* packet = nic_rx(nic);
-		if(packet) {
+		if(packet)
 			lwip_nic_poll(netif, packet);
-		}
 	}
 
 	if(!list_is_empty(manager.actives)) {
@@ -634,17 +651,10 @@ bool manager_core_loop(void* context) {
 			}
 		}
 	}
-}
 
-bool manager_core_server_close(ManagerCore* manager_core) {
 	return true;
 }
 
-ManagerCore* manager_core_server_open(uint16_t port) {
-	struct tcp_pcb* tcp_pcb =  manager_netif_server_open(netif, port);
-	if(!tcp_pcb)
-		return NULL;
-}
 
 static bool manager_core_timer(void* context) {
 	lwip_nic_timer();
@@ -698,28 +708,6 @@ static void pcb_close(RPC* rpc) {
 	manager_close(data->pcb, rpc, false);
 }
 
-static void manager_close(struct tcp_pcb* pcb, RPC* rpc, bool is_force) {
-	printf("Close connection: %p\n", pcb);
-	tcp_arg(pcb, NULL);
-	tcp_sent(pcb, NULL);
-	tcp_recv(pcb, NULL);
-	tcp_err(pcb, NULL);
-	tcp_poll(pcb, NULL, 0);
-
-	if(rpc) {
-		rpc_free(rpc);
-	} else {
-		list_remove_data(manager.clients, pcb);
-	}
-
-	if(is_force) {
-		tcp_abort(pcb);
-	} else if(tcp_close(pcb) != ERR_OK) {
-		printf("Cannot close pcb: %p %p\n", pcb, rpc);
-		//tcp_poll(pcb, manager_poll, 2);
-	}
-}
-
 static err_t manager_recv(void* arg, struct tcp_pcb* pcb, struct pbuf* p, err_t err) {
 	RPC* rpc = arg;
 
@@ -766,33 +754,6 @@ static err_t manager_poll(void* arg, struct tcp_pcb* pcb) {
 			manager_close(pcb, rpc, false);
 		}
 	}
-
-	return ERR_OK;
-}
-
-static err_t manager_accept(void* arg, struct tcp_pcb* pcb, err_t err) {
-	struct tcp_pcb_listen* server = arg;
-	tcp_accepted(server);
-	//printf("Accepted: %p\n", pcb);
-
-	RPC* rpc = malloc(sizeof(RPC) + sizeof(RPCData));
-	bzero(rpc, sizeof(RPC) + sizeof(RPCData));
-	rpc->read = pcb_read;
-	rpc->write = pcb_write;
-	rpc->close = pcb_close;
-
-	accept(rpc);
-
-	RPCData* data = (RPCData*)rpc->data;
-	data->pcb = pcb;
-	data->pbufs = list_create(NULL);
-
-	tcp_arg(pcb, rpc);
-	tcp_recv(pcb, manager_recv);
-	tcp_err(pcb, manager_err);
-	tcp_poll(pcb, manager_poll, 2);
-
-	list_add(manager.clients, pcb);
 
 	return ERR_OK;
 }
@@ -893,7 +854,7 @@ static int cmd_vnic(int argc, char** argv, void(*callback)(char* result, int exi
 
 static int cmd_interface(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	if(argc == 1) {
-		for(int i = 0; i < NIC_MAX_COUNT; i++) {
+		for(int i = 0; i < MAX_VNIC_COUNT; i++) {
 			VNIC* vnic = manager.vnics[i];	// gmalloc, ni_create
 			if(!vnic)
 				continue;
@@ -1095,10 +1056,7 @@ static int cmd_arping(int argc, char** argv, void(*callback)(char* result, int e
 
 static int cmd_dump(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	static uint8_t opt = 0;
-	if(opt)
-		opt = 0;
-	else
-		opt = 0xff;
+	opt = opt ? 0 : 0xff;
 
 	nidev_debug_switch_set(opt);
 
@@ -1145,3 +1103,62 @@ static Command commands[] = {
 		.func = cmd_dump
 	}
 };
+
+int manager_core_init(err_t (*_accept)(RPC* rpc)) {
+	lwip_init();
+
+	rx_process_list = list_create(NULL);
+	manager.netifs = list_create(NULL); //lwip
+	if(!manager.netifs)
+		return -1;
+
+	manager.servers = list_create(NULL); //lwip server pcb
+	if(!manager.servers)
+		return -1;
+
+	manager.clients = list_create(NULL); //lwip client pcb
+	if(!manager.clients)
+		return -1;
+
+	manager.actives = list_create(NULL);
+	if(!manager.actives)
+		return -1;
+
+	VNIC* vnic = manager_create_vnic((char*)MANAGER_DEFAULT_NICDEV);
+	if(!vnic)
+		return -2;
+
+	//TODO: add manager init script
+	netif = manager_create_netif(vnic->nic, MANAGER_DEFAULT_IP, MANAGER_DEFAULT_NETMASK, MANAGER_DEFAULT_GW, true);
+	if(!netif)
+		return -3;
+
+	if(!event_idle_add(manager_core_loop, NULL))
+		return -5;
+
+	if(!event_timer_add(manager_core_timer, NULL, 100000, 100000))
+		return -6;
+
+	cmd_register(commands, sizeof(commands) / sizeof(commands[0]));
+
+    core_accept = _accept;
+
+	printf("Manager::Core Initialized\n");
+	return 0;
+}
+
+ManagerCore* manager_core_server_open(uint16_t port) {
+	struct tcp_pcb* tcp_pcb =  manager_netif_server_open(netif, port);
+	if(!tcp_pcb)
+		return NULL;
+
+	ManagerCore* core = calloc(1, sizeof(ManagerCore));
+	core->port = port;
+	core->data = tcp_pcb;
+	return core;
+}
+
+bool manager_core_server_close(ManagerCore* manager_core) {
+	return manager_netif_server_close((struct tcp_pcb*)manager_core->data);
+}
+
