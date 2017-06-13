@@ -2,6 +2,7 @@ project 'virtio'
     kind        'ConsoleApp'
     targetname  'virtio.ko'
 
+    buildoptions { '-mcmodel=kernel' }
     build.compileProperty('x86_64')
     build.linkingProperty{}
     build.targetPath('..')
