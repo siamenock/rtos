@@ -48,6 +48,7 @@ static int (*core_accept)(RPC* rpc);
 int manager_core_init(int (*_accept)(RPC* rpc)) {
 	printf("\tManager RPC server opened\n");
 
+	actives = list_create(NULL);
 	event_idle_add(manager_loop, NULL);
 
 	core_accept = _accept;
@@ -183,7 +184,7 @@ static bool callback_hello(void* context) {
 	return true;
 }
 
-RPCData* rpc_listen(int port) {
+static RPCData* rpc_listen(int port) {
        int fd = socket(AF_INET, SOCK_STREAM, 0);
        if(fd < 0) {
                return NULL;
@@ -272,10 +273,7 @@ ManagerCore* manager_core_server_open(uint16_t port) {
 		return NULL;
 	}
 
-	if(actives == NULL)
-		actives = list_create(NULL);
-
-	event_idle_add(manager_accept_loop, (void*)rpc_data);
+	event_busy_add(manager_accept_loop, (void*)rpc_data);
 
 	return manager_core;
 }

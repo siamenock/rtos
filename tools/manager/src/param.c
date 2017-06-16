@@ -50,7 +50,7 @@ static int parse_args(char* args) {
 	char* next = strtok(_boot_command_line, "\n");
 	char* str;
 	bool smap_fixed = false;
-	while((str = strtok_r(next, " ", &next))) {
+	while(next && (str = strtok_r(next, " ", &next))) {
 		char* value = NULL;
 		char* key = strtok_r(str, "=", &value);
 
