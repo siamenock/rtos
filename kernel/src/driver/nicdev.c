@@ -162,7 +162,7 @@ VNIC* nicdev_unregister_vnic(NICDevice* nicdev, uint32_t id) {
 	int i, j;
 
 	for(i = 0; i < MAX_VNIC_COUNT; i++) {
-		if(!nic_devices[i])
+		if(!nicdev->vnics[i])
 			return NULL;
 
 		if(nicdev->vnics[i]->id == id) {
@@ -188,6 +188,9 @@ VNIC* nicdev_get_vnic(NICDevice* nicdev, uint32_t id) {
 		return NULL;
 
 	for(int i = 0; i < MAX_VNIC_COUNT; i++) {
+		if(!nicdev->vnics[i])
+			return NULL;
+
 		if(nicdev->vnics[i]->id == id)
 			return nicdev->vnics[i];
 	}
@@ -200,6 +203,9 @@ VNIC* nicdev_get_vnic_mac(NICDevice* nicdev, uint64_t mac) {
 		return NULL;
 
 	for(int i = 0; i < MAX_VNIC_COUNT; i++) {
+		if(!nicdev->vnics[i])
+			return NULL;
+
 		if(nicdev->vnics[i]->mac == mac)
 			return nicdev->vnics[i];
 	}
@@ -305,7 +311,7 @@ int nicdev_rx(NICDevice* dev, void* data, size_t size) {
 	return nicdev_rx0(dev, data, size, NULL, 0);
 }
 
-int nicdev_rx0(NICDevice* dev, void* data, size_t size,
+int nicdev_rx0(NICDevice* nic_dev, void* data, size_t size,
 		void* data_optional, size_t size_optional) {
 	Ether* eth = data;
 	int i;
@@ -319,14 +325,14 @@ int nicdev_rx0(NICDevice* dev, void* data, size_t size,
 
 	if(dmac & ETHER_MULTICAST) {
 		for(i = 0; i < MAX_VNIC_COUNT; i++) {
-			if(!dev->vnics[i])
+			if(!nic_dev->vnics[i])
 				break;
 
-			vnic_rx(dev->vnics[i], (uint8_t*)eth, size, data_optional, size_optional);
+			vnic_rx(nic_dev->vnics[i], (uint8_t*)eth, size, data_optional, size_optional);
 		}
 		return NICDEV_PROCESS_PASS;
 	} else {
-		vnic = nicdev_get_vnic_mac(dev, dmac);
+		vnic = nicdev_get_vnic_mac(nic_dev, dmac);
 		if(vnic) {
 			vnic_rx(vnic, (uint8_t*)eth, size, data_optional, size_optional);
 			return NICDEV_PROCESS_COMPLETE;

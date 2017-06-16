@@ -15,7 +15,7 @@ static void wakeup_ap(long kernel_start_address) {
 	if(!cpu_end)
 		return;
 
-	Shared* shared = (Shared*)VIRTUAL_TO_PHYSICAL(SHARED_ADDR);
+	Shared* shared = (Shared*)SHARED_ADDR;
 	printf("\tBooting APs : %p\n", (void*)(uintptr_t)kernel_start_address);
 	for(int cpu = cpu_start; cpu < cpu_end + 1; cpu++) {
 		printf("\tWakeup %d\n", cpu);
@@ -32,7 +32,7 @@ static void wakeup_ap(long kernel_start_address) {
 
 void amp_init(long kernel_start_address) {
 	processor_count++;
-	Shared* shared = (Shared*)VIRTUAL_TO_PHYSICAL(SHARED_ADDR);
+	Shared* shared = (Shared*)SHARED_ADDR;
 	shared->mp_processors[0] = 0;
 	/**
 	 * Multikernel AP not yet wake-up.

@@ -393,6 +393,7 @@ static long dispatcher_ioctl(struct file *f, unsigned int ioctl,
 				return -EINVAL;
 			}
 			nic_device = kzalloc(sizeof(NICDevice), GFP_KERNEL);
+			memset(nic_device, 0, sizeof(NICDevice));
 			strncpy(nic_device->name, _nic_device->name, MAX_NIC_NAME_LEN);
 			if(nicdev_register(nic_device) < 0) {
 				printk("Failed to register NIC device\n");

@@ -6,7 +6,7 @@
 #include "page.h"
 
 void shared_init() {
-	Shared* shared = (Shared*)VIRTUAL_TO_PHYSICAL(SHARED_ADDR);
+	Shared* shared = (Shared*)SHARED_ADDR;
 	uint8_t apic_id = mp_apic_id();
 	if(apic_id == 0 /*BSP*/) {
 		//printf("\tShared space: %p\n", VIRTUAL_TO_PHYSICAL(SHARED_ADDR));
@@ -19,7 +19,7 @@ void shared_init() {
 }
 
 void shared_sync() {
-	Shared* shared = (Shared*)VIRTUAL_TO_PHYSICAL(SHARED_ADDR);
+	Shared* shared = (Shared*)SHARED_ADDR;
 	static uint8_t barrier;
 	uint8_t apic_id = mp_apic_id();
 	if(apic_id) {

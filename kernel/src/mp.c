@@ -27,7 +27,7 @@ void mp_init() {
 	// Analyze floating pointer structure
 	//   Get IO APIC address
 	//   Other core APIC IDs
-	Shared* shared = (Shared*)VIRTUAL_TO_PHYSICAL(SHARED_ADDR);
+	Shared* shared = (Shared*)SHARED_ADDR;
 	// Calculate core ID
 	processor_id = shared->mp_processors[apic_id];
 
@@ -51,7 +51,7 @@ uint8_t mp_processor_id() {
 }
 
 uint8_t mp_apic_id_to_processor_id(uint8_t apic_id) {
-	Shared* shared = (Shared*)VIRTUAL_TO_PHYSICAL(SHARED_ADDR);
+	Shared* shared = (Shared*)SHARED_ADDR;
 	return shared->mp_processors[apic_id];
 }
 
@@ -170,6 +170,6 @@ void mp_parse_fps(MP_Parser* parser, void* context) {
 }
 
 uint8_t* mp_processor_map() {
-	Shared* shared = (Shared*)VIRTUAL_TO_PHYSICAL(SHARED_ADDR);
+	Shared* shared = (Shared*)SHARED_ADDR;
 	return (uint8_t*)shared->mp_processors;
 }

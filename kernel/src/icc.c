@@ -24,7 +24,7 @@ static ICC_Handler icc_events[ICC_EVENTS_COUNT];
 
 static bool icc_event(void* context) {
 	uint8_t apic_id = mp_apic_id();
-	Shared* shared = (Shared*)VIRTUAL_TO_PHYSICAL(SHARED_ADDR);
+	Shared* shared = (Shared*)SHARED_ADDR;
 	FIFO* icc_queue = shared->icc_queues[apic_id].icc_queue;
 
 	if(fifo_empty(icc_queue))
@@ -54,7 +54,7 @@ static bool icc_event(void* context) {
 
 static void icc(uint64_t vector, uint64_t err) {
 	uint8_t apic_id = mp_apic_id();
-	Shared* shared = (Shared*)VIRTUAL_TO_PHYSICAL(SHARED_ADDR);
+	Shared* shared = (Shared*)SHARED_ADDR;
 	FIFO* icc_queue = shared->icc_queues[apic_id].icc_queue;
 	ICC_Message* icc_msg = fifo_peek(icc_queue, 0);
 
@@ -83,7 +83,7 @@ void icc_init() {
 	uint8_t processor_count = mp_processor_count();
 	extern void* gmalloc_pool;
 	uint8_t apic_id = mp_apic_id();
-	Shared* shared = (Shared*)VIRTUAL_TO_PHYSICAL(SHARED_ADDR);
+	Shared* shared = (Shared*)SHARED_ADDR;
 
 	if(apic_id == 0) {
 		int icc_max = processor_count * processor_count;
@@ -112,7 +112,7 @@ void icc_init() {
 }
 
 ICC_Message* icc_alloc(uint8_t type) {
-	Shared* shared = (Shared*)VIRTUAL_TO_PHYSICAL(SHARED_ADDR);
+	Shared* shared = (Shared*)SHARED_ADDR;
 
 	lock_lock(&shared->icc_lock_alloc);
 	ICC_Message* icc_message = fifo_pop(shared->icc_pool);
@@ -127,7 +127,7 @@ ICC_Message* icc_alloc(uint8_t type) {
 }
 
 void icc_free(ICC_Message* msg) {
-	Shared* shared = (Shared*)VIRTUAL_TO_PHYSICAL(SHARED_ADDR);
+	Shared* shared = (Shared*)SHARED_ADDR;
 
 	lock_lock(&shared->icc_lock_free);
 	fifo_push(shared->icc_pool, msg);
@@ -135,7 +135,7 @@ void icc_free(ICC_Message* msg) {
 }
 
 uint32_t icc_send(ICC_Message* msg, uint8_t apic_id) {
-	Shared* shared = (Shared*)VIRTUAL_TO_PHYSICAL(SHARED_ADDR);
+	Shared* shared = (Shared*)SHARED_ADDR;
 	uint32_t _icc_id = msg->id;
 
 	lock_lock(&shared->icc_queues[apic_id].icc_queue_lock);

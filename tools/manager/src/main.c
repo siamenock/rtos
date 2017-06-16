@@ -90,7 +90,10 @@ static int kernel_symbols_init() {
 			return -1;
 		}
 		char** test = (char**)mmap_symbols[i][0];
-		*test = (char*)symbol_addr;
+
+		if(!strcmp("SHARED_ADDR", mmap_symbols[i][1])) *test = VIRTUAL_TO_PHYSICAL(symbol_addr);
+		else *test = (char*)symbol_addr;
+
 		printf("\tSymbol \"%s\" : %p %p %p\n", mmap_symbols[i][1], symbol_addr, test, *test);
 	}
 
