@@ -455,12 +455,12 @@ static int virtnet_send(VirtNetPriv* priv, Packet* packet) {
 	return 0;
 }
 
-static bool poll(void* context) {
+static bool poll(NICDevice* nicdev) {
 	uint32_t len;
 	int received = 0;
 	void* buf;
 
- 	VirtNetPriv* priv = context;
+ 	VirtNetPriv* priv = nicdev->priv;
 	VirtQueue* vq = priv->rvq;
 	while((BUDGET_SIZE > received) && (buf = get_buf(vq, &len))) {
 		virtnet_receive(priv, buf, len);
@@ -474,6 +474,65 @@ static bool poll(void* context) {
  
 	return true;
 }
+
+static bool process(Packet* packet, void* context) {
+	NICDevice* nicdev = context;
+	if(nicdev->vlan_proto == ETHER_TYPE_8021Q) { //Vlan Tagging
+		Ether* ether = (Ether*)(packet->buffer + packet->start);
+		if(packet->start < 4) {
+			return false;
+		}
+		memmove((uint8_t*)ether - 4, ether, ETHER_LEN - 2);
+		packet->start -= 4;
+		ether = (void*)(packet->buffer + packet->start);
+		ether->type = endian16(ETHER_TYPE_8021Q);
+		VLAN* vlan = (VLAN*)ether->payload;
+		vlan->tci = nicdev->vlan_tci;
+	}
+	return virtnet_send(nicdev->priv, packet) == 0 ? true : false;
+}
+
+static bool virtio_xmit(NICDevice* nicdev, Packet* packet) {
+ 	VirtNetPriv* priv = nicdev->priv;
+	VirtQueue* vq;
+ 
+ 	// Free used buffer
+ 	void* buf;
+ 	while((buf = get_buf(priv->svq, NULL))) {
+ 		nic_free(buf);
+ 	}
+ 
+ 	// TX
+	if(process(packet, nicdev)) {
+		vq = priv->svq;
+		kick(vq);
+	}
+
+	return true;
+}
+
+static bool virtio_tx(NICDevice* nicdev) {
+ 	VirtNetPriv* priv = nicdev->priv;
+	VirtQueue* vq;
+ 
+ 	// Free used buffer
+ 	void* buf;
+ 	while((buf = get_buf(priv->svq, NULL))) {
+ 		nic_free(buf);
+ 	}
+ 
+ 	// TX
+ 	int nicdev_tx(NICDevice* dev,
+ 			bool (*process)(Packet* packet, void* context), void* context);
+ 	int count = nicdev_tx(nicdev, process, nicdev);
+	if(count) {
+		vq = priv->svq;
+		kick(vq);
+	}
+
+	return true;
+}
+
 
 int init(void* device, void* data) {
 	int err;
@@ -535,7 +594,8 @@ int init(void* device, void* data) {
 	//TODO check return value
 	nicdev_register(nicdev);
 
-	event_busy_add(poll, priv);
+	event_busy_add(poll, nicdev);
+	event_busy_add(virtio_tx, nicdev);
 
 	return 0;
 error: 
@@ -563,45 +623,6 @@ void destroy(int id) {
 // 
 // 	// Destroy private structure
 // 	gfree(priv[id]);
-}
-
-static bool process(Packet* packet, void* context) {
-	NICDevice* nicdev = context;
-	if(nicdev->vlan_proto == ETHER_TYPE_8021Q) { //Vlan Tagging
-		Ether* ether = (Ether*)(packet->buffer + packet->start);
-		if(packet->start < 4) {
-			return false;
-		}
-		memmove((uint8_t*)ether - 4, ether, ETHER_LEN - 2);
-		packet->start -= 4;
-		ether = (void*)(packet->buffer + packet->start);
-		ether->type = endian16(ETHER_TYPE_8021Q);
-		VLAN* vlan = (VLAN*)ether->payload;
-		vlan->tci = nicdev->vlan_tci;
-	}
-	return virtnet_send(nicdev->priv, packet) == 0 ? true : false;
-}
-
-int virtio_tx(NICDevice* nicdev) {
- 	VirtNetPriv* priv = nicdev->priv;
-	VirtQueue* vq;
- 
- 	// Free used buffer
- 	void* buf;
- 	while((buf = get_buf(priv->svq, NULL))) {
- 		nic_free(buf);
- 	}
- 
- 	// TX
- 	int nicdev_tx(NICDevice* dev,
- 			bool (*process)(Packet* packet, void* context), void* context);
- 	int count = nicdev_tx(nicdev, process, nicdev);
-	if(count) {
-		vq = priv->svq;
-		kick(vq);
-	}
-
-	return count;
 }
 
 void get_status(int id, NICStatus* status) {
@@ -655,8 +676,8 @@ bool virtnet_vlan_rx_kill_vid(NICDevice* nicdev, uint16_t vid) {
 NICDriver device_driver = {
 	.init = init,
 	.destroy = destroy,
-	.xmit = virtio_tx,
-//	.poll = poll,
+	.xmit = virtio_xmit,
+	.poll = poll,
 	.get_status = get_status,
 	.set_status = set_status,
 	.get_info = get_info,

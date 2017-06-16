@@ -1,8 +1,3 @@
-#include <stdio.h>
-#include <string.h>
-#include <util/event.h>
-
-#include "gmalloc.h"
 #include "nicdev.h"
 
 #define ETHER_TYPE_IPv4		0x0800		///< Ether type of IPv4
@@ -52,6 +47,9 @@ int nicdev_get_count() {
 	return 0;
 }
 
+//for linux driver
+//linux driver can't include glib header
+extern int strncmp (const char *__s1, const char *__s2, size_t __n);
 static NICDevice* nicdev_get0(NICDevice* nicdev, const char* name) {
 	if(!strncmp(nicdev->name, name, MAX_NIC_NAME_LEN))
 		return nicdev;
@@ -75,14 +73,6 @@ NICDevice* nicdev_get(const char* name) {
 	return NULL;
 }
 
-static bool nicdev_schedule(void* context) {
-	NICDevice* nicdev = (NICDevice*)context;
-	if(nicdev->driver && ((NICDriver*)nicdev->driver)->xmit)
-		((NICDriver*)nicdev->driver)->xmit(nicdev);
-
-	return true;
-}
-
 int nicdev_register(NICDevice* nicdev) {
 	if(nicdev_get(nicdev->name))
 		return -1;
@@ -91,9 +81,6 @@ int nicdev_register(NICDevice* nicdev) {
 	for(i = 0; i < MAX_NIC_DEVICE_COUNT; i++) {
 		if(!nic_devices[i]) {
 			nic_devices[i] = nicdev;
-			//FIXME
-			// when NICDevice has any vnic, don't add to event.
-			event_busy_add(nicdev_schedule, nicdev);
 			return 0;
 		}
 	}
@@ -119,7 +106,6 @@ NICDevice* nicdev_unregister(const char* name) {
 				}
 			}
 
-			//FIXME remove event nicdev
 			return dev;
 		}
 	}
@@ -242,72 +228,78 @@ VNIC* nicdev_update_vnic(NICDevice* nicdev, VNIC* src_vnic) {
 	return dst_vnic;
 }
 
-static uint8_t packet_debug_switch;
-void nidev_debug_switch_set(uint8_t opt) {
-	packet_debug_switch = opt;
-}
 
-uint8_t nicdev_debug_switch_get() {
-	return packet_debug_switch;
-}
+#define likely(x)       __builtin_expect(!!(x), 1)
+#define unlikely(x)     __builtin_expect(!!(x), 0)
 
-#define likely(x)       __builtin_expect((x),1)
-#define unlikely(x)     __builtin_expect((x),0)
+// static uint8_t packet_debug_switch;
+// void nidev_debug_switch_set(uint8_t opt) {
+// 	packet_debug_switch = opt;
+// }
 
-inline static void packet_dump(void* _data, size_t size) {
-	if(unlikely(!!packet_debug_switch)) {
-		if(packet_debug_switch | NICDEV_DEBUG_PACKET_INFO) {
-			printf("Packet Lengh:\t%d\n", size);
-		}
+// uint8_t nicdev_debug_switch_get() {
+// 	return packet_debug_switch;
+// }
+// inline static void packet_dump(void* _data, size_t size) {
+// 	if(unlikely(!!packet_debug_switch)) {
+// 		if(packet_debug_switch | NICDEV_DEBUG_PACKET_INFO) {
+// 			printf("Packet Lengh:\t%d\n", size);
+// 		}
 
-		Ether* eth = _data;
-		if(packet_debug_switch | NICDEV_DEBUG_PACKET_ETHER_INFO) {
-			printf("Ether Type:\t0x%04x\n", endian16(eth->type));
-			uint64_t dmac = endian48(eth->dmac);
-			uint64_t smac = endian48(eth->smac);
-			printf("%02x:%02x:%02x:%02x:%02x:%02x %02x:%02x:%02x:%02x:%02x:%02x\n",
-					(dmac >> 40) & 0xff, (dmac >> 32) & 0xff, (dmac >> 24) & 0xff,
-					(dmac >> 16) & 0xff, (dmac >> 8) & 0xff, (dmac >> 0) & 0xff,
-					(smac >> 40) & 0xff, (smac >> 32) & 0xff, (smac >> 24) & 0xff,
-					(smac >> 16) & 0xff, (smac >> 8) & 0xff, (smac >> 0) & 0xff);
-		}
+// 		Ether* eth = _data;
+// 		if(packet_debug_switch | NICDEV_DEBUG_PACKET_ETHER_INFO) {
+// 			printf("Ether Type:\t0x%04x\n", endian16(eth->type));
+// 			uint64_t dmac = endian48(eth->dmac);
+// 			uint64_t smac = endian48(eth->smac);
+// 			printf("%02x:%02x:%02x:%02x:%02x:%02x %02x:%02x:%02x:%02x:%02x:%02x\n",
+// 					(dmac >> 40) & 0xff, (dmac >> 32) & 0xff, (dmac >> 24) & 0xff,
+// 					(dmac >> 16) & 0xff, (dmac >> 8) & 0xff, (dmac >> 0) & 0xff,
+// 					(smac >> 40) & 0xff, (smac >> 32) & 0xff, (smac >> 24) & 0xff,
+// 					(smac >> 16) & 0xff, (smac >> 8) & 0xff, (smac >> 0) & 0xff);
+// 		}
 
-		if(packet_debug_switch | NICDEV_DEBUG_PACKET_VERBOSE_INFO) {
-			switch(eth->type) {
-				case ETHER_TYPE_IPv4:
-					break;
-				case ETHER_TYPE_ARP:
-					break;
-				case ETHER_TYPE_IPv6:
-					break;
-				case ETHER_TYPE_LLDP:
-					break;
-				case ETHER_TYPE_8021Q:
-					break;
-				case ETHER_TYPE_8021AD:
-					break;
-				case ETHER_TYPE_QINQ1:
-					break;
-				case ETHER_TYPE_QINQ2:
-					break;
-				case ETHER_TYPE_QINQ3:
-					break;
-			}
-		}
+// 		if(packet_debug_switch | NICDEV_DEBUG_PACKET_VERBOSE_INFO) {
+// 			switch(eth->type) {
+// 				case ETHER_TYPE_IPv4:
+// 					break;
+// 				case ETHER_TYPE_ARP:
+// 					break;
+// 				case ETHER_TYPE_IPv6:
+// 					break;
+// 				case ETHER_TYPE_LLDP:
+// 					break;
+// 				case ETHER_TYPE_8021Q:
+// 					break;
+// 				case ETHER_TYPE_8021AD:
+// 					break;
+// 				case ETHER_TYPE_QINQ1:
+// 					break;
+// 				case ETHER_TYPE_QINQ2:
+// 					break;
+// 				case ETHER_TYPE_QINQ3:
+// 					break;
+// 			}
+// 		}
 
-		if(packet_debug_switch | NICDEV_DEBUG_PACKET_DUMP) {
-			uint8_t* data = (uint8_t*)_data;
-			for(size_t i = 0 ; i < size;) {
-				printf("\t0x%04x:\t", i);
-				for(size_t j = 0; j < 16 && i < size; j++, i++) {
-					printf("%02x ", data[i] & 0xff);
-				}
-				printf("\n");
-			}
-			printf("\n");
-		}
-	}
-}
+// 		if(packet_debug_switch | NICDEV_DEBUG_PACKET_DUMP) {
+// 			uint8_t* data = (uint8_t*)_data;
+// 			for(size_t i = 0 ; i < size;) {
+// 				printf("\t0x%04x:\t", i);
+// 				for(size_t j = 0; j < 16 && i < size; j++, i++) {
+// 					printf("%02x ", data[i] & 0xff);
+// 				}
+// 				printf("\n");
+// 			}
+// 			printf("\n");
+// 		}
+// 	}
+// }
+
+/**
+ * rx process 
+ */
+static bool (*rx_process)(void* _data, size_t size);
+static bool (*tx_process)(void* _data, size_t size);
 
 int nicdev_rx(NICDevice* dev, void* data, size_t size) {
 	return nicdev_rx0(dev, data, size, NULL, 0);
@@ -323,8 +315,8 @@ int nicdev_rx0(NICDevice* dev, void* data, size_t size,
 		return NICDEV_PROCESS_PASS;
 	uint64_t dmac = endian48(eth->dmac);
 
-	//TODO lock
-	packet_dump(data, size);
+	if(unlikely(!!rx_process)) rx_process(data, size);
+
 	if(dmac & ETHER_MULTICAST) {
 		for(i = 0; i < MAX_VNIC_COUNT; i++) {
 			if(!dev->vnics[i])
@@ -350,14 +342,13 @@ typedef struct _TransmitContext{
 } TransmitContext;
 
 static bool transmitter(Packet* packet, void* context) {
-	if(!packet)
-		return false;
+	if(!packet) return false;
 
-	packet_dump(packet->buffer + packet->start, packet->end - packet->start);
+	if(unlikely(!!tx_process)) tx_process(packet->buffer + packet->start, packet->end - packet->start);
+
 	TransmitContext* transmitter_context = context;
 
-	if(!transmitter_context->process(packet, transmitter_context->context))
-		return false;
+	if(!transmitter_context->process(packet, transmitter_context->context)) return false;
 
 	return true;
 }
@@ -409,76 +400,4 @@ void nicdev_free(Packet* packet) {
 	// TODO
 	for(int i = 0; i < MAX_VNIC_COUNT; ++i) {
 	}
-}
-
-NICDevice* nicdev_add_vlan(NICDevice* nicdev, uint16_t id) {
-	if(((NICDriver*)nicdev->driver)->add_vid) {
-		if(!((NICDriver*)nicdev->driver)->add_vid(nicdev, id))
-			return NULL;
-	}
-
-	NICDevice* vlan_nicdev = gmalloc(sizeof(NICDevice));
-	memset(vlan_nicdev, 0, sizeof(NICDevice));
-	sprintf(vlan_nicdev->name, "%s.%d", nicdev->name, id);
-	if(nicdev_get(vlan_nicdev->name)) {
-		gfree(vlan_nicdev);
-		return NULL;
-	}
-	vlan_nicdev->mac = nicdev->mac;
-	vlan_nicdev->vlan_proto = ETHER_TYPE_8021Q;
-	vlan_nicdev->vlan_tci = endian16(id);
-	vlan_nicdev->driver = nicdev->driver;
-	vlan_nicdev->priv = nicdev->priv;
-
-	NICDevice* next = nicdev;
-	while(1) {
-		if(next->next) {
-			if((endian16(next->next->vlan_tci) & 0xfff) < id) {
-				next = next->next;
-				continue;
-			}
-
-			next->next->prev = vlan_nicdev;
-			vlan_nicdev->next = next->next;
-
-			next->next = vlan_nicdev;
-			vlan_nicdev->prev = next;
-			break;
-		} else {
-			//Add last
-			next->next = vlan_nicdev;
-			vlan_nicdev->prev = next;
-			vlan_nicdev->next = NULL;
-			break;
-		}
-	}
-
-	event_busy_add(nicdev_schedule, vlan_nicdev);
-	return vlan_nicdev;
-}
-
-bool nicdev_remove_vlan(NICDevice* nicdev) {
-	// Check has nicdevice
-	for(int i = 0; i < MAX_NIC_DEVICE_COUNT; i++) {
-		NICDevice* dev = nic_devices[i];
-		if(dev)
-			return false;
-		else
-			break;
-	}
-
-	if(nicdev->vlan_proto != ETHER_TYPE_8021Q)
-			return false;
-
-	if(((NICDriver*)nicdev->driver)->remove_vid) {
-		((NICDriver*)nicdev->driver)->remove_vid(nicdev, endian16(nicdev->vlan_tci) & 0xfff);
-	}
-
-	gfree(nicdev);
-	//FIXME remove event nicdev
-	return false;
-}
-
-bool nicdev_set_flag(NICDevice* nicdev, uint8_t pcp, uint8_t dei) {
-	return true;
 }
