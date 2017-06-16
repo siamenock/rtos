@@ -82,6 +82,7 @@ int main(int argc, char* argv[]) {
 	// Make data structure
 	int total = sizeof(Symbol) * (count + 1) + text_size;
 	Symbol* symbols = malloc(total);
+	memset(symbols, 0, total);
 	char* text = (void*)symbols + total - text_size;
 	int j = 0;
 	for(int i = 0; i < size; i++) {

@@ -11,7 +11,7 @@ void symbols_init() {
 	
 	// Relocate
 	Symbol* s = symbols;
-	while(s->name && s->address && (void*)s < end) {
+	while(s->name && (void*)s < end) {
 		s->name += (uintptr_t)symbols;
 		s++;
 	}
@@ -21,12 +21,14 @@ Symbol* symbols_get(char* name) {
 	if(!symbols)
 		return NULL;
 	
-	Symbol* s = symbols;
-	while(s->name && s->address) {
-		if(strcmp(s->name, name) == 0)
+	PNKC* pnkc = (PNKC*)(0x200000 - sizeof(PNKC));
+	void* end = (void*)0x200000 + pnkc->smap_offset + pnkc->smap_size;
+	for(Symbol* s = symbols; s->name && (void*)s < end; s++) {
+		if(!s->address) continue;
+
+		if(strcmp(s->name, name) == 0) {
 			return s;
-		
-		s++;
+		}
 	}
 	
 	return NULL;
