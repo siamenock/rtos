@@ -1128,26 +1128,6 @@ static int cmd_md5(int argc, char** argv, void(*callback)(char* result, int exit
 	return 0;
 }
 
-char* strtok(char* argv, const char* delim) {
-	char* ptr = strstr(argv, delim);
-	if(!ptr)
-		return NULL;
-	memset(ptr, 0, strlen(delim));
-
-	return argv;
-}
-
-char* strtok_r(char* argv, const char* delim, char** next) {
-	char* res = strtok(argv, delim);
-	if(!res) {
-		*next = NULL;
-		return argv;
-	}
-
-	*next = res + strlen(res) + strlen(delim);
-	return res;
-}
-
 static int cmd_create(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	// Default value
 	VMSpec vm;

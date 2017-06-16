@@ -265,7 +265,8 @@ static void icc_stop(ICC_Message* msg) {
 	task_destroy(1);
 }
 
-static void fixup_page_table(uint8_t apic_id, uint64_t offset) {
+static void fixup_page_table(uint64_t offset) {
+	uint8_t apic_id = amp_get_apic_id();
 	uint64_t base = VIRTUAL_TO_PHYSICAL(PAGE_TABLE_START) + apic_id * 0x200000 + offset;
 	PageTable* l4u = (PageTable*)(base + PAGE_TABLE_SIZE * PAGE_L4U_INDEX);
 
@@ -288,6 +289,7 @@ static void fixup_page_table(uint8_t apic_id, uint64_t offset) {
 }
 
 void main() {
+	if(PHYSICAL_OFFSET) fixup_page_table(PHYSICAL_OFFSET);
 	shared_init();
 	amp_init((uint64_t)NULL);
 	mp_sync();	// Barrier #0
@@ -296,7 +298,6 @@ void main() {
 	uint64_t apic_id = mp_apic_id();
 
 	extern uint64_t PHYSICAL_OFFSET;
-	fixup_page_table(apic_id, PHYSICAL_OFFSET);
 	console_init();
 
 	uint64_t vga_buffer = (uint64_t)VGA_BUFFER_START;

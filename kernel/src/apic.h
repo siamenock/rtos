@@ -59,6 +59,7 @@
 typedef void (*APIC_Handler)(uint64_t,uint64_t);
 
 void apic_activate();
+void apic_address_init();
 void apic_init();
 bool apic_enabled();
 void apic_enable();

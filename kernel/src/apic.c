@@ -69,9 +69,12 @@ static void dummy_timer_handler(uint64_t vector, uint64_t error_code) {
 	apic_eoi();
 }
 
-void apic_init() {
+void apic_address_init() {
 	_apic_address = msr_read(MSR_IA32_APIC_BASE) & 0xFFFFF000;
+}
 
+void apic_init() {
+	apic_address_init();
 	apic_register(32, dummy_timer_handler);
 
 	apic_write32(APIC_REG_SIVR, apic_read32(APIC_REG_SIVR) | 0x100);

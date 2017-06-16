@@ -112,7 +112,7 @@ void icc_init() {
 }
 
 ICC_Message* icc_alloc(uint8_t type) {
-	Shared* shared = (Shared*)SHARED_ADDR;
+	Shared* shared = (Shared*)VIRTUAL_TO_PHYSICAL(SHARED_ADDR);
 
 	lock_lock(&shared->icc_lock_alloc);
 	ICC_Message* icc_message = fifo_pop(shared->icc_pool);
@@ -127,7 +127,7 @@ ICC_Message* icc_alloc(uint8_t type) {
 }
 
 void icc_free(ICC_Message* msg) {
-	Shared* shared = (Shared*)SHARED_ADDR;
+	Shared* shared = (Shared*)VIRTUAL_TO_PHYSICAL(SHARED_ADDR);
 
 	lock_lock(&shared->icc_lock_free);
 	fifo_push(shared->icc_pool, msg);
@@ -135,7 +135,7 @@ void icc_free(ICC_Message* msg) {
 }
 
 uint32_t icc_send(ICC_Message* msg, uint8_t apic_id) {
-	Shared* shared = (Shared*)SHARED_ADDR;
+	Shared* shared = (Shared*)VIRTUAL_TO_PHYSICAL(SHARED_ADDR);
 	uint32_t _icc_id = msg->id;
 
 	lock_lock(&shared->icc_queues[apic_id].icc_queue_lock);

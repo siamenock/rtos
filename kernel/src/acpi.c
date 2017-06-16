@@ -9,6 +9,7 @@
 #include "pci.h"
 #include "acpi.h"
 #include "mmap.h"
+#include "page.h"
 #include "shared.h"
 
 static int acpi_cmd_reboot(int argc, char** argv, void(*callback)(char* result, int exit_status));
@@ -189,7 +190,7 @@ void acpi_init() {
 					ProcessorLocalAPIC* local_apic = (ProcessorLocalAPIC*)(entry + i);
 					i += local_apic->record_length;
 					if(local_apic->flags) {
-						Shared* shared = (Shared*)SHARED_ADDR;
+						Shared* shared = (Shared*)VIRTUAL_TO_PHYSICAL(SHARED_ADDR);
 						shared->mp_processors[local_apic->apic_id] = processor_count++;
 					}
 					break;

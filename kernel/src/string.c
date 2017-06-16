@@ -185,3 +185,23 @@ char* strcpy(char *dest, const char *src) {
 char* strncpy(char *dest, const char *src, size_t len) {
 	return __memcpy(dest, src, len);
 }
+
+char* strtok(char* argv, const char* delim) {
+	char* ptr = strstr(argv, delim);
+	if(!ptr)
+		return NULL;
+	memset(ptr, 0, strlen(delim));
+
+	return argv;
+}
+
+char* strtok_r(char* argv, const char* delim, char** next) {
+	char* res = strtok(argv, delim);
+	if(!res) {
+		*next = NULL;
+		return argv;
+	}
+
+	*next = res + strlen(res) + strlen(delim);
+	return res;
+}
