@@ -63,6 +63,12 @@ project "start"
     targetname "start"
     files { "src/rpc.c" }
     files { "src/start.c" }
+
+    postbuildcommands {
+        "cp ../bin/start ../bin/pause",
+        "cp ../bin/start ../bin/resume",
+        "cp ../bin/start ../bin/stop",
+    }
     -- FIXME: Start, Pause, Resume, Stop commands are same. Need to be refactored
 
 project "upload"
@@ -123,13 +129,7 @@ project 'console'
         'make -C build -f upload.make',
         'make -C build -f download.make',
         'make -C build -f monitor.make',
-        'make -C build -f stdin.make',
-    }
-
-    postbuildcommands { 
-        "cp bin/start bin/pause",
-        "cp bin/start bin/resume",
-        "cp bin/start bin/stop",
+        'make -C build -f stdin.make'
     }
 
     cleancommands {
@@ -143,7 +143,7 @@ project 'console'
         'make -C build clean -f download.make clean',
         'make -C build clean -f monitor.make clean',
         'make -C build clean -f stdin.make clean',
-	'rm -f bin/pause',
-	'rm -f bin/resume',
-	'rm -f bin/stop',
+        "rm -f bin/pause",
+        "rm -f bin/resume",
+        "rm -f bin/stop"
     }
