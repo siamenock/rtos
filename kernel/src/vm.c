@@ -22,6 +22,7 @@
 #include "driver/nicdev.h"
 #include "driver/disk.h"
 #include "driver/fs.h"
+#include "shell.h"
 
 static uint32_t	last_vmid = 1;
 // FIXME: change to static
@@ -519,27 +520,27 @@ static bool vm_loop(void* context) {
 		return -1;
 	}
 
-	for(int i = 1; i < MP_MAX_CORE_COUNT; i++) {
-		Core* core = &cores[i];
+	// for(int i = 1; i < MP_MAX_CORE_COUNT; i++) {
+	// 	Core* core = &cores[i];
 
-		if(core->status != VM_STATUS_PAUSE && core->status != VM_STATUS_START) {
-			continue;
-		}
-		int thread_id = -1;
+	// 	if(core->status != VM_STATUS_PAUSE && core->status != VM_STATUS_START) {
+	// 		continue;
+	// 	}
+	// 	int thread_id = -1;
 
-		if(core->stdout != NULL && *core->stdout_head != *core->stdout_tail) {
-			thread_id = get_thread_id(core->vm, i);
+	// 	if(core->stdout != NULL && *core->stdout_head != *core->stdout_tail) {
+	// 		thread_id = get_thread_id(core->vm, i);
 
-			stdio_callback(core->vm->id, thread_id, 1, core->stdout, core->stdout_head, core->stdout_tail, core->stdout_size);
-		}
+	// 		stdio_callback(core->vm->id, thread_id, 1, core->stdout, core->stdout_head, core->stdout_tail, core->stdout_size);
+	// 	}
 
-		if(core->stderr != NULL && *core->stderr_head != *core->stderr_tail) {
-			if(thread_id == -1)
-				thread_id = get_thread_id(core->vm, i);
+	// 	if(core->stderr != NULL && *core->stderr_head != *core->stderr_tail) {
+	// 		if(thread_id == -1)
+	// 			thread_id = get_thread_id(core->vm, i);
 
-			stdio_callback(core->vm->id, thread_id, 2, core->stderr, core->stderr_head, core->stderr_tail, core->stderr_size);
-		}
-	}
+	// 		stdio_callback(core->vm->id, thread_id, 2, core->stderr, core->stderr_head, core->stderr_tail, core->stderr_size);
+	// 	}
+	// }
 
 	void stdio_dump(int coreno, int fd, char* buffer, volatile size_t* head, volatile size_t* tail, size_t size);
 

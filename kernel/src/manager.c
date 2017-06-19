@@ -28,6 +28,8 @@
 #include "manager.h"
 #include "manager_core.h"
 
+static ManagerCore* manager_core;
+
 static void vm_create_handler(RPC* rpc, VMSpec* vm_spec, void* context, void(*callback)(RPC* rpc, uint32_t id)) {
 	uint32_t id = vm_create(vm_spec);
 	callback(rpc, id);
@@ -63,7 +65,7 @@ static void status_setted(bool result, void* context) {
 	StatusSetData* data = context;
 	RPC* rpc = data->rpc;
 
-	if(list_index_of(manager.clients, rpc, NULL) >= 0) {
+	if(manager_core && list_index_of(manager_core->clients, rpc, NULL) >= 0) {
 		data->callback(rpc, result);
 	}
 
@@ -161,8 +163,6 @@ static int manager_accept(RPC* rpc) {
 }
 
 static void stdio_callback(uint32_t vmid, int thread_id, int fd, char* buffer, volatile size_t* head, volatile size_t* tail, size_t size) {
-	ListIterator iter;
-	list_iterator_init(&iter, manager.clients);
 	size_t len0, len1, len2;
 	bool wrapped;
 
@@ -177,6 +177,11 @@ static void stdio_callback(uint32_t vmid, int thread_id, int fd, char* buffer, v
 		len2 = *tail;
 	}
 
+	if(!!manager_core)
+		return;
+
+	ListIterator iter;
+	list_iterator_init(&iter, manager_core->clients);
 	while(list_iterator_has_next(&iter)) {
 		RPC* rpc = list_iterator_next(&iter);
 
@@ -197,8 +202,6 @@ static void stdio_callback(uint32_t vmid, int thread_id, int fd, char* buffer, v
 		*head += len0;
 	}
 }
-
-static ManagerCore* manager_core;
 
 static int cmd_manager(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	for(int i = 1; i < argc; i++) {

@@ -677,6 +677,7 @@ NICDriver device_driver = {
 	.init = init,
 	.destroy = destroy,
 	.xmit = virtio_xmit,
+	.tx_poll = virtio_tx,
 	.poll = poll,
 	.get_status = get_status,
 	.set_status = set_status,

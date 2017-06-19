@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <malloc.h>
 
 #include "e820.h"
 #include "multiboot_tag.h"

@@ -12,6 +12,7 @@
 typedef struct _ManagerCore {
 	uint16_t	port; ///< tcp port
 	void*		data; ///< `fd` on linux stack, `pcb` on lwip stack
+	List*		clients;
 } ManagerCore;
 
 /**

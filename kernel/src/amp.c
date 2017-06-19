@@ -1,4 +1,6 @@
 #include <stdio.h>
+
+#include "acpi.h"
 #include "mp.h"
 #include "amp.h"
 

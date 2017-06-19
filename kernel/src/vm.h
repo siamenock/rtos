@@ -44,7 +44,7 @@ typedef struct _VM {
 	uint8_t		cores[MP_MAX_CORE_COUNT];	///< Set of core id
 	Block		memory;				///< Total Memeory size
 	Block		storage;			///< Total Block size
-	int		used_size;			///< Application image size
+	uint64_t	used_size;			///< Application image size
 	int		nic_count;			///< Number of NICs
 	VNIC**		nics;				///< NICs (gmalloc)
 	//	VFIO*		fio;

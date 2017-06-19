@@ -27,11 +27,18 @@
 #include <lwip/netif.h>
 #include <arch/driver.h>
 
+typedef struct _Manager {
+	int	vnic_count;
+	VNIC*	vnics[MAX_VNIC_COUNT];	// gmalloc, ni_create
+	List* 	netifs;
+	List*	servers;
+	List* 	actives;
+} Manager;
 
 extern NIC* __nics[MAX_VNIC_COUNT];
 extern int __nic_count;
 
-
+ManagerCore* manager_core;
 Manager manager;
 static struct netif* netif;
 static List* rx_process_list; // TODO netif includes fix rx_process_list
@@ -40,8 +47,8 @@ static err_t (*core_accept)(RPC* rpc);
 // LwIP TCP callbacks
 typedef struct {
 	struct tcp_pcb*	pcb;
-	List*		pbufs;
-	int		poll_count;
+	List*			pbufs;
+	int				poll_count;
 } RPCData;
 
 typedef struct _ARPingContext {
@@ -284,7 +291,7 @@ static void rpc_free(RPC* rpc) {
 	list_remove_data(manager.actives, rpc);
 	free(rpc);
 
-	list_remove_data(manager.clients, data->pcb);
+	list_remove_data(manager_core->clients, rpc);
 }
 
 static VNIC* manager_create_vnic(char* nicdev_name) {
@@ -351,6 +358,8 @@ fail:
 		gfree(vnic);
 	if(vnic && vnic->nic)
 		bfree(vnic->nic);
+
+	return NULL;
 }
 
 static bool manager_destroy_vnic(VNIC* vnic) {
@@ -511,14 +520,6 @@ struct netif* manager_create_netif(NIC* nic, uint32_t ip, uint32_t netmask, uint
 	return netif;
 }
 
-static bool manager_destroy_netif(struct netif* netif) {
-	return false;
-}
-
-struct netif* manager_get_netif(uint32_t ip) {
-	return NULL;
-}
-
 static err_t manager_accept(void* arg, struct tcp_pcb* pcb, err_t err) {
 	struct tcp_pcb_listen* server = arg;
 	tcp_accepted(server);
@@ -540,7 +541,7 @@ static err_t manager_accept(void* arg, struct tcp_pcb* pcb, err_t err) {
 	tcp_err(pcb, manager_err);
 	tcp_poll(pcb, manager_poll, 2);
 
-	list_add(manager.clients, pcb);
+	list_add(manager_core->clients, rpc);
 
 	return ERR_OK;
 }
@@ -555,8 +556,7 @@ static void manager_close(struct tcp_pcb* pcb, RPC* rpc, bool is_force) {
 
 	if(rpc) {
 		rpc_free(rpc);
-	} else {
-		list_remove_data(manager.clients, pcb);
+		list_remove_data(manager_core->clients, rpc);
 	}
 
 	if(is_force) {
@@ -585,7 +585,7 @@ inline void manager_netif_set_netmask(struct netif* netif, uint32_t netmask) {
 	netif_set_netmask(netif, &netmask2);
 }
 
-struct tcp_pcb* manager_netif_server_open(struct netif* netif, uint16_t port) {
+static struct tcp_pcb* manager_netif_server_open(struct netif* netif, uint16_t port) {
 	struct ip_addr ip_addr = netif->ip_addr;
 
 	struct tcp_pcb* tcp_pcb = tcp_new();
@@ -609,11 +609,11 @@ struct tcp_pcb* manager_netif_server_open(struct netif* netif, uint16_t port) {
 
 static bool manager_netif_server_close(struct tcp_pcb* tcp_pcb) {
 	ListIterator iter;
-	list_iterator_init(&iter, manager.clients);
+	list_iterator_init(&iter, manager_core->clients);
 	while(list_iterator_has_next(&iter)) {
-		struct tcp_pcb* pcb = list_iterator_next(&iter);
-		RPC* rpc = pcb->callback_arg;
-		manager_close(pcb, rpc, true);
+		RPC* rpc = list_iterator_next(&iter);
+		RPCData* data = (RPCData*)rpc->data;
+		manager_close(data->pcb, rpc, true);
 	}
 
 	if(tcp_close(tcp_pcb) != ERR_OK) {
@@ -1058,7 +1058,7 @@ static int cmd_dump(int argc, char** argv, void(*callback)(char* result, int exi
 	static uint8_t opt = 0;
 	opt = opt ? 0 : 0xff;
 
-	nidev_debug_switch_set(opt);
+	//nidev_debug_switch_set(opt);
 
 	return 0;
 }
@@ -1116,10 +1116,6 @@ int manager_core_init(err_t (*_accept)(RPC* rpc)) {
 	if(!manager.servers)
 		return -1;
 
-	manager.clients = list_create(NULL); //lwip client pcb
-	if(!manager.clients)
-		return -1;
-
 	manager.actives = list_create(NULL);
 	if(!manager.actives)
 		return -1;
@@ -1152,13 +1148,14 @@ ManagerCore* manager_core_server_open(uint16_t port) {
 	if(!tcp_pcb)
 		return NULL;
 
-	ManagerCore* core = calloc(1, sizeof(ManagerCore));
-	core->port = port;
-	core->data = tcp_pcb;
-	return core;
+	manager_core = calloc(1, sizeof(ManagerCore));
+	manager_core->port = port;
+	manager_core->data = tcp_pcb;
+	manager_core->clients = list_create(NULL);
+
+	return manager_core;
 }
 
 bool manager_core_server_close(ManagerCore* manager_core) {
 	return manager_netif_server_close((struct tcp_pcb*)manager_core->data);
 }
-

@@ -1,7 +1,11 @@
-#include <gmalloc.h>
+#include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
+#include <gmalloc.h>
 #include <net/ether.h>
+#include <util/event.h>
+
 #include "driver/nicdev.h"
 
 NICDevice* nicdev_add_vlan(NICDevice* nicdev, uint16_t id) {
@@ -46,7 +50,7 @@ NICDevice* nicdev_add_vlan(NICDevice* nicdev, uint16_t id) {
 		}
 	}
 
-	event_busy_add(((NICDriver*)vlan_nicdev->driver)->xmit, vlan_nicdev);
+	event_busy_add((void*)((NICDriver*)vlan_nicdev->driver)->tx_poll, vlan_nicdev);
 	return vlan_nicdev;
 }
 

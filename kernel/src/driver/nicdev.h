@@ -35,6 +35,7 @@ typedef struct {
 typedef struct {
 	int		(*init)(void* device, void* data);
 	void		(*destroy)(NICDevice* nicdev);
+	bool		(*tx_poll)(NICDevice* nicdev);
 	int 		(*poll)(NICDevice* nicdev);
 	bool 		(*xmit)(NICDevice* nicdev, Packet* packet);
 

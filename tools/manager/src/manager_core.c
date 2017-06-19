@@ -22,21 +22,19 @@ typedef struct {
 	struct	sockaddr_in caddr;
 } RPCData;
 
-static List* actives;	/* rpc */
-
-Manager manager;
-
+static ManagerCore* manager_core;
 bool rpc_is_closed(RPC* rpc);
 static bool manager_loop(void* context) {
-	if(!list_is_empty(actives)) {
+	ManagerCore* core = context;
+	if(!list_is_empty(manager_core->clients)) {
 		ListIterator iter;
-		list_iterator_init(&iter, actives);
+		list_iterator_init(&iter, manager_core->clients);
 		while(list_iterator_has_next(&iter)) {
 			RPC* rpc = list_iterator_next(&iter);
 			if(!rpc_is_closed(rpc))
 				rpc_loop(rpc);
 			else
-				list_remove_data(actives, rpc);
+				list_remove_data(manager_core->clients, rpc);
 		}
 	}
 
@@ -48,8 +46,6 @@ static int (*core_accept)(RPC* rpc);
 int manager_core_init(int (*_accept)(RPC* rpc)) {
 	printf("\tManager RPC server opened\n");
 
-	actives = list_create(NULL);
-	event_idle_add(manager_loop, NULL);
 
 	core_accept = _accept;
 
@@ -122,6 +118,8 @@ static void sock_close(RPC* rpc) {
 	RPCData* data = (RPCData*)rpc->data;
 	close(data->fd);
 	data->fd = -1;
+
+	list_remove_data(manager_core->clients, rpc);
 #if DEBUG
 	printf("Connection closed : %s\n", inet_ntoa(data->caddr.sin_addr));
 #endif
@@ -157,32 +155,6 @@ typedef struct {
 	uint64_t current;
 	RPC* rpc;
 } HelloContext;
-
-static bool callback_hello(void* context) {
-	HelloContext* context_hello = context;
-
-	struct timeval tv;
-	gettimeofday(&tv, NULL);
-	uint64_t current = tv.tv_sec * 1000 * 1000 + tv.tv_usec;
-
-	printf("Ping PacketNgin time = %0.3f ms\n", (float)(current - context_hello->current) / (float)1000);
-	context_hello->current = current;
-	context_hello->count--;
-	RPC* rpc = context_hello->rpc;
-
-	if(context_hello->count == 0) {
-		if(!context_hello->keep_session) {
-			rpc_disconnect(rpc);
-		}
-		free(context_hello);
-
-		return false;
-	}
-
-	rpc_hello(rpc, callback_hello, context_hello);
-
-	return true;
-}
 
 static RPCData* rpc_listen(int port) {
        int fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -252,8 +224,8 @@ static bool manager_accept_loop(void* _rpc_data) {
 
 	core_accept(crpc);
 
-	if(list_index_of(actives, crpc, NULL) < 0)
-		list_add(actives, crpc);
+	if(list_index_of(manager_core->clients, crpc, NULL) < 0)
+		list_add(manager_core->clients, crpc);
 
 	RPCData* data = (RPCData*)crpc->data;
 	printf("Connection opened : %s\n", inet_ntoa(data->caddr.sin_addr));
@@ -262,10 +234,13 @@ static bool manager_accept_loop(void* _rpc_data) {
 }
 
 bool manager_core_server_close(ManagerCore* manager_core) {
+	return true;
 }
 
 ManagerCore* manager_core_server_open(uint16_t port) {
-	ManagerCore* manager_core = malloc(sizeof(ManagerCore));
+	manager_core = malloc(sizeof(ManagerCore));
+	manager_core->port = port;
+	manager_core->clients = list_create(NULL);
 
 	RPCData* rpc_data = rpc_listen(port);
 	if(!rpc_data) {
@@ -274,6 +249,7 @@ ManagerCore* manager_core_server_open(uint16_t port) {
 	}
 
 	event_busy_add(manager_accept_loop, (void*)rpc_data);
+	event_idle_add(manager_loop, manager_core);
 
 	return manager_core;
 }

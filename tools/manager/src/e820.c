@@ -1,3 +1,6 @@
+#include <stdio.h>
+#include <malloc.h>
+
 #include "e820.h"
 #include "smap.h"
 

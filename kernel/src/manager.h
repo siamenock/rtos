@@ -11,17 +11,6 @@
 #define MANAGER_DEFAULT_NETMASK	0xffffff00	// 255.255.255.0
 #define MANAGER_DEFAULT_PORT	1111
 
-typedef struct _Manager {
-	int	vnic_count;
-	VNIC*	vnics[MAX_VNIC_COUNT];	// gmalloc, ni_create
-	List* 	netifs;
-	List*	servers;
-	List* 	clients;
-	List* 	actives;
-} Manager;
-
-extern Manager manager;
-
 int manager_init();
 
 #endif /* __MANAGER_H__ */
