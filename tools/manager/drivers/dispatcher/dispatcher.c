@@ -227,9 +227,10 @@ rx_handler_result_t dispatcher_handle_frame(struct sk_buff** pskb)
 	BUG_ON(!nic_device);
 
 	int res = nicdev_rx(nic_device, eth, ETH_HLEN + skb->len);
-	if(res == NICDEV_PROCESS_COMPLETE)
+	if(res == NICDEV_PROCESS_COMPLETE) {
+		kfree_skb(skb);
 		return RX_HANDLER_CONSUMED;
-	else
+	} else
 		return RX_HANDLER_PASS;
 }
 
