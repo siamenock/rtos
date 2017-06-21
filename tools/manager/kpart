@@ -1,0 +1,191 @@
+#!/usr/bin/python3
+import os
+import re
+import sys
+import json
+import multiprocessing
+import subprocess
+import traceback
+
+BASEDIR = os.path.dirname(os.path.abspath(__file__))
+RES_MINIMUM = {
+    'linux': {
+        # https://help.ubuntu.com/lts/serverguide/preparing-to-install.html
+        'core': 1,
+        'memory': 512 * 1024 * 1024,
+    },
+    'packetngin': {
+        # https://github.com/packetngin/rtos/blob/master/docs/mmap.md
+        'core': 1,
+        'memory': 128 * 1024 * 1024,
+    },
+}
+MAX_CORE = multiprocessing.cpu_count()
+MAX_MEMORY = os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES')
+
+
+def roundup(value, unit):
+    # roundup(0, 8) -> 0 : roundup(3, 8) -> 8 : roundup(8,8) -> 8
+    return ((((value) + (unit) - 1) // (unit)) * (unit))
+
+
+align2m = lambda v: roundup(v, (2 * (1024 ** 2)))
+
+
+def hform(number, human=False):
+    if not human:
+        convert_table = (
+            (r'([0-9a-f]+)\s*$', 1024 ** 0),
+            (r'([0-9a-f]+)\s*(k|kb)$', 1024 ** 1),
+            (r'([0-9a-f]+)\s*(m|mb)$', 1024 ** 2),
+            (r'([0-9a-f]+)\s*(g|gb)$', 1024 ** 3),
+            (r'([0-9a-f]+)\s*(t|tb)$', 1024 ** 4),
+        )
+
+        for conv in convert_table:
+            match = re.match(conv[0], str(number), re.IGNORECASE)
+            if match:
+                return int(match.group(1), 0) * conv[1]
+
+        raise Exception('Invalid number format were given')
+
+    if human:
+        convert_table = (
+            # (1024 ** 4, 'T'),
+            # (1024 ** 3, 'G'),
+            (1 * 1024 ** 2, 'M'),
+            # (1024 ** 1, 'K'),
+            # (1024 ** 0, ''),
+        )
+
+        for conv in convert_table:
+            if number // conv[0]:
+                return '{}{}'.format(number // conv[0], conv[1])
+
+        raise Exception('Invalid number format were given')
+
+
+def parse(linux_param=None, packetngin_param=None):
+    # Load linux resource information
+    linux = json.loads(linux_param) if linux_param else RES_MINIMUM['linux']
+    linux['memory'] = align2m(hform(linux['memory']))
+
+    # Load packetngin resource information
+    packetngin = None
+    if packetngin_param:
+        packetngin = json.loads(packetngin_param)
+        packetngin['memory'] = align2m(hform(packetngin['memory']))
+    else:
+        packetngin = dict()
+        packetngin['core'] = MAX_CORE - linux['core']
+        packetngin['memory'] = MAX_MEMORY - linux['memory']
+
+    # Check core number
+    if linux['core'] < RES_MINIMUM['linux']['core'] or \
+       packetngin['core'] < RES_MINIMUM['packetngin']['core'] or \
+       linux['core'] + packetngin['core'] > MAX_CORE:
+        raise ValueError('Insufficient core number were given')
+
+    # Check memory size
+    if linux['memory'] < RES_MINIMUM['linux']['memory'] or \
+       packetngin['memory'] < RES_MINIMUM['packetngin']['memory'] or \
+       linux['memory'] + packetngin['memory'] > MAX_MEMORY:
+        raise ValueError('Insufficient memory size were given')
+
+    # Print linux resources
+    linux_args = 'present_mask=0-{core} memmap={memory}@0 mem={memory}'.format(
+          core=linux['core'] - 1, memory=hform(linux['memory'], human=True))
+    linux_args += ' nox2apic' # FIXME remove this
+    with open('linux-boot.args', 'w') as f:
+        f.write(linux_args)
+
+    # Print packetngin resources
+    packetngin_args = 'present_mask={}-{} memmap={}@{} mem={}'.format(
+          linux['core'], MAX_CORE - 1,
+          hform(MAX_MEMORY - linux['memory'], True), hform(linux['memory'], True),
+          hform(MAX_MEMORY, True))
+    with open('packetngin-boot.args', 'w') as f:
+        lspci_script = os.path.join(BASEDIR, 'create_lspci.sh')
+        pci_blacklist = subprocess.check_output(lspci_script).decode('utf-8').replace('\n','')
+        f.write(' '.join([pci_blacklist, packetngin_args]))
+
+    packetngin_params = '../../kernel.bin packetngin-boot.args'
+    with open('packetngin-boot.param', 'w') as f:
+        f.write(packetngin_params)
+
+
+
+def main():
+    def check_privilege():
+        if os.getuid() != 0:
+            raise PermissionError('This program must be run as an root user')
+
+    def check_resources():
+        min_core = RES_MINIMUM['linux']['core'] + RES_MINIMUM['packetngin']['core']
+        if MAX_CORE < min_core:
+            raise EnvironmentError('At least {}cores are required to run linux with packetngin'.format(min_core))
+
+        min_mem = RES_MINIMUM['linux']['memory'] + RES_MINIMUM['packetngin']['memory']
+        if MAX_MEMORY < min_mem:
+            raise EnvironmentError('At least {}memory are required to run linux with packetngin'.format(min_mem))
+
+    def usage():
+        import textwrap
+        print(textwrap.dedent("""\
+            usage
+            {prog} [--help]
+            {prog} [--linux parameters] [--packetngin parameters]
+
+            example
+            {prog}
+            {prog} --linux '{"core": 1, "memory": "1G"}'
+            {prog} --linux '{"core": 1, "memory": "1G"}' --packetngin '{"core": 3, "memory": "7G"}'
+        """.replace('{prog}', sys.argv[0])), file=sys.stderr)
+
+    def parse_and_run():
+        def match_action():
+            usages = (
+                (1, tuple(), lambda: parse()),
+                (2, (r'--help',), lambda: usage()),
+                (3, (r'--linux', r'.*',), lambda: parse(linux_param=sys.argv[2])),
+                (5, (r'--linux', r'.*', r'--packetngin', r'.*'),
+                 lambda: parse(linux_param=sys.argv[4], packetngin_param=sys.argv[4])),
+            )
+
+            for u in usages:
+                arg_count, args, action = u
+                if len(sys.argv) != arg_count:
+                    continue
+
+                nmatch = 1
+                for index, arg in enumerate(args):
+                    if re.match(arg, sys.argv[1 + index], re.I):
+                        nmatch += 1
+                    else:
+                        break
+
+                if nmatch == arg_count:
+                    return action
+
+        matched = match_action()
+        if matched:
+            matched()
+        else:
+            usage()
+            exit(1)
+
+    # Main procedure ----------
+    try:
+        # check_privilege()
+        check_resources()
+        parse_and_run()
+    except Exception as e:
+        traceback.print_exc()
+        print(str(e), file=sys.stderr)
+        exit(1)
+
+    exit(0)
+
+
+if __name__ == "__main__":
+    main()

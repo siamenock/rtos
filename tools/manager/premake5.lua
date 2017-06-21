@@ -24,4 +24,5 @@ project "Manager"
     -- Make version header
     prebuildcommands {
         './mkver.sh > src/version.h'
+		'./kpart'
     }
