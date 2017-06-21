@@ -342,6 +342,32 @@ int nicdev_rx0(NICDevice* nic_dev, void* data, size_t size,
 	return NICDEV_PROCESS_PASS;
 }
 
+static bool (*srx_process)(void* _data, size_t size);
+static bool (*stx_process)(void* _data, size_t size);
+
+int nicdev_srx(VNIC* vnic, void* data, size_t size) {
+	return nicdev_srx0(vnic, data, size, NULL, 0);
+}
+
+int nicdev_srx0(VNIC* vnic, void* data, size_t size,
+		void* data_optional, size_t size_optional) {
+	Ether* eth = data;
+	int i;
+
+	if(size + size_optional < sizeof(Ether))
+		return NICDEV_PROCESS_PASS;
+	uint64_t smac = endian48(eth->smac);
+
+	if(unlikely(!!srx_process)) srx_process(data, size);
+
+	if(smac == vnic->mac) {
+		vnic_srx(vnic, (uint8_t*)eth, size, data_optional, size_optional);
+		return NICDEV_PROCESS_PASS;
+	}
+
+	return NICDEV_PROCESS_PASS;
+}
+
 typedef struct _TransmitContext{
 	bool (*process)(Packet* packet, void* context);
 	void* context;
@@ -366,8 +392,6 @@ static bool transmitter(Packet* packet, void* context) {
  *
  * @return number of packets proccessed
  */
-//FIXME: Need VNIC Scheduling.
-//If device buffer is full, last vnic in array can't send packet.
 //Task = budget
 int nicdev_tx(NICDevice* nicdev,
 		bool (*process)(Packet* packet, void* context), void* context) {
@@ -400,6 +424,30 @@ int nicdev_tx(NICDevice* nicdev,
 	}
 
 	return count;
+}
+
+/**
+ * @param dev NIC device
+ * @param process function to process packets in NIC device
+ * @param context context to be passed to process function
+ *
+ * @return number of packets proccessed
+ */
+//Task = budget
+int nicdev_stx(VNIC *vnic,
+			   bool (*process)(Packet *packet, void *context), void *context) {
+	TransmitContext transmitter_context = {
+		.process = process,
+		.context = context};
+
+	VNICError ret = vnic_stx(vnic, transmitter, &transmitter_context);
+
+	if (ret == VNIC_ERROR_OPERATION_FAILED)
+		return 0;
+	else if (ret == VNIC_ERROR_RESOURCE_NOT_AVAILABLE) // There no Packet, Check next vnic
+		return 0;
+
+	return 0;
 }
 
 void nicdev_free(Packet* packet) {

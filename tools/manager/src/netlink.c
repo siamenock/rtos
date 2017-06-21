@@ -148,10 +148,20 @@ bool netlink_event(void* context) {
 					rtnl_link(msg_ptr, nicdev);
 					if(interface_up_check(iface)) {
 						// Register resources
+						if(!strncmp(nicdev->name, "v", 1)) { //Check VNIC
+							free(nicdev);
+							break;
+						}
 						error = nicdev_register(nicdev);
-						if(error) break;
+						if(error) {
+							free(nicdev);
+							break;
+						}
 						error = dispatcher_create_nicdev(nicdev);
-						if(error) break;
+						if(error) {
+							free(nicdev);
+							break;
+						}
 
 						printf("Register: %s\n", nicdev->name);
 					} else {

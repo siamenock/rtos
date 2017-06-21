@@ -470,13 +470,32 @@ bool vnic_has_stx(VNIC* vnic) {
 	return !queue_empty(&vnic->stx);
 }
 
-Packet* vnic_stx(VNIC* vnic) {
-	if(!lock_trylock(&vnic->nic->stx.rlock))
-		return NULL;
-	vnic->stx.tail = vnic->nic->stx.tail;
-	Packet* packet = queue_pop(vnic->nic, &vnic->stx);
-	vnic->nic->stx.head = vnic->stx.head;
-	lock_unlock(&vnic->nic->stx.rlock);
+VNICError vnic_stx(VNIC* vnic, bool (*transmitter)(Packet*, void*), void* transmitter_context) {
+	if(!vnic_has_stx(vnic))
+		return VNIC_ERROR_RESOURCE_NOT_AVAILABLE;
 
-	return packet;
+	if(!lock_trylock(&vnic->nic->stx.rlock))
+		return VNIC_ERROR_RESOURCE_NOT_AVAILABLE;
+
+	bool transmitted	= false;
+
+	vnic->stx.tail		= vnic->nic->stx.tail;
+	Packet* packet		= queue_pop(vnic->nic, &vnic->stx);
+	vnic->nic->stx.head	= vnic->stx.head;
+
+	if(packet) {
+		uint64_t packet_size = packet->end - packet->start;
+
+		transmitted = transmitter(packet, transmitter_context);
+		if(transmitted) {
+			vnic->output_packets += 1;
+			vnic->output_bytes += packet_size;
+		} else {
+			vnic->output_drop_packets += 1;
+			vnic->output_drop_bytes += packet_size;
+		}
+	}
+
+	lock_unlock(&vnic->nic->stx.rlock);
+	return transmitted ? VNIC_ERROR_NOERROR : VNIC_ERROR_OPERATION_FAILED;
 }

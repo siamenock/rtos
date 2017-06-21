@@ -36,6 +36,7 @@
 #include "driver/nicdev.h"
 #include "param.h"
 #include "symbols.h"
+#include "io_mux.h"
 
 char* QWER;
 static int kernel_symbols_init() {
@@ -365,6 +366,9 @@ int main(int argc, char** argv) {
 
 	printf("\nInitializing events...\n");
 	event_init();
+
+	printf("\nInitializing I/O Multiplexer...\n");
+	io_mux_init();
 
 	printf("\nInitializing inter-core communications...\n");
 	icc_init();

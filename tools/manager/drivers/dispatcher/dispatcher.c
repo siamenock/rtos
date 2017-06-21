@@ -221,8 +221,8 @@ rx_handler_result_t dispatcher_handle_frame(struct sk_buff** pskb)
 	if (!skb)
 		return RX_HANDLER_CONSUMED;
 
-	struct ethhdr *eth = (struct ethhdr*)skb_mac_header(skb);
 	skb_linearize(skb);
+	struct ethhdr *eth = (struct ethhdr*)skb_mac_header(skb);
 	NICDevice* nic_device = rcu_dereference(skb->dev->rx_handler_data);
 	BUG_ON(!nic_device);
 
@@ -271,8 +271,6 @@ static struct sk_buff* convert_to_skb(struct net_device* dev, Packet* packet)
 
 	skb_put(skb, len);
 	memcpy(skb->data, buf, len);
-
-	printk("NIC free in convert to skb\n");
 
 	//TODO fix
 	nic_free(packet);

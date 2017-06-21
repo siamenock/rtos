@@ -1,9 +1,17 @@
 #include <sys/types.h>
 #include <stdio.h>
+#include <stdbool.h>
+#include <string.h>
 #include <signal.h>
 #include <unistd.h>
 #include <sys/fcntl.h>
 #include <sys/ioctl.h>
+#include <linux/if_tun.h>
+#include <net/if.h>
+#include <vnic.h>
+#include <net/ether.h>
+
+#include "slowpath.h"
 #include "dispatcher.h"
 
 static int dispatcher_fd;
@@ -23,7 +31,7 @@ int dispatcher_init() {
 		int rc;
 		printf("PacketNgin manager terminated...\n");
 		if((rc = dispatcher_exit()) < 0)
-			printf("\tDispatcher module abnormally termiated : %d\n", rc);
+			printf("\tDispatcher module abnormally terminated : %d\n", rc);
 
 		signal(SIGINT, SIG_DFL);
 		signal(SIGTERM, SIG_DFL);
@@ -57,6 +65,8 @@ int dispatcher_destroy_nicdev(void* nicdev) {
 }
 
 int dispatcher_create_vnic(void* vnic) {
+	if(slowpath_create(vnic)) return -1;
+
 	printf("Create VNIC to kernel dispatcher\n");
 	return ioctl(dispatcher_fd, DISPATCHER_CREATE_VNIC, vnic);
 }

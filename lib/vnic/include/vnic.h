@@ -3,6 +3,7 @@
 
 #include "nic.h"
 
+#define _IFNAMSIZ		16
 #define MAX_VNIC_COUNT		8
 
 /**
@@ -71,6 +72,7 @@ typedef struct _VNIC {
 	// Information
 	uint64_t	magic;			///< Magic
 	uint32_t	id;			///< NIC unique ID (unique ID in RTOS)
+	char		name[_IFNAMSIZ];
 	uint64_t	mac;			///< MAC Address. (copied from NIC)
 	uint16_t	vlan_proto; 		///< VLAN Protocol
 	uint16_t	vlan_tci;   		///< VLAN TCI
@@ -272,6 +274,6 @@ bool vnic_has_stx(VNIC* vnic);
  *
  * @return transmitted packet
  */
-Packet* vnic_stx(VNIC* vnic);
+VNICError vnic_stx(VNIC* vnic, bool (*transmitter)(Packet*, void*), void* transmitter_context);
 
 #endif /* __VNIC_H__ */

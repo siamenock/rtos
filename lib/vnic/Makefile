@@ -15,6 +15,7 @@ TESTS=$(addsuffix _test.o, $(addprefix obj/, $(basename $(SRCS))))
 libvnic.a: $(OBJS)
 	ar rcv $@ $^
 	cp $@ ../
+	cp include/* ../include/.
 
 obj/asm.o: src/asm.asm
 	-mkdir -p obj

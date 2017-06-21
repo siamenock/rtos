@@ -131,8 +131,36 @@ int nicdev_rx0(NICDevice* dev, void* data, size_t size, void* data_optional, siz
  *
  * @return number of packets proccessed
  */
-int nicdev_tx(NICDevice* dev, bool (*process)(Packet* packet, void* context), void* context);
 
+int nicdev_tx(NICDevice* dev, bool (*process)(Packet* packet, void* context), void* context);
+/**
+ * @param dev NIC device
+ * @param data data to be sent
+ * @param size data size
+ *
+ * @return result of process
+ */
+int nicdev_srx(VNIC* vnic, void* data, size_t size);
+
+/**
+ * @param dev NIC Device
+ * @param data data to be sent
+ * @param size data size
+ * @param data_optional optional data to be sent
+ * @param size_optional opttional data size
+ *
+ * @return  result of process
+ */
+int nicdev_srx0(VNIC* vnic, void* data, size_t size, void* data_optional, size_t size_optional);
+
+/**
+ * @param dev NIC device
+ * @param process function to process packets in NIC device
+ * @param context context to be passed to process function
+ *
+ * @return number of packets proccessed
+ */
+int nicdev_stx(VNIC* vnic, bool (*process)(Packet* packet, void* context), void* context);
 /**
  * @param dev NIC Device
  * @param TCI

@@ -600,6 +600,17 @@ uint32_t vm_create(VMSpec* vm_spec) {
 		return 0;
 	memset(vm, 0, sizeof(VM));
 
+	// Allocate vmid
+	// TODO fix
+	while(true) {
+		uint32_t vmid = last_vmid++;
+
+		if(vmid != 0 && !map_contains(vms, (void*)(uint64_t)vmid)) {
+			vm->id = vmid;
+			break;
+		}
+	}
+
 	// Allocate args
 	int argv_len = sizeof(char*) * vm_spec->argc;
 	for(int i = 0; i < vm_spec->argc; i++) {
@@ -738,6 +749,9 @@ uint32_t vm_create(VMSpec* vm_spec) {
 			}
 
 			vnic->id = vnic_alloc_id();
+			char name_buf[32];
+			sprintf(name_buf, "v%deth%d", vm->id, i);
+			strncpy(vnic->name, name_buf, _IFNAMSIZ);
 			vnic->nic_size = nics[i].pool_size ? : NIC_DEFAULT_POOL_SIZE;
 			vnic->nic = bmalloc(((nics[i].pool_size ? : NIC_DEFAULT_POOL_SIZE) + 0x200000 - 1) / 0x200000);
 			if(!vnic->nic) {
@@ -766,22 +780,11 @@ uint32_t vm_create(VMSpec* vm_spec) {
 		}
 	}
 
-	// Allocate vmid
-	// TODO fix
-	uint32_t vmid;
-	while(true) {
-		vmid = last_vmid++;
-
-		if(vmid != 0 && !map_contains(vms, (void*)(uint64_t)vmid)) {
-			vm->id = vmid;
-			if(!map_put(vms, (void*)(uint64_t)vmid, vm)) {
-				goto fail;
-			}
-			break;
-		}
+	if(!map_put(vms, (void*)(uint64_t)vm->id, vm)) {
+		goto fail;
 	}
 
-	return vmid;
+	return vm->id;
 
 fail:
 	vm_delete(vm, -1);

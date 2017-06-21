@@ -363,7 +363,7 @@ fail:
 }
 
 static bool manager_destroy_vnic(VNIC* vnic) {
-	for(int i = 0; i < NIC_MAX_COUNT; i++) {
+	for(int i = 0; i < MAX_VNIC_COUNT; i++) {
 		if(manager.vnics[i] != vnic)
 			continue;
 
@@ -790,7 +790,7 @@ static int cmd_manager_core(int argc, char** argv, void(*callback)(char* result,
 
 			return 0;
 		} else if(!strcmp("show", argv[i])) {
-			for(int i = 0; i < NIC_MAX_COUNT; i++) {
+			for(int i = 0; i < MAX_VNIC_COUNT; i++) {
 				VNIC* vnic = manager.vnics[i];	// gmalloc, ni_create
 				if(!vnic)
 					continue;
@@ -826,7 +826,7 @@ static int cmd_nic(int argc, char** argv, void(*callback)(char* result, int exit
 }
 
 static int cmd_vnic(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
-	for(int i = 0; i < NIC_MAX_COUNT; i++) {
+	for(int i = 0; i < MAX_VNIC_COUNT; i++) {
 		VNIC* vnic = manager.vnics[i];	// gmalloc, ni_create
 		if(!vnic)
 			continue;
