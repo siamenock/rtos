@@ -23,10 +23,6 @@ config.*
 # Disk images
 *.img
 
-# SDK
-packetngin_sdk-*
-examples/*
-
 # Tag
 tags
 cscope.out
