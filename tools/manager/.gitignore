@@ -16,3 +16,6 @@ util/bin/*
 # Generated
 Makefile
 version.h
+linux-boot.args
+packetngin-boot.args
+packetngin-boot.param
