@@ -168,18 +168,14 @@ static void stdio_callback(uint32_t vmid, int thread_id, int fd, char* buffer, v
 
 	if(*head <= *tail) {
 		wrapped = false;
-
 		len0 = *tail - *head;
 	} else {
 		wrapped = true;
-
 		len1 = size - *head;
 		len2 = *tail;
 	}
 
-	if(!!manager_core)
-		return;
-
+	if(!manager_core) return;
 	ListIterator iter;
 	list_iterator_init(&iter, manager_core->clients);
 	while(list_iterator_has_next(&iter)) {
@@ -196,11 +192,10 @@ static void stdio_callback(uint32_t vmid, int thread_id, int fd, char* buffer, v
 		rpc_loop(rpc);
 	}
 
-	if(wrapped) {
+	if(wrapped)
 		*head = (*head + len1 + len2) % size;
-	} else {
+	else
 		*head += len0;
-	}
 }
 
 static int cmd_manager(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
