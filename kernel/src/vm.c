@@ -520,29 +520,21 @@ static bool vm_loop(void* context) {
 		return -1;
 	}
 
-	// for(int i = 1; i < MP_MAX_CORE_COUNT; i++) {
-	// 	Core* core = &cores[i];
+	for(int i = 1; i < MP_MAX_CORE_COUNT; i++) {
+		Core* core = &cores[i];
+		if(core->status != VM_STATUS_PAUSE && core->status != VM_STATUS_START) continue;
+		int thread_id = -1;
 
-	// 	if(core->status != VM_STATUS_PAUSE && core->status != VM_STATUS_START) {
-	// 		continue;
-	// 	}
-	// 	int thread_id = -1;
+		if(core->stdout != NULL && *core->stdout_head != *core->stdout_tail) {
+			thread_id = get_thread_id(core->vm, i);
+			stdio_callback(core->vm->id, thread_id, 1, core->stdout, core->stdout_head, core->stdout_tail, core->stdout_size);
+		}
 
-	// 	if(core->stdout != NULL && *core->stdout_head != *core->stdout_tail) {
-	// 		thread_id = get_thread_id(core->vm, i);
-
-	// 		stdio_callback(core->vm->id, thread_id, 1, core->stdout, core->stdout_head, core->stdout_tail, core->stdout_size);
-	// 	}
-
-	// 	if(core->stderr != NULL && *core->stderr_head != *core->stderr_tail) {
-	// 		if(thread_id == -1)
-	// 			thread_id = get_thread_id(core->vm, i);
-
-	// 		stdio_callback(core->vm->id, thread_id, 2, core->stderr, core->stderr_head, core->stderr_tail, core->stderr_size);
-	// 	}
-	// }
-
-	void stdio_dump(int coreno, int fd, char* buffer, volatile size_t* head, volatile size_t* tail, size_t size);
+		if(core->stderr != NULL && *core->stderr_head != *core->stderr_tail) {
+			thread_id = thread_id != -1 ? : get_thread_id(core->vm, i);
+			stdio_callback(core->vm->id, thread_id, 2, core->stderr, core->stderr_head, core->stderr_tail, core->stderr_size);
+		}
+	}
 
 	for(int i = 1; i < MP_MAX_CORE_COUNT; i++) {
 		if(cores[i].status == VM_STATUS_INVALID)
@@ -557,16 +549,16 @@ static bool vm_loop(void* context) {
 			stdio_dump(mp_apic_id_to_processor_id(i), 1, buffer, head, tail, size);
 		}
 
-/*
- *                buffer = (char*)MP_CORE(__stderr, i);
- *                head = (size_t*)MP_CORE(&__stderr_head, i);
- *                tail = (size_t*)MP_CORE(&__stderr_tail, i);
- *                size = *(size_t*)MP_CORE(&__stderr_size, i);
- *
- *                while(*head != *tail) {
- *                        //stdio_dump(mp_apic_id_to_processor_id(i), 2, buffer, head, tail, size);
- *                }
- */
+		/*
+		 *                buffer = (char*)MP_CORE(__stderr, i);
+		 *                head = (size_t*)MP_CORE(&__stderr_head, i);
+		 *                tail = (size_t*)MP_CORE(&__stderr_tail, i);
+		 *                size = *(size_t*)MP_CORE(&__stderr_size, i);
+		 *
+		 *                while(*head != *tail) {
+		 *                        //stdio_dump(mp_apic_id_to_processor_id(i), 2, buffer, head, tail, size);
+		 *                }
+		 */
 	}
 
 	return true;
