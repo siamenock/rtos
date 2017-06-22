@@ -91,7 +91,7 @@ int slowpath_create(VNIC* vnic) {
 	int fd = open("/dev/net/tun", O_RDWR);
 	if(fd < 0) return -1;
 
-    // Create New TAP Interface
+	// Create New TAP Interface
 	struct ifreq ifr;
 	memset(&ifr, 0, sizeof(struct ifreq));
 	ifr.ifr_flags = IFF_TAP | IFF_NO_PI;
@@ -108,7 +108,7 @@ int slowpath_create(VNIC* vnic) {
 		return -1;
 	}
 	uint64_t* mac = (uint64_t*)ifr.ifr_hwaddr.sa_data;
-       	*mac = endian48(vnic->mac);
+	*mac = endian48(vnic->mac);
 
 	err = ioctl(fd, SIOCSIFHWADDR, &ifr); //Set New HW Address
 	if(err < 0) {
@@ -117,17 +117,31 @@ int slowpath_create(VNIC* vnic) {
 		return -1;
 	}
 
-    // Regist IO Multiplexer Event
-    io_mux_add(fd, vnic, slowpath_read_handler, slowpath_write_event, NULL);
+	// Regist IO Multiplexer Event
 
-    // FIXME: Check return value
+    IOMultiplexer* io_mux = calloc(sizeof(io_mux));
+    io_mux->fd = fd;
+    io_mux->context = vnic;
+    io_mux->read_handler = slowpath_read_handler;
+    io_mux->write_event = slowpath_write_event;
 
-    return 0;
+	io_mux_add(io_mux, (uint64_t)vnic);
+
+	// FIXME: Check return value
+
+	return 0;
 }
 
 int slowpath_destroy(VNIC* vnic) {
-    //TODO Fill me!!!
-    return 0;
+	IOMultiplexer* io_mux = io_mux_remove((uint64_t)vnic);
+
+    //Close Tap interface
+    ioctl(io_mux->fd, TUNSETPERSIST, 0);
+	close(io_mux->fd);
+
+    free(io_mux);
+
+	return 0;
 }
 
 bool slowpath_init() {

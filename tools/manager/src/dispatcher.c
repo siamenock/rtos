@@ -73,7 +73,11 @@ int dispatcher_create_vnic(void* vnic) {
 
 int dispatcher_destroy_vnic(void* vnic) {
 	printf("Destroy VNIC to kernel dispatcher\n");
-	return ioctl(dispatcher_fd, DISPATCHER_CREATE_VNIC, vnic);
+	ioctl(dispatcher_fd, DISPATCHER_CREATE_VNIC, vnic);
+
+	slowpath_destroy(vnic);
+	// FIXME: Check return value
+	return 0;
 }
 
 int dispatcher_update_vnic(void* vnic) {
