@@ -15,7 +15,7 @@ let target = outputDirectory ? outputDirectory + '/' + applicationName : applica
 
 const cc = 'gcc';
 const ld = 'ld';
-const cflags = '-I ../../lib/include -O2 -g -m64 -ffreestanding -fno-stack-protector -std=gnu99';
+const cflags = '-I ../../lib/include -O0 -g -m64 -ffreestanding -fno-stack-protector -std=gnu99';
 const ldflags = '-melf_x86_64 -nostdlib'; 
 const options = '-Wall -Werror';
 const libs = '../../lib/libcore.a';
