@@ -6,6 +6,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <getopt.h>
+#include <sys/mman.h>
+#include <malloc.h>
 
 #include "smap.h"
 
@@ -32,22 +35,30 @@ static int parse_present_mask(char* present_mask) {
 	return 0;
 }
 
-static char _boot_command_line[1024] = {0,};
 static int parse_args(char* args) {
-	printf("%s\n", args);
 	int fd = open(args, O_RDONLY);
 	if(fd < 0) {
-		perror("Failed to open ");
+		perror("\tFailed to open arguments file\n");
 		return -1;
 	}
 
-	ssize_t len = read(fd, _boot_command_line, 1023);
-	if(!len)
-		goto error;
-
+	off_t args_size = lseek(fd, 0, SEEK_END);
+	char* addr = mmap(NULL, args_size, PROT_READ, MAP_PRIVATE, fd, 0);
+	if(addr == MAP_FAILED) {
+		close(fd);
+		return -2;
+	}
+	char* boot_command_line = calloc(1, args_size + 1);
+	if(!boot_command_line) {
+		munmap(addr, args_size);
+		close(fd);
+		return -3;
+	}
+	memcpy(boot_command_line, addr, args_size);
+	munmap(addr, args_size);
 	close(fd);
 
-	char* next = strtok(_boot_command_line, "\n");
+	char* next = strtok(boot_command_line, "\n");
 	char* str;
 	bool smap_fixed = false;
 	while(next && (str = strtok_r(next, " ", &next))) {
@@ -77,56 +88,70 @@ static int parse_args(char* args) {
 	}
 
 	printf("\tCPU Usage: %d - %d\n", cpu_start, cpu_end);
+	free(boot_command_line);
 
 	return 0;
 
 error:
 	printf("\tFailed to parse arguments\n");
-	close(fd);
+	free(boot_command_line);
+
 	return -2;
 }
 
+static void help() {
+	printf("Usage: pn [Image] [Arguments] [Start Address]\n");
+}
+
 long kernel_start_address;	// Kernel Start address
-long rd_start_address; 	// Ramdisk Start address
 char kernel_elf[256];
 char kernel_args[256];
 
-int param_parse(char* params) {
-	int ret;
-	int fd = open(params, O_RDONLY);
-	if(fd < 0)
-		return -1;
-	char buf[128] = {0,};
-	ssize_t len = read(fd, buf, 127);
-	if(!len)
-		return -2;
-	close(fd);
+int param_parse(int argc, char** argv) {
+	static struct option options[] = {
+		{ "image", required_argument, 0, 'i' },
+		{ "args", required_argument, 0, 'a' },
+		{ "startaddr", required_argument, 0, 's' },
+		{ 0, 0, 0, 0 }
+	};
 
-	char* next = buf;
-	char* param = strtok_r(next, " ", &next);
-	strcpy(kernel_elf, param);
+	int opt;
+	int index = 0;
+	while((opt = getopt_long(argc, argv, "i:a:s:", 
+					options, &index)) != -1) {
+		switch(opt) {
+			case 'i':
+				strncpy(kernel_elf, optarg, 256);
+				break;
+			case 'a':
+				strncpy(kernel_args, optarg, 256);
+				break;
+			case 's':
+				;
+				char* next;
+				kernel_start_address = strtol(optarg, &next, 10);
+				if(*next == 'G' || *next == 'g') {
+					kernel_start_address *= 1024 * 1024 * 1024;
+				} else if(*next == 'M' || *next == 'm') {
+					kernel_start_address *= 1024 * 1024;
+				} else if(*next == 'K' || *next == 'k') {
+					kernel_start_address *= 1024;
+				} else {
+					printf("\tFailed to parse kernel start address : %s\n", optarg);
+					return -1;
+				}
+				break;
+			default:
+				help();
+				exit(-1);
+		}
+	}
 
-	param = strtok_r(next, " ", &next);
-	strcpy(kernel_args, param);
-
-	// TODO: No need start core
-	param = strtok_r(next, " ", &next);
-
-	// TODO: check alignment 2Mbyte
-	param = strtok_r(next, " ", &next);
-	kernel_start_address = strtol(param, NULL, 16);
-
-	// TODO: NO Need ramdisk
-	param = strtok_r(next, " ", &next);
-	rd_start_address = strtol(param, NULL, 16);
-
-	printf("\tPenguinNgin ELF File:\t%s\n", kernel_elf);
+	printf("\tPacketNgin Image:\t%s\n", kernel_elf);
 	printf("\tArgument File:\t\t%s\n", kernel_args);
-	//printf("\tStart Core:\t\t%d\n", start_core);
-	printf("\tKernel Start address:\t%p\n", kernel_start_address);
-	printf("\tRamDisk Start address:\t%p\n", rd_start_address);
+	printf("\tKernel Start address:\t0x%p\n", kernel_start_address);
 
-	ret = parse_args(kernel_args);
+	int ret = parse_args(kernel_args);
 	if(ret) {
 		printf("\tFailed to parse kernel arguments : %d\n", ret);
 		return ret;
@@ -134,4 +159,3 @@ int param_parse(char* params) {
 
 	return 0;
 }
-

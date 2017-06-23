@@ -1,14 +1,13 @@
 #ifndef __PARAM_H__
 #define __PARAM_H__
 
-int cpu_start;
-int cpu_end;
+extern int cpu_start;
+extern int cpu_end;
 
-long kernel_start_address;	// Kernel Start address
-long rd_start_address; 	// Ramdisk Start address
-char kernel_elf[256];
-char kernel_args[256];
+extern long kernel_start_address;	// Kernel Start address
+extern char kernel_elf[256];
+extern char kernel_args[256];
 
-int param_parse(char* params);
+int param_parse(int argc, char** argv);
 
 #endif /*__PARAM_H__*/

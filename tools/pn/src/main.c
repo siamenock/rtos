@@ -272,35 +272,27 @@ int main(int argc, char** argv) {
 
 	if(geteuid() != 0) {
 		printf("Permission denied. \n");
-		printf("\tUsage: $sudo ./manager [BOOT PARAM FILE]\n");
-		return -1;
-	}
-
-	if(argc != 2) {
-		printf("\tUsage: $sudo ./manager [BOOT PARAM FILE]\n");
 		return -1;
 	}
 
 	printf("\nPacketNgin 2.0 Manager\n");
-	ret = smap_init();
-	if(ret)
-		goto error;
-
-	printf("\nInitializing PacketNgin kernel module...\n");
-	if(dispatcher_init() < 0)
-		goto error;
 
 	printf("\nParsing parameter...\n");
-	ret = param_parse(argv[1]);
+	ret = param_parse(argc, argv);
 	if(ret) {
 		printf("\tFailed to parse parameter\n");
 		return ret;
 	}
 
-// 	printf("\nLoading %s...\n", kernel_elf);
-// 	ret = elf_load(kernel_elf);
-// 	if(ret)
-// 		return ret;
+	printf("\nInitializing PacketNgin kernel module...\n");
+	if(dispatcher_init() < 0)
+		goto error;
+
+	printf("\nIntializing System Memory Map\n");
+	ret = smap_init();
+	if(ret)
+		goto error;
+
 	printf("\nInitializing memory mapping... \n");
 	PHYSICAL_OFFSET = kernel_start_address - 0x400000;
 	ret = mapping_memory();
@@ -381,9 +373,6 @@ int main(int argc, char** argv) {
 	printf("\nInitializing linux netlink devices...\n");
 	netlink_init();
 
-// 	printf("\nInitializing NICs...\n");
-// 	nicdev_init();
-
 	printf("\nInitializing RPC manager...\n");
 	manager_init();
 
@@ -392,7 +381,6 @@ int main(int argc, char** argv) {
 
 	mp_sync(2);
 
-	//TODO script
 	bool script_process() {
 // 		int fd = open("./boot.psh", O_RDONLY);
 // 		if(fd == -1)
@@ -410,6 +398,7 @@ int main(int argc, char** argv) {
 
 	return 0;
 error:
-	printf("Manager initialization error occured. Terminated...\n");
+	printf("\nManager initialization error occured.\n");
+	printf("Terminated...\n");
 	return -1;
 }

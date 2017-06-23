@@ -19,17 +19,17 @@ static int dispatcher_fd;
 int dispatcher_init() {
 	int fd = open("/dev/dispatcher", O_WRONLY);
 	if(fd == -1) {
-		printf("PacketNgin dispatcher module does not loaded\n");
+		printf("\tPacketNgin dispatcher module does not loaded\n");
 		return -1;
 	}
 
 	//ioctl(fd, DISPATCHER_SET_MANAGER, getpid());
-	printf("PacketNgin manager set to kernel dispatcher\n");
+	printf("\tPacketNgin manager set to kernel dispatcher\n");
 
 	// Register signal handler for graceful termination
 	void __handler(int data) {
 		int rc;
-		printf("PacketNgin manager terminated...\n");
+		printf("\tPacketNgin manager terminated...\n");
 		if((rc = dispatcher_exit()) < 0)
 			printf("\tDispatcher module abnormally terminated : %d\n", rc);
 
