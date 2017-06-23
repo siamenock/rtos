@@ -1,5 +1,5 @@
 include 'console'
-include 'manager'
+include 'pn'
 
 project 'tools'
     kind        'Makefile'
@@ -9,7 +9,7 @@ project 'tools'
         'test -f grub/Makefile || { cd grub; ./autogen.sh; ./configure; }',
         'make -C grub',
         'make -C console',
-        'make -C manager',
+        'make -C pn',
         'make -C pnkc',
         'make -C smap',
     }
@@ -17,7 +17,7 @@ project 'tools'
     cleancommands {
         'make clean -C grub',
         'make clean -C console',
-        'make clean -C manager',
+        'make clean -C pn',
         'make clean -C pnkc',
         'make clean -C smap',
     }

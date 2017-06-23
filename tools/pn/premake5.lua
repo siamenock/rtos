@@ -1,9 +1,10 @@
-project "Manager"
-    kind "ConsoleApp"
-    targetname "manager"
+project "pn"
+    kind 	"ConsoleApp"
+    targetdir	"."
+    targetname	"pn"
 
     buildoptions {
-        "-idirafter ../../kernel/src",
+        "-idirafter ../../../kernel/src",
         "-std=gnu99",
         "-mcmodel=large",
         "-Wno-unused",
@@ -20,9 +21,24 @@ project "Manager"
     }
     links { "ext", "rt", "vnic", "tlsf" }
     build.compileProperty('x86_64')
+    location	"build"
 
     -- Make version header
     prebuildcommands {
-        './mkver.sh > src/version.h',
-        './kpart'
+        './../mkver.sh > ../src/version.h',
+    }
+
+project 'pn_build'
+    kind        'Makefile'
+    location    '.'
+
+    buildcommands {
+        'test -f ./packetngin-boot.param || ./kpart',
+        'make -C drivers',
+        'make -C build'
+    }
+
+    cleancommands {
+        'make clean -C drivers',
+        'make clean -C build'
     }

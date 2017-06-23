@@ -98,6 +98,7 @@ def parse(linux_param=None, packetngin_param=None):
     linux_args += ' nox2apic' # FIXME remove this
     with open('linux-boot.args', 'w') as f:
         f.write(linux_args)
+        f.write('\n')
 
     # Print packetngin resources
     packetngin_args = 'present_mask={}-{} memmap={}@{} mem={}'.format(
@@ -108,10 +109,12 @@ def parse(linux_param=None, packetngin_param=None):
         lspci_script = os.path.join(BASEDIR, 'create_lspci.sh')
         pci_blacklist = subprocess.check_output(lspci_script).decode('utf-8').replace('\n','')
         f.write(' '.join([pci_blacklist, packetngin_args]))
+        f.write('\n')
 
     packetngin_params = '../../kernel.bin packetngin-boot.args'
     with open('packetngin-boot.param', 'w') as f:
         f.write(packetngin_params)
+        f.write('\n')
 
 
 
