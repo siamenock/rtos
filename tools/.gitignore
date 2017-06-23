@@ -11,7 +11,9 @@ pnkc/pnkc
 rewrite/rewrite
 smap/smap
 
-linux-boot.args
-packetngin-boot.args
-packetngin-boot.param
+pn/pn
+pn/src/version.h
+pn/linux-boot.args
+pn/packetngin-boot.args
+pn/packetngin-boot.param
 
