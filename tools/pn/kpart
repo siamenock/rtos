@@ -92,29 +92,30 @@ def parse(linux_param=None, packetngin_param=None):
        linux['memory'] + packetngin['memory'] > MAX_MEMORY:
         raise ValueError('Insufficient memory size were given')
 
-    # Print linux resources
+    # Print linux resources ---------------------------------------------------------------------------------
     linux_args = 'present_mask=0-{core} memmap={memory}@0 mem={memory}'.format(
           core=linux['core'] - 1, memory=hform(linux['memory'], human=True))
     linux_args += ' nox2apic' # FIXME remove this
     with open('linux-boot.args', 'w') as f:
-        f.write(linux_args)
-        f.write('\n')
+        f.write(linux_args + '\n')
 
-    # Print packetngin resources
-    packetngin_args = 'present_mask={}-{} memmap={}@{} mem={}'.format(
-          linux['core'], MAX_CORE - 1,
-          hform(MAX_MEMORY - linux['memory'], True), hform(linux['memory'], True),
-          hform(MAX_MEMORY, True))
+    # Print packetngin resources ----------------------------------------------------------------------------
+    packetngin_args = 'present_mask={}-{} memmap={}@{} memmap={}${} mem={}'.format(
+          linux['core'], MAX_CORE - 1,  # Packetngin Core
+          hform(MAX_MEMORY - linux['memory'], True), hform(linux['memory'], True),  # Packetngin memory area
+          hform(linux['memory'], True), 0,  # Packetngin memory area (blacklisted)
+          hform(MAX_MEMORY, True)  # PacketNgin upper memory limit
+    )
     with open('packetngin-boot.args', 'w') as f:
         lspci_script = os.path.join(BASEDIR, 'create_lspci.sh')
         pci_blacklist = subprocess.check_output(lspci_script).decode('utf-8').replace('\n','')
-        f.write(' '.join([pci_blacklist, packetngin_args]))
-        f.write('\n')
+        f.write(' '.join([pci_blacklist, packetngin_args]) + '\n')
 
-    packetngin_params = '../../kernel.bin packetngin-boot.args'
+    packetngin_params = '--image ../../kernel.bin --args packetngin-boot.args --startaddr {}'.format(
+            hform(linux['memory'] + (4 * 1024 * 1024), True)  # PacketNgin start address (BASE + 4MB)
+    )
     with open('packetngin-boot.param', 'w') as f:
-        f.write(packetngin_params)
-        f.write('\n')
+        f.write(packetngin_params + '\n')
 
 
 

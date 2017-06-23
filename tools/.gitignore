@@ -10,3 +10,8 @@ console/console
 pnkc/pnkc
 rewrite/rewrite
 smap/smap
+
+linux-boot.args
+packetngin-boot.args
+packetngin-boot.param
+
