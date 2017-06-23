@@ -1,0 +1,72 @@
+const sourceDirectory = 'src';
+const outputDirectory = '';
+const objectDirectory = 'obj';
+const includeDirectory = 'include';
+const applicationName = 'main';
+
+const isAsync = {
+	async: true
+};
+
+const cc = process.env.cc || 'gcc';
+const cflags = process.env.cflags || '-I ../../lib/include -O0 -g -m64 -ffreestanding -fno-stack-protector -std=gnu99';
+const options = process.env.options || '-Wall -Werror';
+const libs = process.env.libs || '../../lib/libcore.a';
+
+let files = new jake.FileList();
+
+// retrieve source files to jakeFile object
+files.include(sourceDirectory + '/*.c');
+
+// get compiled object files from jakeFile object
+let objects = files.toArray().map((fileName) => {
+	return fileName
+		.replace(sourceDirectory, objectDirectory)
+		.replace('.c', '.o');
+});
+
+// target file name
+let target = outputDirectory ? outputDirectory + '/' + applicationName : applicationName
+
+var compile = function (name, source, callback) {
+	var cmd = [cc, cflags, '-c', '-o', name, source, options].join(' ');
+	console.log(cmd)
+	jake.exec(cmd, callback);
+};
+
+var link = function (target, objs, callback) {
+	var cmd = ['ld', '-melf_x86_64 -nostdlib', '-e', 'main', '-o', 'main', 'obj/main.o', libs].join(' ');
+	jake.exec(cmd, callback);
+};
+
+rule('obj/main.o', 'src/main.c', isAsync, function () {
+	console.log('rule!!!')
+	jake.mkdirP(objectDirectory);
+	compile('obj/main.o', 'src/main.c', function () {
+		complete();
+	});
+});
+
+file(applicationName, ['obj/main.o'], isAsync, function () {
+	jake.mkdirP(outputDirectory);
+	link('main', 'obj/main.o', function () {
+		complete();
+	});
+});
+
+desc('compile')
+task('compile', [applicationName], () => {
+	console.log('== compile:', 'Finished with compilation');
+})
+
+desc('clean')
+task('clean', () => {
+	jake.rmRf(objectDirectory);
+	jake.rmRf(target)
+	console.log('== clean:', 'Finished with clean up');
+})
+
+desc('default action');
+task('default', ['compile'], () => {
+	console.log('== default:', 'Everything done!');
+});
