@@ -20,7 +20,8 @@ MINOR=`echo $VERSION | awk -F'[.-]' '{ print $2 }'`
 MICRO=`echo $VERSION | awk -F'[.-]' '{ print $3 }'`
 TAG=`echo $VERSION | awk -F'[.-]' '{ print $4 }'`
 
-echo "#ifndef __VERSION_H__
+echo "/*GENERATED FILE. DO NOT EDIT*/
+#ifndef __VERSION_H__
 #define __VERSION_H__
 
 #define VERSION_MAJOR   $MAJOR
