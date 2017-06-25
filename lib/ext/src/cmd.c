@@ -322,7 +322,22 @@ bool cmd_register(Command* commands, size_t length) {
 }
 
 void cmd_unregister(Command* command) {
-	// TODO
+	if(__commands_size < 1) return;
+	if(!command || !command->name) return;
+
+	ssize_t index = -1;
+
+	// Find the index of the given command object
+	for(size_t i = 0; i < __commands_size; ++i)
+		if(strcmp(__commands[i].name, command->name) == 0)
+			index = (ssize_t)i;
+	if(index == -1)
+		return;
+
+	// Pack the commands array
+	for(size_t i = (size_t)index; i < __commands_size-1; ++i)
+		__commands[i] = __commands[i+1];
+	__commands_size -= 1;
 }
 
 int cmd_exec(char* line, void(*callback)(char* result, int exit_status)) {
