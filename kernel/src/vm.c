@@ -1092,7 +1092,6 @@ void vm_stdio_handler(VM_STDIO_CALLBACK callback) {
 }
 
 
-// makerj
 static int cmd_md5(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
 	if(argc < 2)
 		return CMD_STATUS_WRONG_NUMBER;

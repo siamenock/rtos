@@ -245,18 +245,14 @@ int manager_init() {
 
 	error = manager_core_init(manager_accept);
 	if(error) return -1;
-	printf("step1---------------------------------\n");
 
 	manager_core = manager_core_server_open(MANAGER_DEFAULT_PORT);
 	if(!manager_core) return -2;
-	printf("step2---------------------------------\n");
 
 	vm_stdio_handler(stdio_callback);
-	printf("step3---------------------------------\n");
 
 	error = cmd_register(commands, sizeof(commands) / sizeof(commands[0]));
 	if(error) return -3;
-	printf("step4---------------------------------\n");
 
 	printf("Manager Initialized\n");
 	return 0;
