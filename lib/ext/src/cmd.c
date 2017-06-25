@@ -287,6 +287,29 @@ static char* cmd_history_get_later() {
 	return cmd_history_get(--cmd_history.index);
 }
 
+static void cmd_sort(size_t base) {
+	while(base < __commands_size) {
+		Command command = __commands[base];
+		size_t insert_point = 0;
+
+		// Find where to insert the command
+		for(int i = base-1; i >= 0; --i) {
+			if(strcmp(__commands[i].name, command.name) < 0) {
+				insert_point = i+1;
+				break;
+			}
+		}
+
+		// Push the existing command
+		for(int i = base; i > insert_point; --i)
+			__commands[i] = __commands[i-1];
+
+		// Assign a new command
+		__commands[insert_point] = command;
+
+		base += 1;
+	}
+}
 
 
 void cmd_init(void) {
@@ -308,16 +331,21 @@ void cmd_init(void) {
 }
 
 bool cmd_register(Command* commands, size_t length) {
-	// At this point, kernel is not ready to perform
-	// print and/or malloc function
-	if(!commands || !length)
-		return false;
+	/* Note: At this point, kernel is not ready to perform
+	 * print and/or malloc function */
+	if(!commands || !length) return false;
 
+	size_t oldsize = __commands_size;
+
+	// Merge two arrays
 	for(size_t i = 0; i < length; ++i) {
 		if(commands[i].name) {
 			__commands[__commands_size++] = commands[i];
 		}
 	}
+
+	cmd_sort(oldsize);
+
 	return true;
 }
 
