@@ -701,9 +701,9 @@ uint32_t vm_create(VMSpec* vm_spec) {
 
 		memset(vm->nics, 0, sizeof(VNIC) * vm->nic_count);
 		for(int i = 0; i < vm->nic_count; i++) {
-			NICDevice* nic_dev = nicdev_get(nics[i].dev ? : NIC_DEFAULT_NICDEV);
+			NICDevice* nic_dev = nics[i].dev ? nicdev_get(nics[i].dev) : nicdev_get_by_idx(0);
 			if(!nic_dev) {
-				printf("Manager: Invalid NIC device: %s.\n", nics[i].dev);
+				printf("Manager: Invalid NIC device\n");
 				goto fail;
 			}
 

@@ -277,6 +277,11 @@ int main(int argc, char** argv) {
 
 	printf("\nPacketNgin 2.0 Manager\n");
 
+	printf("\nIntializing System Memory Map\n");
+	ret = smap_init();
+	if(ret)
+		goto error;
+
 	printf("\nParsing parameter...\n");
 	ret = param_parse(argc, argv);
 	if(ret) {
@@ -286,11 +291,6 @@ int main(int argc, char** argv) {
 
 	printf("\nInitializing PacketNgin kernel module...\n");
 	if(dispatcher_init() < 0)
-		goto error;
-
-	printf("\nIntializing System Memory Map\n");
-	ret = smap_init();
-	if(ret)
 		goto error;
 
 	printf("\nInitializing memory mapping... \n");
