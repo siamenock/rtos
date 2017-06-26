@@ -31,10 +31,13 @@ static bool manager_loop(void* context) {
 		list_iterator_init(&iter, manager_core->clients);
 		while(list_iterator_has_next(&iter)) {
 			RPC* rpc = list_iterator_next(&iter);
-			if(!rpc_is_closed(rpc))
-				rpc_loop(rpc);
-			else
-				list_remove_data(manager_core->clients, rpc);
+			if(!rpc_is_closed(rpc)) {
+				if(!rpc_loop(rpc))
+					list_iterator_remove(&iter);
+			} else {
+				list_iterator_remove(&iter);
+			}
+				//list_remove_data(manager_core->clients, rpc);
 		}
 	}
 
@@ -117,12 +120,12 @@ static int sock_write(RPC* rpc, void* buf, int size) {
 static void sock_close(RPC* rpc) {
 	RPCData* data = (RPCData*)rpc->data;
 	close(data->fd);
-	data->fd = -1;
 
-	list_remove_data(manager_core->clients, rpc);
+	//list_remove_data(manager_core->clients, rpc);
 #if DEBUG
 	printf("Connection closed : %s\n", inet_ntoa(data->caddr.sin_addr));
 #endif
+	free(rpc);
 }
 
 void handler(int signo) {
@@ -133,16 +136,6 @@ bool rpc_is_closed(RPC* rpc) {
 	RPCData* data = (RPCData*)rpc->data;
 	return data->fd < 0;
 
-}
-
-void rpc_close(RPC* rpc) {
-	if(rpc->close)
-		rpc->close(rpc);
-}
-
-void rpc_disconnect(RPC* rpc) {
-	if(!rpc_is_closed(rpc))
-		rpc_close(rpc);	
 }
 
 bool rpc_connected(RPC* rpc) {
