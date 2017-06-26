@@ -29,43 +29,38 @@ static bool callback_vm_create(uint32_t id, void* context) {
 
 static int vm_create(int argc, char* argv[]) {
 	// Default value
-	VMSpec vm;
+	VMSpec vm = {};
 	vm.core_size = 1;
 	vm.memory_size = 0x1000000;	// 16MB
 	vm.storage_size = 0x1000000;	// 16MB
-	vm.nic_count = 0;
-	NICSpec nics[VMSPEC_MAX_NIC_COUNT];
-	memset(nics, 0, sizeof(NICSpec) * VMSPEC_MAX_NIC_COUNT);
+
+	NICSpec nics[VMSPEC_MAX_NIC_COUNT] = {};
 	vm.nics = nics;
-	vm.argc = 0;
-	//char* _args[VM_MAX_ARGC];
-	vm.argv = NULL; //_args;
 
 	// Main options
 	static struct option options[] = {
 		{ "core", required_argument, 0, 'c' },
 		{ "memory", required_argument, 0, 'm' },
 		{ "storage", required_argument, 0, 's' },
-		{ "nic", required_argument, 0, 'n' },
+		{ "nic", optional_argument, 0, 'n' },
 		{ "args", required_argument, 0, 'a' },
 		{ 0, 0, 0, 0 }
 	};
 
 	int opt;
 	int index = 0;
-	while((opt = getopt_long(argc, argv, "c:m:s:n:a:", 
-					options, &index)) != -1) {
+	while((opt = getopt_long(argc, argv, "c:m:s:n::a:", options, &index)) != -1) {
 		switch(opt) {
-			case 'c' : 
+			case 'c' :
 				vm.core_size = atoi(optarg);
 				break;
-			case 'm' : 
+			case 'm' :
 				vm.memory_size = strtol(optarg, NULL, 16);
 				break;
-			case 's' : 
+			case 's' :
 				vm.storage_size = strtol(optarg, NULL, 16);
 				break;
-			case 'n' : 
+			case 'n' :
 				;
 				// Suboptions for NIC
 				enum {
@@ -84,9 +79,7 @@ static int vm_create(int argc, char* argv[]) {
 					[POOL]	= "pool",
 				};
 
-				char* subopts = optarg;
-				char* value;
-
+				// Default NIC configuration
 				NICSpec* nic = &vm.nics[vm.nic_count];
 				nic->mac = 0;
 				nic->dev = "eth0";
@@ -97,7 +90,10 @@ static int vm_create(int argc, char* argv[]) {
 				nic->padding_head = 32;
 				nic->padding_tail = 32;
 				nic->pool_size = 0x400000; /* 4 MB */
-				while(*subopts != '\0') {
+
+				char* subopts = optarg;
+				char* value;
+				while(optarg && *subopts != '\0') {
 					switch(getsubopt(&subopts, token, &value)) {
 						case MAC:
 							nic->mac = strtoll(value, NULL, 16);
@@ -140,24 +136,12 @@ static int vm_create(int argc, char* argv[]) {
 				vm.argv = &optarg;
 				break;
 
-			default: 
-				help(); 
+			default:
+				help();
 				exit(EXIT_FAILURE);
 		}
 	}
 
-
-	if(vm.nic_count == 0) {
-		NICSpec* nic = &vm.nics[0];
-		nic->mac = 0;
-		nic->dev = "eth0";
-		nic->input_buffer_size = 1024;
-		nic->output_buffer_size = 1024;
-		nic->input_bandwidth = 1000000000; /* 1 GB */
-		nic->output_bandwidth = 1000000000; /* 1 GB */
-		nic->pool_size = 0x400000; /* 4 MB */
-		vm.nic_count = 1;
-	}
 	rpc_vm_create(rpc, &vm, callback_vm_create, NULL);
 
 	return 0;
@@ -176,7 +160,7 @@ int main(int argc, char *argv[]) {
 		printf("Failed to connect RPC server\n");
 		return ERROR_RPC_DISCONNECTED;
 	}
-	
+
 	int rc;
 	if((rc = vm_create(argc, argv))) {
 		printf("Failed to create VM. Error code : %d\n", rc);
