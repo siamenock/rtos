@@ -523,15 +523,15 @@ static bool vm_loop(void* context) {
 	for(int i = 1; i < MP_MAX_CORE_COUNT; i++) {
 		Core* core = &cores[i];
 		if(core->status != VM_STATUS_PAUSE && core->status != VM_STATUS_START) continue;
-		int thread_id = -1;
+		int thread_id = get_thread_id(core->vm, i);
+		if(thread_id == -1)
+			continue;
 
 		if(core->stdout != NULL && *core->stdout_head != *core->stdout_tail) {
-			thread_id = get_thread_id(core->vm, i);
 			stdio_callback(core->vm->id, thread_id, 1, core->stdout, core->stdout_head, core->stdout_tail, core->stdout_size);
 		}
 
 		if(core->stderr != NULL && *core->stderr_head != *core->stderr_tail) {
-			thread_id = thread_id != -1 ? : get_thread_id(core->vm, i);
 			stdio_callback(core->vm->id, thread_id, 2, core->stderr, core->stderr_head, core->stderr_tail, core->stderr_size);
 		}
 	}

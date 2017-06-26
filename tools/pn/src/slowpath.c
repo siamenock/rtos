@@ -7,6 +7,7 @@
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <fcntl.h>
+#include <malloc.h>
 #include <sys/socket.h>
 #include <net/ether.h>
 #include <vnic.h>
