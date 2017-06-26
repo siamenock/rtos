@@ -2,5 +2,5 @@
 
 KVM=`grep "vmx\|svm" /proc/cpuinfo | wc -l`
 if [ $KVM != "0" ]; then
-   echo "-enable-kvm"
+   echo "-enable-kvm -cpu host,migratable=no,+invtsc"
 fi
