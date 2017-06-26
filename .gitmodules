@@ -3,3 +3,6 @@
 	url = git://git.savannah.gnu.org/grub.git
 	ignore = dirty
 
+[submodule "rtos.wiki"]
+	path = rtos.wiki
+	url = https://github.com/packetngin/rtos.wiki.git
