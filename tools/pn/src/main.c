@@ -113,8 +113,6 @@ static void _cpubrand(char* cpu_brand) {
 	}
 }
 
-// TODO: Fix Timer init libary
-// How to get frequency per second in linux?
 static void _timer_init(char* cpu_brand) {
 	uint64_t _frequency;
 	if(strstr(cpu_brand, "Intel") != NULL && strstr(cpu_brand, "@ ") != NULL) {
