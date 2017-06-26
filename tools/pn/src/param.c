@@ -12,6 +12,8 @@
 
 #include "smap.h"
 
+#define MAX_COMMAND_LINE	2048
+
 int cpu_start;
 int cpu_end;
 
@@ -48,12 +50,10 @@ static int parse_args(char* args) {
 		close(fd);
 		return -2;
 	}
-	char* boot_command_line = calloc(1, args_size + 1);
-	if(!boot_command_line) {
-		munmap(addr, args_size);
-		close(fd);
-		return -3;
-	}
+	//char* boot_command_line = calloc(1, args_size + 1);
+	if(MAX_COMMAND_LINE < args_size + 1) return -2;
+
+	char boot_command_line[MAX_COMMAND_LINE] = {0};
 	memcpy(boot_command_line, addr, args_size);
 	munmap(addr, args_size);
 	close(fd);
