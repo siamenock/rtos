@@ -1,7 +1,7 @@
 project "pn"
     kind 	"ConsoleApp"
     targetdir	"."
-    targetname	"pn"
+    targetname	"pnd"
 
     buildoptions {
         "-idirafter ../../../kernel/src",
