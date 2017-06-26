@@ -120,7 +120,7 @@ int slowpath_create(VNIC* vnic) {
 
 	// Regist IO Multiplexer Event
 
-    IOMultiplexer* io_mux = calloc(sizeof(io_mux));
+    IOMultiplexer* io_mux = calloc(1, sizeof(io_mux));
     io_mux->fd = fd;
     io_mux->context = vnic;
     io_mux->read_handler = slowpath_read_handler;
