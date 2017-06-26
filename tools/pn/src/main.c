@@ -1,5 +1,7 @@
 #include "stdio.h"
-//#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+#include <stdlib.h>
 //#include <unistd.h>
 #include <string.h>
 #include <libgen.h>
@@ -154,15 +156,35 @@ static void _timer_init(char* cpu_brand) {
 
 		_frequency = frequency * number;
 	} else {
-		uint64_t time_tsc1 = timer_frequency();
-		sleep(1);
-		uint64_t time_tsc0 = timer_frequency();
+		// Get timer frequency using bogomips (ref http://www.clifton.nl/bogo-faq.html)
+		FILE* cpuinfo = fopen("/proc/cpuinfo", "r");
+		if(cpuinfo) {
+			char buf[8192];
+			while(!feof(cpuinfo)) {
+				char* line = fgets(buf, sizeof(buf), cpuinfo);
+				if(!line) break;
 
-		_frequency = time_tsc0 - time_tsc1;
+				// example: "bogomips	: 8015.88"
+				if(strstr(line, "bogomips")) {
+					while(!isdigit(*line)) line++;
+					uint64_t bogomips = atof(line);
+					bogomips *= 1000 * 1000 / 2;
+
+					_frequency = bogomips;
+					break;
+				}
+			}
+			fclose(cpuinfo);
+		} else {
+			// Worst case: there is no way to determine timer frequency
+			uint64_t time_tsc1 = timer_frequency();
+			sleep(1);
+			uint64_t time_tsc0 = timer_frequency();
+
+			_frequency = time_tsc0 - time_tsc1;
+		}
 	}
 
-	//TODO timer init
-	//How to initialize timer in linux application????
 	extern uint64_t TIMER_FREQUENCY_PER_SEC;
 	extern uint64_t __timer_ms;
 	extern uint64_t __timer_us;
@@ -210,12 +232,12 @@ static Device* devices[MAX_NIC_DEVICE_COUNT];
 // 	NICDevice* nic_device = gmalloc(sizeof(NICDevice));
 // 	if(!nic_device)
 // 		return NULL;
-// 
+//
 // 	nic_device->mac = info->mac;
 // 	strcpy(nic_device->name, info->name);
-// 
+//
 // 	nicdev_register(nic_device);
-// 
+//
 // 	printf("\tNIC Device created\n");
 // 	printf("\t%s : [%02lx:%02lx:%02lx:%02lx:%02lx:%02lx] [%c]\n", nic_device->name,
 // 			(info->mac >> 40) & 0xff,
@@ -225,13 +247,13 @@ static Device* devices[MAX_NIC_DEVICE_COUNT];
 // 			(info->mac >> 8) & 0xff,
 // 			(info->mac >> 0) & 0xff,
 // 			manager_mac == 0 ? '*' : ' ');
-// 
+//
 // 	if(!manager_mac)
 // 		manager_mac = info->mac;
-// 
+//
 // 	return nic_device;
 // }
-// 
+//
 // int nicdev_init() {
 // 	Device* dev;
 // 	int index = 0;
@@ -240,25 +262,25 @@ static Device* devices[MAX_NIC_DEVICE_COUNT];
 // 		dev = device_get(DEVICE_TYPE_NIC, i);
 // 		if(!dev)
 // 			continue;
-// 
+//
 // 		NICInfo info;
 // 		NICDriver* driver = dev->driver;
 // 		driver->get_info(dev->priv, &info);
-// 
+//
 // 		if(info.name[0] == '\0')
 // 			sprintf(info.name, "eth%d", index++);
-// 
+//
 // 		NICDevice* nic_dev = _nicdev_create(&info);
 // 		if(!nic_dev)
 // 			return -1;
-// 
+//
 // 		if(dispatcher_create_nicdev(nic_dev) < 0)
 // 			return -2;
-// 
+//
 // 		nic_dev->driver = driver;
 // 		dev->priv = nic_dev;
 // 	}
-// 
+//
 // 	return 0;
 // }
 
@@ -385,7 +407,7 @@ int main(int argc, char** argv) {
 // 		int fd = open("./boot.psh", O_RDONLY);
 // 		if(fd == -1)
 // 			return false;
-// 
+//
 // 		command_process(fd);
 
 		return true;
