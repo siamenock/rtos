@@ -1014,7 +1014,7 @@ ssize_t vm_storage_write(uint32_t vmid, void* buf, size_t offset, size_t size) {
 		}
 
 		if(_size == 0) {
-			vm->used_size = size;
+			vm->used_size += size;
 			break;
 		}
 		offset = 0;
@@ -1045,6 +1045,8 @@ bool vm_storage_md5(uint32_t vmid, uint32_t size, uint32_t digest[4]) {
 	VM* vm = map_get(vms, (void*)(uint64_t)vmid);
 	if(!vm)
 		return false;
+	if(size == 0)
+		size = vm_get(vmid)->used_size;
 
 	uint32_t block_count = size / VM_MEMORY_SIZE_ALIGN;
 	if(vm->storage.count < block_count)

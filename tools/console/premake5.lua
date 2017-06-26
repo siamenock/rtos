@@ -115,6 +115,17 @@ project "stdin"
     files { "src/rpc.c" }
     files { "src/stdin.c" }
 
+project "md5"
+    includedirs { "../../lib/include", "include" }
+    libdirs { "../../lib/ext/", "../../lib/tlsf/", "../../lib/hal/" }
+    links { "ext", "tlsf", "hal" }
+    location "build"
+    kind "ConsoleApp"
+    targetdir "bin"
+    targetname "md5"
+    files { "src/rpc.c" }
+    files { "src/md5.c" }
+
 project 'console'
     kind        'Makefile'
     location    '.'
@@ -129,7 +140,8 @@ project 'console'
         'make -C build -f upload.make',
         'make -C build -f download.make',
         'make -C build -f monitor.make',
-        'make -C build -f stdin.make'
+        'make -C build -f stdin.make',
+        'make -C build -f md5.make',
     }
 
     cleancommands {
@@ -143,7 +155,8 @@ project 'console'
         'make -C build clean -f download.make clean',
         'make -C build clean -f monitor.make clean',
         'make -C build clean -f stdin.make clean',
+        'make -C build clean -f md5.make clean',
         "rm -f bin/pause",
         "rm -f bin/resume",
-        "rm -f bin/stop"
+        "rm -f bin/stop",
     }
