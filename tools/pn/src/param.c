@@ -88,13 +88,11 @@ static int parse_args(char* args) {
 	}
 
 	printf("\tCPU Usage: %d - %d\n", cpu_start, cpu_end);
-	free(boot_command_line);
 
 	return 0;
 
 error:
 	printf("\tFailed to parse arguments\n");
-	free(boot_command_line);
 
 	return -2;
 }
