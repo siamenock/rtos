@@ -106,6 +106,14 @@ def parse(linux_param=None, packetngin_param=None):
           hform(linux['memory'], True), 0,  # Packetngin memory area (blacklisted)
           hform(MAX_MEMORY, True)  # PacketNgin upper memory limit
     )
+
+    # FIXME FIXME I created this hotfix because the current pnd does not mmap() memory space over 1G
+    packetngin_args = 'present_mask={}-{} memmap={}${} mem={}'.format(
+          linux['core'], MAX_CORE - 1,
+          hform(linux['memory'], True), 0,
+          hform(min(MAX_MEMORY, 1 * (1024 ** 3)), True)
+    )
+
     with open('packetngin-boot.args', 'w') as f:
         lspci_script = os.path.join(BASEDIR, 'create_lspci.sh')
         pci_blacklist = subprocess.check_output(lspci_script).decode('utf-8').replace('\n','')
