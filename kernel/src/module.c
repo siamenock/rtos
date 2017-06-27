@@ -51,7 +51,7 @@ void module_init() {
 			strcpy(file_name, "/boot/");
 			strcpy(&file_name[6], dirent->name);
 			
-			int fd = open(file_name, "r");
+			int fd = open(file_name, O_RDONLY);
 			if(fd < 0) {
 				printf("\tModule cannot open: %s\n", dirent->name);
 				continue;

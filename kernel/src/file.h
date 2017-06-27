@@ -1,6 +1,7 @@
 #ifndef __FILE_H__
 #define __FILE_H__
 
+#include <fcntl.h>
 #include <fio.h>
 
 #define FILE_MAX_DESC		0x100
@@ -35,9 +36,6 @@ typedef struct _File {
 	FileSystemDriver*	driver; 
 	void*			priv;
 } File;
-
-int open(const char* file_name, char* flags);
-int close(int fd);
 
 ssize_t read(int fd, void* buffer, size_t size);
 ssize_t write(int fd, const void* buffer, size_t size);

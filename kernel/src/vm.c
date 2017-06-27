@@ -9,6 +9,7 @@
 #include <util/cmd.h>
 #include <net/md5.h>
 #include <timer.h>
+#include <fcntl.h>
 #include "file.h"
 #include <vnic.h>
 #include "icc.h"
@@ -1359,14 +1360,9 @@ static int cmd_upload(int argc, char** argv, void(*callback)(char* result, int e
 
 	uint32_t vmid = parse_uint32(argv[1]);
 
-	// Attach root directory for full path
-	char file_name[FILE_MAX_NAME_LEN];
-	file_name[0] = '/';
-	strcpy(&file_name[1], argv[2]);
-
-	int fd = open(file_name, "r");
+	int fd = open(argv[2], O_RDONLY);
 	if(fd < 0) {
-		printf("Cannot open file: %s\n", file_name);
+		printf("Cannot open file: %s\n", argv[2]);
 		return 1;
 	}
 
@@ -1375,7 +1371,7 @@ static int cmd_upload(int argc, char** argv, void(*callback)(char* result, int e
 	char buf[4096];
 	while((len = read(fd, buf, 4096)) > 0) {
 		if(vm_storage_write(vmid, buf, offset, len) != len) {
-			printf("Upload fail : %s\n", file_name);
+			printf("Upload fail : %s\n", argv[2]);
 			callback("false", -1);
 			return -1;
 		}
@@ -1383,7 +1379,7 @@ static int cmd_upload(int argc, char** argv, void(*callback)(char* result, int e
 		offset += len;
 	}
 
-	printf("Upload success : %s\n", vmid);
+	printf("Upload success : %s to %d\n", argv[2], vmid);
 	callback("true", 0);
 	return 0;
 }

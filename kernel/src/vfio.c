@@ -1,5 +1,6 @@
 #include <string.h>
 #include <malloc.h>
+#include <fcntl.h>
 #include "../../loader/src/page.h"
 #include "file.h"
 #include "vfio.h"
@@ -41,59 +42,61 @@ static void vfio_sync_callback(int errno, void* context) {
 }
 
 static void vfio_do_request(VFIO* fio, FIORequest* vaddr, FIORequest* paddr, void* pbuffer, Dirent* pdir) {
-	switch(paddr->type) {
-		case FILE_T_OPEN:
-			paddr->fd = open(paddr->op.open.name, paddr->op.open.flags);
-			break;
-		case FILE_T_CLOSE:
-			paddr->fd = close(paddr->fd);
-			break;
-		case FILE_T_READ:;
-			VFIOContext* read_ctxt = malloc(sizeof(VFIOContext));
-			read_ctxt->fio = fio;
-			read_ctxt->vaddr = vaddr;
-			read_ctxt->paddr = paddr;
-
-			read_async(paddr->fd, pbuffer, paddr->op.file_io.size, vfio_callback, read_ctxt);
-			goto exit;
-		case FILE_T_WRITE:;
-			VFIOContext* write_ctxt = malloc(sizeof(VFIOContext));
-			write_ctxt->fio = fio;
-			write_ctxt->vaddr = vaddr;
-			write_ctxt->paddr = paddr;
-
-			write_async(paddr->fd, pbuffer, paddr->op.file_io.size, vfio_callback, write_ctxt, vfio_sync_callback, NULL);
-
-			goto exit;
-		case FILE_T_OPENDIR:
-			paddr->fd = opendir(paddr->op.open.name);
-			break;
-		case FILE_T_CLOSEDIR:
-			paddr->fd = closedir(paddr->fd);
-			break;
-		case FILE_T_READDIR:;
-			Dirent* dir = (Dirent*)malloc(sizeof(Dirent));
-			if(readdir(paddr->fd, dir) < 0)
-				memcpy(pdir, dir, sizeof(Dirent));
-			free(dir);
-			break;
-	}
-
-	// Check if user changed the fifo tail on purpose	
-	if(fio->output_addr->tail != fio->output_buffer->tail)
-		fio->output_addr->tail = fio->output_buffer->tail;
-
-	// Sync head
-	fio->output_buffer->head = fio->output_addr->head;
-	
-	// Push request to output fifo
-	fifo_push(fio->output_buffer, vaddr);
-
-	// Sync tail
-	fio->output_addr->tail = fio->output_buffer->tail;
-
-exit:
-	return;
+	//FIXME: fix this requst handler
+	//open don't use character flag when open file.
+// 	switch(paddr->type) {
+// 		case FILE_T_OPEN:
+// 			paddr->fd = open(paddr->op.open.name, paddr->op.open.flags);
+// 			break;
+// 		case FILE_T_CLOSE:
+// 			paddr->fd = close(paddr->fd);
+// 			break;
+// 		case FILE_T_READ:;
+// 			VFIOContext* read_ctxt = malloc(sizeof(VFIOContext));
+// 			read_ctxt->fio = fio;
+// 			read_ctxt->vaddr = vaddr;
+// 			read_ctxt->paddr = paddr;
+// 
+// 			read_async(paddr->fd, pbuffer, paddr->op.file_io.size, vfio_callback, read_ctxt);
+// 			goto exit;
+// 		case FILE_T_WRITE:;
+// 			VFIOContext* write_ctxt = malloc(sizeof(VFIOContext));
+// 			write_ctxt->fio = fio;
+// 			write_ctxt->vaddr = vaddr;
+// 			write_ctxt->paddr = paddr;
+// 
+// 			write_async(paddr->fd, pbuffer, paddr->op.file_io.size, vfio_callback, write_ctxt, vfio_sync_callback, NULL);
+// 
+// 			goto exit;
+// 		case FILE_T_OPENDIR:
+// 			paddr->fd = opendir(paddr->op.open.name);
+// 			break;
+// 		case FILE_T_CLOSEDIR:
+// 			paddr->fd = closedir(paddr->fd);
+// 			break;
+// 		case FILE_T_READDIR:;
+// 			Dirent* dir = (Dirent*)malloc(sizeof(Dirent));
+// 			if(readdir(paddr->fd, dir) < 0)
+// 				memcpy(pdir, dir, sizeof(Dirent));
+// 			free(dir);
+// 			break;
+// 	}
+// 
+// 	// Check if user changed the fifo tail on purpose	
+// 	if(fio->output_addr->tail != fio->output_buffer->tail)
+// 		fio->output_addr->tail = fio->output_buffer->tail;
+// 
+// 	// Sync head
+// 	fio->output_buffer->head = fio->output_addr->head;
+// 	
+// 	// Push request to output fifo
+// 	fifo_push(fio->output_buffer, vaddr);
+// 
+// 	// Sync tail
+// 	fio->output_addr->tail = fio->output_buffer->tail;
+// 
+// exit:
+// 	return;
 }
 
 void vfio_poll(VM* _vm) {
