@@ -35,15 +35,25 @@ static void free_descriptor(File* descriptor) {
 /**
  * Path is absolute path with file name e.g. /boot/kernel.bin
  */
-int open(const char* path, char* flags) {
+int open(const char* path, int flags, ...) {
 	// Name validation check
 	int len = strlen(path);
 	int ret;
 	File* file = NULL;
 
-	if(flags[0] != 'r' && flags[0] != 'w' && flags[0] != 'a') {
-		ret = -1;
-		goto failed;
+	char* _flags;
+	switch(flags) {
+		case O_RDONLY:
+			_flags = "r";
+			break;
+		case O_WRONLY:
+			_flags = "w";
+			break;
+		case O_APPEND:
+			_flags = "a";
+			break;
+		default:
+			return -1;
 	}
 
 	if((len > FILE_MAX_NAME_LEN - 1) || (len == 0)) {
@@ -76,7 +86,7 @@ int open(const char* path, char* flags) {
 		return base ? base + 1 : path;
 	}
 
-	ret = file->driver->open(file->driver, get_file_name(path), flags, &file->priv);
+	ret = file->driver->open(file->driver, get_file_name(path), _flags, &file->priv);
 
 	if(ret != FILE_OK)
 		goto failed;
