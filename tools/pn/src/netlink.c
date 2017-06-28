@@ -12,6 +12,7 @@
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
 #include <linux/if_arp.h>
+#include <linux/limits.h>
 #include <util/event.h>
 
 #include "driver/nicdev.h"
@@ -45,6 +46,23 @@ static inline const char *ll_addr_n2a(const unsigned char *addr,
 		snprintf(buf + l, blen - l, ":%02x", addr[i]);
 
 	return buf;
+}
+
+static char* nlmsghdr_getname(struct nlmsghdr* h) {
+	if(!h) return NULL;
+	struct ifinfomsg *iface;
+	struct rtattr *attr;
+	int len;
+
+	iface = NLMSG_DATA(h);
+	len = h->nlmsg_len - NLMSG_LENGTH(sizeof(*iface));
+
+	for(attr= IFLA_RTA(iface); RTA_OK(attr, len); attr= RTA_NEXT(attr, len)) {
+		if(attr->rta_type == IFLA_IFNAME) {
+			return RTA_DATA(attr);
+		}
+	}
+	return NULL;
 }
 
 static void rtnl_link(struct nlmsghdr *h, NICDevice* nicdev) {
@@ -95,12 +113,16 @@ static bool interface_up_check(struct ifinfomsg *iface) {
 	return false;
 }
 
-static bool interface_loopback_filtered(struct ifinfomsg *iface) {
-	if((iface->ifi_flags & IFF_LOOPBACK) == IFF_LOOPBACK) {
-		return true;
-	}
+static bool is_loopback(struct ifinfomsg *iface) {
+	return (iface->ifi_flags & IFF_LOOPBACK) == IFF_LOOPBACK;
+}
 
-	return false;
+static bool is_bridge(char* name) {
+	if(!name) return false;
+	char bridge_config[PATH_MAX] = {};
+	snprintf(bridge_config, sizeof(bridge_config), "/sys/class/net/%s/bridge", name);
+
+	return access(bridge_config, F_OK) == 0;
 }
 
 bool netlink_event(void* context) {
@@ -135,7 +157,7 @@ bool netlink_event(void* context) {
 			struct ifinfomsg *iface;
 			iface = NLMSG_DATA(msg_ptr);
 
-			if (interface_loopback_filtered(iface))
+			if (is_loopback(iface) || is_bridge(nlmsghdr_getname(msg_ptr)))
 				continue;
 
 			switch(msg_ptr->nlmsg_type) {
