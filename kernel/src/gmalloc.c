@@ -156,7 +156,7 @@ void gmalloc_init() {
 		}
 	}
 
-	printf("\tExtend bmallc pool\n");
+	printf("\tExtend bmalloc pool\n");
 	Block* pop() {
 		uintptr_t last_start = UINTPTR_MAX;
 		int last_index = -1;
