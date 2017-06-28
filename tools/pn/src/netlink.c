@@ -125,6 +125,14 @@ static bool is_bridge(char* name) {
 	return access(bridge_config, F_OK) == 0;
 }
 
+static bool is_tap(char* name) {
+	if(!name) return false;
+	char tap_config[PATH_MAX] = {};
+	snprintf(tap_config, sizeof(tap_config), "/sys/class/net/%s/tun_flags", name);
+
+	return access(tap_config, F_OK) == 0;
+}
+
 bool netlink_event(void* context) {
 	int fd = (int)(uint64_t)context;
 	int len;
@@ -157,7 +165,8 @@ bool netlink_event(void* context) {
 			struct ifinfomsg *iface;
 			iface = NLMSG_DATA(msg_ptr);
 
-			if (is_loopback(iface) || is_bridge(nlmsghdr_getname(msg_ptr)))
+			char* ifname = nlmsghdr_getname(msg_ptr);
+			if (is_loopback(iface) || is_bridge(ifname) || is_tap(ifname))
 				continue;
 
 			switch(msg_ptr->nlmsg_type) {
