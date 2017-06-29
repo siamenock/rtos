@@ -7,6 +7,7 @@
 #include <libgen.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/file.h>
 #include <linux/limits.h>
 
 #include <util/event.h>
@@ -281,9 +282,20 @@ static Device* devices[MAX_NIC_DEVICE_COUNT];
 //
 // 	return 0;
 // }
+//
+static int ensure_single_instance() {
+	int lockfile = open("/tmp/pnd.lock", O_RDONLY | O_CREAT, 0444);
+	if(lockfile == -1) return 1;
+
+	return flock(lockfile, LOCK_EX | LOCK_NB);
+}
 
 int main(int argc, char** argv) {
 	int ret;
+
+	ret = ensure_single_instance();
+	if(ret)
+		goto error;
 
 	//uint64_t vga_buffer = (uint64_t)VGA_BUFFER_START;
 	char vga_buffer[64 * 1024];
