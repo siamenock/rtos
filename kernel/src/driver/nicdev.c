@@ -352,7 +352,6 @@ int nicdev_srx(VNIC* vnic, void* data, size_t size) {
 int nicdev_srx0(VNIC* vnic, void* data, size_t size,
 		void* data_optional, size_t size_optional) {
 	Ether* eth = data;
-	int i;
 
 	if(size + size_optional < sizeof(Ether))
 		return NICDEV_PROCESS_PASS;

@@ -18,6 +18,7 @@ uint8_t amp_get_apic_id() {
 	return (b >> 24) & 0xff;
 }
 
-void amp_init(long kernel_start_address) {
+int amp_init(long kernel_start_address) {
 	acpi_init();
+	return 0;
 }

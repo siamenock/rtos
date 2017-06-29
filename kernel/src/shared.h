@@ -33,7 +33,7 @@ typedef struct {
 	uint64_t		magic;
 } __attribute__ ((packed)) Shared;
 
-void shared_init();
+int shared_init();
 void shared_sync();
 
 #endif /* __ASSEMBLY__ */

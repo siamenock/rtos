@@ -9,6 +9,7 @@
 #include "mmap.h"
 #include "shared.h"
 #include "page.h"
+#include "param.h"
 
 static inline int open_memory() {
 	int fd = open("/dev/mem", O_RDWR | O_SYNC);
@@ -30,6 +31,7 @@ int mapping_memory() {
 	if(fd < 0)
 		return -1;
 
+	PHYSICAL_OFFSET = kernel_start_address - 0x400000;
 	printf("\tPhysical offset : %p\n", PHYSICAL_OFFSET);
 	printf("\tAssuming physical mapping area : %lx\n", MAPPING_AREA);
 
@@ -69,11 +71,13 @@ int mapping_apic() {
 
 	if(_apic_address_page == (uint64_t)MAP_FAILED) {
 		perror("\tMapping memory for absolute memory access failed.\n");
+		close(fd);
 		return -1;
 	}
 
 	if(_apic_address_page != _apic_address) {
 		perror("\tMapping memory is not same as APIC address.\n");
+		close(fd);
 		return -1;
 	}
 
@@ -81,4 +85,3 @@ int mapping_apic() {
 	close(fd);
 	return 0;
 }
-

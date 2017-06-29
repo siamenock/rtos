@@ -20,7 +20,7 @@ static Command commands[] = {
 	},
 };
 
-void cpu_init() {
+int cpu_init() {
 	uint32_t* p = (uint32_t*)cpu_brand;
 
 	uint32_t eax = 0x80000002;
@@ -43,6 +43,8 @@ void cpu_init() {
 	printf("\tInvariant TSC: %s\n", has_invariant_tsc ? "\x1b""32msupported""\x1b""0m" : "\x1b""31mnot supported""\x1b""0m");
 
 	cmd_register(commands, sizeof(commands) / sizeof(commands[0]));
+
+	return 0;
 }
 
 bool cpu_has_feature(int feature) {

@@ -62,7 +62,7 @@ bool io_mux_init() {
 bool io_mux_add(IOMultiplexer* io_mux, uint64_t key) {
     if(!io_mux) return false;
 
-    if(!map_put(io_mux_table, key, io_mux)) return false;
+    if(!map_put(io_mux_table, (void*)key, io_mux)) return false;
 
     FD_SET(io_mux->fd, &fds);
     if(max_fd < io_mux->fd) max_fd = io_mux->fd;
@@ -71,7 +71,7 @@ bool io_mux_add(IOMultiplexer* io_mux, uint64_t key) {
 }
 
 IOMultiplexer* io_mux_remove(uint64_t key) {
-    IOMultiplexer* io_mux = map_remove(io_mux_table, key);
+    IOMultiplexer* io_mux = map_remove(io_mux_table, (void*)key);
     FD_CLR(io_mux->fd, &fds);
 
     return io_mux;

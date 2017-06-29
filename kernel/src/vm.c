@@ -565,8 +565,9 @@ static bool vm_loop(void* context) {
 	return true;
 }
 
-void vm_init() {
+int vm_init() {
 	vms = map_create(4, map_uint64_hash, map_uint64_equals, NULL);
+	if(!vms) return -1;
 
 	icc_register(ICC_TYPE_STARTED, icc_started);
 	icc_register(ICC_TYPE_PAUSED, icc_paused);
@@ -585,6 +586,8 @@ void vm_init() {
 	event_idle_add(vm_loop, NULL);
 
 	cmd_register(commands, sizeof(commands) / sizeof(commands[0]));
+
+	return 0;
 }
 
 uint32_t vm_create(VMSpec* vm_spec) {

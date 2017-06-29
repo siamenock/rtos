@@ -394,9 +394,6 @@ void main() {
 		fs_register(&bfs_driver);
 		fs_mount(DISK_TYPE_RAMDISK << 16 | 0x00, 0,  FS_TYPE_BFS, "/boot");
 
-		printf("Initializing kernel symbols...\n");
-		symbols_init();
-
 		printf("Initializing modules...\n");
 		module_init();
 

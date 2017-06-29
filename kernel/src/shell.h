@@ -5,7 +5,7 @@
 
 #define CMD_SIZE        512
 
-void shell_init();
+int shell_init();
 bool shell_process(Packet* packet);
 void shell_sync();
 

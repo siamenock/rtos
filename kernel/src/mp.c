@@ -19,7 +19,7 @@
 static uint8_t processor_id;
 static uint8_t processor_count;
 
-void mp_init() {
+int mp_init() {
 	// Map IA32_APIC_BASE_MSR(0x1B) to virtual memory
 
 	// Get APIC ID
@@ -36,6 +36,8 @@ void mp_init() {
 		if(shared->mp_processors[i] != 0xff)
 			processor_count++;
 	}
+
+	return 0;
 }
 
 void mp_sync() {

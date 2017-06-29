@@ -46,7 +46,7 @@ static void vm_get_handler(RPC* rpc, uint32_t vmid, void* context, void(*callbac
 	spec.memory_size = vm->memory.count * VM_MEMORY_SIZE_ALIGN / 0x100000;
 	spec.storage_size = vm->storage.count * VM_STORAGE_SIZE_ALIGN / 0x100000;
 	spec.nic_count = vm->nic_count;
-	spec.nics = &ns;
+	spec.nics = ns;
 	for(int i = 0; i < spec.nic_count; ++i) {
 		VNIC* vnic = vm->nics[i];
 		NICSpec* nicspec = &spec.nics[i];

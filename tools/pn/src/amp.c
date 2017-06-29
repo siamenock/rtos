@@ -30,7 +30,7 @@ static void wakeup_ap(long kernel_start_address) {
 	printf("Done\n");
 }
 
-void amp_init(long kernel_start_address) {
+int amp_init(long kernel_start_address) {
 	processor_count++;
 	Shared* shared = (Shared*)SHARED_ADDR;
 	shared->mp_processors[0] = 0;
@@ -38,6 +38,8 @@ void amp_init(long kernel_start_address) {
 	 * Multikernel AP not yet wake-up.
 	 */
 	wakeup_ap(kernel_start_address);
+
+	return 0;
 }
 
 uint8_t amp_get_apic_id() {

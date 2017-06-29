@@ -119,7 +119,7 @@ typedef struct {
 	bool(*parse_cbasme)(MP_CompatabilityBusAddressSpaceModifierEntry*, void*);
 } MP_Parser;
 
-void mp_init();
+int mp_init();
 uint8_t mp_apic_id();
 uint8_t mp_processor_id();
 uint8_t mp_apic_id_to_processor_id(uint8_t apic_id);

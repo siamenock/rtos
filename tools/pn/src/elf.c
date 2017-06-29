@@ -8,96 +8,28 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 
+#include "elf.h"
 #include "symbols.h"
 #include "pnkc.h"
 #include "page.h"
 
-Elf64_Ehdr* ehdr;
-Elf64_Shdr* strtab;
-static char* shstrtab;
-Elf64_Shdr* symtab;
-
-// int elf_load(char* elf_file) {
-// 	int fd = open(elf_file, O_RDONLY);
-// 	if(fd < 0) {
-// 		printf("Cannot open file: %s\n", elf_file);
-// 		return -1;
-// 	}
-// 
-// 	struct stat state;
-// 	if(stat(elf_file, &state) != 0) {
-// 		printf("Cannot get state of file: %s\n", elf_file);
-// 		return -2;
-// 	}
-// 
-// 	ehdr = mmap(NULL, state.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
-// 	if(ehdr == (void*)-1) {
-// 		printf("Cannot open file: %s\n", elf_file);
-// 		return -3;
-// 	}
-// 
-// 	if(ehdr->e_ident[0] != ELFMAG0 || ehdr->e_ident[1] != ELFMAG1 || ehdr->e_ident[2] != ELFMAG2 || ehdr->e_ident[3] != ELFMAG3) {
-// 		printf("Illegal file format: %s\n", elf_file);
-// 		return -4;
-// 	}
-// 
-// 	Elf64_Shdr* shdr = (Elf64_Shdr*)((uint8_t*)ehdr + ehdr->e_shoff);
-// 	shstrtab = (char*)ehdr + shdr[ehdr->e_shstrndx].sh_offset;
-// 	Elf64_Shdr* get_shdr(char* name) {
-// 		for(int i = 0; i < ehdr->e_shnum; i++) {
-// 			if(strcmp(name, shstrtab + shdr[i].sh_name) == 0)
-// 				return &shdr[i];
-// 		}
-// 		return NULL;
-// 	}
-// 
-// 	strtab = get_shdr(".strtab");
-// 	if(!strtab)
-// 		return -5;
-// 
-// 	symtab = get_shdr(".symtab");
-// 	if(!symtab)
-// 		return -6;
-// 
-// 	return 0;
-// }
-
-void copy(void* dst, void* src, size_t size, uint16_t apic_id) {
+static void copy(void* dst, void* src, size_t size, uint16_t apic_id) {
 	memcpy(dst, src, size);
 }
 
-void clean(void* dst, size_t size, uint16_t apic_id) {
+static void clean(void* dst, size_t size, uint16_t apic_id) {
 	memset(dst, 0, size);
 }
 
-//bool copy_kernel(Elf64_Ehdr* ehdr) {
-bool copy_kernel(PNKC* pnkc) {
-// 	if(ehdr->e_ident[0] != ELFMAG0 || ehdr->e_ident[1] != ELFMAG1 || ehdr->e_ident[2] != ELFMAG2 || ehdr->e_ident[3] != ELFMAG3) {
-// 		return false;
-// 	}
-// 
-// 	Elf64_Shdr* shdr = (Elf64_Shdr*)((uint8_t*)ehdr + ehdr->e_shoff);
-// 	char* strs = (char*)ehdr + shdr[ehdr->e_shstrndx].sh_offset;
-// 
-// 	int t;
-// 	for(int i = 0; i < ehdr->e_shnum; i++) {
-// 		if(!shdr[i].sh_addr)
-// 			continue;
-// 
-// 		if(!strcmp(strs + shdr[i].sh_name, ".bss")) {
-// 			continue;
-// 		}
-// 
-// 		memcpy((void*)VIRTUAL_TO_PHYSICAL(shdr[i].sh_addr), (uint8_t*)ehdr + shdr[i].sh_offset, shdr[i].sh_size);
-// 	}
+static bool copy_kernel(PNKC* pnkc) {
  	uint16_t apic_id = 0;
 	void* pos = pnkc;
 	pos += sizeof(PNKC);
 
-	if(pnkc->magic != PNKC_MAGIC)
-		return false;
+	if(pnkc->magic != PNKC_MAGIC) return false;
 
 	// Copy .text
+	clean((void*)0x200000, 0x400000, apic_id);
 	copy((void*)0x200000 + pnkc->text_offset, pos, pnkc->text_size, apic_id);
 	pos += pnkc->text_size;
 
@@ -120,52 +52,97 @@ bool copy_kernel(PNKC* pnkc) {
 	return true;
 }
 
+static int kernel_symbols_init() {
+	void* mmap_symbols[][2] = {
+		{ &DESC_TABLE_AREA_START, "DESC_TABLE_AREA_START"},
+		{ &DESC_TABLE_AREA_END, "DESC_TABLE_AREA_END"},
+
+		{ &GDTR_ADDR, "GDTR_ADDR" },
+		{ &GDT_ADDR, "GDT_ADDR" },
+		{ &GDT_END_ADDR, "GDT_END_ADDR" },
+		{ &TSS_ADDR, "TSS_ADDR" },
+
+		{ &IDTR_ADDR, "IDTR_ADDR" },
+		{ &IDT_ADDR, "IDT_ADDR" },
+		{ &IDT_END_ADDR, "IDT_END_ADDR" },
+
+		{ &KERNEL_TEXT_AREA_START, "KERNEL_TEXT_AREA_START" },
+		{ &KERNEL_TEXT_AREA_END, "KERNEL_TEXT_AREA_END" },
+
+		{ &KERNEL_DATA_AREA_START, "KERNEL_DATA_AREA_START" },
+		{ &KERNEL_DATA_AREA_END, "KERNEL_DATA_AREA_END" },
+
+		{ &KERNEL_DATA_START, "KERNEL_DATA_START" },
+		{ &KERNEL_DATA_END, "KERNEL_DATA_END" },
+
+		{ &VGA_BUFFER_START, "VGA_BUFFER_START" },
+		{ &VGA_BUFFER_END, "VGA_BUFFER_END" },
+
+		{ &USER_INTR_STACK_START, "USER_INTR_STACK_START" },
+		{ &USER_INTR_STACK_END, "USER_INTR_STACK_END" },
+
+		{ &KERNEL_INTR_STACK_START, "KERNEL_INTR_STACK_START" },
+		{ &KERNEL_INTR_STACK_END, "KERNEL_INTR_STACK_END" },
+
+		{ &KERNEL_STACK_START, "KERNEL_STACK_START" },
+		{ &KERNEL_STACK_END, "KERNEL_STACK_END" },
+
+		{ &PAGE_TABLE_START, "PAGE_TABLE_START" },
+		{ &PAGE_TABLE_END, "PAGE_TABLE_END" },
+
+		{ &LOCAL_MALLOC_START, "LOCAL_MALLOC_START" },
+		{ &LOCAL_MALLOC_END, "LOCAL_MALLOC_END" },
+
+		{ &SHARED_ADDR, "SHARED_ADDR" },
+	};
+
+	int count = sizeof(mmap_symbols) / (sizeof(char*) * 2);
+	for(int i = 0; i < count; i++) {
+		uint64_t symbol_addr = elf_get_symbol(mmap_symbols[i][1]);
+		if(!symbol_addr) {
+			printf("\tCan't Get Symbol Address: \"%s\"", mmap_symbols[i][1]);
+			return -1;
+		}
+		char** addr = (char**)mmap_symbols[i][0];
+
+		// PND needs to access shread area
+		if(!strcmp("SHARED_ADDR", mmap_symbols[i][1]) || !strncmp("LOCAL_MALLOC", mmap_symbols[i][1], strlen("LOCAL_MALLOC"))) *addr = (void*)VIRTUAL_TO_PHYSICAL(symbol_addr);
+		else *addr = (char*)symbol_addr;
+
+		printf("\tSymbol \"%s\" : %p %p\n", mmap_symbols[i][1], symbol_addr, *addr);
+	}
+
+	return 0;
+}
+
 int elf_copy(char* elf_file, unsigned long kernel_start_address) {
 	int fd = open(elf_file, O_RDONLY);
 	if(fd < 0) {
-		printf("Cannot open file: %s\n", elf_file);
+		printf("\tCannot open file: %s\n", elf_file);
 		return -1;
 	}
 
 	off_t elf_size = lseek(fd, 0, SEEK_END);
-	char* addr = mmap(NULL, elf_size, PROT_READ, MAP_PRIVATE, fd, 0);
-	if(addr == MAP_FAILED) {
+	PNKC* pnkc = (PNKC*)mmap(NULL, elf_size, PROT_READ, MAP_PRIVATE, fd, 0);
+	if(pnkc == MAP_FAILED) {
 		close(fd);
 		return -2;
 	}
 
-	memset((void*)0x200000, 0, 0x600000);
-
-	copy_kernel((PNKC*)addr);
-	munmap(addr, elf_size);
+	copy_kernel(pnkc);
+	munmap(pnkc, elf_size);
 	close(fd);
+
+	printf("\tInitiliazing Kernel symbols...\n");
+	if(kernel_symbols_init()) return -3;
 
 	return 0;
 }
 
 uint64_t elf_get_symbol(char* sym_name) {
-// 	char* name(int offset) {
-// 		return (char*)ehdr + strtab->sh_offset + offset;
-// 	}
-// 
-// 	Elf64_Sym* sym = (void*)ehdr + symtab->sh_offset;
-// 	int size = symtab->sh_size / sizeof(Elf64_Sym);
-// 	for(int i = 0; i < size; i++) {
-// 		if(ELF64_ST_BIND(sym[i].st_info) != STB_GLOBAL)
-// 			continue;
-// 
-// 		if(strlen(sym_name) != strlen(name(sym[i].st_name)))
-// 			continue;
-// 
-// 		if(!strncmp(sym_name, name(sym[i].st_name), strlen(sym_name))) {
-// 			return sym[i].st_value;
-// 		}
-// 		char* test = name(sym[i].st_name);
-// 	}
 	Symbol* symbol = symbols_get(sym_name);
-	if(symbol)
-		return (uint64_t)symbol->address;
+	if(!symbol)
+		return 0;
 
-	return 0;
+	return (uint64_t)symbol->address;
 }
-

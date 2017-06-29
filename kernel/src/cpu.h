@@ -11,7 +11,8 @@
 #define CPU_FEATURE_TURBO_BOOST		5
 #define CPU_FEATURE_INVARIANT_TSC	6
 
-void cpu_init();
+int cpu_init();
 bool cpu_has_feature(int feature);
+extern char cpu_brand[4 * 4 * 3 + 1];
 
 #endif /* __CPU_H__ */

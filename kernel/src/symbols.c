@@ -4,8 +4,10 @@
 
 static Symbol* symbols;
 
-void symbols_init() {
+static bool symbols_init() {
 	PNKC* pnkc = (PNKC*)(0x200000 - sizeof(PNKC));
+	if(pnkc->magic != PNKC_MAGIC) return false;
+
 	symbols =  (void*)0x200000 + pnkc->smap_offset;
 	void* end = (void*)0x200000 + pnkc->smap_offset + pnkc->smap_size;
 	
@@ -15,11 +17,14 @@ void symbols_init() {
 		s->name += (uintptr_t)symbols;
 		s++;
 	}
+
+	return true;
 }
 
 Symbol* symbols_get(char* name) {
-	if(!symbols)
-		return NULL;
+	if(!symbols) {
+		if(!symbols_init()) return NULL;
+	}
 	
 	PNKC* pnkc = (PNKC*)(0x200000 - sizeof(PNKC));
 	void* end = (void*)0x200000 + pnkc->smap_offset + pnkc->smap_size;

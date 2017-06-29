@@ -5,6 +5,7 @@
 #include <string.h>
 #include <elf.h>
 #include <fio.h>
+#include <unistd.h>
 #include "file.h"
 #include "pnkc.h"
 #include "page.h"

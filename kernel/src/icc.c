@@ -79,7 +79,7 @@ static void icc(uint64_t vector, uint64_t err) {
 	}
 }
 
-void icc_init() {
+int icc_init() {
 	uint8_t processor_count = mp_processor_count();
 	extern void* gmalloc_pool;
 	uint8_t apic_id = mp_apic_id();
@@ -109,6 +109,8 @@ void icc_init() {
 
 	event_busy_add(icc_event, NULL);
 	apic_register(48, icc);
+
+	return 0;
 }
 
 ICC_Message* icc_alloc(uint8_t type) {

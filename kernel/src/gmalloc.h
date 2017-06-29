@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stddef.h>
 
-void gmalloc_init();
+int gmalloc_init();
 void gmalloc_extend();
 size_t gmalloc_total();
 size_t gmalloc_used();

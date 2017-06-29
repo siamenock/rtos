@@ -31,7 +31,7 @@ int debug_free_count;
 
 extern void* __malloc_pool;	// Defined in malloc.c from libcore
 
-void malloc_init() {
+int malloc_init() {
 	uint64_t start = (uint64_t)LOCAL_MALLOC_START;
 	uint64_t end = (uint64_t)LOCAL_MALLOC_END; 
 
@@ -43,6 +43,8 @@ void malloc_init() {
 	tracing = map_create(8192, map_uint64_hash, map_uint64_equals, NULL);
 	is_debug = true;
 	#endif /* DEBUG */
+
+	return 0;
 }
 
 size_t malloc_total() {

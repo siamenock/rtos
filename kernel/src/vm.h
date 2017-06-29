@@ -57,7 +57,7 @@ typedef struct _VM {
 /**
  * Initilaize Module
  */
-void vm_init();
+int vm_init();
 
 /**
  * Create VM

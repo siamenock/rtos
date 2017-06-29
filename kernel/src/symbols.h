@@ -13,7 +13,6 @@ typedef struct _Symbol {
 	void*	address;
 } Symbol;
 
-void symbols_init();
 Symbol* symbols_get(char* name);
 
 #endif /* __SYMBOLS_H__ */

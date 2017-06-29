@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <sys/types.h>
 
-void malloc_init();
+int malloc_init();
 size_t malloc_total();
 size_t malloc_used();
 

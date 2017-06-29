@@ -55,7 +55,7 @@ typedef struct _ICC_Message {
 
 extern ICC_Message* icc_msg;	// Core's local message
 
-void icc_init();
+int icc_init();
 ICC_Message* icc_alloc(uint8_t type);
 void icc_free(ICC_Message* msg);
 uint32_t icc_send(ICC_Message* msg, uint8_t apic_id);

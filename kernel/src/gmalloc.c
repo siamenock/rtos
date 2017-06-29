@@ -23,7 +23,7 @@ typedef struct _BmallocPool {
 BmallocPool* bmalloc_pool;
 void* gmalloc_pool;
 
-void gmalloc_init() {
+int gmalloc_init() {
 	/* Gmalloc pool area : IDT_END_ADDR */
 	uint64_t start = VIRTUAL_TO_PHYSICAL(IDT_END_ADDR);
 	uint64_t end = VIRTUAL_TO_PHYSICAL(DESC_TABLE_AREA_END);
@@ -209,6 +209,8 @@ void gmalloc_init() {
 	print_pool("global", gmalloc_total());
 	print_pool("block", bmalloc_total());
 	printf("\n");
+
+	return 0;
 }
 
 inline size_t gmalloc_total() {
