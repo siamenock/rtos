@@ -25,7 +25,7 @@ project "pn"
 
     -- Make version header
     prebuildcommands {
-        './../mkver.sh > ../src/version.h',
+        '../../../scripts/mkver.sh > ../src/version.h',
     }
 
 project 'pn_build'

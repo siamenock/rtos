@@ -137,7 +137,7 @@ void shell_callback() {
 }
 
 void shell_init() {
-	printf("\nPacketNgin ver %d.%d.%d-%s\n", VERSION_MAJOR, VERSION_MINOR, VERSION_MICRO, VERSION_TAG);
+	printf("\nPacketNgin ver %s\n", VERSION);
 	printf("# ");
 
 	extern Device* device_stdin;

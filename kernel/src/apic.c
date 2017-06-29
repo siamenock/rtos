@@ -196,7 +196,7 @@ uint64_t apic_user_return_code() {
 void apic_dump(uint64_t vector, uint64_t error_code) {
 	Frame* frame = (void*)(PHYSICAL_TO_VIRTUAL(KERNEL_INTR_STACK_END) - sizeof(Frame));//(void*)(0xffffffff805b0000 - sizeof(Frame))
 
-	printf("\n* Exception: ver=%d.%d.%d-%s core=%d, vector=0x%lx, error=0x%lx\n", VERSION_MAJOR, VERSION_MINOR, VERSION_MICRO, VERSION_TAG, mp_processor_id(), vector, error_code);
+	printf("\n* Exception: ver=%s core=%d, vector=0x%lx, error=0x%lx\n", VERSION, mp_processor_id(), vector, error_code);
 	printf("AX=%016lx BX=%016lx CX=%016lx DX=%016lx\n", frame->rax, frame->rbx, frame->rcx, frame->rdx);
 	printf("SI=%016lx DI=%016lx BP=%016lx SP=%016lx\n", frame->rsi, frame->rdi, frame->rbp, frame->rsp);
 	printf("8 =%016lx 9 =%016lx 10=%016lx 11=%016lx\n", frame->r8, frame->r9, frame->r10, frame->r11);

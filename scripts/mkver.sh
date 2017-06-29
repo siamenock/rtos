@@ -13,8 +13,8 @@ echo "#ifndef __VERSION_H__
 #define VERSION_MAJOR   $MAJOR
 #define VERSION_MINOR   $MINOR
 #define VERSION_MICRO   $MICRO
-#define VERSION_TAG	\"$TAG\"
+#define VERSION_TAG	0x$TAG
 
-#define VERSION         ((VERSION_MAJOR << 16) | (VERSION_MINOR << 8) | (VERSION_MICRO))
+#define VERSION         \"$MAJOR.$MINOR.$MICRO-$TAG\"
 
 #endif /* __VERSION_H__ */"
