@@ -5,7 +5,7 @@ project 'ext'
     build.linkingProperty { 'hal', 'tlsf', 'vnic' }
     build.targetPath('..')
 
-    buildoptions { "-fpic" }
+    buildoptions { "-fpic", "-msse4.1" }
 
     filter { 'configurations:linux' }
         defines     { 'LINUX' }
