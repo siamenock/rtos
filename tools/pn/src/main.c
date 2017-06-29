@@ -33,7 +33,7 @@
 #include "elf.h"
 #include "device.h"
 #include "popcorn.h"
-#include "netlink.h"
+#include "netob.h"
 #include "dispatcher.h"
 #include "driver/nicdev.h"
 #include "param.h"
@@ -390,8 +390,8 @@ int main(int argc, char** argv) {
 
 	printf("\nInitializing standard IO...\n");
 
-	printf("\nInitializing linux netlink devices...\n");
-	netlink_init();
+	printf("\nInitializing linux network interface observer...\n");
+	netob_init();
 
 	printf("\nInitializing RPC manager...\n");
 	manager_init();

@@ -18,6 +18,7 @@
 #include "driver/nicdev.h"
 #include "device.h"
 #include "dispatcher.h"
+#include "netob.h"
 
 #define IFLIST_REPLY_BUFFER	8192
 #define MAX_NET_DEVICES		8
@@ -217,7 +218,7 @@ bool netlink_event(void* context) {
 }
 
 // FIXME: refactor netlink function
-int netlink_init() {
+int netob_init() {
 	int fd;
 	struct sockaddr_nl local;
 	struct sockaddr_nl kernel;
