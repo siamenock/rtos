@@ -9,6 +9,7 @@
 typedef struct _NICDevice{
 	char		name[MAX_NIC_NAME_LEN];
 	uint64_t	mac;
+	int		mtu;
 	uint16_t	vlan_proto; ///< VLAN Protocol
 	uint16_t	vlan_tci;   ///< VLAN TCI
 
