@@ -5,4 +5,5 @@ MAJOR=`echo $VERSION | awk -F'[.-]' '{ print $1 }'`
 MINOR=`echo $VERSION | awk -F'[.-]' '{ print $2 }'`
 
 echo "PacketNgin Release Script"
-git commit && git tag v$MAJOR.$MINOR
+echo "Must raise the minor version"
+git add ver.sh && git commit && git tag v$MAJOR.$MINOR
