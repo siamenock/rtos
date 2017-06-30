@@ -95,6 +95,7 @@ int nicdev_register_vnic(NICDevice* nicdev, VNIC* vnic);
 VNIC* nicdev_unregister_vnic(NICDevice* nicdev, uint32_t id);
 VNIC* nicdev_get_vnic(NICDevice* nicdev, uint32_t id);
 VNIC* nicdev_get_vnic_mac(NICDevice* nicdev, uint64_t mac);
+VNIC* nicdev_get_vnic_name(NICDevice* nicdev, char* name);
 VNIC* nicdev_update_vnic(NICDevice* nicdev, VNIC* src_vnic);
 
 enum NICDEV_PROCESS_RESULT {
