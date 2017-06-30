@@ -14,6 +14,7 @@
 #include <timer.h>
 #include "mmap.h"
 
+#include "version.h"
 #include "apic.h"
 #include "icc.h"
 #include "mapping.h"
@@ -154,15 +155,14 @@ int main(int argc, char** argv) {
 	int ret;
 
 	ret = ensure_single_instance();
-	if(ret)
-		goto error;
+	if(ret) goto error;
 
 	//uint64_t vga_buffer = (uint64_t)VGA_BUFFER_START;
-	char vga_buffer[64 * 1024];
 	console_init();
+	char vga_buffer[64 * 1024];
 	stdio_init(0, (void*)vga_buffer, 64 * 1024);
 
-	printf("\nPacketNgin 2.0 Manager\n");
+	printf("PacketNgin %s\n", VERSION);
 
 	printf("Permission Check...\n");
 	if(geteuid()) goto error;
@@ -249,7 +249,7 @@ int main(int argc, char** argv) {
 	return 0;
 
 error:
-	printf("\nManager initialization error occured.\n");
+	printf("\nPacketNgin initialization error occured.\n");
 	printf("Terminated...\n");
 	return -1;
 }
