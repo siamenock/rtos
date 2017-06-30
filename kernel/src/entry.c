@@ -166,37 +166,37 @@ static __always_inline void copy_bootdata(uint64_t* real_mode_data) {
 	}
 }
 
-static void reserve_initrd() {
-	/* Assume only end is not page aligned */
-	uint64_t ramdisk_shift = boot_params.hdr.ramdisk_shift;
-	uint64_t ramdisk_image;
-	uint64_t ramdisk_size  = boot_params.hdr.ramdisk_size;
-	uint64_t ramdisk_end;
+// static void reserve_initrd() {
+// 	/* Assume only end is not page aligned */
+// 	uint64_t ramdisk_shift = boot_params.hdr.ramdisk_shift;
+// 	uint64_t ramdisk_image;
+// 	uint64_t ramdisk_size  = boot_params.hdr.ramdisk_size;
+// 	uint64_t ramdisk_end;
 
-#define RAMDISK_MAGIC 0xdf
-	if(boot_params.hdr.ramdisk_magic == RAMDISK_MAGIC)
-		ramdisk_image = boot_params.hdr.ramdisk_image + (ramdisk_shift << 32);
-	else
-		ramdisk_image = boot_params.hdr.ramdisk_image;
+// #define RAMDISK_MAGIC 0xdf
+// 	if(boot_params.hdr.ramdisk_magic == RAMDISK_MAGIC)
+// 		ramdisk_image = boot_params.hdr.ramdisk_image + (ramdisk_shift << 32);
+// 	else
+// 		ramdisk_image = boot_params.hdr.ramdisk_image;
 
-#define PAGE_SIZE		4096
-#define ALIGN(addr, align)	(((uintptr_t)(addr) + (align) - 1) & ~((align) - 1))
-#define PAGE_ALIGN(addr)	ALIGN(addr, PAGE_SIZE)
+// #define PAGE_SIZE		4096
+// #define ALIGN(addr, align)	(((uintptr_t)(addr) + (align) - 1) & ~((align) - 1))
+// #define PAGE_ALIGN(addr)	ALIGN(addr, PAGE_SIZE)
 
-	ramdisk_end = PAGE_ALIGN(ramdisk_image + ramdisk_size);
+// 	ramdisk_end = PAGE_ALIGN(ramdisk_image + ramdisk_size);
 
-	if(!boot_params.hdr.type_of_loader ||
-			!ramdisk_image || !ramdisk_size)
-		return;		/* No initrd provided by bootloader */
+// 	if(!boot_params.hdr.type_of_loader ||
+// 			!ramdisk_image || !ramdisk_size)
+// 		return;		/* No initrd provided by bootloader */
 
-	pnkc.initrd_start = ramdisk_image;
-	pnkc.initrd_end = ramdisk_end;
-}
+// 	pnkc.initrd_start = ramdisk_image;
+// 	pnkc.initrd_end = ramdisk_end;
+// }
 
-static void reserve_mmap() {
-	pnkc.smap_count = boot_params.e820_entries;
-	memcpy(pnkc.smap, boot_params.e820_map, sizeof(boot_params.e820_map));
-}
+// static void reserve_mmap() {
+// 	pnkc.smap_count = boot_params.e820_entries;
+// 	memcpy(pnkc.smap, boot_params.e820_map, sizeof(boot_params.e820_map));
+// }
 
 static void _main() {
 	init_kernel_stack();
@@ -294,4 +294,3 @@ void entry() {
 
 	jump_kernel();
 }
-
