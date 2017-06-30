@@ -40,7 +40,9 @@
 #include "pnkc.h"
 #include "mmap.h"
 #include "version.h"
+
 #include "rtc.h"
+#include "packet_dump.h"
 
 // Drivers
 #include "driver/pata.h"
@@ -135,7 +137,6 @@ void main() {
 	printf("\nInitializing malloc area...\n");
 	if(malloc_init()) goto error;
 
-	rtc_init();
 
 	mp_sync();	// Barrier #1
 	if(apic_id == 0) {
@@ -245,6 +246,16 @@ void main() {
 		printf("\nInitializing shell...\n");
 		if(shell_init()) goto error;
 
+		printf("\nInitializing Utilities... \n");
+		printf("\nPacket Dumper... \n");
+		if(packet_dump_init()) {
+			printf("Can't initialize Packet Dumper\n");
+		}
+
+		printf("\nReal Time Clock... \n");
+		if(rtc_init()) {
+			printf("Can't initialize Real Time Clock\n");
+		}
 	} else {
 		mp_sync();	// Barrier #2
 		ap_timer_init();

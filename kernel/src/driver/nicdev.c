@@ -16,6 +16,43 @@
 #define ETHER_MULTICAST		((uint64_t)1 << 40)	///< MAC address is multicast
 #define ID_BUFFER_SIZE		(MAX_NIC_DEVICE_COUNT * 8)
 
+
+static bool (*rx_process)(void* _data, size_t size, void* context);
+static void* rx_process_context;
+static bool (*tx_process)(void* _data, size_t size, void* context);
+static void* tx_process_context;
+static bool (*srx_process)(void* _data, size_t size, void* context);
+static void* srx_process_context;
+static bool (*stx_process)(void* _data, size_t size, void* context);
+static void* stx_process_context;
+
+int nicdev_process_register(bool (*process)(void*, size_t, void*), void* context, NICDEV_PROCESS_TYPE type) {
+	switch(type) {
+		case NICDEV_RX_PROCESS:
+			rx_process = process;
+			rx_process_context = context;
+			return 0;
+		case NICDEV_TX_PROCESS:
+			tx_process = process;
+			tx_process_context = context;
+			return 0;
+		case NICDEV_SRX_PROCESS:
+			srx_process = process;
+			srx_process_context = context;
+			return 0;
+		case NICDEV_STX_PROCESS:
+			stx_process = process;
+			stx_process_context = context;
+			return 0;
+		default:
+			return -1;
+	}
+}
+
+int nicdev_process_unregister(NICDEV_PROCESS_TYPE type) {
+	return nicdev_process_register(NULL, NULL, type);
+}
+
 typedef struct _Ether {
 	uint64_t dmac: 48;			///< Destination address (endian48)
 	uint64_t smac: 48;			///< Destination address (endian48)
@@ -235,77 +272,9 @@ VNIC* nicdev_update_vnic(NICDevice* nicdev, VNIC* src_vnic) {
 }
 
 
-#define likely(x)       __builtin_expect(!!(x), 1)
-#define unlikely(x)     __builtin_expect(!!(x), 0)
-
-// static uint8_t packet_debug_switch;
-// void nidev_debug_switch_set(uint8_t opt) {
-// 	packet_debug_switch = opt;
-// }
-
-// uint8_t nicdev_debug_switch_get() {
-// 	return packet_debug_switch;
-// }
-// inline static void packet_dump(void* _data, size_t size) {
-// 	if(unlikely(!!packet_debug_switch)) {
-// 		if(packet_debug_switch | NICDEV_DEBUG_PACKET_INFO) {
-// 			printf("Packet Lengh:\t%d\n", size);
-// 		}
-
-// 		Ether* eth = _data;
-// 		if(packet_debug_switch | NICDEV_DEBUG_PACKET_ETHER_INFO) {
-// 			printf("Ether Type:\t0x%04x\n", endian16(eth->type));
-// 			uint64_t dmac = endian48(eth->dmac);
-// 			uint64_t smac = endian48(eth->smac);
-// 			printf("%02x:%02x:%02x:%02x:%02x:%02x %02x:%02x:%02x:%02x:%02x:%02x\n",
-// 					(dmac >> 40) & 0xff, (dmac >> 32) & 0xff, (dmac >> 24) & 0xff,
-// 					(dmac >> 16) & 0xff, (dmac >> 8) & 0xff, (dmac >> 0) & 0xff,
-// 					(smac >> 40) & 0xff, (smac >> 32) & 0xff, (smac >> 24) & 0xff,
-// 					(smac >> 16) & 0xff, (smac >> 8) & 0xff, (smac >> 0) & 0xff);
-// 		}
-
-// 		if(packet_debug_switch | NICDEV_DEBUG_PACKET_VERBOSE_INFO) {
-// 			switch(eth->type) {
-// 				case ETHER_TYPE_IPv4:
-// 					break;
-// 				case ETHER_TYPE_ARP:
-// 					break;
-// 				case ETHER_TYPE_IPv6:
-// 					break;
-// 				case ETHER_TYPE_LLDP:
-// 					break;
-// 				case ETHER_TYPE_8021Q:
-// 					break;
-// 				case ETHER_TYPE_8021AD:
-// 					break;
-// 				case ETHER_TYPE_QINQ1:
-// 					break;
-// 				case ETHER_TYPE_QINQ2:
-// 					break;
-// 				case ETHER_TYPE_QINQ3:
-// 					break;
-// 			}
-// 		}
-
-// 		if(packet_debug_switch | NICDEV_DEBUG_PACKET_DUMP) {
-// 			uint8_t* data = (uint8_t*)_data;
-// 			for(size_t i = 0 ; i < size;) {
-// 				printf("\t0x%04x:\t", i);
-// 				for(size_t j = 0; j < 16 && i < size; j++, i++) {
-// 					printf("%02x ", data[i] & 0xff);
-// 				}
-// 				printf("\n");
-// 			}
-// 			printf("\n");
-// 		}
-// 	}
-// }
-
 /**
  * rx process 
  */
-static bool (*rx_process)(void* _data, size_t size);
-static bool (*tx_process)(void* _data, size_t size);
 
 int nicdev_rx(NICDevice* dev, void* data, size_t size) {
 	return nicdev_rx0(dev, data, size, NULL, 0);
@@ -321,7 +290,7 @@ int nicdev_rx0(NICDevice* nic_dev, void* data, size_t size,
 		return NICDEV_PROCESS_PASS;
 	uint64_t dmac = endian48(eth->dmac);
 
-	if(unlikely(!!rx_process)) rx_process(data, size);
+	if(unlikely(!!rx_process)) rx_process(data, size, rx_process_context);
 
 	if(dmac & ETHER_MULTICAST) {
 		for(i = 0; i < MAX_VNIC_COUNT; i++) {
@@ -342,9 +311,6 @@ int nicdev_rx0(NICDevice* nic_dev, void* data, size_t size,
 	return NICDEV_PROCESS_PASS;
 }
 
-static bool (*srx_process)(void* _data, size_t size);
-static bool (*stx_process)(void* _data, size_t size);
-
 int nicdev_srx(VNIC* vnic, void* data, size_t size) {
 	return nicdev_srx0(vnic, data, size, NULL, 0);
 }
@@ -357,7 +323,7 @@ int nicdev_srx0(VNIC* vnic, void* data, size_t size,
 		return NICDEV_PROCESS_PASS;
 	uint64_t smac = endian48(eth->smac);
 
-	if(unlikely(!!srx_process)) srx_process(data, size);
+	if(unlikely(!!srx_process)) srx_process(data, size, srx_process_context);
 
 	if(smac == vnic->mac) {
 		vnic_srx(vnic, (uint8_t*)eth, size, data_optional, size_optional);
@@ -375,7 +341,7 @@ typedef struct _TransmitContext{
 static bool transmitter(Packet* packet, void* context) {
 	if(!packet) return false;
 
-	if(unlikely(!!tx_process)) tx_process(packet->buffer + packet->start, packet->end - packet->start);
+	if(unlikely(!!tx_process)) tx_process(packet->buffer + packet->start, packet->end - packet->start, tx_process);
 
 	TransmitContext* transmitter_context = context;
 
@@ -428,7 +394,7 @@ int nicdev_tx(NICDevice* nicdev,
 static bool stransmitter(Packet* packet, void* context) {
 	if(!packet) return false;
 
-	if(unlikely(!!stx_process)) tx_process(packet->buffer + packet->start, packet->end - packet->start);
+	if(unlikely(!!stx_process)) tx_process(packet->buffer + packet->start, packet->end - packet->start, stx_process_context);
 
 	TransmitContext* transmitter_context = context;
 

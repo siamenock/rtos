@@ -1055,15 +1055,6 @@ static int cmd_arping(int argc, char** argv, void(*callback)(char* result, int e
 	return 0;
 }
 
-static int cmd_dump(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
-	static uint8_t opt = 0;
-	opt = opt ? 0 : 0xff;
-
-	//nidev_debug_switch_set(opt);
-
-	return 0;
-}
-
 static Command commands[] = {
 	{
 		.name = "manager_core",
@@ -1098,11 +1089,6 @@ static Command commands[] = {
 		.args = "address \"-I\" nic_name [\"-c\" count:u32]",
 		.func = cmd_arping
 	},
-	{
-		.name = "dump",
-		.desc = "Packet dump",
-		.func = cmd_dump
-	}
 };
 
 int manager_core_init(err_t (*_accept)(RPC* rpc)) {

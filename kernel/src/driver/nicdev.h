@@ -6,6 +6,9 @@
 #define MAX_NIC_DEVICE_COUNT	128
 #define MAX_NIC_NAME_LEN	16
 
+#define likely(x)       __builtin_expect(!!(x), 1)
+#define unlikely(x)     __builtin_expect(!!(x), 0)
+
 typedef struct _NICDevice{
 	char		name[MAX_NIC_NAME_LEN];
 	uint64_t	mac;
@@ -47,6 +50,16 @@ typedef struct {
 	bool 		(*add_vid)(NICDevice* nicdev, uint16_t vid);
 	bool 		(*remove_vid)(NICDevice* nicdev, uint16_t vid);
 } NICDriver;
+
+typedef enum _NICDEV_PROCESS_TYPE {
+		NICDEV_RX_PROCESS = 1,
+		NICDEV_TX_PROCESS,
+		NICDEV_SRX_PROCESS,
+		NICDEV_STX_PROCESS,
+} NICDEV_PROCESS_TYPE;
+
+int nicdev_process_register(bool (*process)(void*, size_t, void*), void* context, NICDEV_PROCESS_TYPE type);
+int nicdev_process_unregister(NICDEV_PROCESS_TYPE type);
 
 int nicdev_get_count();
 NICDevice* nicdev_create();
