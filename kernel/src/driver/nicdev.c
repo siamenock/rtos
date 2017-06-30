@@ -425,6 +425,17 @@ int nicdev_tx(NICDevice* nicdev,
 	return count;
 }
 
+static bool stransmitter(Packet* packet, void* context) {
+	if(!packet) return false;
+
+	if(unlikely(!!stx_process)) tx_process(packet->buffer + packet->start, packet->end - packet->start);
+
+	TransmitContext* transmitter_context = context;
+
+	if(!transmitter_context->process(packet, transmitter_context->context)) return false;
+
+	return true;
+}
 /**
  * @param dev NIC device
  * @param process function to process packets in NIC device
@@ -439,7 +450,7 @@ int nicdev_stx(VNIC *vnic,
 		.process = process,
 		.context = context};
 
-	VNICError ret = vnic_stx(vnic, transmitter, &transmitter_context);
+	VNICError ret = vnic_stx(vnic, stransmitter, &transmitter_context);
 
 	if (ret == VNIC_ERROR_OPERATION_FAILED)
 		return 0;

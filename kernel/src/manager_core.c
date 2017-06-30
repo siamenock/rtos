@@ -562,7 +562,7 @@ static void manager_close(struct tcp_pcb* pcb, RPC* rpc, bool is_force) {
 	if(is_force) {
 		tcp_abort(pcb);
 	} else if(tcp_close(pcb) != ERR_OK) {
-		printf("Cannot close pcb: %p %p\n", pcb, rpc);
+		printf("\tCannot close pcb: %p %p\n", pcb, rpc);
 		//tcp_poll(pcb, manager_poll, 2);
 	}
 }
@@ -591,7 +591,7 @@ static struct tcp_pcb* manager_netif_server_open(struct netif* netif, uint16_t p
 	struct tcp_pcb* tcp_pcb = tcp_new();
 	err_t err = tcp_bind(tcp_pcb, &ip_addr, port);
 	if(err != ERR_OK) {
-		printf("ERROR: Manager cannot bind TCP session: %d\n", err);
+		printf("\tERROR: Manager cannot bind TCP session: %d\n", err);
 
 		return false;
 	}
@@ -599,7 +599,7 @@ static struct tcp_pcb* manager_netif_server_open(struct netif* netif, uint16_t p
 	tcp_pcb = tcp_listen(tcp_pcb);
 	tcp_arg(tcp_pcb, tcp_pcb);
 
-	printf("Manager started: %d.%d.%d.%d:%d\n", ip_addr.addr & 0xff, (ip_addr.addr >> 8) & 0xff,
+	printf("\tManager started: %d.%d.%d.%d:%d\n", ip_addr.addr & 0xff, (ip_addr.addr >> 8) & 0xff,
 		(ip_addr.addr >> 16) & 0xff, (ip_addr.addr >> 24) & 0xff, port);
 
 	tcp_accept(tcp_pcb, manager_accept);
@@ -617,7 +617,7 @@ static bool manager_netif_server_close(struct tcp_pcb* tcp_pcb) {
 	}
 
 	if(tcp_close(tcp_pcb) != ERR_OK) {
-		printf("Cannot close manager server: %p", tcp_pcb);
+		printf("\tCannot close manager server: %p", tcp_pcb);
 
 		return false;
 	}
@@ -1140,7 +1140,6 @@ int manager_core_init(err_t (*_accept)(RPC* rpc)) {
 
     core_accept = _accept;
 
-	printf("Manager::Core Initialized\n");
 	return 0;
 }
 

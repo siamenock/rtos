@@ -47,10 +47,14 @@ found:
 	return true;
 }
 
-bool disk_init() {
+int disk_init() {
 	disks = map_create(DISK_MAX_DRIVERS * DISK_AVAIL_DEVICES, map_uint64_hash, map_uint64_equals, NULL);	
+	if(!disks) {
+		printf("\tCan't Allocate Disk Driver Map\n");
+		return -1;
+	}
 
-	return true;
+	return 0;
 }
 
 size_t disk_count() {

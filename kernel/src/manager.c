@@ -270,19 +270,23 @@ static Command commands[] = {
 // Entry Point of Manager
 // it calls each manager_core_init() `manager_core.c` of kernel's and tools/manager's
 int manager_init() {
-	int error;
-
-	error = manager_core_init(manager_accept);
-	if(error) return -1;
+	if(manager_core_init(manager_accept)) {
+		printf("\tCan't open manager server\n");
+		return -1;
+	}
 
 	manager_core = manager_core_server_open(MANAGER_DEFAULT_PORT);
-	if(!manager_core) return -2;
+	if(!manager_core) {
+		printf("\tCan't open manager server\n");
+		return -2;
+	}
 
 	vm_stdio_handler(stdio_callback);
 
-	error = cmd_register(commands, sizeof(commands) / sizeof(commands[0]));
-	if(error) return -3;
+	if(cmd_register(commands, sizeof(commands) / sizeof(commands[0]))) {
+		printf("\tCan't register command\n");
+		return -3;
+	}
 
-	printf("Manager Initialized\n");
 	return 0;
 }

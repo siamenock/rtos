@@ -330,10 +330,10 @@ void cmd_init(void) {
 	cmd_register(cmds, sizeof(cmds) / sizeof(cmds[0]));
 }
 
-bool cmd_register(Command* commands, size_t length) {
+int cmd_register(Command* commands, size_t length) {
 	/* Note: At this point, kernel is not ready to perform
 	 * print and/or malloc function */
-	if(!commands || !length) return false;
+	if(!commands || !length) return -1;
 
 	size_t oldsize = __commands_size;
 
@@ -346,7 +346,7 @@ bool cmd_register(Command* commands, size_t length) {
 
 	cmd_sort(oldsize);
 
-	return true;
+	return 0;
 }
 
 void cmd_unregister(Command* command) {

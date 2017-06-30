@@ -224,7 +224,7 @@ int main(int argc, char** argv) {
 	if(mapping_apic()) goto error;
 
 	printf("\nInitializing events...\n");
-	if(event_init()) goto error;
+	if(event_init() == false) goto error;
 
 	printf("\nInitializing I/O Multiplexer...\n");
 	if(io_mux_init() < 0) goto error;

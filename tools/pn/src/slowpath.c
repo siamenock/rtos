@@ -28,7 +28,6 @@ static int slowpath_read_handler(int fd, void* context) {
     if(size > 0) {
         //TODO Check MTU
 
-        printf("Packet SRX\n");
         nicdev_srx(vnic, buffer, size);
     }
 
@@ -39,8 +38,6 @@ static int slowpath_read_handler(int fd, void* context) {
 static bool packet_process(Packet* packet, void* context) {
     int fd = (int)(uint64_t)context;
     if(packet) {
-
-        printf("Packet STX\n");
         while(packet->end - packet->start) {
             packet->start += write(fd, packet->buffer + packet->start, packet->end - packet->start);
         }

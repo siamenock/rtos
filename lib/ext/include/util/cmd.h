@@ -44,7 +44,7 @@ extern CommandHistory	cmd_history;
 extern char		cmd_result[];
 
 extern void cmd_init();
-extern bool cmd_register(Command* commands, size_t length);
+extern int cmd_register(Command* commands, size_t length);
 extern void cmd_unregister(Command* command);
 extern int cmd_help(int argc, char** argv, void(*callback)(char* result, int exit_status));
 extern int cmd_exec(char* line, void(*callback)(char* result, int exit_status));

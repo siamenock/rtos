@@ -145,3 +145,36 @@ void vfio_poll(VM* _vm) {
 out:
 	vfio_do_request(fio, vaddr, paddr, pbuffer, pdir);
 }
+
+// static bool idle0_event(void* data) {
+// #ifdef VFIO_ENABLED
+// 	// Poll FIO
+// #define MAX_VM_COUNT	128
+// 	uint32_t vmids[MAX_VM_COUNT];
+// 	int vm_count = vm_list(vmids, MAX_VM_COUNT);
+// 	for(int i = 0; i < vm_count; i++) {
+// 		VM* vm = vm_get(vmids[i]);
+// 		VFIO* fio = vm->fio;
+// 		if(!fio)
+// 			continue;
+// 
+// 		if(!fio->input_addr)
+// 			continue;
+// 
+// 		// Check if user changed request_id on purpose, and fix it
+// 		if(fio->user_fio->request_id != fio->request_id + fifo_size(fio->input_addr))
+// 			fio->user_fio->request_id = fio->request_id + fifo_size(fio->input_addr);
+// 
+// 		// Check if there's something in the input fifo
+// 		if(fifo_size(fio->input_addr) > 0)
+// 			vfio_poll(vm);
+// 	}
+// #endif
+// 
+// 	// idle
+// 	for(int i = 0; i < 1000; i++)
+// 		asm volatile("nop");
+// 
+// 	idle_time += cpu_tsc() - time;
+// 	return true;
+// }

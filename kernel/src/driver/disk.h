@@ -51,7 +51,7 @@ typedef struct _DiskDriver {
 	void* 	priv;
 } DiskDriver;
 
-bool disk_init();
+int disk_init();
 bool disk_register(DiskDriver* driver, const char* cmdline);
 size_t disk_count();
 int disk_ids(uint32_t* ids, int size);
