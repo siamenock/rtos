@@ -881,6 +881,7 @@ static int cmd_interface(int argc, char** argv, void(*callback)(char* result, in
 		uint16_t vmid;
 		uint16_t vnic_index;
 		uint16_t interface_index;
+		// TODO use vnic's name
 		if(!parse_vnic_interface(argv[1], &vmid, &vnic_index, &interface_index))
 			return -1;
 

@@ -72,7 +72,7 @@ typedef struct _VNIC {
 	// Information
 	uint64_t	magic;			///< Magic
 	uint32_t	id;			///< NIC unique ID (unique ID in RTOS)
-	char		name[_IFNAMSIZ];
+	char		name[_IFNAMSIZ];	///< Interface name of this VNIC
 	uint64_t	mac;			///< MAC Address. (copied from NIC)
 	uint16_t	vlan_proto; 		///< VLAN Protocol
 	uint16_t	vlan_tci;   		///< VLAN TCI

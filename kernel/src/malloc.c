@@ -33,7 +33,7 @@ extern void* __malloc_pool;	// Defined in malloc.c from libcore
 
 int malloc_init() {
 	uint64_t start = (uint64_t)LOCAL_MALLOC_START;
-	uint64_t end = (uint64_t)LOCAL_MALLOC_END; 
+	uint64_t end = (uint64_t)LOCAL_MALLOC_END;
 
 	__malloc_pool = (void*)start;
 	init_memory_pool((uint32_t)(end - start), __malloc_pool, 0);
@@ -58,7 +58,7 @@ size_t malloc_used() {
 #if DEBUG
 void malloc_statistics() {
 	is_debug = false;
-	
+
 	printf("Caller                      Count             Size\n");
 	MapIterator iter;
 	map_iterator_init(&iter, statistics);
@@ -68,12 +68,12 @@ void malloc_statistics() {
 		if(s->count >= 2 || s->size > 2048)
 			printf("%p %16ld %16ld\n", entry->key, s->count, s->size);
 	}
-	
+
 	printf("usage: %ld/%ld\n", malloc_used(), malloc_total());
 	printf("tracing: class: %ld total: %ld\n", map_size(statistics), map_size(tracing));
 	printf("malloc/free count: %d - %d = %d\n", debug_malloc_count, debug_free_count, debug_malloc_count - debug_free_count);
 	debug_malloc_count = debug_free_count = 0;
-	
+
 	is_debug = true;
 }
 
@@ -81,23 +81,23 @@ void malloced(void* caller, size_t size, void* ptr) {
 	debug_malloc_count++;
 	if(is_debug) {
 		is_debug = false;
-		
+
 		if(!map_contains(statistics, caller)) {
 			Stat* stat = malloc(sizeof(Stat));
 			stat->count = 0;
 			stat->size = 0;
 			map_put(statistics, caller, stat);
 		}
-		
+
 		Stat* stat = map_get(statistics, caller);
 		stat->count++;
 		stat->size += size;
-		
+
 		Trace* trace = malloc(sizeof(Trace));
 		trace->caller = caller;
 		trace->size = size;
 		map_put(tracing, ptr, trace);
-		
+
 		is_debug = true;
 	}
 }
@@ -106,7 +106,7 @@ void freed(void* ptr) {
 	debug_free_count++;
 	if(is_debug) {
 		is_debug = false;
-		
+
 		Trace* trace = map_remove(tracing, ptr);
 		if(!trace) {
 			printf("ERROR: freeing never alloced pointer: %p from: %p\n", ptr, ((void**)read_rbp())[1]);
@@ -116,16 +116,16 @@ void freed(void* ptr) {
 			}
 			while(1) asm("hlt");
 		}
-		
+
 		Stat* stat = map_get(statistics, trace->caller);
 		if(stat == NULL) {
 			printf("ERROR: freeing not alloced pointer from: %p\n", ((void**)read_rbp())[1]);
 			while(1) asm("hlt");
 		}
-		
+
 		stat->count--;
 		stat->size -= trace->size;
-		
+
 		if(stat->count == 0 && stat->size == 0) {
 			map_remove(statistics, trace->caller);
 			free(stat);
@@ -133,9 +133,9 @@ void freed(void* ptr) {
 			printf("ERROR: malloc/free mismatching: count: %ld, size: %ld\n", stat->count, stat->size);
 			while(1) asm("hlt");
 		}
-		
+
 		free(trace);
-		
+
 		is_debug = true;
 	}
 }
@@ -144,29 +144,29 @@ void freed(void* ptr) {
 #if 0
 inline void* malloc(size_t size) {
 	void* ptr = __malloc(size, __malloc_pool);
-	
+
 	if(!ptr) {
 		// TODO: print to stderr
 		printf("Not enough local memory!!!\n");
 		printf("Requested size: %ld from %p\n", size, ((void**)read_rbp())[1]);
-		
+
 		#if DEBUG
 		malloc_statistics();
 		#endif /* DEBUG */
-		
+
 		while(1) asm("hlt");
 	}
-	
+
 	#if DEBUG
 	malloced(((void**)read_rbp())[1], size, ptr);
 	#endif /* DEBUG */
-	
+
 	return ptr;
 }
 
 inline void free(void* ptr) {
 	__free(ptr, __malloc_pool);
-	
+
 	#if DEBUG
 	freed(ptr);
 	#endif /* DEBUG */
