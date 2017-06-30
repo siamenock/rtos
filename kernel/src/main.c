@@ -41,8 +41,11 @@
 #include "mmap.h"
 #include "version.h"
 
+//
 #include "rtc.h"
 #include "packet_dump.h"
+#include "ver.h"
+//
 
 // Drivers
 #include "driver/pata.h"
@@ -80,20 +83,6 @@ static bool idle_hlt_event(void* data) {
 
 	return true;
 }
-
-static int print_version(int argc, char** argv, void(*callback)(char* result, int exit_status)) {
-	printf("%s\n", VERSION);
-
-	return 0;
-}
-
-static Command commands[] = {
-	{
-		.name = "version",
-		.desc = "Print the kernel version.",
-		.func = print_version
-	},
-};
 
 static void fixup_page_table(uint64_t offset) {
 	uint8_t apic_id = amp_get_apic_id();
@@ -256,6 +245,11 @@ void main() {
 		if(rtc_init()) {
 			printf("Can't initialize Real Time Clock\n");
 		}
+
+		printf("\nVersion... \n");
+		if(ver_init()) {
+			printf("Can't initialize Version\n");
+		}
 	} else {
 		mp_sync();	// Barrier #2
 		ap_timer_init();
@@ -285,7 +279,6 @@ void main() {
 	// 	                event_loop();
 	// 	}
 
-	cmd_register(commands, sizeof(commands) / sizeof(commands[0]));
 
 	while(1) event_loop();
 
