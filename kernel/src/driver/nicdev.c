@@ -1,5 +1,4 @@
 #include "nicdev.h"
-#include "string.h"
 
 #define ETHER_TYPE_IPv4		0x0800		///< Ether type of IPv4
 #define ETHER_TYPE_ARP		0x0806		///< Ether type of ARP
@@ -251,6 +250,7 @@ VNIC* nicdev_get_vnic_mac(NICDevice* nicdev, uint64_t mac) {
 	return NULL;
 }
 
+extern int strcmp(const char *s1, const char *s2);
 VNIC* nicdev_get_vnic_name(NICDevice* nicdev, char* name) {
 	if(!nicdev || !name) return NULL;
 
