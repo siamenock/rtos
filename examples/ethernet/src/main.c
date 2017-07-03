@@ -22,6 +22,17 @@ void process(NIC* ni) {
 		return;
 
 	Ether* ether = (Ether*)(packet->buffer + packet->start);
+	printf("dmac: %02x:%02x:%02x:%02x:%02x:%02x ",
+			(ether->dmac >> 0) & 0xff, (ether->dmac >> 8) & 0xff,
+			(ether->dmac >> 16) & 0xff, (ether->dmac >> 24) & 0xff,
+			(ether->dmac >> 32) & 0xff, (ether->dmac >> 40) & 0xff);
+	printf("smac: %02x:%02x:%02x:%02x:%02x:%02x",
+			(ether->smac >> 0) & 0xff, (ether->smac >> 8) & 0xff,
+			(ether->smac >> 16) & 0xff, (ether->smac >> 24) & 0xff,
+			(ether->smac >> 32) & 0xff, (ether->smac >> 40) & 0xff);
+	printf("type: %04x", endian16(ether->type));
+	printf("type: %d\n", (packet->end - packet->start) - ETHER_LEN);
+
 	if(endian16(ether->type) == ETHER_TYPE_ARP) {
 		ARP* arp = (ARP*)ether->payload;
 		if(endian16(arp->operation) == 1 && endian32(arp->tpa) == address) {
@@ -40,7 +51,6 @@ void process(NIC* ni) {
 		IP* ip = (IP*)ether->payload;
 		if(ip->protocol == IP_PROTOCOL_ICMP && endian32(ip->destination) == address) {
 			ICMP* icmp = (ICMP*)ip->body;
-
 			icmp->type = 0;
 			icmp->checksum = 0;
 			icmp->checksum = endian16(checksum(icmp, packet->end - packet->start - ETHER_LEN - IP_LEN));

@@ -36,49 +36,6 @@ void process(NIC* ni) {
 			nic_tx(ni, packet);
 			packet = NULL;
 		}
-	} else if(endian16(ether->type) == ETHER_TYPE_IPv4) {
-		IP* ip = (IP*)ether->payload;
-		if(ip->protocol == IP_PROTOCOL_ICMP && endian32(ip->destination) == address) {
-			ICMP* icmp = (ICMP*)ip->body;
-
-			icmp->type = 0;
-			icmp->checksum = 0;
-			icmp->checksum = endian16(checksum(icmp, packet->end - packet->start - ETHER_LEN - IP_LEN));
-
-			ip->destination = ip->source;
-			ip->source = endian32(address);
-			ip->ttl = endian8(64);
-			ip->checksum = 0;
-			ip->checksum = endian16(checksum(ip, ip->ihl * 4));
-
-			ether->dmac = ether->smac;
-			ether->smac = endian48(ni->mac);
-
-			nic_tx(ni, packet);
-			packet = NULL;
-		} else if(ip->protocol == IP_PROTOCOL_UDP) {
-			UDP* udp = (UDP*)ip->body;
-			if(endian16(udp->destination) == 7) {
-				uint16_t t = udp->destination;
-				udp->destination = udp->source;
-				udp->source = t;
-				udp->checksum = 0;
-
-				uint32_t t2 = ip->destination;
-				ip->destination = ip->source;
-				ip->source = t2;
-				ip->ttl = 0x40;
-				ip->checksum = 0;
-				ip->checksum = endian16(checksum(ip, ip->ihl * 4));
-
-				uint64_t t3 = ether->dmac;
-				ether->dmac = ether->smac;
-				ether->smac = t3;
-
-				nic_tx(ni, packet);
-				packet = NULL;
-			}
-		}
 	}
 
 	if(packet)
