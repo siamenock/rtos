@@ -93,7 +93,12 @@ static bool event(void* context) {
 	} else if(ret) {
 		if(FD_ISSET(STDIN_FILENO, (fd_set*)&temp) != 0) {
 			read(STDIN_FILENO, &a, 1);
-			stdio_putchar(a);
+			if(a == 127 || a == 8) {
+				stdio_putchar('\b');
+				stdio_putchar(' ');
+				stdio_putchar('\b');
+			} else
+				stdio_putchar(a);
 		}
 	}
 
