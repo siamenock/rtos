@@ -26,12 +26,12 @@ void process(NIC* ni) {
 			(ether->dmac >> 0) & 0xff, (ether->dmac >> 8) & 0xff,
 			(ether->dmac >> 16) & 0xff, (ether->dmac >> 24) & 0xff,
 			(ether->dmac >> 32) & 0xff, (ether->dmac >> 40) & 0xff);
-	printf("smac: %02x:%02x:%02x:%02x:%02x:%02x",
+	printf("smac: %02x:%02x:%02x:%02x:%02x:%02x ",
 			(ether->smac >> 0) & 0xff, (ether->smac >> 8) & 0xff,
 			(ether->smac >> 16) & 0xff, (ether->smac >> 24) & 0xff,
 			(ether->smac >> 32) & 0xff, (ether->smac >> 40) & 0xff);
-	printf("type: %04x", endian16(ether->type));
-	printf("type: %d\n", (packet->end - packet->start) - ETHER_LEN);
+	printf("type: %04x ", endian16(ether->type));
+	printf("payload: %d\n", (packet->end - packet->start) - ETHER_LEN);
 
 	if(endian16(ether->type) == ETHER_TYPE_ARP) {
 		ARP* arp = (ARP*)ether->payload;
