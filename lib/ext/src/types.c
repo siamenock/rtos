@@ -54,7 +54,7 @@ uint32_t parse_uint32(const char* val) {
 
 bool is_uint64(const char* val) {
 	char* end = NULL;
-	long int v = strtol(val, &end, 0);
+	long long int v = strtoll(val, &end, 0);
 
 	if(end == NULL || *end != '\0')
 		return false;
@@ -66,5 +66,5 @@ bool is_uint64(const char* val) {
 }
 
 uint64_t parse_uint64(const char* val) {
-	return strtol(val, NULL, 0);
+	return strtoll(val, NULL, 0);
 }

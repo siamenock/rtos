@@ -1188,7 +1188,7 @@ static int cmd_create(int argc, char** argv, void(*callback)(char* result, int e
 						printf("Mac must be uint64\n");
 						return -1;
 					}
-					nic->mac = parse_uint64(token);
+					nic->mac = strtoll(value, NULL, 16);
 				} else if(strcmp(token, "dev") == 0) {
 					nic->dev = malloc(strlen(token + 1));
 					strcpy(nic->dev, value);
