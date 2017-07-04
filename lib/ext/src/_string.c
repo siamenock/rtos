@@ -703,28 +703,30 @@ long int __strtol(const char *nptr, char **endptr, int base) {
 	char* p = (char*)nptr;
 	while(1) {
 		switch(base) {
-			case 16:
-				if(*p >= 'a' && *p <= 'f') {
-					value = value * base + *(p++) - 'a' + 10;
-					continue;
-				} else if(*p >= 'A' && *p <= 'F') {
-					value = value * base + *(p++) - 'A' + 10;
-					continue;
-				}
-			case 10:
-				if(*p >= '0' && *p <= '9') {
-					value = value * base + *(p++) - '0';
-					continue;
-				}
-			case 8:
-				if(*p >= '0' && *p <= '7') {
-					value = value * base + *(p++) - '0';
-					continue;
-				}
+		case 16:
+			if(*p >= '0' && *p <= '9') {
+				value = value * base + *(p++) - '0';
+			} else if(*p >= 'a' && *p <= 'f') {
+				value = value * base + *(p++) - 'a' + 10;
+			} else if(*p >= 'A' && *p <= 'F') {
+				value = value * base + *(p++) - 'A' + 10;
+			}
+			break;
+		case 10:
+			if(*p >= '0' && *p <= '9') {
+				value = value * base + *(p++) - '0';
+			}
+			break;
+		case 8:
+			if(*p >= '0' && *p <= '7') {
+				value = value * base + *(p++) - '0';
+			}
+			break;
 		}
 
-		if(endptr != NULL)
-			*endptr = p;
+		if(*p) continue;
+
+		if(endptr) *endptr = p;
 
 		return value;
 	}
@@ -750,28 +752,30 @@ long long int __strtoll(const char *nptr, char **endptr, int base) {
 	char* p = (char*)nptr;
 	while(1) {
 		switch(base) {
-			case 16:
-				if(*p >= 'a' && *p <= 'f') {
-					value = value * base + *(p++) - 'a' + 10;
-					continue;
-				} else if(*p >= 'A' && *p <= 'F') {
-					value = value * base + *(p++) - 'A' + 10;
-					continue;
-				}
-			case 10:
-				if(*p >= '0' && *p <= '9') {
-					value = value * base + *(p++) - '0';
-					continue;
-				}
-			case 8:
-				if(*p >= '0' && *p <= '7') {
-					value = value * base + *(p++) - '0';
-					continue;
-				}
+		case 16:
+			if(*p >= '0' && *p <= '9') {
+				value = value * base + *(p++) - '0';
+			} else if(*p >= 'a' && *p <= 'f') {
+				value = value * base + *(p++) - 'a' + 10;
+			} else if(*p >= 'A' && *p <= 'F') {
+				value = value * base + *(p++) - 'A' + 10;
+			}
+			break;
+		case 10:
+			if(*p >= '0' && *p <= '9') {
+				value = value * base + *(p++) - '0';
+			}
+			break;
+		case 8:
+			if(*p >= '0' && *p <= '7') {
+				value = value * base + *(p++) - '0';
+			}
+			break;
 		}
 
-		if(endptr != NULL)
-			*endptr = p;
+		if(*p) continue;
+
+		if(endptr) *endptr = p;
 
 		return value;
 	}
