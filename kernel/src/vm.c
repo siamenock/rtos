@@ -1191,7 +1191,6 @@ static int cmd_create(int argc, char** argv, void(*callback)(char* result, int e
 					}
 					nic->mac = strtoll(value, NULL, 16);
 				} else if(strcmp(token, "dev") == 0) {
-					nic->dev = malloc(strlen(token + 1));
 					strcpy(nic->dev, value);
 				} else if(strcmp(token, "ibuf") == 0) {
 					if(!is_uint32(value)) {

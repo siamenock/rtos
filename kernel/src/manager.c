@@ -51,7 +51,7 @@ static void vm_get_handler(RPC* rpc, uint32_t vmid, void* context, void(*callbac
 		VNIC* vnic = vm->nics[i];
 		NICSpec* nicspec = &spec.nics[i];
 		nicspec->mac = vnic->mac;
-		nicspec->dev = vnic->parent;
+		strcpy(nicspec->dev, vnic->parent);
 		nicspec->budget = vnic->budget;
 		nicspec->input_buffer_size = vnic->rx.size;
 		nicspec->output_buffer_size = vnic->tx.size;
