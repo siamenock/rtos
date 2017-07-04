@@ -82,6 +82,11 @@ static bool event(void* context) {
 	tv.tv_usec = 0;
 	char a;
 
+	struct termios termios;
+	tcgetattr(STDIN_FILENO, &termios);
+	termios.c_lflag &= ~(ICANON | ECHO);
+	tcsetattr(STDIN_FILENO, TCSANOW, &termios);
+
 	fd_set temp;
 	fsync(STDIN_FILENO);
 	FD_ZERO(&temp);
