@@ -252,7 +252,7 @@ static int request_scan_all_interfaces(int socket) {
 	error = (int)sendmsg(socket, (struct msghdr *) &rtnl_msg, 0);
 	if(error <= 0) return 3;
 
-	return error;
+	return 0;
 }
 
 int netob_init() {
