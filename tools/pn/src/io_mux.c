@@ -31,14 +31,14 @@ bool io_mux_poll(void* context) {
 
             //Read Handle
             if(FD_ISSET(io_mux->fd, &read_fds)) {
-                if(io_mux->read_handler(io_mux->fd, io_mux->context) < 0) {
+                if(io_mux->read_handler && io_mux->read_handler(io_mux->fd, io_mux->context) < 0) {
                     perror("IO Mux Read Error\n");
                 }
             }
 
             //Write Handle
             if(FD_ISSET(io_mux->fd, &write_fds)) {
-                if(io_mux->write_event(io_mux->fd, io_mux->context) < 0) {
+                if(io_mux->write_event && io_mux->write_event(io_mux->fd, io_mux->context) < 0) {
                     perror("IO Mux Read Error\n");
                 }
             }
