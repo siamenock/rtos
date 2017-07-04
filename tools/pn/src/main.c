@@ -42,6 +42,8 @@
 #include "symbols.h"
 #include "io_mux.h"
 
+#include "ver.h"
+
 static int _timer_init(char* cpu_brand) {
 	uint64_t _frequency;
 	if(strstr(cpu_brand, "Intel") != NULL && strstr(cpu_brand, "@ ") != NULL) {
@@ -142,8 +144,6 @@ static int _timer_init(char* cpu_brand) {
 	return 0;
 }
 
-static Device* devices[MAX_NIC_DEVICE_COUNT];
-
 static int ensure_single_instance() {
 	int lockfile = open("/tmp/pnd.lock", O_RDONLY | O_CREAT, 0444);
 	if(lockfile == -1) return 1;
@@ -243,6 +243,11 @@ int main(int argc, char** argv) {
 
 	printf("\nInitializing shell...\n");
 	if(shell_init()) goto error;
+
+	printf("\nVersion... \n");
+	if(ver_init()) {
+		printf("Can't initialize Version\n");
+	}
 
 	while(1) event_loop();
 
