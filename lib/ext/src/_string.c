@@ -688,7 +688,6 @@ static int is_space(const char c) {
 		case ' ' :
 		case '\t':
 		case '\v':
-		case '\v':
 		case '\f':
 		case '\r':
 			return 1;
