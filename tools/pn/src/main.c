@@ -248,6 +248,7 @@ int main(int argc, char** argv) {
 	if(ver_init()) {
 		printf("Can't initialize Version\n");
 	}
+	mp_sync(); // Barrier #3
 
 	while(1) event_loop();
 
