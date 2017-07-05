@@ -706,7 +706,7 @@ uint32_t vm_create(VMSpec* vm_spec) {
 
 		memset(vm->nics, 0, sizeof(VNIC) * vm->nic_count);
 		for(int i = 0; i < vm->nic_count; i++) {
-			NICDevice* nic_dev = nics[i].dev ? nicdev_get(nics[i].dev) : nicdev_get_by_idx(0);
+			NICDevice* nic_dev = strlen(nics[i].dev) ? nicdev_get(nics[i].dev) : nicdev_get_by_idx(0);
 			if(!nic_dev) {
 				printf("Manager: Invalid NIC device\n");
 				goto fail;
@@ -873,11 +873,11 @@ static bool status_changed(uint64_t event_type, void* event, void* context) {
 	return false;
 }
 
-void vm_status_set(uint32_t vmid, int status, VM_STATUS_CALLBACK callback, void* context) {
+bool vm_status_set(uint32_t vmid, int status, VM_STATUS_CALLBACK callback, void* context) {
 	VM* vm = map_get(vms, (void*)(uint64_t)vmid);
 	if(!vm) {
 		callback(false, context);
-		return;
+        return false;
 	}
 
 	int icc_type = 0;
@@ -887,7 +887,7 @@ void vm_status_set(uint32_t vmid, int status, VM_STATUS_CALLBACK callback, void*
 			printf("VM Status start\n");
 			if(vm->status != VM_STATUS_STOP) {
 				callback(false, context);
-				return;
+                return false;
 			}
 			event_type = EVENT_VM_STARTED;
 			icc_type = ICC_TYPE_START;
@@ -895,7 +895,7 @@ void vm_status_set(uint32_t vmid, int status, VM_STATUS_CALLBACK callback, void*
 		case VM_STATUS_PAUSE:
 			if(vm->status != VM_STATUS_START) {
 				callback(false, context);
-				return;
+                return false;
 			}
 			event_type = EVENT_VM_PAUSED;
 			icc_type = ICC_TYPE_PAUSE;
@@ -903,7 +903,7 @@ void vm_status_set(uint32_t vmid, int status, VM_STATUS_CALLBACK callback, void*
 		case VM_STATUS_RESUME:
 			if(vm->status != VM_STATUS_PAUSE) {
 				callback(false, context);
-				return;
+                return false;
 			}
 			event_type = EVENT_VM_RESUMED;
 			icc_type = ICC_TYPE_RESUME;
@@ -912,7 +912,7 @@ void vm_status_set(uint32_t vmid, int status, VM_STATUS_CALLBACK callback, void*
 			printf("VM Status stop\n");
 			if(vm->status != VM_STATUS_PAUSE && vm->status != VM_STATUS_START) {
 				callback(false, context);
-				return;
+                return false;
 			}
 			event_type = EVENT_VM_STOPPED;
 			icc_type = ICC_TYPE_STOP;
@@ -927,8 +927,10 @@ void vm_status_set(uint32_t vmid, int status, VM_STATUS_CALLBACK callback, void*
 	}
 
 	CallbackInfo* info = malloc(sizeof(CallbackInfo));
-	if(!info)
-		return;
+	if(!info) {
+        callback(false, context);
+        return false;
+    }
 	info->callback = callback;
 	info->context = context;
 	info->status = status;
@@ -953,6 +955,8 @@ void vm_status_set(uint32_t vmid, int status, VM_STATUS_CALLBACK callback, void*
 			icc_send(msg, vm->cores[i]);
 		}
 	}
+
+    return true;
 }
 
 VMStatus vm_status_get(uint32_t vmid) {
@@ -1191,7 +1195,7 @@ static int cmd_create(int argc, char** argv, void(*callback)(char* result, int e
 					}
 					nic->mac = strtoll(value, NULL, 16);
 				} else if(strcmp(token, "dev") == 0) {
-					strcpy(nic->dev, value);
+					strncpy(nic->dev, value, MAX_NIC_NAME_LEN - 1);
 				} else if(strcmp(token, "ibuf") == 0) {
 					if(!is_uint32(value)) {
 						printf("Ibuf must be uint32\n");
@@ -1418,7 +1422,6 @@ static int cmd_status_set(int argc, char** argv, void(*callback)(char* result, i
 	}
 
 	shell_sync();
-
 	vm_status_set(vmid, status, status_setted, callback);
 
 	return 0;

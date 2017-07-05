@@ -113,7 +113,7 @@ typedef void(*VM_STATUS_CALLBACK)(bool, void*);
  * @param callback status callback
  * @param context callback context
  */
-void vm_status_set(uint32_t vmid, int status, VM_STATUS_CALLBACK callback, void* context);
+bool vm_status_set(uint32_t vmid, int status, VM_STATUS_CALLBACK callback, void* context);
 
 /**
  * Get the status of the VM
