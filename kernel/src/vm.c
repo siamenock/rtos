@@ -1299,11 +1299,6 @@ static int cmd_create(int argc, char** argv, void(*callback)(char* result, int e
 		callback(cmd_result, 0);
 	}
 
-	for(int i = 0; i < vm.nic_count; i++) {
-		if(vm.nics[i].dev)
-			free(vm.nics[i].dev);
-	}
-
 	free(vm.argv);
 	return 0;
 }
