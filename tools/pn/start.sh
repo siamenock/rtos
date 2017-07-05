@@ -9,3 +9,4 @@ sudo modprobe msr
 sudo ./pnd $BOOT_PARAM
 sudo rmmod msr
 sudo rmmod dispatcher
+stty echo icanon

@@ -82,7 +82,7 @@ static int vm_create(int argc, char* argv[]) {
 				// Default NIC configuration
 				NICSpec* nic = &vm.nics[vm.nic_count];
 				nic->mac = 0;
-				nic->dev = "eth0";
+				strcpy(nic->dev, "eth0");
 				nic->input_buffer_size = 1024;
 				nic->output_buffer_size = 1024;
 				nic->input_bandwidth = 1000000000; /* 1 GB */
@@ -99,7 +99,7 @@ static int vm_create(int argc, char* argv[]) {
 							nic->mac = strtoll(value, NULL, 16);
 							break;
 						case DEV:
-							nic->dev = value;
+							strcpy(nic->dev, value);
 							break;
 						case IBUF:
 							nic->input_buffer_size = atol(value);

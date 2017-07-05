@@ -278,12 +278,6 @@ static int read_vm(RPC* rpc, VMSpec** vm2) {
 			char* ch;
 			uint16_t len2;
 			READ2(read_string(rpc, &ch, &len2), failed);
-			vm->nics[i].dev = (char*)malloc(len2 + 1);
-			if(!vm->nics[i].dev) {
-				failed();
-				return -10;
-			}
-			memset(vm->nics[i].dev, 0x0, len2 + 1);
 			memcpy(vm->nics[i].dev, ch, len2);
 
 			READ2(read_uint32(rpc, &vm->nics[i].input_buffer_size), failed);

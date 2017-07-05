@@ -2,6 +2,7 @@
 #define __CONTROL_VMSPEC_H__
 
 #include <stdint.h>
+#include <nic.h>
 
 typedef enum {
 	VM_STATUS_STOP		= 0,
@@ -19,7 +20,7 @@ typedef enum {
 
 typedef struct {
 	uint64_t	mac;
-	char*		dev;
+	char		dev[MAX_NIC_NAME_LEN];
 	uint16_t	budget;
 	uint32_t	input_buffer_size;
 	uint32_t	output_buffer_size;
