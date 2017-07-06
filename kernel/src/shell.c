@@ -137,9 +137,6 @@ void shell_callback() {
 }
 
 int shell_init() {
-	printf("\nPacketNgin ver %s\n", VERSION);
-	printf("# ");
-
 	extern Device* device_stdin;
 	((CharIn*)device_stdin->driver)->set_callback(device_stdin->id, shell_callback);
 	cmd_sync = false;

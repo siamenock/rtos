@@ -236,17 +236,17 @@ void main() {
 		if(shell_init()) goto error;
 
 		printf("\nInitializing Utilities... \n");
-		printf("\nPacket Dumper... \n");
+		printf("\nInitializing Packet Dumper... \n");
 		if(packet_dump_init()) {
 			printf("Can't initialize Packet Dumper\n");
 		}
 
-		printf("\nReal Time Clock... \n");
+		printf("\nInitializing Real Time Clock... \n");
 		if(rtc_init()) {
 			printf("Can't initialize Real Time Clock\n");
 		}
 
-		printf("\nVersion... \n");
+		printf("\nInitializing Version... \n");
 		if(ver_init()) {
 			printf("Can't initialize Version\n");
 		}

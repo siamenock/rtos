@@ -244,7 +244,7 @@ int main(int argc, char** argv) {
 	printf("\nInitializing shell...\n");
 	if(shell_init()) goto error;
 
-	printf("\nVersion... \n");
+	printf("\nInitializing Version... \n");
 	if(ver_init()) {
 		printf("Can't initialize Version\n");
 	}

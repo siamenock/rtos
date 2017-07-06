@@ -19,6 +19,9 @@ static Command commands[] = {
 };
 
 int ver_init() {
+	print_version(0, NULL, NULL);
+	printf("# ");
+
 	if(cmd_register(commands, sizeof(commands) / sizeof(commands[0]))) return -1;
 
 	return 0;
